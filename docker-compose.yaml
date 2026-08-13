@@ -1,0 +1,120 @@
+# 47 §1(c) — **評価用**の最小 compose。
+#
+#   > **(c) `docker-compose.yaml`** — 評価用。`gx serve`コンテナ + ledger用named volume（`gx-log`の
+#   > 追記専用tile store永続化）の最小構成。単一マシンでの動作確認・PoC・小口顧客の初回導入を意図する
+#
+# 47 §6 makes this and the single static binary the **only** two v0.1-required artefacts. There is no
+# signed image (47 §1(b)) and no Helm chart (47 §1(d)) in this repository, and req/88 §1 N-10 keeps
+# T3 (K8s) and T4 (air-gapped) out of M6 altogether.
+#
+# ---------------------------------------------------------------------------
+# 🔴 The loopback problem, which is the interesting part of this file
+# ---------------------------------------------------------------------------
+#
+# `gx serve` **refuses to bind anywhere but loopback**, without an override flag. That is not an
+# oversight; it is §53 M6H6-6 採(a):
+#
+#   > **M6H6-6 採(a) v0.1**: 非 loopback bind の無条件拒否。(b) `--allow-remote-bind` は authorization
+#   > 実装と同窓
+#
+# v0.1 has no authorization layer (M5H6-4 採(a)): the Bearer token is one static string and no
+# request is tied to an `Actor`, so a socket on a routable interface is a socket on which anyone can
+# `cancel` somebody else's transformation.
+#
+# Docker's ordinary `ports:` publishing **cannot work under that rule**. Publishing forwards the
+# host's port to the container's network namespace, and a process listening on that namespace's
+# `127.0.0.1` is not reachable from it — the container would start, `gx serve` would be running, and
+# `curl` would be refused. Two ways out exist and this file takes the first:
+#
+#   1. **`network_mode: host`** (this file). The container shares the host's network namespace, so
+#      the loopback `gx serve` binds to *is the evaluator's own loopback* and `127.0.0.1:8080` works
+#      from the host with the fail-closed rule completely intact. This is exactly 47 §1(c)'s stated
+#      audience — 「単一マシンでの動作確認・PoC」 — and on a single machine host networking is not a
+#      compromise, it is the shape of the deployment.
+#      Caveat, because it is a real one: host networking is native on Linux and is a **recent and
+#      optional** feature of Docker Desktop on Windows and macOS. On a Desktop without it, this file
+#      starts the container and the port is not reachable from the host.
+#   2. **M6H6-6 (b)'s `--allow-remote-bind`**, which does not exist in v0.1 and whose window §53 tied
+#      to the authorization work. A compose that published a port would need it.
+#
+# 🔴 So 47 §1(c) and M6H6-6 採(a) are in tension, and this is the first artefact where the tension is
+# load-bearing rather than theoretical. req/95 raises it (**M6H7**), because 「compose で配る」 and
+# 「loopback 以外を拒む」 cannot both be unconditional. Note also that M5H6-4(b)'s firing condition —
+# 「HTTP が loopback 以外に bind される時」 — is what a published port *is*: an operator who reaches
+# for `ports:` here has met the condition, and the refusal is what makes them notice.
+#
+# ---------------------------------------------------------------------------
+# Before `up`: two things this file cannot do for you
+# ---------------------------------------------------------------------------
+#
+#   * `docker compose build` needs the measured static binary at
+#     `target/x86_64-unknown-linux-gnu/release/gx` (see `Dockerfile`, and `tools/m6h7_dist.sh
+#     static` for the build and its `readelf` evidence).
+#   * `gx serve` refuses to start without a Bearer token (44 §2.5 是 「必須」) and without a signing
+#     key. Create both into the volume once:
+#
+#       docker compose run --rm gx key gen --out /project/.gx/keys/engine.json
+#       printf 'a-token-you-chose' > ./gx-token
+#
+#     The token is passed as a **path** and not as a value: `--token-file` exists so that the secret
+#     does not appear in `ps` (M6H6-8 = E-M6-23).
+
+services:
+  gx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: glovrex/gx:0.1.0-dev
+    # See the header. `ports:` is deliberately absent.
+    network_mode: host
+    # 44 §1.1's verb, with the flags 44 §1.2 and E-M6-23 give it. `--bind` is the default and is
+    # written out so that a reader does not have to know what the default is.
+    command:
+      - serve
+      - --bind
+      - 127.0.0.1:8080
+      - --token-file
+      - /run/secrets/gx-token
+      # 🔴 The engine signing key, by id. E-M6-7 gives `.gx/config.toml` an
+      # `engine_signing_keyid = "…"` slot and `gx serve` reads it — but **no command writes it**, and
+      # a `scratch` image has no shell to write it with, so a fresh volume has no way to record the
+      # value. Passing the id here is the workaround, not the design; req/95 raises the missing
+      # writer. The id is per deployment (it is derived from the key `gx key gen` drew), so it comes
+      # from the environment rather than being baked in:
+      #
+      #   GX_SIGNING_KEY_ID=$(docker compose run --rm gx key gen --json | jq -r .key_id)
+      #   GX_SIGNING_KEY_ID=$GX_SIGNING_KEY_ID docker compose up -d
+      - --signing-key
+      - ${GX_SIGNING_KEY_ID:?run `docker compose run --rm gx key gen --json` first and export its key_id}
+    environment:
+      # 🔴 req/56 §3 puts private keys in the **user home** — 「秘密鍵=`~/.gx/keys/`(user home・0600)。
+      # project 側は**公開 keyid の参照のみ**」 — and a `scratch` image has no `/etc/passwd`, so
+      # nothing resolves a home for it. `KeyStore::user` refuses to guess (it errors when neither
+      # `HOME` nor `USERPROFILE` is set), which is the right refusal and makes this line mandatory
+      # rather than optional.
+      HOME: /home/gx
+    volumes:
+      # 🔴 The keys are a **second** volume, and the separation is req/56 §3's rather than tidiness:
+      # a backup of the ledger volume (47 §4's runbook) must not carry the signing key with it.
+      - gx-keys:/home/gx/.gx/keys
+      # 47 §1(c)'s named volume: the append-only tile store and everything else req/56 §2 puts under
+      # `.gx/` (ledger, checkpoints, evidence, receipts, index, drafts, config.toml, VERSION).
+      # 🔴 One volume for the whole directory rather than one per subdirectory: 47 §4's backup
+      # runbook is 「tile storeのファイルレベルsnapshot取得」 followed by `gx log consistency`, and a
+      # snapshot that captured the ledger without the checkpoints it is verified against would be a
+      # backup that cannot be checked.
+      - gx-state:/project/.gx
+      # The token, read-only, as a file. Not an environment variable: an env var is visible to every
+      # process in the namespace and is printed by `docker inspect`.
+      - ./gx-token:/run/secrets/gx-token:ro
+    # The binary is static and the image is `scratch`: there is no shell, so a `healthcheck` with a
+    # `CMD-SHELL` test would fail for the wrong reason. `GET /healthz` is 44 §2.6's unauthenticated
+    # endpoint and hand 6 made shutdown stage 1 cover it deliberately — a load balancer's health
+    # check is the first request that must stop succeeding when a server is leaving. Checking it
+    # needs a client the image does not carry, so the check is left to the operator rather than
+    # written as a line that would always report unhealthy.
+    restart: unless-stopped
+
+volumes:
+  gx-state:
+  gx-keys:

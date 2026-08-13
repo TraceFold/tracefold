@@ -1,0 +1,18 @@
+{
+  "id": "S-AI31",
+  "kind": "codec-deviation",
+  "statement": "major type 7 の break stop code(additional-info 31)単体は decode されない",
+  "vector": "ff",
+  "expected": "REJECT",
+  "expected_error": "IndefiniteLength",
+  "normative_basis": "IPLD-SHOULD+gx-policy",
+  "tier": "Tier2",
+  "deviation": "`ff` は不定長 item を閉じる break stop code で、開いている不定長 item が無い場所には現れない。42 §2.1-3 が不定長を禁じる以上 gx には開く道が無く、したがって閉じる道も無い。P-3(`7f6161ff`)は不定長 text string=head 経路の ai 31 を踏むが、この vector は major 7 経路の ai 31 を踏む——同じ additional-info が別の関数の別 arm で判定される事の判別。",
+  "spec_anchor": "RFC 8949 §3.2.1(break stop code) / ipld/ipld@a65340b spec.md L59 / 42 §2.1-3",
+  "origin": "gx self-authored for the fix hand (req/38 §16 H6-4)",
+  "control": {
+    "vector": "f6",
+    "expected": "ACCEPT",
+    "note": "同じ major 7 で gx が admit する値=null(ai 22)"
+  }
+}

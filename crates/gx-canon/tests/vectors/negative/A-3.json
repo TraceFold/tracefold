@@ -1,0 +1,17 @@
+{
+  "id": "A-3",
+  "kind": "codec-deviation",
+  "statement": "major type 2〜5 の長さを最短でない形で書いた byte 列は decode されない",
+  "vector": "780161",
+  "expected": "REJECT",
+  "normative_basis": "IPLD-SHOULD+gx-policy",
+  "tier": "Tier2",
+  "deviation": "長さ 1 のテキスト文字列 \"a\" は major 3・ai 直値の `6161` が最短。ai=24 形式に冗長化した。",
+  "spec_anchor": "ipld/ipld@a65340b spec.md L56 / RFC 8949 §4.2.1(a) / 42 §2.1-1 / req/33 §2 A-3",
+  "origin": "gx self-authored from spec (req/33 §2)",
+  "control": {
+    "vector": "6161",
+    "expected": "ACCEPT",
+    "note": "同じ文字列 \"a\" の最短形"
+  }
+}

@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/gx-core",
+    "crates/gx-canon",
+    "crates/gx-witness",
+    "crates/gx-gate",
+    "crates/gx-log",
+    "crates/gx-substrate",
+    "crates/gx-substrate-conformance",
+    "crates/gx-adapter-fs",
+    "crates/gx-adapter-git",
+    "crates/gx-adapter-mcp",
+    "crates/gx-engine",
+    "crates/gx-cli",
+    "crates/gx-api",
+]
+
+# `probes/doubt` is not a member of this workspace. It is a path-dependency test crate that
+# depends on the private development tree (`Glovrex_Alpha`), which is not part of this
+# repository. Test probes against that tree are maintained in the development tree, not here.
+
+# 🔴 卓-1 採 (req/38 §47, 規律51 形): 「MSRV=1.89 宣言採。根拠=cedar 4.12 の実測要求(M3 手 1)+
+# rust-toolchain.toml 1.97.1 pin 済/時期=M6 手 1 で `rust-version` を Cargo.toml へ/可逆=1 行」.
+#
+# 41 §2 と 33 NFR-023 は 1.85+ と書き、M3 手 1 が cedar-policy 4.12 の実要求を 1.89 と実測した。
+# 二つの数字のうち **build が通る方**が真であって、宣言だけが 1.85 のままだった間は、1.85 の runner
+# で build できると言いながら実際は落ちる状態だった——NFR-023 の CI job (`cargo msrv verify` 相当)が
+# まだ無いので、その嘘を捕まえる gate も無かった。
+#
+# `[workspace.package]` に 1 度だけ書き、12 member は `rust-version.workspace = true` で継承する。
+# 12 箇所に同じ数字を書くのは 3 宣言 1 実測(M5H1-7)が防いだ形そのもの——数字が複数箇所に在って何とも
+# 比較されていなければ、それは複数の数字である。
+[workspace.package]
+rust-version = "1.89"

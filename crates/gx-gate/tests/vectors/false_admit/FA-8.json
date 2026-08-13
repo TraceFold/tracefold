@@ -1,0 +1,32 @@
+{
+  "id": "FA-8",
+  "kind": "false-admit",
+  "statement": "evidence が付いていても、拒否される変換が admit されてはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "fs-deny-etc",
+    "code": "POLICY_DENIED"
+  },
+  "request": {
+    "substrate": "fs",
+    "locator": "/etc/passwd",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 2
+  },
+  "why": "ASM-60-1 は evidence を `context.evidence_count` / `evidence_kinds` として policy に見せる。∴ 「evidence が在れば通す」型の節が pack に混ざる、または mapping が evidence を permit 側の条件に流す形になると、forbid が在るのに admit される。11 §4 の 3 項目め(evidence 要件)は**通す理由**ではなく**足す条件**である、という向きを固定する 1 本。",
+  "spec_anchor": "11 §4 / req/38 §19 M3-07 / ASM-60-1(req/62 §2 の写像表)",
+  "origin": "gx self-authored for M3 hand 6",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "/tmp/x",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 2
+    },
+    "expected": "MUST_ADMIT",
+    "note": "同じ evidence を許可域の locator に付けた形。evidence の有無ではなく locator が答えを決めている事の対照で、evidence を要求する節が pack に入った日にはこちらが赤くなる(=出荷 pack の変化が見える)"
+  }
+}

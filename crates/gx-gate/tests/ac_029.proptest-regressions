@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc cd2ea5a61054cd95f145885dc78b5869d44ea778d35f15849e278d4ad0cb04db # shrinks to order = 0, locator = "/etc/passwd", invert_available = false

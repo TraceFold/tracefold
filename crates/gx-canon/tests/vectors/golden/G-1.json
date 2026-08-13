@@ -1,0 +1,12 @@
+{
+  "id": "G-1",
+  "kind": "golden",
+  "statement": "Cid は 32 byte の byte-string(major type 2)として載り、tag も自己記述も付かない",
+  "type": "Cid",
+  "value": "gx1:aaaqeayeaudaocajbifqydiob4ibceqtcqkrmfyydenbwha5dypq",
+  "hex": "5820000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "expected": "ACCEPT",
+  "spec_anchor": "42 §1.1 / 42 §2.1-5",
+  "origin": "gx self-authored; hex は RFC 8949 §3 の major-type/additional-info 表と 42 §2.1 の 6 規則から手で組み立てた(encoder 出力からの複写ではない)",
+  "note": "42 §1.1「バイナリ埋め込み（DAG-CBOR内部）では32byte byte-string（major type 2）として直接格納」。array of 32 integers ではない。"
+}

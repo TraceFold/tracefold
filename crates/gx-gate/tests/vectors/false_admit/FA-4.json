@@ -1,0 +1,32 @@
+{
+  "id": "FA-4",
+  "kind": "false-admit",
+  "statement": "末尾に / を足しただけの /etc/ も admit してはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "fs-deny-etc",
+    "code": "POLICY_DENIED"
+  },
+  "request": {
+    "substrate": "fs",
+    "locator": "/etc/",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "同じ場所の 2 通りの綴りのうち、`==` 側だけを持つ pack はこちらを取り逃がす(`\"/etc/\" == \"/etc\"` は偽)。ここを守っているのは glob 側で、`*` が 0 文字にも match するという一次の読みに依存している——その読みが変われば本 vector が admit 側へ倒れる。",
+  "spec_anchor": "34 AC-025 / req/62 §2(like の一次照合: 「one or more asterisks (*) as wildcard characters」)",
+  "origin": "gx self-authored for M3 hand 6",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "/et/c/passwd",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "同じ文字を 1 つの区切りで割った形。pack が文字集合や部分一致で拒むようになったら赤くなる"
+  }
+}

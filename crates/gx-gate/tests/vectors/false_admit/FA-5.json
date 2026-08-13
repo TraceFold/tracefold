@@ -1,0 +1,31 @@
+{
+  "id": "FA-5",
+  "kind": "false-admit",
+  "statement": "出荷 set が語らない substrate の変換を、他の substrate の permit で admit してはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "NoPolicyApplied"
+  },
+  "expires_when_a_pack_speaks_for": "s3",
+  "request": {
+    "substrate": "s3",
+    "locator": "refs/heads/main",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "ASM-60-1 の写像から `resource.substrate` が落ちる/どれかの pack から `resource.substrate == \"…\"` が消える と、語られていない substrate の変換がその permit に当たって admit される。∴ 出荷物は「語らない substrate は Cedar の第 3 規則(何も satisfy しない→Deny)へ落ちる」でなければならない。\n\n🔴 **M7 手 4 で書き直した(H-9)**。M3 手 6 の綴りは request が `git` で、statement は「fs pack が語らない substrate」だった——`policies/git/deny-nonbranch-refs.cedar` が出荷された M7 手 2 の瞬間にこの期待は偽になり(git は語られる substrate になった)、負例 suite が fs pack 単独に対して走り続けていたので 2 手のあいだ緑のままだった。req/38 §25 H-9 の予約(「FA-5 の期待は M7 で反転する」)はこの事であり、req/66 §4 が同時に起票した「vector に期限を持たせる仕組みが無い」は `expires_when_a_pack_speaks_for` と `false_admit.rs::no_vector_outlives_the_pack_that_makes_it_true` が塞いだ。\n\n測っている性質は 1 mm も弱めていない: 「語られていない substrate は permit に当たらない」は同じで、その subject が(fs/git/mcp の 3 本が出荷された今)`custom:` の側へ移っただけである。locator の綴りは M3 手 6 のまま——対照との差が substrate の行**だけ**である事が、この vector の設計そのものだから。",
+  "spec_anchor": "32 FR-028 / 34 AC-028 / 34 AC-074 / req/38 §21 C-3(E-M3-11: NoPolicyApplied)/ req/38 §25 H-9",
+  "origin": "gx self-authored for M3 hand 6, restated for the shipped set in M7 hand 4",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "refs/heads/main",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "**locator の文字列は 1 文字も違わず substrate だけを変えた対照**。∴ この対を分けているのは substrate の行だけであり、写像からその行が落ちれば負例と対照が同じ答えになる"
+  }
+}

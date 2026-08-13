@@ -1,0 +1,73 @@
+# The third real `SubstrateAdapter`, and the one 22-roadmap.md:23 calls 「**DR-1(a) wedgeの実体**」.
+# `req/spec/30-requirements/32-functional.md:101` 逐語 (FR-046): 「gx-adapter-mcp は MCP tool-call 境界を
+# 傍受し tool-call intent を `PlannedDelta` へ candidate 化するプロキシを実装しなければならない（MUST）」,
+# and 34 **AC-051** is what is measured: 「プロキシを経由しない直接呼び出し経路の有無を**構成レベルで検査**
+# し…バイパス手段が技術的に存在しない」.
+#
+# M7 hand 3 builds all seven (req/98 §7-2 手 3), ratified by `req/38` §59.
+[package]
+name = "gx-adapter-mcp"
+description = "The MCP SubstrateAdapter: a tool call that cannot reach a server except through an admitted apply (41 §4, FR-046, AC-051)."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+
+# 🔴 **No external dependency, and that is AC-051's doing rather than thrift.** 41 §2's crate table
+# writes `dep: gix (gitoxide)` on the git adapter's row and writes **nothing** on this one, so no
+# implementation route is mandated here the way FR-045 mandates one there. What decides it is
+# AC-051: 「バイパス手段が技術的に存在しない」 is a claim about the set of roads to the substrate, and a
+# linked MCP client library is a **second road** -- its own transport, reachable by anyone who can
+# name the crate, with no `Admitted` in its signature. So the wire is the deployment's
+# ([`transport::ToolTransport`]) and this crate holds the boundary, the grammar and the gate.
+#
+# What that costs is stated where a reader will find it (`src/lib.rs`, 「What v0.1 does not close」):
+# **no JSON-RPC framing ships here**, so 「the proxy speaks MCP」 is not among the things this hand
+# measured. What it measured is that nothing in this workspace can call a tool without going through
+# one admitted `apply`.
+#
+# `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
+# requirement (M2 hand 6, req/55 §4 H6-1).
+[dependencies]
+gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-canon = { path = "../gx-canon", version = "0.1.0" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
+
+serde = { version = "1", features = ["derive"] }  # the delta grammar of 42 §3.4
+
+# The shared contract harness of 51 §7, which an adapter crate calls from one `#[test]`
+# (「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」).
+#
+# 🔴 **`gx-engine` and `gx-gate` are here, and they are AC-051's other half.** 34 AC-051 asks for two
+# things and the second is 「**結合テスト**で確認する」 that 「全tool-callがsubmit→verify経路を必ず通過」.
+# A scan of this crate cannot say that: whether a tool call reaches a server *only* after a gate
+# admitted it is a fact about the **pipeline**, and the pipeline is the engine's. So `tests/ac_051.rs`
+# drives a real `Engine` with a denying gate and with an admitting one and counts what arrived at the
+# transport -- 0 and 1.
+#
+# The precedent is exact and it is the engine's own: `gx-engine` dev-depends on `gx-adapter-fs`
+# (「for the benches only」, req/85 §5.2), for the same reason in the other direction. **N-13 is
+# untouched where N-13 is written**: `[dependencies]` above names no engine, `cargo tree -e normal`
+# shows none, and `probes/doubt/tests/workspace_doubt.rs` reads the shipping section. Moving either
+# line up into `[dependencies]` compiles and is caught by one text gate only -- which is why it is
+# **a4 同型 2 本目** in this hand's battery (req/98 §5-1, as §58 re-spelled it).
+[dev-dependencies]
+gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.0" }
+gx-gate = { path = "../gx-gate", version = "0.1.0" }
+gx-engine = { path = "../gx-engine", version = "0.1.0" }
+gx-witness = { path = "../gx-witness", version = "0.1.0" }
+
+# 🔴 **AC-067 / NFR-004** (req/98 §7-2 手 5, 裁定 #15) — 「プロキシが追加するレイテンシが p99 ≤ 30ms」.
+#
+# The bench lives here rather than in `gx-api` because the subject is **this proxy**, and it reuses
+# `tests/support/mod.rs` through `#[path]` rather than a second fixture: the server a measurement
+# talks to has to be the server the contracts were measured against, or the number is about a third
+# thing. (`gx-engine`'s benches could not do that — `tests/support` there calls
+# `env!("CARGO_BIN_EXE_crash_probe")`, which cargo does not define for a bench. This one has no bin.)
+#
+# `harness = false`, no criterion: the measurement is a **paired difference** between two arms over
+# one interleaved run, and criterion's batch-mean sampling has no shape for that. A bench raises no
+# `test result:` line, so the floor does not move for it.
+[[bench]]
+name = "proxy_latency"
+harness = false

@@ -1,0 +1,32 @@
+{
+  "id": "FA-3",
+  "kind": "false-admit",
+  "statement": "/etc の何段深くの file であっても admit してはならない(glob は / を跨ぐ)",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "fs-deny-etc",
+    "code": "POLICY_DENIED"
+  },
+  "request": {
+    "substrate": "fs",
+    "locator": "/etc/ssl/private/server.key",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "Cedar の `like` の `*` は任意の文字列に match し、shell の glob と違って `/` で止まらない(一次: syntax-operators)。∴ `/etc/*` は 1 段でなく配下全体を覆う——出荷 pack の実効範囲がその読みである事を、prose でなく入力で固定する。読みが逆(1 段のみ)なら本 vector が admit 側へ倒れる。",
+  "spec_anchor": "34 AC-025(/etc/** の逐語) / req/62 §2(like の一次照合)",
+  "origin": "gx self-authored for M3 hand 6",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "/srv/etc/ssl/private/server.key",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "同じ末尾を別の root の下に置いた形。pack が「文字列 /etc を含む」で拒むようになったら赤くなる=拒否が先頭からの一致である事の対照"
+  }
+}

@@ -1,0 +1,47 @@
+# The first real `SubstrateAdapter`. 41 §2 gives this crate one line -- 「gx-adapter-fs/ # dep:
+# landlock (apply時sandbox, v0.2+)」 -- and **E-M4-26** (`req/38_ERRATA_2026-08-07.md` §28) is the
+# erratum that reads the rest of it: 「`gx-adapter-fs # dep: 0 本(landlock は v0.2+)`」.
+#
+# M4 hand 4 builds `kind`/`snapshot`/`plan`/`precondition`; `apply`/`invert` are hand 5 and
+# `commutation` hand 6 (req/69 §6.2). N-05 keeps landlock out of v0.1 entirely.
+[package]
+name = "gx-adapter-fs"
+description = "The filesystem SubstrateAdapter: single-file whole replacement, lexical locators (41 §4, M4-13(a))."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+
+# **Zero external dependencies**, which is what N-05 and E-M4-26 mean by 「依存 0 本」: the three
+# entries below are workspace members and `serde` is already resolved by every one of them, so the
+# external package count does not move (§29 M4H1-6 fixed that as the way to say 「依存追加 0」).
+#
+# gx-canon is here rather than in a dev-dependency because the payload of an fs delta is canonical
+# DAG-CBOR (42 §3.4) and 41 §6 admits exactly one encoder: **N-14** is the ruling that keeps this
+# adapter from writing a parser of its own -- 「fs delta の payload は canonical DAG-CBOR なので既存
+# `fuzz_dagcbor_decode` の射程内——adapter 固有の parser を作るなら話が変わる」.
+#
+# `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
+# requirement (M2 hand 6, req/55 §4 H6-1).
+[dependencies]
+gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-canon = { path = "../gx-canon", version = "0.1.0" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
+
+serde = { version = "1", features = ["derive"] }  # the delta grammar of 42 §3.4
+
+# The shared contract harness of 51 §7, which an adapter crate calls from one `#[test]`
+# (「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」). proptest is
+# L7's property (req/69 §3.4) and AC-047's 判定方法 column (34: 「unit + property」); both are already
+# in the graph.
+#
+# **M4-18 採(a)** (req/38 §28) puts AC-048's integration test here rather than in the gate's own
+# suite: 「AC-048 結合 test は gx-adapter-fs の tests に **gx-gate を dev-dependency** で(E-M3-2 先例・
+# 循環なし)」. The gate half is M3's (E-M3-4: `invert_available=false → Escalate`) and the adapter half
+# is hand 5's `Ok(None)`; what had never run is the join. A dev-dependency reaches no shipped graph
+# (`cargo tree -e normal` does not see it) and adds no package -- gx-gate is a workspace member and
+# everything it resolves is already in the graph, which is the sense §29 M4H1-6 fixed for 「依存追加 0」.
+[dev-dependencies]
+gx-gate = { path = "../gx-gate", version = "0.1.0" }
+gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.0" }
+proptest = "1.11"

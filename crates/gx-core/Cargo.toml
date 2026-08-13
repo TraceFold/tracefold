@@ -1,0 +1,37 @@
+# The core types of the calculus and nothing else. 41 §2 places this crate first in
+# the workspace and 41 §6 tells it what it may not do: no I/O, deterministic, no unsafe.
+[package]
+name = "gx-core"
+description = "Core types of the Glovrex transformation calculus. No I/O, deterministic (41 §3 / §6)."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+
+# 41 §2 allows this crate "serde, thiserror 程度" and step 2 spends exactly that much.
+# serde is not optional here: AC-004 and AC-005 are stated as serde round-trip properties,
+# so the derive is the acceptance criterion rather than a convenience. thiserror is named
+# by 41 §6 ("エラーは thiserror で型化") and carries `Error::OrderExceeded` (AC-003).
+# Neither performs I/O, which is what AC-008 actually forbids -- the DoD line in req/31 §9
+# reads "cargo tree に I/O 系 crate 0", not "zero dependencies".
+#
+# The dependency that matters in the other direction is the one that is absent for good:
+# gx-core never names gx-canon (A-1 / ASM-16), so the two crates cannot cycle.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+
+# Test-only. They are absent from `cargo tree -p gx-core -e normal` and so cannot reach the
+# shipped dependency graph. serde_json supplies the concrete format for the round trips of
+# AC-004/AC-005, which name serde but no encoding; gx-canon's DAG-CBOR cannot be used here
+# because gx-core is forbidden to know that crate exists.
+[dev-dependencies]
+proptest = "1.11"
+serde_json = "1"
+
+# `#[cfg(kani)]` is set by the Kani driver and by nothing else, so rustc does not know the name
+# and (since 1.80) says so. Declaring it here keeps `-D warnings` meaningful: the lint stays on
+# for every *other* unexpected cfg, which is the one that would otherwise hide a typo in a
+# `#[cfg(...)]` and silently drop the code under it.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }

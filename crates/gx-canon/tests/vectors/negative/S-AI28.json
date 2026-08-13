@@ -1,0 +1,18 @@
+{
+  "id": "S-AI28",
+  "kind": "codec-deviation",
+  "statement": "major type 7 で予約 additional-info 28 を使った byte 列は decode されない",
+  "vector": "fc",
+  "expected": "REJECT",
+  "expected_error": "ReservedAdditionalInfo",
+  "normative_basis": "gx-policy",
+  "tier": "Tier3",
+  "deviation": "RFC 8949 §3 Table 1 は ai 28/29/30 を予約(未割当)とする。major 7 では 20..=22 が false/true/null、25..=27 が float 幅、31 が break で、28-30 だけが「意味を持たない」——scanner はこれを ReservedAdditionalInfo として、単なる SimpleValueNotAllowed と**区別して**返す。29(`fd`)/30(`fe`)は同一 arm を通る隣接値。IPLD spec 本文に MUST は無い(req/33 §1 の item3 除外)ため根拠は gx の strict-by-default(CM-6)。",
+  "spec_anchor": "RFC 8949 §3 Table 1(ai 28-30=reserved) / 42 §2.1-4 / req/33 §5 item3",
+  "origin": "gx self-authored for the fix hand (req/38 §16 H6-4)",
+  "control": {
+    "vector": "f4",
+    "expected": "ACCEPT",
+    "note": "同じ major 7 で意味を持つ最も近い値=false(ai 20)。これが受理される事が「major 7 を全部拒む scanner」との判別"
+  }
+}

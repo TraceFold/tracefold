@@ -1,0 +1,22 @@
+{
+  "id": "D-65K",
+  "kind": "policy-limit",
+  "statement": "深さの上限は map の key を読む前に効く(key が壊れていても TooDeep が先に返る)",
+  "vector": "a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16261",
+  "expected": "REJECT",
+  "expected_error": "TooDeep",
+  "expected_error_payload": {
+    "at": 193,
+    "max": 64
+  },
+  "normative_basis": "gx-policy",
+  "tier": "gx",
+  "deviation": "`{\"a\": ...}` を 64 組 入れ子にし、65 組目の map header `a1` の直後を**途中で切れた text string header** `62 61`(長さ 2 の text と宣言して 1 byte しか持たない)で終えた。scanner は map の key を `item(depth + 1)` で読むので、65 組目の key は depth 65 に達し、key の byte を 1 つも読まないうちに `depth > MAX_DEPTH`(64)で TooDeep になる。D-65 が array/map-value 側の site を通るのに対し、**この 1 本だけが map の key 側の `depth + 1` を判別する**: その加算を消すと key は depth 64 で通ってしまい、壊れた header を読んで `Truncated` を返す。∴ `expected_error` の宣言が変異を捕まえる。42 §2.1 のどの条項にも違反していない(D-65 と同じく gx-policy)。",
+  "spec_anchor": "41 §6(panic=bug) / 42 §2.1(この条項には該当しない事を明記) / req/38 §18 A-9",
+  "origin": "gx self-authored for M3 hand 4 (req/38 §18 A-9 の裁定・手順は req/58 §4 A-9 に byte 単位で在る)",
+  "control": {
+    "vector": "a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a1616100",
+    "expected": "ACCEPT",
+    "note": "同じ 64 組の入れ子に、65 組目の map の key ではなく**整数 0 を value として**置いた形=最深の item が depth 64 ちょうど。受理される。∴ 負例との差は「65 段目に到達したか」だけであり、上限の位置ではなく key 側の加算そのものを測っている事の対照になる"
+  }
+}

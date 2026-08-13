@@ -1,0 +1,17 @@
+{
+  "id": "A-2",
+  "kind": "codec-deviation",
+  "statement": "整数を最短でない形で書いた byte 列は decode されない",
+  "vector": "1801",
+  "expected": "REJECT",
+  "normative_basis": "IPLD-SHOULD+gx-policy",
+  "tier": "Tier2",
+  "deviation": "値 1 は major 0・additional info 直値の 1 byte `01` が最短。ai=24(uint8 追加)形式に冗長化した。",
+  "spec_anchor": "ipld/ipld@a65340b spec.md L55 / RFC 8949 §4.2.1(a) / 42 §2.1-1 / req/33 §2 A-2",
+  "origin": "gx self-authored from spec (req/33 §2)",
+  "control": {
+    "vector": "01",
+    "expected": "ACCEPT",
+    "note": "同じ値 1 の最短形"
+  }
+}

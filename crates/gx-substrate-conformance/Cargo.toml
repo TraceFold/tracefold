@@ -1,0 +1,36 @@
+# The shared contract harness 51 §7 requires of every `SubstrateAdapter`, and **E-M4-19**
+# (`req/38_ERRATA_2026-08-07.md` §28) is the erratum that puts it in 41 §2's crate table:
+# 「member 6→9(gx-substrate/gx-adapter-fs/gx-substrate-conformance)・conformance は **publish 対象外**
+# (§5 probe bin 先例)・`gx-conformance-gen`(M8)とは**別物**の注記(N-12)」.
+#
+# 51 §7 逐語: 「`SubstrateAdapter` traitを実装する全adapter（fs, git, mcp、将来追加分含む）が満たすべき
+# 契約を、adapter非依存の共有テストハーネス`gx-substrate-conformance`（新規test-only crate、35起票対象）
+# として実装する。各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」.
+[package]
+name = "gx-substrate-conformance"
+description = "The adapter contract harness of 51 §7: seven contracts and the laws the rulings added."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+
+# **Not published.** E-M4-19 逐語: 「conformance は publish 対象外(§5 probe bin 先例)」. This crate is a
+# test instrument: it holds no product code, and a released version of it would be a second
+# published surface whose compatibility promises nobody has made. `probes/doubt` carries the same
+# line for the same reason.
+publish = false
+
+# The harness calls the seven methods and folds their answers, so it needs the boundary and the
+# vocabulary those answers are in -- and nothing else. It does **not** depend on gx-canon: the
+# library never takes a digest, because a shared harness that hashed anything would be deciding what
+# an adapter's products mean. gx-canon is a dev-dependency instead, for the mock in `tests/support`,
+# which mints its own snapshot ids the way any adapter has to.
+#
+# `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
+# requirement (M2 hand 6, req/55 §4 H6-1).
+[dependencies]
+gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
+
+[dev-dependencies]
+gx-canon = { path = "../gx-canon", version = "0.1.0" }

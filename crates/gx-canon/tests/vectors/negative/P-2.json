@@ -1,0 +1,17 @@
+{
+  "id": "P-2",
+  "kind": "codec-deviation",
+  "statement": "tag 42 を含む byte 列は、IPLD の Link 機構として正しくても decode されない",
+  "vector": "d82a582500017012208888888888888888888888888888888888888888888888888888888888888888",
+  "expected": "REJECT",
+  "normative_basis": "gx-policy",
+  "tier": "gx",
+  "deviation": "最短形 `d82a` の valid な CIDv1 link。IPLD はこれを唯一許される tag とするが、42 §2.1-5 は tag 42 を含めて tag を使わないと定め、Cid は 32 byte byte-string として直接埋め込む。",
+  "spec_anchor": "42 §2.1-5 / 42 §1.1 / req/10 T-30",
+  "origin": "gx self-authored for this hand (req/33 表外・起票候補)",
+  "control": {
+    "vector": "58208888888888888888888888888888888888888888888888888888888888888888",
+    "expected": "ACCEPT",
+    "note": "同じ digest を gx の形で載せた物"
+  }
+}

@@ -1,0 +1,108 @@
+# A(f): the admissibility predicate. 41 §2 gives this crate its module list
+# (`src/{lib,policy,invariant,verdict,packs/}.rs`) and its dependency line (`cedar-policy`);
+# 42 §3.8 gives the field tables `verdict.rs` and `policy.rs` carry.
+[package]
+name = "gx-gate"
+description = "Cedar policy evaluation, invariant registry and verdict composition (41 §2 / §4, 42 §3.8)."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ -- see the cedar-policy block below
+license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+
+# The direction of every edge here is fixed by two rulings and checked by cargo rather than by a
+# convention. **E-M3-1** puts the opaque `PlannedDeltaBytes` in gx-core (M4 supplies the meaning),
+# and **E-M3-2** puts `VerdictKind` there too -- so gx-witness can type its receipt's discriminant
+# without naming this crate. That matters because the edge runs the other way: `GateInput.evidence`
+# is `&[Evidence]` (41 §4, AC-016), so **gx-gate names gx-witness**. Had `VerdictKind` stayed where
+# 42 §0 files it, the two crates would have had to name each other -- M2-1's cycle a second time.
+#
+# `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
+# requirement (M2 hand 6, req/55 §4 H6-1).
+[dependencies]
+gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-witness = { path = "../gx-witness", version = "0.1.0" }
+
+# Hands 1-3 wrote here that gx-canon was NOT a dependency, on gx-witness's rule -- 「a dependency
+# declared before its first use cannot be reviewed against a reason」 -- and named the hand that
+# would add it: 「`TicketId` and `AdmitProof` will need a CID (42 §1.3 gives both an IdentityView),
+# and the hand that mints one is the hand that adds the edge」. Hand 4 is that hand, and the reason
+# is M2-10 (req/49 §3): 「Deny=`Vec<Reason>`・Escalate=`EscalationTicket` の CID を取る規則を明記
+# (型自体は M3)」. A `proof_digest` per verdict arm cannot be produced without computing a CID, and
+# 41 §6 admits exactly one road to one -- 「全 canonical encode は gx-canon 経由のみ」 -- so the
+# alternative to this line is a second encoder, which AC-014 forbids by name.
+#
+# No package is added by it: gx-witness already depends on gx-canon, so the graph is unchanged
+# (223 before and after, measured in req/64 §2). What changes is that this crate now says out loud
+# which digests it takes, rather than reaching them through a re-export.
+gx-canon = { path = "../gx-canon", version = "0.1.0" }
+
+# 41 §2's dependency line for this crate, and 35 DR-8's DEFAULT ruling. Measured before it was
+# written down (M3-17 → req/38 §19: 「数字を見てから宣言する」), and the numbers are in
+# `req/61_M3_HAND1_REPORT_2026-08-08.md` §2: licence Apache-2.0 at three points (crates.io API,
+# GitHub API, the LICENSE file in the repository), the package delta, `cargo deny check`, the
+# duplicate subtrees and the declared MSRV.
+#
+# 🔴 **The declared MSRV does not fit.** cedar-policy declares `rust-version = "1.89"` in every
+# release from 4.8.0 to 4.12.0 (crates.io API, read on 2026-08-08); this workspace declares 1.85 on
+# the line above because 41 §2 does. The toolchain here is 1.97, so nothing fails to build -- what
+# is wrong is the *declaration*: a reader on 1.85 cannot build this crate. Raising 41 §2's floor is
+# Owner-only (req/59 卓-1, H6-6), so this hand changes no `rust-version` anywhere and raises the
+# conflict in req/61 §4 instead. The dependency is declared because hand 2 (AC-025) cannot start
+# without it and because the measurement the ruling asks for has to be taken on a resolved graph.
+#
+# No `default-features = false`. Hand 1 measured that turning the defaults off removes no package
+# (223 either way: `datetime`, `decimal` and `ipaddr` are internal extension types that pull nothing
+# in), and hand 2 -- which has the call site -- keeps them on for a reason of meaning rather than of
+# size: the three features decide whether a policy may write `ip("10.0.0.0/8")` or `datetime(...)`,
+# so switching them off would silently make some third-party policy pack fail to parse. A narrowing
+# with no measurable benefit and an invisible cost is not a narrowing.
+cedar-policy = "4.12"
+
+# 41 §6: 「エラーは thiserror で型化」. serde carries 42 §3.8's field tables.
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+
+# Test-only, and the same version gx-core already resolves, so the graph does not move: 51 §3 asks
+# for 「≥1000ケース/PR」 on properties, and hand 2's property is that a policy set's answer to a
+# request is a function of the two (`tests/policy_determinism.rs`).
+[dev-dependencies]
+proptest = "1.11"
+
+# Hand 6's false-admit vectors are JSON files, read at test time. The family req/29 §2 defines keeps
+# its vectors as data 「生成 script に依存せず読める」 (T-31), which is how gx-canon's negative vectors
+# are already carried -- so this is the same shape one layer up, and the reader of a vector needs no
+# Rust to read it.
+#
+# It adds no package: gx-canon already resolves serde_json, so the graph is the same 223 it was
+# before criterion (measured in req/66 §2).
+serde_json = "1"
+
+# AC-064's instrument, named by 34 and by 51 §9. **M3-14** approves it the A-6 way (「criterion は
+# A-6 方式で research/02 追補+導入前 5 点実測+**feature 選定(plotters 系を引かない構成を既定)**」),
+# and the five measurements are in req/66 §2 -- licence at three points, the package delta, `cargo
+# deny check`, the duplicate subtrees, and the declared MSRV.
+#
+# `default-features = false` is the ruling's feature clause, and the primary is what it is read
+# against: criterion's own Cargo.toml declares `default = ["rayon", "plotters", "cargo_bench_support",
+# "alloca"]` (criterion-rs/criterion.rs, master, read 2026-08-08). Turning the defaults off and
+# naming `cargo_bench_support` keeps the one feature that makes a bench runnable by `cargo bench`
+# and drops the plotting stack, the thread pool and the stack randomiser -- none of which a recorded
+# median needs. What that costs is the HTML report, which no gate reads.
+#
+# 🔴 The declared MSRV does not fit, the same way cedar-policy's does not: criterion declares
+# `rust-version = "1.86"` for every 0.8.x and this workspace declares 1.85 because 41 §2 does. The
+# toolchain here is 1.97 and nothing fails to build; the declaration is what is wrong, and raising
+# 41 §2's floor is Owner-only (req/59 卓-1, B-1/B-5). cedar's 1.89 is the binding one of the two.
+#
+# Test-only in the strict sense: a dev-dependency cannot reach `cargo tree -e normal`, so nothing
+# criterion pulls in is in anything gx ships.
+criterion = { version = "0.8", default-features = false, features = [
+    "cargo_bench_support",
+] }
+
+# 51 §9 names the file and 34 AC-064 names it again. `harness = false` because criterion supplies its
+# own main (this one also runs the per-call instrument the percentile of NFR-001 needs -- see the
+# file's own note on why criterion's estimator is not that instrument).
+[[bench]]
+name = "verify_latency"
+harness = false

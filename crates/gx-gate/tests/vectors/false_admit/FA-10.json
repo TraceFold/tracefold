@@ -1,0 +1,31 @@
+{
+  "id": "FA-10",
+  "kind": "false-admit",
+  "statement": "server 越しに /etc の file を書く tool-call を、mcp の permit で admit してはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "mcp-deny-etc-resources"
+  },
+  "request": {
+    "substrate": "mcp",
+    "locator": "https://mcp.example/sse#file:///etc/passwd",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "**M7 手 4(H-9 の「pack 出荷との連動」)**の mcp 側 1 本、かつこの suite で最も load-bearing な行である: **FA-1/FA-2 が fs substrate で拒む `/etc/passwd` そのものを、substrate を変えるだけで通せてはならない**。fs pack の rule は fs の locator にしか効かず、同じ file へ MCP server 経由で到達する変換は別の `SubstrateKind`・別の locator・別の policy 主体である。`policies/mcp/deny-etc-resources.cedar` はその穴を塞ぐために出荷され、この vector はそれが塞がっている事の負例側の測定である。\n\n対照(`file:///srv/notes.md`)は resource の path **だけ**を変えており、server も scheme も 1 文字も違わない。∴ この対を分けているのは forbid の pattern だけである。\n\n🔴 pattern の anchor(`*#file:///etc/*`)を落とすと、server 側に `file:///etc` を綴る endpoint の**普通の** call まで deny に落ちる——その case は `crates/gx-gate/tests/ac_074.rs` の mcp 表が名前で持っている。",
+  "spec_anchor": "32 FR-028 / 34 AC-074 / 34 AC-051(バイパス手段) / req/38 §25 H-9",
+  "origin": "gx self-authored for M7 hand 4",
+  "control": {
+    "request": {
+      "substrate": "mcp",
+      "locator": "https://mcp.example/sse#file:///srv/notes.md",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "**resource の path だけを変えた対照**。server endpoint は同一で、mcp permit が生きている事(=pack が「全部拒む」に壊れていない事)を測る"
+  }
+}

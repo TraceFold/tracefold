@@ -1,0 +1,17 @@
+{
+  "id": "A-9",
+  "kind": "codec-deviation",
+  "statement": "同じ key を 2 度持つ map を含む byte 列は decode されない",
+  "vector": "a3636261720363666f6f0163666f6f02",
+  "expected": "REJECT",
+  "normative_basis": "gx-policy",
+  "tier": "Tier3",
+  "deviation": "{\"bar\":3,\"foo\":1,\"foo\":2}。key \"foo\" の重複が唯一の逸脱。spec 本文に \"duplicate\" の逐語は無く(req/33 §4 の grep 実測)、根拠は L58 の sort 条項からの間接含意=厳密全順序を 2 つの同一 key は満たせない。",
+  "spec_anchor": "42 §2.1-2「同名キーの重複は許可しない」/ req/33 §4 A-9",
+  "origin": "ipld/codec-fixtures@5427e5ce6426a4ca19741044cee076ead0e2298d negative-fixtures/dag-cbor/decode/duplicate-keys.json (data のみ取込み・判定 code は自前)",
+  "control": {
+    "vector": "a2636261720363666f6f01",
+    "expected": "ACCEPT",
+    "note": "重複を除いた {\"bar\":3,\"foo\":1}"
+  }
+}

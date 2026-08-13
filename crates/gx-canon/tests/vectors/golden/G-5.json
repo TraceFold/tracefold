@@ -1,0 +1,34 @@
+{
+  "id": "G-5",
+  "kind": "golden",
+  "statement": "None は null(0xf6)、空 Vec は 0 要素 array(0x80)、非 ASCII 文字列は UTF-8 byte 長で載る",
+  "type": "Transformation",
+  "value": {
+    "id": "gx1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "intent_id": "gx1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "order": 0,
+    "subject": {
+      "Object": "gx1:caibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaia"
+    },
+    "target": null,
+    "delta": {
+      "substrate": "Fs",
+      "cid": "gx1:ceirceirceirceirceirceirceirceirceirceirceirceirceiq"
+    },
+    "context": {
+      "Custom": "日本語"
+    },
+    "actor": {
+      "Human": {
+        "key": ""
+      }
+    },
+    "parents": [],
+    "created_at": 0
+  },
+  "hex": "aa62696458200000000000000000000000000000000000000000000000000000000000000000656163746f72a16548756d616ea1636b6579606564656c7461a2636369645820111111111111111111111111111111111111111111111111111111111111111169737562737472617465624673656f726465720066746172676574f667636f6e74657874a166437573746f6d69e697a5e69cace8aa9e67706172656e747380677375626a656374a1664f626a6563745820101010101010101010101010101010101010101010101010101010101010101069696e74656e745f6964582000000000000000000000000000000000000000000000000000000000000000006a637265617465645f617400",
+  "expected": "ACCEPT",
+  "spec_anchor": "41 §3 / 42 §2.1-3(既知長のみ) / 42 §3.2",
+  "origin": "gx self-authored; hex は RFC 8949 §3 の major-type/additional-info 表と 42 §2.1 の 6 規則から手で組み立てた(encoder 出力からの複写ではない)",
+  "note": "「日本語」は UTF-8 で 9 byte なので header は 0x69。文字数 3 ではない。"
+}

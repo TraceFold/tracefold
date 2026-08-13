@@ -1,0 +1,69 @@
+# The second real `SubstrateAdapter`, and the first one the canon names a dependency for.
+# `req/spec/40-architecture/41-architecture.md:48` 逐語: 「`gx-adapter-git/         # dep: gix
+# (gitoxide)`」, and 32 FR-045: 「gx-adapter-git は git repo substrate 向けに `SubstrateAdapter` 全
+# メソッドを **gix 経由**で実装しなければならない（MUST）」.
+#
+# M7 hand 1 builds all seven (req/98 §7-2 手 1). `gx-adapter-mcp` is hand 3.
+[package]
+name = "gx-adapter-git"
+description = "The git SubstrateAdapter: a file on a branch, moved by a commit, undone by a reference reset (41 §4, FR-045)."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+
+# 🔴 **The first external dependency an adapter has had**, and the canon is what put it here rather
+# than this hand: 41 §2's crate table writes `dep: gix (gitoxide)` on this row, and FR-045 makes the
+# implementation route a MUST rather than a preference. `gx-adapter-fs` ships 「依存 0 本」 (E-M4-26)
+# because a filesystem is `std`; a git object database is not.
+#
+# **`default-features = false`, and one feature.** `gix` activates 31 features by default -- a
+# network protocol stack, a worktree, a diff engine, an index -- and this adapter opens a repository,
+# reads objects, writes objects and edits one reference. `sha1` is the smallest set that compiles:
+# `gix-hash`'s `Kind` enum has **no variants** without a hash feature, so the crate does not build at
+# all with the flag bare (measured 2026-08-12: `error[E0004]`/`E0665` x16 in gix-hash 0.26.0). What
+# the narrowing buys is not elegance -- it is the size of the surface `cargo audit` and `cargo deny`
+# have to keep clean for the rest of this project's life.
+#
+# **Licence, checked first-hand** (`cargo info gix`, 2026-08-12, recorded in
+# `Desktop/GitRepo/REFERENCES.md`): `MIT OR Apache-2.0`. An `OR` is satisfied by either branch and
+# this repository ships Apache-2.0 (35 DR-5), so the Apache branch is the one taken. `rust-version`
+# is 1.85, under this workspace's declared 1.89 (卓-1).
+#
+# 🔴 **Observed, never copied.** gitoxide's implementation is not read and not reproduced here: what
+# this crate uses is the public API (`open`, `write_blob`, `write_object`, `find_object`,
+# `refs.transaction()`), and the delta grammar, the locator normalisation and the quantifiers of the
+# seven contracts are gx's own.
+#
+# `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
+# requirement (M2 hand 6, req/55 §4 H6-1).
+[dependencies]
+gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-canon = { path = "../gx-canon", version = "0.1.0" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
+
+serde = { version = "1", features = ["derive"] }  # the delta grammar of 42 §3.4
+gix = { version = "0.86", default-features = false, features = ["sha1"] }
+
+# The shared contract harness of 51 §7, which an adapter crate calls from one `#[test]`
+# (「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」). `gix` is
+# repeated here because an integration test is its own crate and does not inherit the library's
+# dependencies; it resolves to the same package, so no package is added to the graph (§29 M4H1-6's
+# sense of 「依存追加 0」). The fixture needs it to move the substrate **behind the adapter's back**
+# (`Fixture::disturb`) and to read HEAD and the tree hash for AC-050 by a route that is not the
+# adapter's own.
+#
+# 🔴 **M7 hand 4** adds `gx-gate`, and it is a **dev** dependency for the reason H-2 exists: 「locator
+# は正規化済みで gate に渡す」 is a claim about a road that ends at a gate, so measuring it needs one.
+# `crates/gx-adapter-git/tests/h2_normalised_before_the_gate.rs` drives real spellings through
+# `snapshot` into the shipped git pack and shows three of four evading it when the normalisation is
+# skipped. The precedent is exact and one substrate over: `gx-adapter-mcp` dev-depends on `gx-gate`
+# and `gx-engine` for AC-051's 結合テスト (req/101 §0), ratified by req/38 §60.
+#
+# Nothing in `[dependencies]` moves: an adapter that depended on a policy layer would be an adapter
+# that could ask what a rule says, and 41 §4 keeps judging in one function. It is a path dependency
+# already resolved in this workspace, so the package graph does not move either.
+[dev-dependencies]
+gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.0" }
+gx-gate = { path = "../gx-gate", version = "0.1.0" }
+gix = { version = "0.86", default-features = false, features = ["sha1"] }

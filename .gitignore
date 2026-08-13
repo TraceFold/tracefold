@@ -1,0 +1,9 @@
+target/
+mutants.out/
+*.o
+*.log
+
+# 44 §2.5 makes the Bearer token 「必須」, and `gx serve` takes it as a **path** so that the value
+# never reaches `ps`. `docker-compose.yaml` bind-mounts this file at the repository root, so a
+# repository that has committed one has published it.
+/gx-token

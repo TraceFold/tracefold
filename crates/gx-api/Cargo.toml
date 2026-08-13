@@ -1,0 +1,160 @@
+# 41 §2's other new crate: 「`gx-api/` — axum HTTP+JSONL stream（44準拠）」.
+#
+# 🔴 **M6 hand 5 implements 44 §2's synchronous surface**: every endpoint of §2.1 except `GET
+# /stream`, which is hand 6's together with `gx serve`'s runtime and M6-05's three list endpoints.
+# req/88 §6.2 calls that 「同期面 11 endpoint」 and §2.1 has **fourteen** rows, of which thirteen are
+# not `/stream` — the count is raised as **M6H5-1** and the implementation follows the words
+# (「`/stream` と一覧系を除く全部」).
+[package]
+name = "gx-api"
+description = "The Glovrex HTTP surface (44 §2): thirteen synchronous endpoints, the gx_code map, Bearer auth and Idempotency-Key."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+
+# 🔴 **則 1** (req/88 §3 Λ1) applies to this table exactly as it applies to gx-cli's: `gx-canon` is
+# absent and may not be added. 48 §4 wrote the same rule about the Console — 「TS自体が検証ロジックを
+# 持つことは決してない（P-8「二次言語はGlovrexの意味権威を持たない」の厳密遵守）」 — and req/88 §3 Λ1 is
+# that principle's form **inside** the primary language. `crates/gx-canon/tests/authority_boundary.rs`
+# reads this file and the source below it.
+#
+# 🔴 **`gx-cli` is absent and must stay absent, and the reason is a cycle.** 47 §1(a) makes the v0.1
+# artefact 「単一静的バイナリ(`gx-cli` が `gx serve` で `gx-api` 機能を内包)」, so hand 6 adds
+# `gx-api` to *gx-cli's* manifest. A dependency the other way would close the loop, and cargo
+# refuses it. The consequence is structural rather than stylistic and shows up in `AppState`: this
+# crate never spells `.gx/`, because req/56's directory is gx-cli's declaration (one list, one
+# probe — `m6_surface_doubt::the_dotgx_layout_is_req56_exactly`). The caller hands it two paths.
+#
+# 🔴 It also means AC-055 cannot live here: comparing the CLI with the HTTP surface needs both, so
+# the suite is `crates/gx-cli/tests/ac_055.rs` and `gx-api` is a **dev**-dependency of gx-cli under
+# the same 「declare where it is called」 rule (req/38 §38 採(a)) that hand 6 will promote.
+#
+# ---------------------------------------------------------------------------
+# The dependency measurement, before the declaration (M6-27's order, M6H2-4's question)
+# ---------------------------------------------------------------------------
+#
+# `axum` was measured and declared by hand 1 (req/89 §2: +29 packages, licences inside deny.toml's
+# allow list, subtree MSRV 1.80). What this hand adds:
+#
+#   * `chrono` — **M6H2-4 採(a)**: 「RFC 3339 変換は手5 が `time`/`chrono` の 5 点実測をして決める」.
+#     44 §0 is normative — 「日時はRFC 3339…内部`Timestamp`（ナノ秒epoch）からの変換は**API層の
+#     責務**」 — and this is the API layer. The five points, measured in a scratch package with this
+#     repository's manifest untouched (`tools/m6h5_dep_probe.sh`):
+#       - **packages: +0**. `chrono 0.4.45` is already in the shipping closure —
+#         `cargo tree -e normal -i chrono` shows `chrono → cedar-policy-core → cedar-policy →
+#         gx-gate → {gx-cli, gx-engine}` — so `cargo metadata` and `Cargo.lock` do not move.
+#       - **licences**: `MIT OR Apache-2.0`; `cargo deny check licenses` RC=0, allow list unchanged.
+#       - **rust-version**: subtree max **1.82**, inside 卓-1's 1.89 declaration.
+#       - **duplicate roots**: `cargo tree -e normal -d` empty.
+#       - **subtree**: 31 packages, every one already resolved.
+#     🔴 The alternative was `time 0.3.55`, which is in `Cargo.lock` and in **no build graph**
+#     (`cargo tree -e normal -i time` prints nothing): adopting it would have added **12** packages
+#     to the shipping closure for a smaller subtree. Cheaper on paper, more expensive here.
+#     🔴 **The 0 is borrowed.** It is cedar-policy-core's dependency, not ours; the day cedar drops
+#     `chrono` the number becomes 31. Firing condition, in the report and here: **re-measure when
+#     cedar's dependency set changes**, and `time` is the fallback that was already priced.
+#   * `default-features = false` is 則 2, not thrift. chrono's default `clock` feature is what
+#     provides `Utc::now()`, and 41 §6 puts the clock at the engine boundary — M6-28 measures that
+#     gx-cli reads the wall clock in exactly one place. A formatting-only chrono cannot be a second
+#     clock, so the absence is structural rather than a rule somebody has to remember.
+#   * 🔴 **`tokio`** and **`futures-core`** — M6 hand 6, under the same 「declare where it is called」
+#     rule (req/38 §38 採(a)). `gx serve`'s runtime is `crates/gx-api/src/serve.rs`, which is where
+#     41 §2 and 44 §1.1 put it (the verb is gx-cli's, the axum surface is this crate's), and
+#     `GET /stream` needs a body that is a `Stream`. The five points, measured before declaring
+#     (`tools/m6h6_dep_probe.sh`):
+#       - 🔴 **packages: +1**, and the +1 is the one this hand did not expect. `tokio 1.53.1` and
+#         `futures-core 0.3.33` are themselves already resolved (both arrive inside axum's own tree
+#         and both were dev-dependencies here), but the **`signal` feature** pulls
+#         `signal-hook-registry 1.4.8`, which nothing in this workspace had. Measured, not assumed:
+#         `Cargo.lock` 289 → **290**, external **277 → 278**. The declaration was written before the
+#         measurement and said 「+0 each」; the measurement corrected it, which is what M6-27's
+#         「数字の前に宣言しない」 is for, and the report records the correction rather than the
+#         corrected text alone (M6H6-9).
+#         It is kept: without `signal` there is no `SIGTERM`, and without `SIGTERM` 「graceful
+#         shutdown」 means 「on Ctrl-C only」 — an init system's `systemctl stop` would reach the
+#         process as a kill, which is the crash path req/88 §6.2 forbids spelling as a normal exit.
+#       - **licences**: `MIT` (tokio), `MIT OR Apache-2.0` (futures-core and signal-hook-registry);
+#         `cargo deny check licenses` RC=0 and `check bans` RC=0, allow list unchanged.
+#       - **rust-version**: tokio 1.71, mio 1.71, signal-hook-registry 1.26 — all inside 卓-1's 1.89.
+#       - **duplicate roots**: `cargo tree -e normal -d` unchanged from the base (10 lines, all
+#         pre-existing; no new root).
+#       - **subtree**: inside axum's, which hand 1 already priced at +29.
+#     🔴 **The bigger number is the shipping closure of the `gx` binary**, because 「what `Cargo.lock`
+#     holds」 and 「what a third-party auditor installs」 are different questions (the distinction hand
+#     5 drew for `chrono`). Measured with `tools/m6h6_dep_probe.sh` §6: **126 → 167 packages (+41)**,
+#     against a verification core (`gx-canon`'s own closure) of **41**. So an auditor handed the
+#     single binary of 47 §1(a) now installs four times the code the verification actually needs, and
+#     §3 Λ6's claim — 「配布形は検証の量を変えない。変わるのは検証者に何を install させるか」 — has its
+#     number. §47 registered the `gx-verify` split against 「AC-057 の E2E で依存閉包が第三者の受け入れ
+#     を妨げた時」; nobody has been blocked, so the condition has **not** fired, and the number is on
+#     the D-7 ledger rather than acted on (M6H6-10).
+#     Features are named rather than `full`: `rt-multi-thread` and `net` for the server, `time` for
+#     the deadline of shutdown stage 3, `signal` for SIGTERM, `sync` for the subscriber channel.
+#     `macros` is **absent** — there is no `#[tokio::main]` here, because a runtime this crate builds
+#     is a runtime gx-cli does not have to know about.
+[dependencies]
+axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
+futures-core = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "signal", "sync"] }
+
+# The engine and the three layers whose refusals 44 §2.3 has to name. All **path** dependencies, so
+# the external package count does not move: req/89 §2.3's 277 stands.
+#
+# `gx-engine` — the eight entry points. 🔴 This is the line M6-06 is about: `Engine`'s entries take
+#   `&mut self` (M5H5-6 採(a): 「engine は自前 lock を持たない・並行度は呼び出し側の責務」) and axum
+#   wants `Send + Sync` state, and §47 adopted (a) — one `Arc<Mutex<..>>`, every request serialised —
+#   with the per-object lock registered in the D-7 ledger against 「serve 経由 AC-066 が SLA を割った
+#   時」. See `state.rs`.
+# `gx-gate`   — `TicketId` for 44 §0's id-resolution on the escalation endpoint, `HumanRuling`'s
+#   vocabulary, and `Error::kind` for the map. **No `Verdict` is constructed here** (則 1 (ii)).
+# `gx-witness`— `Receipt`, `KeyPair`, `Evidence`, and `dsse::sign_checkpoint` for
+#   `GET /ledger/checkpoint` (M6-24 採(b): 「handler が `unsigned_checkpoint` → `sign_checkpoint` を
+#   呼ぶ」).
+# `gx-log`    — `prove_inclusion` and `unsigned_checkpoint` for the two ledger endpoints.
+# `gx-core`   — ids, `Cid::from_text` (the `gx1:` parser 44 §0 needs, and **not** a mint), `Intent`.
+gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-engine = { path = "../gx-engine", version = "0.1.0" }
+gx-gate = { path = "../gx-gate", version = "0.1.0" }
+gx-witness = { path = "../gx-witness", version = "0.1.0" }
+gx-log = { path = "../gx-log", version = "0.1.0" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 🔴 The test client 51 §7 names: 「axum test client（`tower::ServiceExt`相当）でCLIと同一パイプライン
+# を叩き、レスポンスを比較する」. Both are **already resolved** through axum's own tree
+# (`tower 0.5.3`, `tokio 1.53.1`) and the measurement above found **+0 packages** for each, so the
+# suites cost nothing the binary was not already carrying. `tokio` is a dev-dependency here and
+# becomes a shipping one in **hand 6**, which is the hand that writes `#[tokio::main]`.
+[dev-dependencies]
+gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
+# `macros` for `#[tokio::test]`, `rt-multi-thread` for the suites that drive a subscriber and a
+# writer at the same time. `http-body-util` reads one frame of a streaming body without draining it,
+# which is how `tests/stream.rs` observes a line arriving on a body that never ends; it is already in
+# `Cargo.lock` through axum, so it costs no package either.
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
+# 🔴 **M6-07 採(b)** — AC-066 re-measured through this crate's surface (M6 hand 7, `benches/
+# serve_throughput.rs`). The feature list is **the same spelling** gx-gate resolved in M3 hand 6 and
+# gx-engine repeats, and that is deliberate: cargo unifies features across the graph, so a second
+# spelling here would turn criterion's defaults (`rayon`, `plotters`, `alloca`) back on for all three
+# crates and move the external package count. Measured before declaring (M6-27's order,
+# `tools/m6h7_dep_probe.sh`): `criterion 0.8` is already resolved in `Cargo.lock` through gx-gate and
+# gx-engine, the feature set is identical, so **packages +0** and `cargo tree -e normal` is unmoved
+# (a dev-dependency cannot reach it).
+criterion = { version = "0.8", default-features = false, features = [
+    "cargo_bench_support",
+] }
+
+# 51 §9's table gains no row for this file: AC-066's row already names 「gx-engine/gx-cli」 and this is
+# the same AC measured through a second surface, which §47 M6-07 採(b) asked for by name. `harness =
+# false` because criterion supplies its own main, and because the sixty-second load generator runs
+# only under `--bench` (the flag that separates a measurement from `cargo test`'s check that the file
+# still builds).
+[[bench]]
+name = "serve_throughput"
+harness = false

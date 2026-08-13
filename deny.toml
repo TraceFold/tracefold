@@ -1,0 +1,220 @@
+# cargo-deny, 51 §10: 「`licenses`（Apache-2.0/MIT/BSD系許可リスト、DR-5準拠でGPL/AGPL排除）、`bans`
+# （重複バージョン・禁止依存）、`sources`（不明レジストリ拒否）の3チェックすべてブロッキングgate」.
+#
+# Until M2 hand 6 the audit stage of tools/ci.sh was a **declared skip** -- 「cargo-audit and
+# cargo-deny are not installed」 -- which is honest but is not a gate. This file is what turns it
+# into one.
+#
+# Scope note: `probes/doubt` depends by path on ../../../Glovrex_Alpha, so on a machine that holds
+# that tree cargo-deny walks into it. Alpha's crates declare `MIT OR Apache-2.0` and pass; on a
+# runner without the tree the graph does not resolve at all and ci.sh reports a skip rather than a
+# pass (req/29 §4).
+
+[graph]
+all-features = true
+# Explicit rather than defaulted. `probes/doubt`'s dev-dependencies and proptest's tree are
+# compiled by every CI run, so a vulnerability or a licence in them is as real as one in a normal
+# dependency; leaving this to a default would make the gate's reach depend on a cargo-deny release.
+exclude-dev = false
+
+# ---------------------------------------------------------------------------
+# advisories -- RustSec, the same database `cargo audit` reads
+# ---------------------------------------------------------------------------
+[advisories]
+version = 2
+# No `ignore` entries. An advisory that has to be lived with should be an entry here with a reason
+# and a date, not a silence; the list being empty is the current fact and not a policy of denial.
+ignore = []
+
+# ---------------------------------------------------------------------------
+# licenses -- DR-5, and the reason the list is short
+# ---------------------------------------------------------------------------
+#
+# Every crate in this repository is published `Apache-2.0` (35 DR-5, DEFAULT column). The rule that
+# follows is not 「permissive licences are nicer」 but 「a dependency whose terms cannot be met while
+# shipping Apache-2.0 cannot be in the tree」. So this list holds exactly the permissive families
+# 51 §10 names, plus `Unicode-3.0`, which one crate requires by *conjunction* rather than as an
+# alternative (`(MIT OR Apache-2.0) AND Unicode-3.0`) and which is a data licence with no copyleft
+# obligation.
+#
+# What is deliberately absent is the whole point: GPL, AGPL, LGPL and MPL appear nowhere, so a
+# dependency offered under one of them alone fails this gate rather than being noticed later. Two
+# crates in the current tree offer `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; an OR is satisfied by
+# any allowed branch, so they pass under Apache-2.0 and the LGPL branch is never taken.
+[licenses]
+version = 2
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",   # ed25519-dalek and the curve25519 family (checked at three points, req/50 §5)
+    "Unicode-3.0",
+    # 2026-08-08, M3 hand 1. One crate, named rather than a family: `ar_archive_writer` 0.5.3, a
+    # **build** dependency of `psm → stacker → cedar-policy-core`. The LLVM exception is an
+    # *additional permission* on top of Apache-2.0 -- it removes the requirement to attribute when
+    # the code is linked into a binary -- so a crate offered under it can be shipped everywhere a
+    # plain Apache-2.0 one can, and DR-5's line (no GPL/AGPL/LGPL/MPL) is untouched.
+    #
+    # The reason for a whole SPDX expression instead of a wildcard is the fix hand's §3.9
+    # precedent: a `WITH` clause matched loosely would admit every future exception, including ones
+    # that take permissions away. This entry admits exactly one string.
+    "Apache-2.0 WITH LLVM-exception",
+    # 🔴 2026-08-12, M7 hand 1. **Two** crates, both under gitoxide, and the licence is named as a
+    # family because it is one licence with one text rather than an expression with a clause:
+    #
+    #   * `zlib-rs` 0.6.7  ← `gix-zlib` ← `gix`, `gix-odb`, `gix-pack`. Decompression of git objects,
+    #     which is not optional: a git object database stores everything deflated.
+    #   * `foldhash` 0.2.0 ← `hashbrown` 0.16 ← `clru` ← `gix-pack`. A hasher for a cache.
+    #
+    # 32 FR-045 makes `gix` a MUST and 41 §2 names it on the crate row, so this is a cost the canon
+    # chose rather than one this hand did. DR-5's line is 「GPL/AGPL 排除」 and the Zlib licence is on
+    # the other side of it by a wide margin: it is OSI-approved, has **no copyleft**, requires no
+    # notice in a binary, and its only obligations are 「do not misrepresent the origin」 and 「mark
+    # altered versions」 -- both of which shipping an unmodified crates.io dependency satisfies by
+    # construction. It sits beside MIT and BSD-2-Clause in every practical respect.
+    #
+    # 🔴 It is nonetheless an **addition to 35 DR-5's list**, and this file is not where that column
+    # is decided. Raised for the Owner's desk in `req/99` §9 R-12 rather than paid silently; the
+    # entry is here so that CI states the truth in the meantime, not so that the decision is skipped.
+    #
+    # 🔴 2026-08-13, v0.2.2 spec 批 (§67 R-12 採). **The meantime is over.** `req/38` §63 raised this
+    # to the Owner's desk and said the entry's standing was 「暫定」 until it came back; §67 采用 it,
+    # and `35-open-questions.md` §D now carries a **DR-5 付表** — a dependency licence allow-list,
+    # kept apart from the licence Glovrex itself ships under (Apache-2.0, untouched by any of this).
+    # So this entry is no longer provisional and no longer the only place the decision lives: 35 is
+    # the column, this file is the gate that enforces it. The paragraph above is left exactly as
+    # written (no-delete) — it is the record of what the standing *was*, and a reader who finds only
+    # the ruling would not learn that a hand once had to ship a licence entry ahead of its ruling.
+    "Zlib",
+]
+# 0.93 is cargo-deny's own default. Lowering it to make a fuzzy licence text match would be the
+# same failure as loosening a test to make it pass.
+confidence-threshold = 0.93
+
+# ---------------------------------------------------------------------------
+# bans -- duplicate versions, and the three that are already known
+# ---------------------------------------------------------------------------
+#
+# `deny` rather than `warn`, with the three duplicates hands 2-5 already measured named one by one.
+# A `warn` would report the same three forever and say nothing when a fourth appeared; naming them
+# means a **new** duplicate is a red build, and each entry carries what would close it. All three
+# are transitive and none is this workspace's choice.
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"          # no `*` version requirement may enter a manifest
+allow-wildcard-paths = true # path dependencies inside the workspace are not registry wildcards
+
+# 🔴 **2026-08-12, M7 hand 1: the paragraph that used to be here has come true, and it is worth
+# keeping the correction beside it.** Until this hand `getrandom` and `r-efi` were deliberately *not*
+# skipped, and the reason was a measurement: `Cargo.lock` held two versions of each,
+# `cargo tree --duplicates` reported both pairs, and cargo-deny 0.20.2's ban graph saw **one** of
+# each -- because the second `getrandom` arrived through `tempfile → proptest`, a dev-dependency.
+# req/55 §4 H6-2 raised the gap (「a bans gate whose reach is narrower than `cargo tree`'s」) and left
+# the cause unestablished.
+#
+# The cause is established now, by the thing that changed: `gix` pulls `getrandom` 0.4 through
+# `gix-utils` as a **normal** dependency, so the pair is inside the ban graph's reach and the check
+# turned red. The gate was never narrower than 51 §10 reads -- it was reporting exactly the edges a
+# shipped artefact carries, and the dev-dependency half was correctly outside it. H6-2 can close.
+#
+# The three below are all inside gitoxide's tree or on its far side, and none is this workspace's
+# choice. `multiple-versions` stays `deny`, so a **fourth** duplicate is still a red build.
+[[bans.skip]]
+name = "getrandom"
+version = "=0.3.4"
+# The **older** half is ours: `gx-witness` uses it for key generation (via the ed25519/curve25519
+# stack). 0.4.3 arrives under `gix-utils ← gix-config/gix-features/gix-fs`. Closes when the
+# RustCrypto stack releases against getrandom 0.4.
+
+[[bans.skip]]
+name = "hashbrown"
+version = "=0.16.1"
+# gitoxide disagrees with **itself** by one minor version: 0.16.1 under `clru ← gix-pack` (an object
+# cache) and 0.17.1 under `gix-hashtable ← gix-object/gix-odb/gix-diff`. Nothing of ours reaches
+# either. Closes when `clru` releases against hashbrown 0.17.
+
+[[bans.skip]]
+name = "r-efi"
+version = "=5.3.0"
+# A UEFI target shim, and it is a duplicate only because `getrandom` is: 5.3.0 hangs off 0.3.4 and
+# 6.0.0 off 0.4.3. It compiles on no target this project builds for. Closes with the getrandom entry
+# above, in the same release.
+
+[[bans.skip]]
+name = "syn"
+# 1.x/2.x/3.x across proc-macro crates (serde_derive, thiserror-impl, curve25519-dalek-derive).
+# The canonical long-tail duplicate of the Rust ecosystem; closes when every proc-macro dependency
+# has released against syn 3.
+
+# ---------------------------------------------------------------------------
+# 2026-08-08, M3 hand 1: cedar-policy's seven
+# ---------------------------------------------------------------------------
+#
+# The gate is **not** loosened. `multiple-versions` stays `deny` and each of the seven is named
+# with its two versions, the edge that brings the older half, and what closes it -- so an eighth
+# duplicate, from cedar or from anywhere else, is still a red build. The alternative on offer was
+# `[[bans.skip-tree]]` over cedar-policy, which would have silenced every duplicate under that
+# subtree including the ones that do not exist yet; that is the shape §3.9 warns about.
+#
+# What the seven cost is measured rather than asserted: adding cedar-policy took the graph from
+# **104 packages to 223** (+119) and the duplicate roots `cargo tree --duplicates` reports from 2 to
+# 15. cargo-deny's ban graph sees seven of those fifteen, which is the same narrower reach req/55
+# §4 H6-2 already raised about `getrandom` and is still open.
+#
+# Two of the seven -- `block-buffer`, `crypto-common`, `digest` -- are the RustCrypto trait stack in
+# two generations, and their presence is the same fact that decided **M2H1-6** against `rs_merkle`:
+# a second SHA-256 implementation in a workspace that hashes with BLAKE3. The difference is that
+# rs_merkle was a choice with an alternative (write the merkle arithmetic, which the hand did) and
+# cedar-policy is 35 DR-8's default with a Lean-verified upstream that 46 §1 explicitly declines to
+# re-verify. The cost is recorded in req/61 §4 for the owner's desk rather than paid silently.
+
+[[bans.skip]]
+name = "arrayvec"
+version = "=0.5.2"
+# 0.5.2 arrives under `stacker → psm`, cedar-policy-core's recursion guard; 0.7.8 is proptest's.
+# Closes when stacker releases against arrayvec 0.7.
+
+[[bans.skip]]
+name = "block-buffer"
+version = "=0.10.4"
+# RustCrypto's 0.10 generation, under `sha2 0.10 ← cedar-policy-core`. gx hashes with BLAKE3 (DR-3)
+# and reaches neither. 0.12.1 is ed25519-dalek 3's. Closes when cedar moves to sha2 0.11.
+
+[[bans.skip]]
+name = "cpufeatures"
+version = "=0.2.17"
+# Same edge as block-buffer: the 0.10-generation sha2's CPU feature probe. 0.3.0 is the current one.
+
+[[bans.skip]]
+name = "crypto-common"
+version = "=0.1.7"
+# Same edge again -- the trait crate the 0.10 generation shares. 0.2.2 is the current one.
+
+[[bans.skip]]
+name = "digest"
+version = "=0.10.7"
+# And the last of that stack. Naming all four separately rather than skipping the sha2 subtree is
+# deliberate: if cedar ever pulls a *fifth* 0.10-generation crate, this file should say so.
+
+[[bans.skip]]
+name = "itertools"
+version = "=0.14.0"
+# cedar-policy-core and cedar-policy-formatter disagree with each other by one minor version --
+# 0.14.0 and 0.15.0 are both in cedar's own tree. Closes upstream, in one release.
+
+[[bans.skip]]
+name = "unicode-width"
+version = "=0.1.14"
+# 0.1.14 under `miette` (cedar's diagnostics renderer), 0.2.2 under `pretty` (its formatter). Both
+# are display-side and neither reaches a decision.
+
+# ---------------------------------------------------------------------------
+# sources -- where a crate may come from
+# ---------------------------------------------------------------------------
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# No git dependencies. 05 §4 R-4 and 52 keep this workspace to reviewed, published releases; a git
+# dependency is a moving target that no `--locked` fully pins for a reader.
+allow-git = []

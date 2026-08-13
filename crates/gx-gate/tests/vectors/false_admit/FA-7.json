@@ -1,0 +1,32 @@
+{
+  "id": "FA-7",
+  "kind": "false-admit",
+  "statement": "逆 delta が作れない(invert_available=false)場合でも、拒否された変換は Escalate へ昇格してはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "fs-deny-etc",
+    "code": "POLICY_DENIED"
+  },
+  "request": {
+    "substrate": "fs",
+    "locator": "/etc/passwd",
+    "order": 0,
+    "invert_available": false,
+    "evidence": 0
+  },
+  "why": "E-M3-4 の Escalate 生成規則(invert_available=false)と AC-027 の Deny 優越が同時に当たる唯一の入力。3 本の腕の順が入れ替わると、拒否された変換が「人間に承認を求める」形になる=2 つの系統が既に拒否した物を人へ回す。**Escalate は Deny でない**ので、これは偽 Admit と同じ穴の別の綴り(admit されなくても『通り道が開く』)。",
+  "spec_anchor": "34 AC-027 / 34 AC-048 / req/38 §19 M3-04(E-M3-4)",
+  "origin": "gx self-authored for M3 hand 6",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "/tmp/x",
+      "order": 0,
+      "invert_available": false,
+      "evidence": 0
+    },
+    "expected": "MUST_ESCALATE",
+    "note": "**対照が Admit ではなく Escalate である事が要点**: flag は同じなので、負例が Deny になる理由は flag ではなく locator だと言える。対照を Admit にすると flag を変える事になり、対にならない"
+  }
+}

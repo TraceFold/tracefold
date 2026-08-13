@@ -1,0 +1,31 @@
+{
+  "id": "FA-9",
+  "kind": "false-admit",
+  "statement": "tag を動かす変換を、git の permit で admit してはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "git-deny-nonbranch-refs"
+  },
+  "request": {
+    "substrate": "git",
+    "locator": "/srv/repo#refs/tags/v1.0.0:VERSION",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "**M7 手 4(H-9 の「pack 出荷との連動」)**。M7 手 2 が `policies/git/deny-nonbranch-refs.cedar` を出荷した時点で、負例 suite が測る「出荷物」は 2 pack になった——にもかかわらず、この suite の 8 本は fs pack の話しかしていなかった。`false_admit.rs::every_shipped_pack_is_refused_by_a_vector_of_this_suite` はその分母の穴を機械化したもので、この vector はその要求を満たす git 側の 1 本である。\n\n拒否の理由が forbid **そのもの**である事を宣言している(`expected_reason.policy_id`)。tag は release/署名/deploy が既に指している名前で、動かす事は事実を足すのでなく既存の参照の意味を事後に変える事である(pack file が理由を持つ)。`git-deny-nonbranch-refs` が消えれば permit に当たって Admit へ倒れ、この行が赤くなる。\n\n🔴 この vector が**今日到達可能**なのは M7 手 4 の既定 policy set が合成 set になったからである(req/38 §60 の R-9 対裁定)。それ以前は git の変換は Cedar の第 3 規則で拒まれており、この forbid は v0.1 の surface から一度も発火しなかった。",
+  "spec_anchor": "32 FR-028 / 34 AC-074 / req/38 §25 H-9 / req/38 §60(R-9 対裁定)",
+  "origin": "gx self-authored for M7 hand 4",
+  "control": {
+    "request": {
+      "substrate": "git",
+      "locator": "/srv/repo#refs/heads/main:VERSION",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "**reference の namespace だけを変えた対照**——repository も entry も 1 文字も違わない。branch への commit は gx が仲介するために在る変更そのもの(pack が `refs/heads/main` を保護しない理由)なので、この対を分けているのは forbid の 2 つの disjunct だけである"
+  }
+}

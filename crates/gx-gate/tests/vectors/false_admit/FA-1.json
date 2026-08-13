@@ -1,0 +1,32 @@
+{
+  "id": "FA-1",
+  "kind": "false-admit",
+  "statement": "/etc 配下の file への fs 変換は出荷 pack が admit してはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "fs-deny-etc",
+    "code": "POLICY_DENIED"
+  },
+  "request": {
+    "substrate": "fs",
+    "locator": "/etc/passwd",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "AC-025 の逐語ケースそのもの。出荷 pack の forbid が消えた・permit が広がった・mapping が resource.locator を落とした——のいずれでも、この 1 本が admit 側へ倒れる。",
+  "spec_anchor": "34 AC-025 / 34 AC-028 / req/38 §24",
+  "origin": "gx self-authored for M3 hand 6 (req/60 §5.2 手 6・偽 Admit 系統)",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "/tmp/x",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "AC-025 の第 2 ケース。全部 deny する gate なら緑にならない事の対照(req/29 §2)"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "G-3",
+  "kind": "golden",
+  "statement": "10 field の Transformation が 41 §3 のまま載り、order/target/parents/合成 enum も含めて byte 一致する",
+  "type": "Transformation",
+  "value": {
+    "id": "gx1:aeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaq",
+    "intent_id": "gx1:aibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaiba",
+    "order": 1,
+    "subject": {
+      "Transformation": "gx1:ambqgaydambqgaydambqgaydambqgaydambqgaydambqgaydambq"
+    },
+    "target": "gx1:aqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqcaibaeaqca",
+    "delta": {
+      "substrate": "Git",
+      "cid": "gx1:aucqkbifaucqkbifaucqkbifaucqkbifaucqkbifaucqkbifaucq"
+    },
+    "context": "Policy",
+    "actor": {
+      "Agent": {
+        "key": "k",
+        "model": "m"
+      }
+    },
+    "parents": [
+      "gx1:aydambqgaydambqgaydambqgaydambqgaydambqgaydambqgayda"
+    ],
+    "created_at": -1
+  },
+  "hex": "aa62696458200101010101010101010101010101010101010101010101010101010101010101656163746f72a1654167656e74a2636b6579616b656d6f64656c616d6564656c7461a263636964582005050505050505050505050505050505050505050505050505050505050505056973756273747261746563476974656f7264657201667461726765745820040404040404040404040404040404040404040404040404040404040404040467636f6e7465787466506f6c69637967706172656e74738158200606060606060606060606060606060606060606060606060606060606060606677375626a656374a16e5472616e73666f726d6174696f6e5820030303030303030303030303030303030303030303030303030303030303030369696e74656e745f6964582002020202020202020202020202020202020202020202020202020202020202026a637265617465645f617420",
+  "expected": "ACCEPT",
+  "spec_anchor": "41 §3 / 42 §2.1 / A-3(req/38 §1)",
+  "origin": "gx self-authored; hex は RFC 8949 §3 の major-type/additional-info 表と 42 §2.1 の 6 規則から手で組み立てた(encoder 出力からの複写ではない)",
+  "note": "key 順 = id actor delta order target context parents subject intent_id created_at。created_at = Timestamp(-1) は major type 1 の 0x20。"
+}

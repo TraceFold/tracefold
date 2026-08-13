@@ -1,0 +1,213 @@
+//! Every shipped crate root in `crates/` forbids `unsafe` — including the one that is a binary.
+//!
+//! # Where this came from
+//!
+//! M2 hand 6 ran `cargo geiger` over the workspace for the first time (51 §10's neighbourhood: the
+//! unsafe inventory of what gx depends on). Three of the four gx packages came back `:)` — 「no
+//! unsafe usage found, declares `#![forbid(unsafe_code)]`」 — and `gx-canon` came back `?` — 「no
+//! unsafe usage found, **missing** `#![forbid(unsafe_code)]`」.
+//!
+//! `crates/gx-canon/src/lib.rs` has the attribute. What it does not have is the *other* crate root
+//! in the same package: `tests/bin/cid_probe.rs`, the separate binary AC-011 requires (「完全に独立
+//! した子プロセスB（別バイナリ）」), pointed at by an explicit `[[bin]]` and compiled under the
+//! `probe-bin` feature. An attribute in `lib.rs` says nothing about it, because it is a different
+//! crate. So the package's guarantee was one crate root short, and no test could see it — geiger
+//! could, on its first run.
+//!
+//! # Why a source scan rather than a lint
+//!
+//! `#![forbid(unsafe_code)]` is per crate root by construction: there is no workspace-level form of
+//! it, and `[lints]` in a manifest configures a lint level rather than the `forbid` that cannot be
+//! locally overridden. The declaration therefore has to be repeated, and a thing that has to be
+//! repeated needs something that counts the repetitions. That is this file.
+//!
+//! Same shape as `gx-witness/tests/evidence_cid.rs`, which reads its own crate's source to prove an
+//! absence, and as `ac_018`, which reads gx-log's manifest. §13 H4-6's limit is about parsing the
+//! **正本 markdown** and is not this.
+//!
+//! # What is deliberately not covered
+//!
+//! * **Test binaries.** Each file under `tests/` is a crate root too, and none carries the
+//!   attribute. A test is not shipped, `unsafe` in one cannot reach a user, and requiring it there
+//!   would add nineteen attributes that say nothing about the product. The count below is of the
+//!   roots that are *compiled into the deliverable*.
+//! * **`probes/doubt`.** It has no `src/` at all -- only `tests/` and `benches/` against the
+//!   read-only Alpha tree -- so it has no shipped crate root to carry the attribute.
+//! * **`fuzz/`.** Outside the workspace, nightly-only, and `libfuzzer_sys::fuzz_target!` expands to
+//!   `unsafe` by construction (`#[no_mangle] pub unsafe extern "C" fn`). Forbidding it there would
+//!   forbid the harness.
+
+use std::path::{Path, PathBuf};
+
+/// The crate roots that are compiled into something a user receives.
+///
+/// A list rather than a glob, so that adding a crate root is a decision somebody writes down.
+/// `every_shipped_crate_root_is_in_the_list` below is the other half: it walks the tree and fails
+/// if a root exists that this list does not name, which is what stops the list from being a
+/// comfortable fiction.
+const SHIPPED_CRATE_ROOTS: [&str; 17] = [
+    // M6 hand 1: the thirteenth, fourteenth and fifteenth. `gx-cli` has **two** roots because
+    // NFR-019 asks for a single static binary and 44 spells every command `gx <verb>`: the library
+    // is what the tests drive and `src/main.rs` is what a user runs, and `#![forbid(unsafe_code)]`
+    // is per crate root -- a binary does not inherit its library's.
+    //
+    // 🔴 req/88 §6.2 手 1 ① writes the DoD as 「`unsafe_forbidden` の crate root **12**」, which is the
+    // value this list already held at member 10. The number was carried from the member count rather
+    // than measured, exactly as M5H1-2 recorded of req/78's 「8 本」. Fifteen is the measurement.
+    // Raised as **M6H1-3**.
+    "crates/gx-api/src/lib.rs",
+    "crates/gx-cli/src/lib.rs",
+    "crates/gx-cli/src/main.rs",
+    "crates/gx-adapter-fs/src/lib.rs", // M4 hand 4: the ninth, and the first real adapter
+    // 🔴 M7 hand 1: the sixteenth, and the **second** real adapter. It is the first crate root in
+    // this list with an external dependency behind it (`gix`, which 41 §2 names on its row and 32
+    // FR-045 makes a MUST), so `#![forbid(unsafe_code)]` here is a statement about this crate's own
+    // source and not about gitoxide's -- the attribute cannot reach a dependency, and saying so is
+    // better than letting a reader of the list infer otherwise.
+    "crates/gx-adapter-git/src/lib.rs",
+    // 🔴 M7 hand 3: the seventeenth, and the **third** real adapter. Back to no external
+    // dependency -- and here that is AC-051's doing rather than thrift: a linked MCP client would be a
+    // second road to the substrate, with no `Admitted` in its signature (`gx-adapter-mcp/Cargo.toml`).
+    "crates/gx-adapter-mcp/src/lib.rs",
+    "crates/gx-core/src/lib.rs",
+    "crates/gx-canon/src/lib.rs",
+    // M5 hand 1: the tenth workspace member and the first crate that names every layer below it.
+    // req/78 §6.2 手 1 ② writes the DoD as 「crate root 一覧が **8 本**に」; the list is ten after
+    // this line, because it counts crate *roots* and not packages -- nine `src/lib.rs` plus the
+    // AC-011 probe binary. The number in the ruling was carried from M4 hand 1's seven and never
+    // re-measured (req/78 §10 records that the batch ran no cargo). Raised as M5H1-2.
+    "crates/gx-engine/src/lib.rs",
+    "crates/gx-gate/src/lib.rs", // M3 hand 1: the sixth workspace member
+    "crates/gx-log/src/lib.rs",
+    "crates/gx-substrate/src/lib.rs", // M4 hand 1: the seventh
+    // M4 hand 3: the eighth. `publish = false` (E-M4-19), so 「shipped」 is not literally true of it
+    // -- but the walker below finds every crate root under `crates/`, and the honest way to keep the
+    // two halves equal is to name it rather than to teach the walker an exception. A test harness
+    // that reached for `unsafe` would be a test harness whose results are about something else.
+    "crates/gx-substrate-conformance/src/lib.rs",
+    "crates/gx-witness/src/lib.rs",
+    "crates/gx-canon/tests/bin/cid_probe.rs", // the AC-011 probe binary, via [[bin]]
+    // M5 hand 2: the eleventh. AC-030 asks the two-stage identity to hold 「完全に独立した別プロセス」
+    // as well as twice in one, and 34's AC-011 row names itself as the precedent for how that is
+    // spawned. So this is `cid_probe.rs`'s shape one crate over -- a `[[bin]]` under `tests/bin/`,
+    // gated behind a feature the package's own dev-dependency turns on, so that `cargo build` and
+    // `cargo package` never see it while `cargo test` always does.
+    "crates/gx-engine/tests/bin/engine_id_probe.rs",
+    // M5 hand 5: the twelfth. 51 §8.1 asks for crash recovery to be measured 「実バイナリ・実プロセス
+    // で」, and `gx-cli` is M6's, so the 実バイナリ is a second `[[bin]]` under `tests/bin/` — same
+    // gate, same reasoning, and named here for the same reason the one above it is: the walker finds
+    // every crate root under `crates/`, and a root the list does not name is a root nobody checked.
+    "crates/gx-engine/tests/bin/crash_probe.rs",
+];
+
+fn repo_root() -> PathBuf {
+    // CARGO_MANIFEST_DIR is `<repo>/crates/gx-canon`.
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("the manifest sits two levels under the repository root")
+        .to_path_buf()
+}
+
+/// The criterion.
+#[test]
+fn every_shipped_crate_root_forbids_unsafe() {
+    let root = repo_root();
+    let mut missing = Vec::new();
+
+    for rel in SHIPPED_CRATE_ROOTS {
+        let path = root.join(rel);
+        let source = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "{} is named in the list but unreadable: {e}",
+                path.display()
+            )
+        });
+        if !source.contains("#![forbid(unsafe_code)]") {
+            missing.push(rel);
+        }
+    }
+
+    println!(
+        "SHIPPED_CRATE_ROOTS={} FORBID_UNSAFE_MISSING={}",
+        SHIPPED_CRATE_ROOTS.len(),
+        missing.len()
+    );
+    assert!(
+        missing.is_empty(),
+        "these shipped crate roots do not forbid unsafe: {missing:?}. \
+         `#![forbid(unsafe_code)]` is per crate root; a binary does not inherit its library's."
+    );
+}
+
+/// The half that stops the list above from being a comfortable fiction.
+///
+/// Walks `crates/` for anything that is a crate root by cargo's rules -- `src/lib.rs`, `src/main.rs`,
+/// files under `src/bin/`, and the one file an explicit `[[bin]]` points at -- and fails if it finds
+/// one the list does not name. Without this, a new binary added tomorrow would be forbidden-free and
+/// the test above would still pass, which is req/08 N-1's shape (a name that has become a lie).
+#[test]
+fn every_shipped_crate_root_is_in_the_list() {
+    let root = repo_root();
+    let mut found: Vec<String> = Vec::new();
+
+    for entry in std::fs::read_dir(root.join("crates")).expect("crates/ exists") {
+        let dir = entry.expect("readable").path();
+        if !dir.is_dir() {
+            continue;
+        }
+        for candidate in ["src/lib.rs", "src/main.rs"] {
+            if dir.join(candidate).is_file() {
+                found.push(format!(
+                    "crates/{}/{candidate}",
+                    dir.file_name().expect("named").to_string_lossy()
+                ));
+            }
+        }
+        if let Ok(bins) = std::fs::read_dir(dir.join("src/bin")) {
+            for b in bins.flatten() {
+                found.push(
+                    b.path()
+                        .strip_prefix(&root)
+                        .expect("under the root")
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                );
+            }
+        }
+        // The explicit `[[bin]]` roots, read from the manifest rather than guessed: cargo only
+        // auto-discovers `src/bin/`, and gx-canon's probe deliberately lives elsewhere so that
+        // `src/` still holds exactly the modules 41 §2 lists.
+        let manifest = std::fs::read_to_string(dir.join("Cargo.toml")).unwrap_or_default();
+        for line in manifest.lines() {
+            let line = line.trim();
+            if let Some(rest) = line.strip_prefix("path = ") {
+                let p = rest.trim().trim_matches('"');
+                if p.ends_with(".rs") && dir.join(p).is_file() {
+                    found.push(format!(
+                        "crates/{}/{p}",
+                        dir.file_name().expect("named").to_string_lossy()
+                    ));
+                }
+            }
+        }
+    }
+
+    found.sort();
+    found.dedup();
+    let mut declared: Vec<String> = SHIPPED_CRATE_ROOTS
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+    declared.sort();
+
+    println!(
+        "SHIPPED_CRATE_ROOTS_FOUND={} DECLARED={}",
+        found.len(),
+        declared.len()
+    );
+    assert_eq!(
+        found, declared,
+        "the shipped crate roots on disk are not the ones SHIPPED_CRATE_ROOTS names"
+    );
+}

@@ -1,0 +1,32 @@
+{
+  "id": "FA-6",
+  "kind": "false-admit",
+  "statement": "order-2(policy 自体の変更)であっても /etc への変換は admit してはならない",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "fs-deny-etc",
+    "code": "POLICY_DENIED"
+  },
+  "request": {
+    "substrate": "fs",
+    "locator": "/etc/passwd",
+    "order": 2,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "AC-029 の「order-2 専用のバイパス経路が存在しない」を、gate の呼び出しトレース側でなく**出荷 pack の答え**の側から測る 1 本。order を見て素通りさせる分岐が gate か mapping に入れば、同じ locator の FA-1 が赤くならないままこの 1 本だけが admit 側へ倒れる。",
+  "spec_anchor": "34 AC-029 / 41 §3(order) / req/63 §2",
+  "origin": "gx self-authored for M3 hand 6",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "/tmp/x",
+      "order": 2,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "**D-9 を可視にした対照**: 出荷 pack には order-2 を拒む物が無い(既製 invariant は同梱していない)ので、/tmp への order-2 は admit される。拒否の出所は order でなく locator である、という負例側の主張の裏"
+  }
+}

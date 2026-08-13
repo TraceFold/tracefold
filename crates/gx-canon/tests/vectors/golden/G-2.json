@@ -1,0 +1,18 @@
+{
+  "id": "G-2",
+  "kind": "golden",
+  "statement": "ObjectSnapshot の 5 field は key の encode 済 byte 列の昇順(短い key が先)で並ぶ",
+  "type": "ObjectSnapshot",
+  "value": {
+    "id": "gx1:vkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkvkva",
+    "substrate": "Fs",
+    "locator": "a",
+    "digest": "gx1:xo53xo53xo53xo53xo53xo53xo53xo53xo53xo53xo53xo53xo5q",
+    "representation": "Json"
+  },
+  "hex": "a56269645820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa666469676573745820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb676c6f6361746f726161697375627374726174656246736e726570726573656e746174696f6e644a736f6e",
+  "expected": "ACCEPT",
+  "spec_anchor": "42 §2.1-2 / 42 §3.1",
+  "origin": "gx self-authored; hex は RFC 8949 §3 の major-type/additional-info 表と 42 §2.1 の 6 規則から手で組み立てた(encoder 出力からの複写ではない)",
+  "note": "key 順 = id(2) digest(6) locator(7) substrate(9) representation(14)。declaration 順ではない。"
+}

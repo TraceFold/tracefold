@@ -1,0 +1,18 @@
+{
+  "id": "S-AI24",
+  "kind": "codec-deviation",
+  "statement": "additional-info 24(1 byte 引数)で ai 直値に収まる 23 を書いた byte 列は decode されない",
+  "vector": "1817",
+  "expected": "REJECT",
+  "expected_error": "NonMinimal",
+  "normative_basis": "IPLD-SHOULD+gx-policy",
+  "tier": "Tier2",
+  "deviation": "整数 23 は ai 直値(0..=23)で 1 byte `17` が最短。ai=24 形式 `18 17` は 1 byte 長い。**境界そのもの**: 23 は直値に収まる最大値で、24 は収まらない最小値——scanner の判定は `v >= 24` の 1 本で、この vector と control はその比較の両側に 1 つずつ在る。req/33 A-2 は値 1 を使うため境界から遠く、`>=` を `>` に替えても落ちない。",
+  "spec_anchor": "ipld/ipld@a65340b specs/codecs/dag-cbor/spec.md L55 / RFC 8949 §3 Table 1 / 42 §2.1-1",
+  "origin": "gx self-authored for the fix hand (req/38 §16 H6-4: 「additional-info 境界の判別 vector(24/25/26/27・28-30・31)」)",
+  "control": {
+    "vector": "1818",
+    "expected": "ACCEPT",
+    "note": "24 は ai 直値に収まらない最小値なので ai=24 形式が最短=受理"
+  }
+}

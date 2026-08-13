@@ -1,0 +1,14 @@
+# 🔴 M5H8-5 採(a) (req/38_ERRATA_2026-08-07.md §45): 45 TH-10 の緩和欄と 33 NFR-013 が要求する
+# 「Rust toolchain pin」。req/86 §5.2 が `rust-toolchain.toml` の不在を実測し、§45 が「安いので
+# fix 批へ前倒し」と裁定した。SBOM 生成と SLSA provenance は release pipeline=M8 の CI gate 窓
+# (51 §11.2)で、この file とは cost が 2 桁違う。
+#
+# 1.97.1 は 2026-08-10 時点で `stable` が解決する版そのもの(rustc 1.97.1 (8bab26f4f 2026-07-14))
+# なので、この pin は今日の build を 1 つも変えない。変えるのは明日の build である——`stable` は
+# 動く名前で、動く名前で pin した供給網は pin されていない。46 の CI gate はこの file を読む。
+#
+# `components` は宣言しない。rustup は既定 profile の components を入れ、CI image と開発機は
+# `rustfmt`/`clippy`/`llvm-tools` を既に持っている。ここで列挙すると「この list が満たされている
+# 事」が第二の宣言になり、ci.sh の stage 群と二重に食い違いうる(§30 の病)。
+[toolchain]
+channel = "1.97.1"
