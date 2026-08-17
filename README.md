@@ -1,16 +1,16 @@
 <div align="center">
 
-<img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold — the inverse is sealed before the action" width="880">
+<img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold — verifiable reversibility" width="880">
 
 ### Undo is a feature. Reversibility is a property.
 
-An agent's change is held with a checked inverse **before** it lands, and every verdict
-becomes a receipt anyone can verify offline — without trusting whoever issued it.
+A change is held with a checked inverse **before** it lands, and every verdict becomes a
+receipt anyone can verify offline — without trusting whoever issued it.
 
 <p>
 <a href="#what-this-does-not-cover"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/the%20limits%20first-ece7da?style=for-the-badge&labelColor=ece7da"><img alt="the limits first" src="https://img.shields.io/badge/the%20limits%20first-0b0a09?style=for-the-badge&labelColor=0b0a09"></picture></a>
+<a href="#verify-a-receipt-without-us"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/verify%20a%20receipt-ece7da?style=for-the-badge&labelColor=ece7da"><img alt="verify a receipt" src="https://img.shields.io/badge/verify%20a%20receipt-0b0a09?style=for-the-badge&labelColor=0b0a09"></picture></a>
 <a href="https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/technical%20report-ece7da?style=for-the-badge&labelColor=ece7da"><img alt="technical report" src="https://img.shields.io/badge/technical%20report-0b0a09?style=for-the-badge&labelColor=0b0a09"></picture></a>
-<a href="https://discord.gg/bFBvvg7AG"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/discord-ece7da?style=for-the-badge&labelColor=ece7da&logo=discord&logoColor=0b0a09"><img alt="discord" src="https://img.shields.io/badge/discord-0b0a09?style=for-the-badge&labelColor=0b0a09&logo=discord&logoColor=ece7da"></picture></a>
 </p>
 
 <p>
@@ -18,7 +18,6 @@ becomes a receipt anyone can verify offline — without trusting whoever issued 
 <a href="https://github.com/TraceFold/tracefold/commits/main"><img alt="last commit" src="https://img.shields.io/github/last-commit/TraceFold/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09"></a>
 <a href="https://crates.io/crates/tracefold"><img alt="crates.io" src="https://img.shields.io/crates/v/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09&logo=rust&logoColor=ece7da"></a>
 <a href="https://www.npmjs.com/package/tracefold"><img alt="npm" src="https://img.shields.io/npm/v/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09&logo=npm&logoColor=ece7da"></a>
-<a href="https://github.com/TraceFold/tracefold"><img alt="language" src="https://img.shields.io/github/languages/top/TraceFold/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09"></a>
 </p>
 
 </div>
@@ -30,7 +29,6 @@ becomes a receipt anyone can verify offline — without trusting whoever issued 
 [What it does](https://github.com/TraceFold/tracefold#what-it-does) ·
 [Report](https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md) ·
 [Contributing](https://github.com/TraceFold/tracefold/blob/main/.github/CONTRIBUTING.md) ·
-[Discord](https://discord.gg/bFBvvg7AG) ·
 [Glovrex](https://glovrex.com)
 
 ---
@@ -131,8 +129,6 @@ own description. Silently bounded is the failure this project guards against har
 
 Good first things to pick up: a limit that is true but badly worded, a platform in the
 "not measured" row above, or an adversarial probe that breaks something we believe holds.
-
-Questions and half-formed ideas are welcome on [Discord](https://discord.gg/bFBvvg7AG).
 
 ## Sponsors
 
