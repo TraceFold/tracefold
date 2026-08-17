@@ -49,7 +49,9 @@ cd tracefold
 cargo build --workspace
 ```
 
-The binary is `gx`. Rust stable; the toolchain is pinned in `rust-toolchain.toml`. The
+The binary is `gx` — short for Glovrex effects, the thing being governed. A project and its
+command are allowed to have different names, the way ripgrep answers to `rg`. Rust stable;
+the toolchain is pinned in `rust-toolchain.toml`. The
 subcommands that exist today: `submit`, `plan`, `verify`, `commit`, `undo`, `cancel`,
 `escalation`, `receipt`, `replay`, `log`, `key`, `policy`, `serve`.
 
