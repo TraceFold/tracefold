@@ -11,6 +11,7 @@ receipt anyone can verify offline — without trusting whoever issued it.
 <a href="#what-this-does-not-cover"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/the%20limits%20first-ece7da?style=for-the-badge&labelColor=ece7da"><img alt="the limits first" src="https://img.shields.io/badge/the%20limits%20first-0b0a09?style=for-the-badge&labelColor=0b0a09"></picture></a>
 <a href="#verify-a-receipt-without-us"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/verify%20a%20receipt-ece7da?style=for-the-badge&labelColor=ece7da"><img alt="verify a receipt" src="https://img.shields.io/badge/verify%20a%20receipt-0b0a09?style=for-the-badge&labelColor=0b0a09"></picture></a>
 <a href="https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/technical%20report-ece7da?style=for-the-badge&labelColor=ece7da"><img alt="technical report" src="https://img.shields.io/badge/technical%20report-0b0a09?style=for-the-badge&labelColor=0b0a09"></picture></a>
+<a href="https://discord.gg/bFBvvg7AG"><picture><source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/discord-ece7da?style=for-the-badge&labelColor=ece7da&logo=discord&logoColor=0b0a09"><img alt="discord" src="https://img.shields.io/badge/discord-0b0a09?style=for-the-badge&labelColor=0b0a09&logo=discord&logoColor=ece7da"></picture></a>
 </p>
 
 <p>
