@@ -36,10 +36,11 @@ becomes a receipt anyone can verify offline — without trusting whoever issued 
 ---
 
 > [!IMPORTANT]
-> **Not released.** The crate is not on crates.io yet and `gx wrap` has not shipped. The
-> engine, the ledger, the policy gate, three substrate adapters, the CLI, the HTTP API, an
-> SDK and a machine-checked model exist and are tested — but what you can install today is
-> a build from source, and nothing below should be read otherwise.
+> **Not released.** What sits on crates.io and npm under this name is a reservation — version
+> `0.0.1`, holding the name, containing nothing you would want to install — and `gx wrap` has
+> not shipped. The engine, the ledger, the policy gate, three substrate adapters, the CLI, the
+> HTTP API, an SDK and a machine-checked model exist and are tested, but what you can install
+> today is a build from source, and nothing below should be read otherwise.
 
 ## Build it
 
