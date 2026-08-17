@@ -1,0 +1,58 @@
+name: Something does not hold
+description: A claim this project makes about itself turned out to be false on your machine.
+labels: ["defect"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Three classes of failure are outside this tool **by declaration** — root-privileged
+        writes, writes into the tool's own state directory, and a policy that encodes the
+        wrong intent. Those are in `docs/LIMITS.md` and are not defects.
+
+  - type: textarea
+    id: claim
+    attributes:
+      label: Which claim failed
+      description: Quote the sentence, the exit code, or the guarantee you were relying on.
+      placeholder: "`gx receipt verify --offline` is documented to exit 7 on a bad receipt."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: What you ran, and what came back
+      description: Commands and output. A failing command beats a description of one.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: build
+    attributes:
+      label: Which build
+      description: "`gx --version`, or the commit you built from."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: substrate
+    attributes:
+      label: Where it ran
+      options:
+        - Linux
+        - macOS
+        - Windows under WSL
+        - Windows native (not measured — zero runs so far)
+        - A network or synced filesystem (OneDrive, SMB — not measured)
+        - Somewhere else
+    validations:
+      required: true
+
+  - type: textarea
+    id: measured
+    attributes:
+      label: Anything you measured
+      description: >
+        Optional, and the most useful thing you can attach. A count, a hash, a diff before
+        and after — something a stranger could re-derive without asking you.
