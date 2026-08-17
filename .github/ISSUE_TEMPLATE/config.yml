@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question, or a half-formed idea
+    url: https://discord.gg/bFBvvg7AG
+    about: Anything that is not yet a defect report. No pressure to have it worked out first.
+  - name: Something that is out of scope on purpose
+    url: https://github.com/TraceFold/tracefold/blob/main/docs/LIMITS.md
+    about: Three classes of failure are declared outside this tool rather than missed. Check here before filing.
+  - name: A security issue
+    url: https://github.com/TraceFold/tracefold/blob/main/.github/SECURITY.md
+    about: Do not open a public issue for these. The policy says which reports are in scope.
