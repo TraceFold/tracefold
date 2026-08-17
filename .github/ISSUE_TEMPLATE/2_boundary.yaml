@@ -1,0 +1,39 @@
+name: A limit is wrong, missing, or badly worded
+description: The declared boundary between what is covered and what is not does not match reality.
+labels: ["boundary"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project treats its own limits as part of the product. A limit that is true but
+        unreadable is a defect in the same way a false one is.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which of these is it
+      options:
+        - A declared limit is not actually true — the tool does cover this
+        - A limit is true but the wording misled me
+        - Something is outside the tool and is not declared anywhere
+        - A platform is listed as unmeasured and I have measurements for it
+    validations:
+      required: true
+
+  - type: textarea
+    id: where
+    attributes:
+      label: Where it is written
+      description: The line in `docs/LIMITS.md`, or the sentence in the README.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reality
+    attributes:
+      label: What is actually the case
+      description: >
+        What you observed, and how you observed it. If a limit is enforced in code, a test
+        holds the written text against it — say if you think that test is the thing at fault.
+    validations:
+      required: true
