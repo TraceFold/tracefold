@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="" width="880">
+<img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold — the inverse is sealed before the action" width="880">
 
 ### Undo, but proven.
 
@@ -14,19 +14,21 @@ becomes a receipt anyone can verify offline — without trusting whoever issued 
 </p>
 
 <p>
-<img alt="license" src="https://img.shields.io/github/license/TraceFold/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09">
-<img alt="last commit" src="https://img.shields.io/github/last-commit/TraceFold/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09">
-<img alt="crates.io" src="https://img.shields.io/crates/v/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09&logo=rust&logoColor=ece7da">
-<img alt="npm" src="https://img.shields.io/npm/v/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09&logo=npm&logoColor=ece7da">
+<a href="https://github.com/TraceFold/tracefold/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/github/license/TraceFold/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09"></a>
+<a href="https://github.com/TraceFold/tracefold/commits/main"><img alt="last commit" src="https://img.shields.io/github/last-commit/TraceFold/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09"></a>
+<a href="https://crates.io/crates/tracefold"><img alt="crates.io" src="https://img.shields.io/crates/v/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09&logo=rust&logoColor=ece7da"></a>
+<a href="https://www.npmjs.com/package/tracefold"><img alt="npm" src="https://img.shields.io/npm/v/tracefold?style=flat-square&color=0b0a09&labelColor=0b0a09&logo=npm&logoColor=ece7da"></a>
 </p>
 
-<a href="#what-this-does-not-cover">Limits</a> ·
-<a href="#where-it-stands">Where it stands</a> ·
-<a href="#what-it-does">What it does</a> ·
-<a href="#trying-it">Trying it</a> ·
-<a href="https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md">Report</a>
-
 </div>
+
+[Limits](https://github.com/TraceFold/tracefold#what-this-does-not-cover) ·
+[Where it stands](https://github.com/TraceFold/tracefold#where-it-stands) ·
+[What it does](https://github.com/TraceFold/tracefold#what-it-does) ·
+[Build it](https://github.com/TraceFold/tracefold#building-it) ·
+[Verify a receipt](https://github.com/TraceFold/tracefold#verifying-a-receipt-without-us) ·
+[Technical report](https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md) ·
+[Glovrex](https://glovrex.com)
 
 ---
 
@@ -84,7 +86,7 @@ issuer.
 **Declared coverage.** What is not covered ships beside what is, with equal weight. A skip
 prints its name rather than passing quietly.
 
-## Trying it
+## Building it
 
 ```sh
 git clone https://github.com/TraceFold/tracefold
@@ -95,6 +97,11 @@ The binary is `gx`. The subcommands that exist today are `submit`, `plan`, `veri
 `commit`, `undo`, `cancel`, `escalation`, `receipt`, `replay`, `log`, `key`, `policy` and
 `serve`. Verifying a receipt needs nothing but the binary and three files — no workspace,
 no key store, no network:
+
+## Verifying a receipt without us
+
+Checking a receipt needs the binary and three files. No workspace, no key store, no
+network, and no account with us.
 
 ```sh
 gx receipt verify --offline --checkpoint <checkpoint> --key <public key>
