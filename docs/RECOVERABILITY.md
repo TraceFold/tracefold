@@ -35,6 +35,14 @@ object: GitHub, Slack, Notion, Linear, Stripe, Google Workspace.
 Each row repeats its own date and denominator on purpose. Rows get quoted one at a time, and a
 row that says "same as above" stops being true the moment it travels.
 
+```mermaid
+pie showData
+    title 27 kinds of object, six services, 18 August 2026
+    "Kept, readable through the API" : 12
+    "Kept, person only" : 5
+    "Not kept at all" : 10
+```
+
 The split is not arbitrary. Everything in the first row is **structure**: titles, labels,
 assignees, states, file contents through git. Everything in the last row is **content**: issue
 bodies, comments, pull request bodies, release notes, an edited message.
@@ -58,6 +66,14 @@ Measured against one widely deployed MCP server, `github/github-mcp-server`, at 
 Seven further tools fold create, update and delete into a single entry point, so their
 reversibility cannot be read off the name. They are excluded from the denominator rather than
 guessed at. Fifty nine tools only read and are not counted here at all.
+
+```mermaid
+pie showData
+    title 50 judgeable write tools, github/github-mcp-server, 18 August 2026
+    "Touches something the service still has" : 18
+    "Left undecided" : 8
+    "Touches something nobody has once written" : 24
+```
 
 **These two tables are separate measurements over different populations. Multiplying them is
 not a valid operation.**
