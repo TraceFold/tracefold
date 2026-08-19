@@ -83,6 +83,26 @@ They are above the features because reading them first can save you the afternoo
 The full list ships in [`docs/LIMITS.md`](docs/LIMITS.md), and a test fails if it drifts
 from the code that enforces it. These are not sentences someone remembered to update.
 
+## Who this is for
+
+Someone who will later have to show a third party what an agent did, and to whom "we checked
+our logs" is not an acceptable answer: an audit, a customer contract, a regulator, an internal
+review. If you only want to undo your own mistake, the assistant you already use probably
+keeps enough history, and you do not need this.
+
+Two things an agent's own client cannot do for you, however good it gets.
+
+It cannot see what left it. A rewind feature covers the conversation and the edits the client
+made itself; a change that went out through a shell command, or through someone else's tool
+server, was never inside its view.
+
+And it cannot be the independent check on its own work. The party being audited grading its
+own paper is not an audit, at any level of accuracy. That is a statement about position, not
+about quality, so it does not resolve as the client improves.
+
+Both gaps are the reason this exists. Neither is a complaint about those clients, which do
+the thing they were built for well.
+
 ## Where it stands
 
 | | measured | under what conditions |
