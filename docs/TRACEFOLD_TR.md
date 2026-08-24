@@ -16,11 +16,11 @@ Glovrex · Apache-2.0 · drafted 2026-08-13
 |---|---|
 | Kind | Technical report accompanying a public source repository. Not a submission to a refereed venue, and not a specification. |
 | Audience | Developers who run agents or MCP servers against systems that change, and engineers who build verification and audit machinery. |
-| Software described | The `gx-*` crate workspace (13 crates), a Rust implementation of what the internal specification calls a *verified transformation calculus*. CLI binary: `gx`. |
+| Software described | The `gx-*` crate workspace (17 workspace members; as of 2026-08-25, 13 are shipped in the public repository, the remaining 4 — the two database adapters and two internal-plumbing crates — are private), a Rust implementation of what the internal specification calls a *verified transformation calculus*. CLI binary: `gx`. |
 | Specification baseline | Internal specification v0.2.3; implementation tag `req0.09` (milestone M7 complete). All quantitative claims are pinned to named commits in §5. |
 | Licence | Apache-2.0. |
-| Product name | **Tracefold** is the selected name. It is provisional in one respect: a registrar and trademark check (`.com`/`.dev`, J-PlatPat/USPTO) is a precondition of publication and had not returned when this draft was written. If that check fails the name changes and this report changes with it. The company name, Glovrex, is fixed. |
-| Formal-methods status | There is no Lean model and no differential-test corpus in the tree. Both are planned work (milestone M8) and are written here in the future tense only. See §7.4. |
+| Product name | **Tracefold** is the selected name, in operational use since the 2026-08-13 publication of `github.com/TraceFold/tracefold` (confirmed still current as of 2026-08-25). The company name, Glovrex, is fixed. (A same-named `.dev` domain held by an unrelated third party was found during the survey that produced §6.9; that is a distinct, still-open naming-collision item, not a trademark-clearance blocker on the repository name itself.) |
+| Formal-methods status | As of 2026-08-25, `lean/` holds 117 theorems (12 named counterexamples) and 1 carried axiom across 13 files, 0 `sorry`. A differential test (1,500 conformance vectors, six kinds) compares the Rust implementation against it on every push. A comparison is a difference check, not a proof — no refinement theorem connects the two — and the release gates that would license unqualified present tense (`lean-current`, `difftest-nightly`) have not yet run green against a real release tag. See §7.4. |
 
 **How to read this report.** Start with §7 and §4. Non-claims and declared coverage come before §2 and §3 in importance, and if you have time for two sections, those are the two.
 
@@ -234,11 +234,11 @@ Both rules make the same modest point. They do not make bad changes impossible. 
 
 Everything substrate-specific lives behind one trait: `snapshot`, `plan`, `precondition`, `apply`, `invert`, `commutation`, `kind`. `plan` is pure, producing a delta without touching the world. `apply` is called only after the gate has admitted and the compare-and-swap has passed, and is contractually idempotent. `invert` may return `None`, and `None` is information the gate receives, not an error.
 
-Three adapters ship: filesystem, Git, and MCP. A shared conformance harness runs seven contract properties against each. The MCP adapter carries the product's first use case, and it also carries the sharpest declared limit (§4.3).
+As of 2026-08-25, three adapters ship in the public repository: filesystem, Git, and MCP. A shared conformance harness (`gx-substrate-conformance`) runs contract properties against each. The MCP adapter carries the product's first use case, and it also carries the sharpest declared limit (§4.3). Two more adapters — PostgreSQL and MySQL/MariaDB — exist in the workspace and pass conformance locally but are not yet in the public tree; their undo path is a live re-read taken before the statement runs, rather than the plan/invert path the three public adapters share, and DB-backed conformance runs require a live PostgreSQL/MariaDB server.
 
 ### 2.6 The workspace
 
-Thirteen crates, with the dependency direction running downward and the two top rows holding no semantic authority (§2.4).
+As of 2026-08-25, seventeen crates make up the workspace — thirteen ship publicly, the remaining four (the two database adapters, `gx-mcp-wire`, and `gx-confine`) are private — with the dependency direction running downward and the two top rows holding no semantic authority (§2.4).
 
 | Crate | Responsibility | Notable constraint |
 |---|---|---|
@@ -251,7 +251,11 @@ Thirteen crates, with the dependency direction running downward and the two top 
 | `gx-canon` | canonical DAG-CBOR, content identifiers, the RFC 8785 compatibility path | the monopoly on canonical encoding |
 | `gx-core` | the central types and nothing else | no I/O, deterministic, `forbid(unsafe_code)` |
 | `gx-substrate` | the `SubstrateAdapter` trait and its delta and fingerprint types | the point where substrate neutrality is held |
-| `gx-adapter-fs` / `-git` / `-mcp` | the three shipped substrates | plan is pure; apply is idempotent by contract |
+| `gx-adapter-fs` / `-git` / `-mcp` | three of the five shipped substrates | plan is pure; apply is idempotent by contract |
+| `gx-adapter-postgres` / `-mysql` | the two database substrates (private, not in public tree) | undo by live re-read taken before the statement runs, not plan/invert; DB-backed conformance needs a live server |
+| `gx-substrate-conformance` | the shared contract harness every `SubstrateAdapter` must pass | test-only crate; adapters inherit it via `#[test]` |
+| `gx-mcp-wire` | the MCP wire framing `gx-adapter-mcp` does not carry, and the proxy around it (private, not in public tree) | turns tool-call intent into a `PlannedDelta` candidate before the boundary |
+| `gx-confine` | a kernel ruleset derived from the write-target catalogue (private, not in public tree) | `forbid(unsafe_code)` |
 
 The engine does not execute. Application to a substrate is the adapter's job, and the engine arbitrates between gate, canonicaliser, witness, and ledger. Random numbers and clocks are injected at the engine boundary so that a run can be replayed deterministically from the journal.
 
@@ -380,7 +384,7 @@ Under-reporting is then detectable arithmetically, even when the lie is re-signe
 **Two things it does not close, stated here and not in a limitations appendix:**
 
 1. **Policy relaxation is not addressed.** A gate widened until it refuses nothing reports `deny = 0` truthfully. What the checkpoint supports is the detection of *non-disclosure*, not of permissiveness. A test in the repository is named for the fact that this detection does not fire, so that if it ever starts firing, someone finds out.
-2. **Split view is not addressed.** A signature attests that this key stated these numbers. It does not attest that these are the only numbers this key stated. One key can sign two internally consistent chains for two verifiers. Detecting the fork requires verifiers to compare notes, which is a consistency-proof problem and is not solved here.
+2. **As of 2026-08-25, split view is addressed only once verifiers compare notes.** A signature attests that this key stated these numbers. It does not attest that these are the only numbers this key stated. One key can sign two internally consistent chains for two verifiers. A detector for this now exists (`gx-log::witness_audit::CheckpointContradiction::Equivocation`): given a *pooled* set of checkpoints, two signed checkpoints of one origin naming the same tree size but different roots are flagged, arithmetically, no matter how the key re-signs. What it does not close is the pooling itself — if the two verifiers who were shown different chains never bring their checkpoints together, the fork is never fed to the detector, and that residual case is exactly the one the shipped module's own doc comment declares open.
 
 ---
 
@@ -428,8 +432,9 @@ This is the content of the `/limits` page, in English. It is an extract of the t
 | **We cannot observe an MCP tool call whose effect lands outside the object the transformation is about.** | The protocol does not tell a proxy what a tool touches. This is a gap in MCP, not an unimplemented feature: the fingerprint reads the object, and the object is not where the effect went. What we offer instead is **serialisation** — the footprint is the server, so nothing else on that server runs beside it. The price is that two resources on one server conflict. |
 | **Lexical normalisation of a locator does not cover alias resolution inside the substrate.** | All three substrates resolve names outside our lexical layer: filesystem symlinks, Git reference resolution, and MCP servers that map one URI to another resource. We can say our normalisation of *the string we named* is deterministic. Whether that string resolves where you think it does is the substrate's property. |
 | **A count checkpoint closes non-disclosure only.** Relax the policy until everything is admitted and the counts are zero and legitimate. Show two verifiers two different chains and both are internally consistent. | §3.5, limits 1 and 2. |
-| **Continuous differential testing against a formal (Lean) model is planned work for milestone M8. There is none today.** | No `lean/` directory, no conformance corpus, no artifacts for the three acceptance criteria that would cover it. See §7.4. |
-| **Machine-enforced CI on push and pull request covers 2 of 13 crates.** The rest of the green is a record of a human running the full script. | §5.5. |
+| **As of 2026-08-25, a Lean model and a continuous differential test exist** (117 theorems, 12 counterexamples, 13 files, 0 `sorry`; 1,500-vector differential test on every push), but no refinement theorem connects the Lean model to the Rust implementation, and the release gates that would license unqualified present tense have not yet gone green against a real release tag. | See §7.4. |
+| **As of 2026-08-25, machine-enforced CI on push and pull request covers 16 of this project's 17 `gx-*` workspace crates** (`gx-adapter-mysql` runs by hand; the TypeScript SDK is not run by CI at all). The rest of the green is a record of a human running the full script for the excluded pieces. | §5.5. |
+| **As of 2026-08-25, kani model-checking of `gx-canon`'s CBOR round-trip is BLOCKED-TERMINAL**, not merely opt-in-and-skipped. Six independent attempts across sessions did not reach a verdict. | Root cause isolated to the generic CBOR codec's symbolic reachability, not to this project's own code; a split-harness experiment eliminated the alternative symbolic-length hypothesis, and stubbing the codec was rejected as property-weakening. `gx-core`'s own kani coverage is unaffected (381 checks, 0 failures). Property coverage for `gx-canon`'s round-trip instead rests on fuzz testing (3/3 green) plus nextest integration coverage. |
 
 ### 4.3 Where the boundary came from
 
@@ -494,6 +499,7 @@ All figures come from a single developer machine: WSL2 on Windows, single node, 
 | Independent agreement | 4 parties | declared count, reconstructed count, actual run, and an independent re-run by a separate adjudicating lane, all agreeing |
 | State-machine transition coverage | **21 / 21** | tracked in a transition-to-test table, checked by a dedicated CI stage |
 | Growth over milestone M7 | 968 / 170 → 1,370 / 247 | start to end of the milestone |
+| Measurement date | 2026-08-13 | the author date of `b407365`, the commit every row above was taken at. This table is a milestone-M7 snapshot and is deliberately not restated; the current floor is in `README.md`, and it is larger. (`req/38` §207 ruling 7) |
 
 **A disclosure about the floor.** As of the most recent audited commit (`c7cdb6a`), one probe in that floor is **red**, and it is red on purpose.
 
@@ -537,12 +543,12 @@ This is the measurement we expect to be least comfortable and are most concerned
 
 | | Scope that runs | Started by |
 |---|---|---|
-| `tools/ci.sh` (manual) | all stages, all 13 crates | a person |
-| `.github/workflows/ci.yml` (push / PR) | **2 crates** (`gx-core`, `gx-canon`) for the format, lint, and test stages | GitHub Actions |
+| `tools/ci.sh` (manual) | all stages, all 17 `gx-*` crates | a person |
+| `.github/workflows/ci.yml` (push / PR) | **16 of 17 `gx-*` crates** (all except `gx-adapter-mysql`), as of 2026-08-25, for the format, lint, and test stages | GitHub Actions |
 
-The reason is a workspace member with a path dependency on a tree that does not exist on a runner holding only this repository. The manifest cannot be resolved, so the workflow drops that member from the checkout and narrows the scope, and the CI script prints the narrowing as `SKIPPED` lines instead of letting a narrowed run look like a full one.
+The one exclusion (`gx-adapter-mysql`) is a workspace member whose conformance suites need a live MariaDB server the runner does not carry; the CI script prints the narrowing as `SKIPPED` lines instead of letting a narrowed run look like a full one. The scope was narrowed to 2 crates for a period (a stale artifact of an early milestone, corrected in a later batch — see the workflow's own comment at the `GLOVREX_CI_SCOPE` definition) and is 16 of 17 as of 2026-08-25.
 
-**The consequence is stated plainly: of the gates this report describes, the ones that can turn a pull request red automatically cover 2 of 13 crates. The remaining green is a record of a human having run the script.** Widening the scope is registered work, not done.
+**The consequence is stated plainly: of the gates this report describes, the ones that can turn a pull request red automatically cover 16 of 17 `gx-*` crates, as of 2026-08-25.** The remaining exclusion — `gx-adapter-mysql`, plus `probes/doubt` (runs by hand, its subject lives outside the repository) and the TypeScript SDK (not run by CI at all) — is a record of a human having run the script. Widening further is registered work, not done.
 
 Related disclosures in the same family:
 
@@ -626,7 +632,7 @@ The internal specification carries a layered formalisation. It is described here
 
 **The shipped layer.** Admissible morphisms as a multiplicative morphism property, closed under composition and containing identities, which is a wide subcategory. Invariants as an indexed family with a sequential composition rule, which is Hoare logic in a categorical dress [PB]. Witnesses as a lax functor into a monoidal category of evidence, so that the witness of a composite is bounded by the composition of the parts' witnesses. Measured quantities as a lax functor into a quantale, following Lawvere-style enrichment [2°], with an optional Lyapunov-shaped law bounding the measure of the output by the measure of the input plus the cost of the morphism.
 
-Five statements are named as the things a formal model would be asked to prove: composition preserves admissibility; Hoare triples compose; canonicalisation is idempotent and representation-independent; receipt verification implies both admissibility and ledger inclusion; and the verdict chain of a composite is recoverable from its receipts. **None of the five has been mechanically proven. They are the M8 assignment (§7.4).** They are listed because a reader should be able to see what the eventual proof obligation is, and because the properties are stated as testable requirements in the meantime.
+Five statements are named as the things a formal model would be asked to prove: composition preserves admissibility; Hoare triples compose; canonicalisation is idempotent and representation-independent; receipt verification implies both admissibility and ledger inclusion; and the verdict chain of a composite is recoverable from its receipts. **As of 2026-08-25, a named Lean theorem exists for each of the five** (`T1_composition_sound`, `T2_invariant_composition`, `T3_canon`/`canonicalizer_idempotent`, `T4_receipt_soundness`, `T5_witness_recovery`), mechanically checked with zero `sorry`. What this does not establish is a refinement theorem connecting the Lean model to the Rust implementation — the differential test (§7.4) is a difference check between the two, not a proof that the Rust code satisfies what Lean proves — so "five theorems exist" and "the Rust implementation is proven correct against them" remain two different claims, and only the first is made here.
 
 **The layer above, not shipped.** Change actions — a monoid of changes per object with an application operator, and derivatives satisfying `f(x ⊕ δ) = f(x) ⊕ f'(x, δ)` — are the intended semantics for indexing change by something other than time. The lineage is incremental lambda calculus (Cai and colleagues, 2014) and its later categorical treatment (Alvarez-Picallo and Ong, 2019) [PB], with DBSP as the worked database instance [2°].
 
@@ -701,17 +707,17 @@ Everything in this report is scoped to changes that go through an adapter. A wri
 
 ### 7.4 We do not claim any formal-methods result, in any tense but the future
 
-There is no Lean model in the tree. There is no differential-test corpus. There are no artifacts for the three acceptance criteria that would cover them, and the code generator that would produce the vectors does not exist. **Continuous differential testing between the Rust implementation and an independently formalised model is planned work for milestone M8, and its current progress is zero.**
+As of 2026-08-25, there is a Lean model in the tree, and there is a differential-test corpus. `lean/` holds 117 theorems (12 named counterexamples) and 1 carried axiom across 13 files, checked with 0 `sorry`. The differential test compares the Rust implementation against the model on every push: 1,500 conformance vectors, six kinds. **This is a difference check, not a proof — no refinement theorem connects the Lean model to the Rust implementation** — and the CI scope that runs it automatically now covers 16 of this project's 17 workspace crates (`gx-adapter-mysql` runs by hand; the TypeScript SDK is not run by CI at all).
 
 We are explicit about this because the project got it wrong in its own documents and corrected it in the current specification revision. The forbidden-sentence list already prohibited *"the Lean proof and the Rust implementation have been proven mathematically equivalent."* But the sentence written in its place — *"verified by continuous differential testing"* — was in the present tense while the differential testing did not exist, and had become a way of asserting the forbidden thing through the exit. A comparison table in the product requirements likewise carried a filled-in mark for that property. Both were changed to a reservation, and the previous wording is retained in comments rather than deleted.
 
-The condition under which the present tense becomes permitted is fixed in advance rather than left to judgement: when the release gates named `lean-current` (build succeeds, zero `sorry`, the five theorems reachable) and `difftest-nightly` (at least 10^5 vectors) are actually green as release blockers. Until then the future tense is the correct tense.
+The condition under which the *unqualified* present tense becomes permitted is fixed in advance rather than left to judgement: when the release gates named `lean-current` (build succeeds, zero `sorry`, the five theorems reachable) and `difftest-nightly` (at least 10^5 vectors) are actually green **as release blockers against a real release tag**. As of 2026-08-25 the gates exist and run (`lean-current` and `difftest-nightly` are implemented CI jobs), but neither has yet run against a real release tag, so the condition for unqualified present tense is not yet met even though the underlying artifacts — the model and the differential corpus — are no longer absent. The qualified present tense used above ("there is a Lean model", stated with its difference-check caveat) describes that intermediate state; it is not the sentence the release condition would license.
 
 Related, and in the same family: we do not claim that the commutation mechanism is *proven categorically* or *verified with double categories*. The category-theoretic framing is a research layer explicitly excluded from the shipped product, and the internal document that defines it also contains the prohibition on citing it as implemented.
 
 ### 7.5 We do not claim the measurements are pass marks
 
-The performance figures in §5 are measurements against provisional design budgets. Until those budgets are decided against real measurement, the correct sentence is "2.6–6.5% of budget on tmpfs" and the incorrect sentence is "meets the performance requirement." Two of nine benchmarks are unwired; five verification layers are opt-in; machine-enforced CI covers 2 of 13 crates.
+The performance figures in §5 are measurements against provisional design budgets. Until those budgets are decided against real measurement, the correct sentence is "2.6–6.5% of budget on tmpfs" and the incorrect sentence is "meets the performance requirement." Two of nine benchmarks are unwired; five verification layers are opt-in; as of 2026-08-25, machine-enforced CI covers 16 of 17 `gx-*` crates (`gx-adapter-mysql` excluded; the TypeScript SDK is outside CI entirely).
 
 ### 7.6 We do not claim a single-writer deployment is a multi-writer one
 
@@ -719,7 +725,7 @@ Every measurement in this report is single-node and single-process. Throughput t
 
 ### 7.7 We do not claim the name
 
-Tracefold is provisional pending a registrar and trademark check, and an adjacent product in the `trace-*` naming neighbourhood was detected during the same survey that produced §6.9. If the check goes against us the name changes.
+As of 2026-08-25, Tracefold has been in public use as the repository and product name since 2026-08-13. What we do not claim is that the name is free of collision: an adjacent, unrelated product holds a same-named `.dev` domain, detected during the same survey that produced §6.9. We have not pursued a registrar or trademark clearance action on it, and this report makes no claim about how that collision resolves.
 
 ---
 
@@ -733,7 +739,7 @@ The sole author is a person. No tool is listed as an author or treated as one.
 
 - a **drafting lane**, producing specification text, implementation code, and prose including drafts of this report;
 - **implementation lanes**, one per milestone hand, each with a written assignment and a prohibition on exceeding it;
-- **adversarial audit lanes**, instructed to break the document or the code in front of them and to report blocking findings;
+- **self red-team audit lanes**, instructed to break the document or the code in front of them and to report blocking findings;
 - an **adjudication lane**, which rules on each finding under a numbered decision and which performs an independent re-run of each milestone's frozen measurement script before accepting it;
 - **research lanes**, used for breadth-first survey of prior work, whose output was not accepted without a separate party fetching the primary record.
 
@@ -818,7 +824,7 @@ Ranked, most doubtful first.
 5. **§2.4's description of rule two.** Two different rules have carried the number 2 in different internal documents (clock and entropy single-read; single call site for `apply`). Both are real and both are enforced; the numbering is a collision we have reported rather than resolved, and a reader tracing a reference to "rule two" in our source comments may land on either.
 6. **§6.9's characterisation of what each surveyed project does not have.** These are statements about the absence of a mechanism in a repository we read at README and design-document level, under a strict prohibition on copying code. Absence at that reading depth is weaker evidence than presence.
 7. **§6.8's attribution of the semantic lineage.** Every author and year in that subsection is carried from the internal specification's own reading, not from ours. The one substantive claim in it that is *ours* — that the commutator formulation is a type error outside abelian change structures, and that independence-with-residual is the correct generalisation — is a downgrade the project applied to its own founding intuition after an external mathematical review, and we have reproduced the conclusion rather than re-derived it.
-8. **The claim in §2.4 that the two membrane rules make a class of bypass into a near-compile-time failure.** They make it a *test* failure, on a stage that is in the manually run script. Whether that stage runs on a pull request depends on §5.5, and for eleven of thirteen crates it does not.
+8. **The claim in §2.4 that the two membrane rules make a class of bypass into a near-compile-time failure.** They make it a *test* failure, on a stage that is in the manually run script. Whether that stage runs on a pull request depends on §5.5, and as of 2026-08-25 it does for 16 of 17 `gx-*` crates — narrower than "near-compile-time" for the one excluded crate (`gx-adapter-mysql`) and for the TypeScript SDK, which §5.5 now names explicitly.
 
 ### C.4 Whole areas this report does not address at all
 
