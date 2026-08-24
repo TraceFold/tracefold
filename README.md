@@ -107,9 +107,10 @@ the thing they were built for well.
 
 | | measured | under what conditions |
 |:--|--:|:--|
-| Test floor | **1,770** | probes across 318 suites · fresh clone · one machine · single run |
-| Machine-checked | **90** | theorems, 0 `sorry` · three axioms carried, not proved |
-| Open holes | **3** | high severity · adversarial round 13 · repair in progress |
+| Test floor | **2,601** | probes across 454 suites · fresh clone · one machine · single run · 25 August 2026 |
+| Machine-checked | **117** | theorems in Lean (12 of them counterexamples), 0 `sorry` · one axiom carried, not proved |
+| Open holes | **0** | high severity · round 44 · a zero here is the state of one afternoon, not a settled property — rounds 29 through 44 all landed H=0, this is not read as permanent |
+| SDK (TypeScript) | **36 / 0 / 7** | passed / failed / skipped · lives in the private tree today, not yet part of this public repo — no install command is given here because there is nothing here to install it from |
 | Not measured | **3** | Windows native, OneDrive, SMB — zero runs |
 
 Every figure can be re-derived here by someone who does not trust us. Figures without the
