@@ -32,10 +32,26 @@ publish = false                       # req/636: no crate in this workspace is a
 # extended one crate down. The feature gates **both** the embedding and its `SHIPPED_PACKS` row,
 # because gating only the first would leave the table naming a pack no build carries, and gating
 # only the second would still fail to compile.
+# 🔴 **`req/832` ATOM -1 — off in the public distribution, and this is the whole point of the file.**
+#
+# `crates/gx-gate/src/packs.rs` embeds the postgres pack with `include_str!`, and this distribution's
+# `policies/` directory is three files (`fs`, `git`, `mcp`) — the postgres pack is not in the sync
+# set. An `include_str!` naming a file that is not in the tree is a **compile error before any Rust
+# is read**, which is exactly what the published repository did on every `cargo build --workspace`
+# (`req/817` §2.5, measured on an anonymous clone). No feature on a *dependent* crate can reach it,
+# because the embedding is resolved while this crate compiles.
+#
+# So this manifest ships the same Rust with the feature off. Three packs embedded, three rows in
+# `SHIPPED_PACKS`, three adapters registered by `gx-cli` — the public tree stays self-consistent
+# rather than merely compiling, which is the property `crates/gx-cli/tests/defaults.rs` checks.
+#
+# Turning `pg` on here will not work: the pack file is not in this tree and the build will say so by
+# name. That refusal is the intended answer, and it is the same posture `public/crates/gx-cli/
+# Cargo.toml` takes for `mcp`, `confine` and its own `pg`.
 [features]
-default = ["pg"]
+default = []
 # The shipped postgres pack (`req/446` V0-C) and its `SHIPPED_PACKS` row.
-pg = []
+pg = []  # needs `policies/postgres/deny-system-catalogs.cedar`, not in this distribution
 
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
