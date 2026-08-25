@@ -586,5 +586,19 @@ fn every_shipped_pack_passes_its_own_scenario_file() {
         assert_eq!(tested.json()["failed"], 0);
         checked += 1;
     }
-    assert_eq!(checked, 4, "four packs ship as of policy pack v0");
+    // req/833: the postgres pack sits behind the `pg` feature (req/817/832 public shape), so a
+    // build without it walks SHIPPED_PACKS at three. With `pg` on (the private default) the
+    // count is the policy-pack-v0 four, unchanged.
+    let expected = 3 + usize::from(cfg!(feature = "pg"));
+    if expected == 3 {
+        eprintln!(
+            "NOTE policy_cmds: the postgres pack is compiled out (`pg` feature off; published \
+             tree, req/817/832); its scenario road is measured on the private tree (req/833)."
+        );
+    }
+    assert_eq!(
+        checked, expected,
+        "every shipped pack travels its scenario road: four as of policy pack v0, three without \
+         the `pg` feature (req/833)"
+    );
 }

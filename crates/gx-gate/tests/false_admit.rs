@@ -471,6 +471,27 @@ fn false_admit_the_refusal_carries_the_declared_source_and_code() {
         let Some(expected) = &v.expected_source else {
             continue;
         };
+        // req/833: a vector may declare a statement of a pack this build compiles without —
+        // the postgres pack sits behind the `pg` feature (req/817/832 public shape), and a
+        // build without it refuses the vector by default-deny rather than by the named clause.
+        // The guard is keyed on the feature and on the declared id being absent from
+        // `SHIPPED_PACKS`, so with `pg` on (the private default) nothing is skipped.
+        if !cfg!(feature = "pg") {
+            if let ReasonSource::Policy { policy_id } = expected {
+                let shipped = packs::SHIPPED_PACKS
+                    .iter()
+                    .any(|p| p.policy_ids.contains(&policy_id.as_str()));
+                if !shipped {
+                    eprintln!(
+                        "SKIP {}: the vector declares {policy_id}, a statement of a pack this \
+                         build compiles without (`pg` feature off; published tree, req/817/832). \
+                         The named-clause refusal is measured on the private tree (req/833).",
+                        v.id
+                    );
+                    continue;
+                }
+            }
+        }
         checked += 1;
         let Verdict::Deny(reasons) = verdict_for(&gate, &v.request, &v.id) else {
             panic!("{}: the previous probe owns this failure", v.id);

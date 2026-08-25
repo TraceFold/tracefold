@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 //! 🔴 **`req/316` M-01 and M-02** (`req/317` §1 items 2 and 3, `req/38` §227 ruling 3) — how "the
 //! server answered, and its answer is that there is nothing here" crosses the adapter boundary, and
@@ -56,6 +56,34 @@ const AFTER: &[u8] = b"what the call put there\n";
 /// the branch point (`req/299` §0's rule).
 const ANSWERED_ABSENT: &str =
     "[gx: the server answered, and its answer is that this locator holds nothing]";
+
+/// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
+/// `members` array, inside which nothing but member paths may be written (the public root's own
+/// rule, `public/Cargo.toml`).
+///
+/// `req/833`: the published tree (`req/817`) carries its own 14-member root and `req/789` §3
+/// holds `crates/gx-mcp-wire` private, so the two source-scan arms below have no file to read
+/// there. The guard is keyed on the **declaration**, not on bare absence, so `req/29` §4 stays
+/// intact: a tree that declares the member and lacks the file still fails loudly; only a tree
+/// that deliberately does not carry it skips, and says so.
+fn workspace_declares(member: &str) -> bool {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("crates/gx-adapter-mcp sits two levels under the workspace root")
+        .join("Cargo.toml");
+    let text = std::fs::read_to_string(&manifest)
+        .unwrap_or_else(|e| panic!("{} unreadable: {e}", manifest.display()));
+    let Some(start) = text.find("members = [") else {
+        return false;
+    };
+    let Some(end) = text[start..].find(']') else {
+        return false;
+    };
+    text[start..start + end]
+        .lines()
+        .any(|l| l.trim().trim_end_matches(',').trim_matches('"') == member)
+}
 
 /// How a read behaves after the call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -317,6 +345,15 @@ fn a_failure_that_says_nothing_about_absence_is_still_refused() {
 /// being read, which is fail-closed and therefore silent. This arm is what makes it loud.
 #[test]
 fn every_site_that_writes_the_token_writes_it_first() {
+    if !workspace_declares("crates/gx-mcp-wire") {
+        eprintln!(
+            "SKIP every_site_that_writes_the_token_writes_it_first: this tree's workspace does \
+             not declare crates/gx-mcp-wire (req/789 §3 private crate; published tree, \
+             req/817). The scan's subject is not shipped here; the claim is measured on the \
+             private tree (req/833)."
+        );
+        return;
+    }
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("crates/")
@@ -353,6 +390,15 @@ fn every_site_that_writes_the_token_writes_it_first() {
 /// `fn read_prior_by_tool`. This is that scan, kept.
 #[test]
 fn the_declared_read_road_has_a_branch_that_marks_an_absence() {
+    if !workspace_declares("crates/gx-mcp-wire") {
+        eprintln!(
+            "SKIP the_declared_read_road_has_a_branch_that_marks_an_absence: this tree's \
+             workspace does not declare crates/gx-mcp-wire (req/789 §3 private crate; \
+             published tree, req/817). The scan's subject is not shipped here; the claim is \
+             measured on the private tree (req/833)."
+        );
+        return;
+    }
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("crates/")

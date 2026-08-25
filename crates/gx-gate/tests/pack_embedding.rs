@@ -153,9 +153,30 @@ fn each_pack_reaches_a_build_by_exactly_one_road() {
         pack_roads.len(),
         SHIPPED_PACKS.len()
     );
+    // req/833: the postgres road is in the source text behind `cfg(feature = "pg")` (req/832),
+    // so a build without the feature still *sees* the road while `SHIPPED_PACKS` does not carry
+    // the pack. The compiled-out road is accounted for by name rather than subtracted silently:
+    // it must be exactly the postgres pack's, and there must be exactly one of it.
+    let compiled_out = usize::from(!cfg!(feature = "pg"));
+    if compiled_out == 1 {
+        eprintln!(
+            "NOTE pack_embedding: 1 embedding road (policies/postgres/deny-system-catalogs.cedar) \
+             is compiled out (`pg` feature off; published tree, req/817/832) and is checked by \
+             name here rather than through SHIPPED_PACKS (req/833)."
+        );
+        assert_eq!(
+            pack_roads
+                .iter()
+                .filter(|(_, e)| e.ends_with("policies/postgres/deny-system-catalogs.cedar"))
+                .count(),
+            1,
+            "the road outside SHIPPED_PACKS must be exactly the compiled-out postgres pack's: \
+             {pack_roads:?}"
+        );
+    }
     assert_eq!(
         pack_roads.len(),
-        SHIPPED_PACKS.len(),
+        SHIPPED_PACKS.len() + compiled_out,
         "FR-028 asks for one road per pack; found {pack_roads:?}"
     );
     for (file, _) in &pack_roads {
@@ -203,7 +224,7 @@ fn the_embedded_bytes_are_the_files_the_criteria_name() {
 #[test]
 fn nothing_ships_in_policies_that_no_build_loads() {
     let shipped = shipped_cedar_files();
-    let embedded: BTreeSet<String> = embedded_paths()
+    let mut embedded: BTreeSet<String> = embedded_paths()
         .into_iter()
         .filter(|(_, path)| path.contains("policies/"))
         .map(|(_, path)| {
@@ -211,6 +232,19 @@ fn nothing_ships_in_policies_that_no_build_loads() {
             path[at..].to_string()
         })
         .collect();
+    // req/833: the postgres road sits in the source text behind `cfg(feature = "pg")`
+    // (req/832); a build without the feature never loads it and the published tree (req/817)
+    // does not ship the file it names. Set the compiled-out road aside by name, loudly — with
+    // `pg` on (the private default) nothing is removed.
+    if !cfg!(feature = "pg")
+        && embedded.remove("policies/postgres/deny-system-catalogs.cedar")
+    {
+        eprintln!(
+            "NOTE pack_embedding: policies/postgres/deny-system-catalogs.cedar is embedded by a \
+             road this build compiles out (`pg` feature off; published tree, req/817/832) and is \
+             not held against the shipped set (req/833)."
+        );
+    }
     println!("pack_embedding: shipped={shipped:?} embedded={embedded:?}");
     assert_eq!(
         shipped, embedded,

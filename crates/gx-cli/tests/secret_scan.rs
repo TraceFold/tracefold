@@ -117,6 +117,24 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
+/// `members` array, inside which nothing but member paths may be written (the public root's own
+/// rule, `public/Cargo.toml`). See the corpus guard below for why this exists (req/833).
+fn workspace_declares(member: &str) -> bool {
+    let manifest = repo_root().join("Cargo.toml");
+    let text = std::fs::read_to_string(&manifest)
+        .unwrap_or_else(|e| panic!("{} unreadable: {e}", manifest.display()));
+    let Some(start) = text.find("members = [") else {
+        return false;
+    };
+    let Some(end) = text[start..].find(']') else {
+        return false;
+    };
+    text[start..start + end]
+        .lines()
+        .any(|l| l.trim().trim_end_matches(',').trim_matches('"') == member)
+}
+
 /// One rule's hit: which rule, and where.
 #[derive(Debug)]
 struct Finding {
@@ -883,6 +901,19 @@ fn the_scanner_detects_a_planted_secret_in_its_own_fixture() {
 #[test]
 fn the_scanner_detects_all_eight_evasion_shapes_in_the_audit_corpus() {
     let corpus = repo_root().join("tools/audit_m9_p2_scanner_evasion_fixture.sh");
+    // req/833: the corpus plants eight secret-shaped strings on purpose, so it must not ship in
+    // the published tree (`tools/` there is `e2e.sh` alone, req/817 §3 — a public copy would
+    // seed the repo with secret-scanner bait). The guard is keyed on the workspace declaration,
+    // not on bare absence: the published root (req/817) declares no probes/doubt member, the
+    // private root does — so a private tree that loses the corpus still fails below.
+    if !corpus.is_file() && !workspace_declares("probes/doubt") {
+        eprintln!(
+            "SKIP the_scanner_detects_all_eight_evasion_shapes_in_the_audit_corpus: the evasion \
+             corpus is deliberately not shipped (secret-shaped fixture; published tree, \
+             req/817). The AC-V2B-1 detection claim is measured on the private tree (req/833)."
+        );
+        return;
+    }
     assert!(
         corpus.is_file(),
         "{} is missing; the AC-V2B-1 detection claim has nothing to point the scanner at",

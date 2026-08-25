@@ -1,0 +1,48 @@
+[
+  {
+    "name": "place: a change under /etc is refused by name",
+    "substrate": "fs",
+    "locator": "/etc/passwd",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "expect_policy_id": "fs-deny-etc"
+  },
+  {
+    "name": "place: the /etc node itself is refused, not only what is under it",
+    "substrate": "fs",
+    "locator": "/etc",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "expect_policy_id": "fs-deny-etc"
+  },
+  {
+    "name": "gate: an fs change outside /etc is admitted by this pack's own default",
+    "substrate": "fs",
+    "locator": "/tmp/x",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Admit",
+    "expect_policy_id": "fs-permit-default"
+  },
+  {
+    "name": "gate: a git change reaches no statement of the fs pack",
+    "substrate": "git",
+    "locator": "/srv/repo#refs/heads/main:file.txt",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "deny_by_no_policy": true
+  },
+  {
+    "name": "range: no inverse escalates whatever the locator says",
+    "substrate": "fs",
+    "locator": "/tmp/x",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "order": 1,
+    "invert_available": false,
+    "expect": "Escalate"
+  }
+]

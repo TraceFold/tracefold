@@ -65,6 +65,34 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// Registry rows that exist only in the private tree (req/833): `probes/doubt` is not in the
+/// public sync set at all (req/789 §3), and `boundary_attest.rs` is on the canon-reading
+/// exclusion set executed in the resync (req/38 SS772-773). In a tree whose workspace root does
+/// not declare `probes/doubt` — the published tree's own 14-member root, req/817 — these two rows
+/// are set aside loudly; in the private tree their absence still fails.
+const PRIVATE_TREE_ONLY: &[&str] = &[
+    "probes/doubt/tests/declaration_writer_doubt.rs",
+    "crates/gx-witness/tests/boundary_attest.rs",
+];
+
+/// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
+/// `members` array, inside which nothing but member paths may be written (the public root's own
+/// rule, `public/Cargo.toml`).
+fn workspace_declares(member: &str) -> bool {
+    let manifest = repo_root().join("Cargo.toml");
+    let text = std::fs::read_to_string(&manifest)
+        .unwrap_or_else(|e| panic!("{} unreadable: {e}", manifest.display()));
+    let Some(start) = text.find("members = [") else {
+        return false;
+    };
+    let Some(end) = text[start..].find(']') else {
+        return false;
+    };
+    text[start..start + end]
+        .lines()
+        .any(|l| l.trim().trim_end_matches(',').trim_matches('"') == member)
+}
+
 fn limits() -> String {
     std::fs::read_to_string(repo_root().join("docs/LIMITS.md")).expect("docs/LIMITS.md is readable")
 }
@@ -233,6 +261,14 @@ fn a_bed_control_every_registered_count_is_this_trees_count() {
     for (path, word) in REGISTERED {
         let full = repo_root().join(path);
         let Ok(text) = std::fs::read_to_string(&full) else {
+            if PRIVATE_TREE_ONLY.contains(&path) && !workspace_declares("probes/doubt") {
+                eprintln!(
+                    "SKIP {path}: a private-tree registry row (req/789 §3 / SS772-773 canon \
+                     exclusion) and this tree's workspace does not declare probes/doubt \
+                     (published tree, req/817). Held against the private tree (req/833)."
+                );
+                continue;
+            }
             wrong.push(format!("{path} is not in this tree"));
             continue;
         };

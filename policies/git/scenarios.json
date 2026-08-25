@@ -1,0 +1,48 @@
+[
+  {
+    "name": "place: a tag reference is refused by name",
+    "substrate": "git",
+    "locator": "/srv/repo#refs/tags/v1:file.txt",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "expect_policy_id": "git-deny-nonbranch-refs"
+  },
+  {
+    "name": "place: a remote-tracking reference is refused by name",
+    "substrate": "git",
+    "locator": "/srv/repo#refs/remotes/origin/main:file.txt",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "expect_policy_id": "git-deny-nonbranch-refs"
+  },
+  {
+    "name": "place: the anchor holds - a repository directory called refs is not a tag write",
+    "substrate": "git",
+    "locator": "/srv/refs/tags/x#refs/heads/main:file.txt",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Admit",
+    "expect_policy_id": "git-permit-default"
+  },
+  {
+    "name": "gate: an fs change reaches no statement of the git pack",
+    "substrate": "fs",
+    "locator": "/tmp/x",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "deny_by_no_policy": true
+  },
+  {
+    "name": "range: no inverse escalates a branch write this pack would otherwise admit",
+    "substrate": "git",
+    "locator": "/srv/repo#refs/heads/main:file.txt",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "order": 1,
+    "invert_available": false,
+    "expect": "Escalate"
+  }
+]

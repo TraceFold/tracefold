@@ -146,13 +146,54 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// The workspace member a listed crate root belongs to: `crates/<name>/…` → `crates/<name>`,
+/// `sdk/<name>/…` → `sdk/<name>`.
+fn member_of(rel: &str) -> String {
+    rel.splitn(3, '/').take(2).collect::<Vec<_>>().join("/")
+}
+
+/// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
+/// `members` array, inside which nothing but member paths may be written (the public root's own
+/// rule, `public/Cargo.toml`).
+///
+/// `req/833`: the published tree (`req/817`) carries its own 14-member root; `req/789` §3 holds
+/// four crates private, so five of the roots `SHIPPED_CRATE_ROOTS` names have no file there. The
+/// guard is keyed on the **declaration**, not on bare absence, so req/29 §4 stays intact: a root
+/// whose crate the manifest declares and whose file is gone still fails; only roots of crates
+/// this tree deliberately does not carry are set aside, loudly.
+fn workspace_declares(member: &str) -> bool {
+    let manifest = repo_root().join("Cargo.toml");
+    let text = std::fs::read_to_string(&manifest)
+        .unwrap_or_else(|e| panic!("{} unreadable: {e}", manifest.display()));
+    let Some(start) = text.find("members = [") else {
+        return false;
+    };
+    let Some(end) = text[start..].find(']') else {
+        return false;
+    };
+    text[start..start + end]
+        .lines()
+        .any(|l| l.trim().trim_end_matches(',').trim_matches('"') == member)
+}
+
 /// The criterion.
 #[test]
 fn every_shipped_crate_root_forbids_unsafe() {
     let root = repo_root();
     let mut missing = Vec::new();
+    let mut not_carried = 0usize;
 
     for rel in SHIPPED_CRATE_ROOTS {
+        if !workspace_declares(&member_of(rel)) {
+            eprintln!(
+                "SKIP {rel}: this tree's workspace does not declare {} (req/789 §3 private \
+                 crate; published tree, req/817). Its forbid(unsafe_code) is measured on the \
+                 private tree (req/833).",
+                member_of(rel)
+            );
+            not_carried += 1;
+            continue;
+        }
         let path = root.join(rel);
         let source = std::fs::read_to_string(&path).unwrap_or_else(|e| {
             panic!(
@@ -166,9 +207,10 @@ fn every_shipped_crate_root_forbids_unsafe() {
     }
 
     println!(
-        "SHIPPED_CRATE_ROOTS={} FORBID_UNSAFE_MISSING={}",
+        "SHIPPED_CRATE_ROOTS={} FORBID_UNSAFE_MISSING={} NOT_CARRIED_BY_THIS_TREE={}",
         SHIPPED_CRATE_ROOTS.len(),
-        missing.len()
+        missing.len(),
+        not_carried
     );
     assert!(
         missing.is_empty(),
@@ -238,8 +280,22 @@ fn every_shipped_crate_root_is_in_the_list() {
 
     found.sort();
     found.dedup();
+    // req/833: hold the walk only to the roots whose crates this tree's workspace declares —
+    // the published tree (req/817) does not carry the four req/789 §3 private crates. A root
+    // set aside here is announced; a declared root the walk does not find still fails below.
     let mut declared: Vec<String> = SHIPPED_CRATE_ROOTS
         .iter()
+        .filter(|rel| {
+            let carried = workspace_declares(&member_of(rel));
+            if !carried {
+                eprintln!(
+                    "SKIP {rel}: this tree's workspace does not declare {} (req/789 §3 private \
+                     crate; published tree, req/817). Checked on the private tree (req/833).",
+                    member_of(rel)
+                );
+            }
+            carried
+        })
         .map(|s| (*s).to_string())
         .collect();
     declared.sort();

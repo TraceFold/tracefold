@@ -1,0 +1,48 @@
+[
+  {
+    "name": "place: an MCP call landing under /etc is refused by name",
+    "substrate": "mcp",
+    "locator": "stdio://server#file:///etc/passwd",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "expect_policy_id": "mcp-deny-etc-resources"
+  },
+  {
+    "name": "place: the /etc node itself is refused, not only what is under it",
+    "substrate": "mcp",
+    "locator": "stdio://server#file:///etc",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "expect_policy_id": "mcp-deny-etc-resources"
+  },
+  {
+    "name": "place: an MCP call landing elsewhere is admitted by this pack's own default",
+    "substrate": "mcp",
+    "locator": "stdio://server#file:///srv/notes.md",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Admit",
+    "expect_policy_id": "mcp-permit-default"
+  },
+  {
+    "name": "gate: an fs change reaches no statement of the mcp pack",
+    "substrate": "fs",
+    "locator": "/etc/passwd",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "expect": "Deny",
+    "deny_by_no_policy": true
+  },
+  {
+    "name": "range: no inverse escalates a call this pack would otherwise admit",
+    "substrate": "mcp",
+    "locator": "stdio://server#file:///srv/notes.md",
+    "context": "Policy",
+    "actor_key": "key-1",
+    "order": 1,
+    "invert_available": false,
+    "expect": "Escalate"
+  }
+]

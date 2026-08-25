@@ -84,10 +84,41 @@ fn workspace_root() -> PathBuf {
 /// Read from the directory rather than from `cargo metadata`: the question is what the repository
 /// holds, and a member that was quietly dropped from the workspace list would vanish from
 /// `cargo metadata` while its source stayed on disk.
+/// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
+/// `members` array, inside which nothing but member paths may be written (the public root's own
+/// rule, `public/Cargo.toml`). See the guard in [`manifests`] for why this exists (req/833).
+fn workspace_declares(root: &Path, member: &str) -> bool {
+    let manifest = root.join("Cargo.toml");
+    let text = std::fs::read_to_string(&manifest)
+        .unwrap_or_else(|e| panic!("{} unreadable: {e}", manifest.display()));
+    let Some(start) = text.find("members = [") else {
+        return false;
+    };
+    let Some(end) = text[start..].find(']') else {
+        return false;
+    };
+    text[start..start + end]
+        .lines()
+        .any(|l| l.trim().trim_end_matches(',').trim_matches('"') == member)
+}
+
 fn manifests(root: &Path) -> BTreeMap<String, PathBuf> {
     let mut out = BTreeMap::new();
     for group in ["crates", "probes"] {
         let dir = root.join(group);
+        // req/833: the published tree (req/817) does not carry probes/ at all — its own
+        // workspace root declares 14 members and none under probes/. The guard is keyed on that
+        // declaration, not on bare absence, so req/29 §4 stays intact: a tree whose manifest
+        // declares probes/doubt and lacks the directory still fails below; only a tree that
+        // deliberately does not carry it skips this group, and says so.
+        if group == "probes" && !dir.is_dir() && !workspace_declares(&root, "probes/doubt") {
+            eprintln!(
+                "SKIP probes/ in ac_014's manifest walk: this tree's workspace does not declare \
+                 probes/doubt (published tree, req/817); the probes half of this audit is \
+                 measured on the private tree (req/833)."
+            );
+            continue;
+        }
         assert!(
             dir.is_dir(),
             "{} is missing; a check that cannot find the tree it audits must fail, not pass \

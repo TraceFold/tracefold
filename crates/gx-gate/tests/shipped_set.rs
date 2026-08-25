@@ -251,7 +251,21 @@ fn each_pack_decides_only_its_own_substrate() {
     let mut divergences: Vec<String> = Vec::new();
     let mut checked = 0usize;
     for Row { tag, case } in rows() {
-        let pack = pack_for(tag).unwrap_or_else(|| panic!("{tag}: no shipped pack speaks for it"));
+        // req/833: the postgres pack sits behind the `pg` feature (req/817/832 public shape); a
+        // build without it has no pack speaking for that row's substrate. Only that named row is
+        // set aside, loudly — with `pg` on (the private default) nothing is skipped, and any
+        // other unowned row still fails.
+        let Some(pack) = pack_for(tag) else {
+            if !cfg!(feature = "pg") && tag == "custom:postgres" {
+                eprintln!(
+                    "SKIP shipped_set row {tag}: the postgres pack is compiled out (`pg` feature \
+                     off; published tree, req/817/832). Its locality row is measured on the \
+                     private tree (req/833)."
+                );
+                continue;
+            }
+            panic!("{tag}: no shipped pack speaks for it")
+        };
         let alone = answered(&one_pack_gate(&pack), &case);
         let together = answered(&composed, &case);
         checked += 1;
