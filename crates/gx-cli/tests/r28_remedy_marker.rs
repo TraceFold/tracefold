@@ -66,6 +66,18 @@
 //!
 //! R29 re-measured today's tree the same way: **naive 37 / 0, rejoined 40 / 0, the same 3 files.**
 //! `arm d` below holds the corrected numbers so that this paragraph cannot drift again silently.
+//!
+//! # 🔴 DR-46-21 / `req/836` — the forty-first sentence (additive; every paragraph above stands)
+//!
+//! Commit `c8a0b38d` (DR-46-21, `req/680`, merged `fbe5c97b` 2026-08-22) added
+//! `CAS_OBJECT_DIGEST_REFUSAL` to `crates/gx-adapter-mcp/src/invert.rs`, and its body carries one
+//! more `What to fix:` sentence — **intact on one physical line**, so naive and rejoined move
+//! together (`37 → 38` naive, `40 → 41` rejoined) and the hidden-marker set stays the same three
+//! files. Today's derivation therefore closes as **`27 + 10 = 37`, `+3` R28 sentences, `+1`
+//! DR-46-21 = `41`**, and `census()` prints `kept=41`. What DR-46-21's own commit omitted was
+//! exactly the engrave step this paragraph exists for — the population gates in
+//! `r29_instrument_repairs.rs` (arms `d`/`e`) stood red in both trees until `req/836` supplied
+//! the re-derivation, which is those gates doing precisely their job.
 
 use std::path::{Path, PathBuf};
 

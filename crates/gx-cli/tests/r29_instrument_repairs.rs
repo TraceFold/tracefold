@@ -393,11 +393,18 @@ fn d_the_selection_predicate_admits_static_str_and_still_excludes_arrays() {
         // that the repaired *selector* must not move the population by itself, and the audit's
         // 27 is kept in the sentence below so a reader can see which of the two moved it. A
         // slot added to the declaration face is exactly what this count exists to notice.
-        selected, 28,
+        //
+        // 🔴 **DR-46-21 (`req/836` re-derivation)** — 28 until commit `c8a0b38d` (`req/680`,
+        // merged `fbe5c97b` 2026-08-22): `invert.rs` gained `CAS_OBJECT_DIGEST_REFUSAL`, the
+        // CAS read path's digest-mismatch refusal, the twenty-ninth. The count noticed the
+        // addition exactly as designed; what DR-46-21's own commit omitted was this
+        // re-derivation, which stood red in both trees until `req/836` supplied it (the same
+        // engrave-step drift `req/361` L-01 is about, one arm over).
+        selected, 29,
         "🔴 the repaired selector changed what this directory yields. `req/361` L-02 is a repair to \
          a **latent** defect — the audit measured 27 selected and 27 terminating (DR-46-28 added the \
-         twenty-eighth), and a repair that moves today's population is doing something other \
-         than what was ruled"
+         twenty-eighth, DR-46-21 the twenty-ninth), and a repair that moves today's population is \
+         doing something other than what was ruled"
     );
     assert!(
         !arrays.is_empty(),
@@ -542,7 +549,12 @@ fn e_the_announcing_paragraph_states_the_numbers_the_recount_produces() {
          re-run: {split_files:?}"
     );
     assert_eq!(
-        joined, 40,
+        // 🔴 **DR-46-21 (`req/836` re-derivation)** — 40 until commit `c8a0b38d`:
+        // `CAS_OBJECT_DIGEST_REFUSAL`'s body carries the forty-first `What to fix:` sentence,
+        // intact on one physical line (naive and rejoined both count it: 37→38 / 40→41; the
+        // hidden-marker set stays the same three files, which is why the `split_files` arm
+        // above did not move).
+        joined, 41,
         "🔴 the rejoined census of this tree is what the marker gate prints as `kept`; the two are \
          the same measurement and they have to agree"
     );
@@ -551,12 +563,16 @@ fn e_the_announcing_paragraph_states_the_numbers_the_recount_produces() {
         "🔴 rejoining found nothing, so this arm is not measuring the thing `req/361` L-01 is about"
     );
     assert_eq!(
-        27 + 10 + 3,
+        // 🔴 **DR-46-21 (`req/836` re-derivation)** — the derivation gains a named fourth term:
+        // corrected base pair (27 + 10) + R28's three new sentences + DR-46-21's one
+        // (`CAS_OBJECT_DIGEST_REFUSAL`, `invert.rs`, commit `c8a0b38d`). Every term has an
+        // owner, which is what "re-derived rather than re-run" means here.
+        27 + 10 + 3 + 1,
         joined,
         "🔴 the arithmetic that made L-01 decisive: the corrected base pair (27 + 10 = 37) plus \
-         R28's three new sentences is exactly what the gate counts today. If this stops closing, \
-         either the base numbers or the count of new sentences has moved and the paragraph is \
-         stale again"
+         R28's three new sentences plus DR-46-21's one is exactly what the gate counts today. If \
+         this stops closing, either the base numbers or the count of new sentences has moved and \
+         the paragraph is stale again"
     );
     assert!(
         states_27_and_10,
