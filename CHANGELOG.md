@@ -717,18 +717,18 @@
 
 ## 4. Milestone tag history (mechanically transcribed from `git tag -l`) (sem: SEM-CHANGELOG.md-024)
 
-| tag | Date | Kind | subject (transcribed) (sem: SEM-CHANGELOG.md-025) |
+| tag | Date | Kind | subject (transcribed; the six lightweight-tag subjects are **translated** from the Japanese tag text, since the tags themselves are not carried by the public tree — originals verbatim in the maintainers' ledger) (sem: SEM-CHANGELOG.md-025) |
 |---|---|---|---|
 | `req0.00` | 2026-08-06 | annotated | baseline: spec 25 doc + probes 32 green + lake build RC=0 (2026-08-06) |
 | `req0.01` | 2026-08-06 | annotated | scaffold: 36 probes green (typed parser), e2e floor, semantics map — hostile-audited (B1-B5 fixed, verify PASS) |
-| `req0.02` | 2026-08-07 | lightweight | req(08): V§10 NEW-B1/M1検収PASS——req0.02成立裁定(spot e2e RC=0 GREEN 37/5・判別pass確認) |
-| `req0.03` | 2026-08-07 | lightweight | req(48): req0.03 pipeline完遂——手6b両半分GREEN(153/33判別つき+lake)・手6c RUNTIME実測(encode522/decode394/cid601ns median N=1000)・tag発行裁定 |
+| `req0.02` | 2026-08-07 | lightweight | req(08): V§10 NEW-B1/M1 acceptance PASS — req0.02 declared (spot e2e RC=0 GREEN 37/5; discrimination pass confirmed) (sem: SEM-CHANGELOG.md-033) |
+| `req0.03` | 2026-08-07 | lightweight | req(48): req0.03 pipeline complete — hand 6b both halves GREEN (153/33 with discrimination + lake); hand 6c RUNTIME measured (encode522/decode394/cid601ns median N=1000); tag issuance ruled (sem: SEM-CHANGELOG.md-034) |
 | `req0.04` | 2026-08-08 | annotated | M2 complete: gx-log merkle ledger + gx-witness DSSE receipts. Floor 370/62, AC 12/12, mutation 90.9%, Kani 3/3, fuzz 3 targets crash 0, primaries byte-checked. T4/T5 not yet proven (M8). |
-| `req0.05` | 2026-08-09 | lightweight | req(38): §27 M3 fix批検収PASS+J-1..7裁定+tag req0.05成立宣言(偽PASS 6本全捕捉・coverage 5/5・床511/83) |
-| `req0.06` | 2026-08-09 | lightweight | req(38): §36 M4 fix批検収PASS+L-1〜L-7裁定+tag req0.06成立宣言(coverage 8/8 PASS・battery 11本独立再走・規律46/47・gotcha45) |
+| `req0.05` | 2026-08-09 | lightweight | req(38): §27 M3 fix-batch acceptance PASS + J-1..7 rulings + tag req0.05 declared (all 6 false-PASSes caught; coverage 5/5; floor 511/83) (sem: SEM-CHANGELOG.md-035) |
+| `req0.06` | 2026-08-09 | lightweight | req(38): §36 M4 fix-batch acceptance PASS + L-1..L-7 rulings + tag req0.06 declared (coverage 8/8 PASS; 11-script battery independently re-run; disciplines 46/47; gotcha 45) (sem: SEM-CHANGELOG.md-036) |
 | `req0.07` | 2026-08-10 | annotated | M5 complete: gx-engine state machine (21/21 transitions), all 22 ACs, floor 968/170, E-M5-1..16, crash recovery proven, decay identified, mutants+coverage measured. req/38 §37-§46. |
-| `req0.08` | 2026-08-11 | lightweight | req(38): §56 M6 fix批検収PASS(凍結計器独立再走: 床1211/221一致・battery13/13 RED・ci GREEN/clone e2e/semantics5/5)+M6FIX-1追認/2はM7 FR化/6 shard禁+規律54(UC三分法)制定+Λ7 routing(req/97§4正本+axiom independence註記)+M6FIX-7起票+tag req0.08 |
-| `req0.09` | 2026-08-13 | lightweight | req(38): §65 fix批検収PASS+B-1〜B-11裁定+req/103引用訂正+M7完遂=tag req0.09 |
+| `req0.08` | 2026-08-11 | lightweight | req(38): §56 M6 fix-batch acceptance PASS (frozen instruments independently re-run: floor 1211/221 match; battery 13/13 RED; ci GREEN / clone e2e / semantics 5/5) + M6FIX-1 confirmed / -2 becomes an M7 FR / -6 sharding forbidden + discipline 54 (UC trichotomy) enacted + Λ7 routing (req/97 §4 canonical + axiom-independence note) + M6FIX-7 filed + tag req0.08 (sem: SEM-CHANGELOG.md-037) |
+| `req0.09` | 2026-08-13 | lightweight | req(38): §65 fix-batch acceptance PASS + B-1..B-11 rulings + req/103 citation fix + M7 complete = tag req0.09 (sem: SEM-CHANGELOG.md-038) |
 
 🔴 **On `req0.00`'s subject spelling "spec 25 doc"**: that was the real count at the time; the canon later became 28 docs (`req/semantics.json`'s `spec.canon` title was corrected to the measured figure in v0.2.4 §68 #6). **This is a transcription, not a current claim**, so the tag's wording is not fixed -- a tag is the record of the moment it was struck. (sem: SEM-CHANGELOG.md-026)
 

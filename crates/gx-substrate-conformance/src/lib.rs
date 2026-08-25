@@ -16,11 +16,12 @@
 //! with the completion condition: "no adapter satisfies the M4/M7 completion condition unless it
 //! passes all seven of the above contracts".
 //!
-//! # 身分: 「契約 7」 と 「法則 n」 は別の節である
+//! # Identity: "contract 7" and "law n" are separate sections
 //!
-//! (This heading is kept in Japanese (sem: SEM-gx-substrate-conformance-055):
+//! (This heading was kept in Japanese until 2026-08-26, req/835 §4 (sem: SEM-gx-substrate-conformance-055):
 //! `tests/harness_shape.rs::the_crate_states_its_two_sections_and_their_reason` checks this file's
-//! text for the literal substrings "契約 7" and "法則 n".)
+//! text for the literal substrings "contract 7" and "law n" — both sides of that check moved to
+//! English in the same commit; the Japanese originals sit verbatim in the maintainers' ledger.)
 //! `req/38_ERRATA_2026-08-07.md` §30 M4H2-1, adopted (a), verbatim (sem:
 //! SEM-gx-substrate-conformance-039): "split the harness's identity into **two sections, 'contract 7
 //! (1:1 with 51 §7)' + 'law n (from the L-series the rulings produced)'**, and distinguish their
@@ -40,10 +41,11 @@
 //!   each (sem: SEM-gx-substrate-conformance-041)
 //!   line, so a reader of the output never has to remember which list a name came from.
 //!
-//! # 対応の無い契約は「無い」と印字
+//! # A contract with no counterpart prints as absent, not as silence
 //!
-//! (This heading is kept in Japanese (sem: SEM-gx-substrate-conformance-056): the same
-//! `tests/harness_shape.rs` test checks this file's text for this literal heading substring.)
+//! (This heading was kept in Japanese until 2026-08-26, req/835 §4 (sem: SEM-gx-substrate-conformance-056):
+//! the same `tests/harness_shape.rs` test checks this file's text for the literal heading
+//! substring, now English on both sides of the check.)
 //! A contract whose subject a fixture does not supply is reported as [`Outcome::NotSupplied`] and
 //! printed as "NOT_SUPPLIED" (sem: SEM-gx-substrate-conformance-042), **not** as a pass and not as a
 //! silent skip. Three of the seven need something
@@ -103,7 +105,7 @@ impl Origin {
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
-            // Translated from "契約"/"法則" (sem: SEM-gx-substrate-conformance-046): the two callers
+            // Translated from the two Japanese section words (sem: SEM-gx-substrate-conformance-046): the two callers
             // that pin this literal, `tests/contracts_seven.rs` and `tests/laws.rs`, were updated in
             // the same migration so the two stay in lockstep.
             Origin::Contract => "contract",
@@ -236,12 +238,12 @@ impl Report {
     /// The counts go on their own line so that a report read from a CI log answers "how many, and of
     /// which kind" without the reader counting lines.
     ///
-    /// # 🔴 **L-5 / 裁定 #17 — judged in M7 hand 4, and the answer is that it lives**
+    /// # 🔴 **L-5 / ruling #17 — judged in M7 hand 4, and the answer is that it lives**
     ///
-    /// ("裁定 #17" above, sem: SEM-gx-substrate-conformance-152, and "退役印" below, sem:
-    /// SEM-gx-substrate-conformance-052, are kept in Japanese:
+    /// ("ruling #17" above, sem: SEM-gx-substrate-conformance-152, and "retirement mark" below,
+    /// sem: SEM-gx-substrate-conformance-052, were kept in Japanese until 2026-08-26, req/835 §4:
     /// `tests/print_consumers.rs::the_decision_is_recorded_beside_the_function` checks this file's
-    /// text for both literal substrings.)
+    /// text for both literal substrings — English on both sides of the check since that cure.)
     ///
     /// This function carried a kill condition through four windows. req/77 §L-5 found that the
     /// mutation `Report::print → ()` survives (nobody asserts stdout); req/78 §5 row 23 sent the
@@ -249,8 +251,8 @@ impl Report {
     /// two options — a retirement mark now, or "M7 (when two adapters actually run the conformance
     /// harness) is the last window" — and req/38 §46 took the second: "killing it in M6 is too
     /// early". req/98 §3-4 row 8 states what M7 owes (sem: SEM-gx-substrate-conformance-052): "judge,
-    /// **exactly once**, whether a consumer grew, and if none did, strike **退役印** (a retirement
-    /// mark, E-7's form)".
+    /// **exactly once**, whether a consumer grew, and if none did, strike the **retirement mark**
+    /// (E-7's form)".
     ///
     /// **The consumer grew.** The candidate M6 named was "when two of M7's adapters actually run the
     /// conformance harness" and all three adapters now do: `gx-adapter-fs` (M4 hand 6),

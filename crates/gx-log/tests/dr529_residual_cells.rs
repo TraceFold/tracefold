@@ -6,10 +6,10 @@
 //! **log** layer's two cells live, against a real `LedgerStore`, following `ac_069.rs`'s own raw-
 //! file-construction method (the precedent `req/534` §2 names).
 //!
-//! Cell identity, quoted from `req/529` §2's grid: **log × 欠落field (missing-field) = ✘**,
-//! **log × 順序入替 (order-swap) = △** ("map key順のみ・entry並べ替え注入なし・根再計算が捕える
-//! 筈だが未実測" — "the root recomputation is *supposed* to catch it, unmeasured"). Both fired
-//! live below.
+//! Cell identity, from `req/529` §2's grid: **log × missing-field = ✘**,
+//! **log × order-swap = △** (the grid's own honest flag, translated: "map key order only; no
+//! entry-reordering injection; the root recomputation is *supposed* to catch it, unmeasured").
+//! Both fired live below.
 
 mod support;
 
@@ -139,8 +139,9 @@ fn dr529_log_missing_field_is_treated_as_a_torn_tail_not_silently_accepted() {
 // Cell: log x order-swap
 // ---------------------------------------------------------------------------
 
-/// **Fired live** (`req/529` §2's own honest flag: "根再計算が捕える筈だが未実測" -- turned into a
-/// measurement). Two adjacent entries are written to the raw file in swapped order (entry 1's
+/// **Fired live** (`req/529` §2's own honest flag -- "the root recomputation is supposed to catch
+/// it, unmeasured" -- turned into a measurement). Two adjacent entries are written to the raw file
+/// in swapped order (entry 1's
 /// bytes where entry 0's belong, and vice versa), then the store is reopened.
 ///
 /// **Finding**: `store.rs:1103`'s `if recorded.index != tree.len() { break; }` catches the swap at
@@ -149,8 +150,8 @@ fn dr529_log_missing_field_is_treated_as_a_torn_tail_not_silently_accepted() {
 /// the genuinely-in-order prefix. **L, not H**: fail-closed, no silent wrong root, matching the
 /// same safe direction the missing-field cell takes. The mechanism this measures
 /// (index-monotonicity, not a content hash) is a **different** guard than merkle-root
-/// recomputation -- `req/529` §2's "根再計算が捕える" framing was imprecise about *which*
-/// mechanism actually fires; this test corrects that by naming the real one.
+/// recomputation -- `req/529` §2's "the root recomputation catches it" framing was imprecise about
+/// *which* mechanism actually fires; this test corrects that by naming the real one.
 #[test]
 fn dr529_log_order_swap_is_caught_by_index_monotonicity_not_silently_accepted() {
     // The swap: two well-formed, fully-populated records, index=1 and index=2, hand-built and

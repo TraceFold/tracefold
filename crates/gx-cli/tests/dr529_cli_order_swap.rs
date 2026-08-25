@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
-//! `req/529` residual cell — **cli × 順序入替 (order-swap)**, fired live.
+//! `req/529` residual cell — **cli × order-swap**, fired live.
 //!
 //! `req/529` §2's grid marks this cell `✘` (empty). This file builds a real 2-leaf ledger (same
 //! shape `receipt_verify_history.rs` uses), then issues each leaf's receipt with the OTHER leaf's
@@ -17,7 +17,8 @@ use support::{commit_payload, issue, keypair, project, run, write_json, write_pu
 /// **Fired live.** Two commits are appended to a real ledger; each one's receipt is issued with
 /// the SIBLING leaf's inclusion proof (proof for leaf 1 attached to leaf 0's payload, and vice
 /// versa) rather than its own -- signed normally, so the DSSE signature itself is genuine over the
-/// swapped content (this is not a forgery test; the "署名不正" cell already covers that).
+/// swapped content (this is not a forgery test; `req/529` §2's signature-forgery cell already
+/// covers that).
 ///
 /// **Finding (H/M/L)**: `gx receipt verify` must refuse both swapped receipts -- accepting either
 /// would be the H-class failure `req/529` §4-2's AC names directly: a destructive/inconsistent

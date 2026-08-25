@@ -164,11 +164,11 @@ fn the_consumers_of_report_print_are_counted_rather_than_remembered() {
 fn the_decision_is_recorded_beside_the_function() {
     let text = fs::read_to_string(repo_root().join("crates/gx-substrate-conformance/src/lib.rs"))
         .expect("the crate this test is about");
-    // "裁定 #17" (sem: SEM-gx-substrate-conformance-152) / "退役印" (sem:
-    // SEM-gx-substrate-conformance-052) are kept in Japanese, declared beside `src/lib.rs`'s
-    // matching text: `src/lib.rs` keeps its heading and the "退役印" token in Japanese for exactly
-    // this check.
-    for clause in ["裁定 #17", "L-5", "退役印", "M7 hand 4"] {
+    // "ruling #17" (sem: SEM-gx-substrate-conformance-152) / "retirement mark" (sem:
+    // SEM-gx-substrate-conformance-052) were kept in Japanese until 2026-08-26 (req/835 §4);
+    // this declaration and `src/lib.rs`'s matching text moved to English in the same commit, so
+    // the two sides stay in lockstep.
+    for clause in ["ruling #17", "L-5", "retirement mark", "M7 hand 4"] {
         assert!(
             text.contains(clause),
             "the consumer judgement must name {clause:?} beside `Report::print`"

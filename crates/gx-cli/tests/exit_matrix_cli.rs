@@ -44,12 +44,12 @@ use gx_cli::exit::{
 /// `[0, 1, 6]`, so folding it in would pair one section's codes to another's — and this lane pays
 /// the separate group `req/589` §8 declined inside P-2 I's coordinate budget.
 ///
-/// 🔴 **Three section strings below carry Japanese** (`（v0.2.1 追記・2026-08-13）` and the two
-/// P3 addenda). Kept in Japanese on purpose: they are exact-match twins of `SPEC_44_EXITS` in
-/// `crates/gx-cli/src/exit.rs`, which itself quotes `req/spec/40-architecture/44-api-spec.md`'s
-/// `#### ` headings character for character under `probes/doubt/tests/m6_exit_matrix.rs`'s
-/// verbatim comparison — translating them here alone breaks the pairing, and translating all
-/// three sides means rewriting the canon's own headings, which no maintenance lane owns.
+/// 🔴 **Three section strings below carried Japanese provenance markers until 2026-08-26**
+/// (req/835 §4). They are exact-match twins of `SPEC_44_EXITS` in `crates/gx-cli/src/exit.rs`,
+/// which itself quotes `req/spec/40-architecture/44-api-spec.md`'s `#### ` headings character for
+/// character under `probes/doubt/tests/m6_exit_matrix.rs`'s verbatim comparison — so the canon
+/// headings, exit.rs's literals and these twins moved to English in one commit, and the Japanese
+/// originals sit verbatim in the maintainers' ledger.
 const GROUP_SECTIONS: [(&str, &str); 18] = [
     ("attach", "`gx attach`"),
     ("submit", "`gx submit`"),
@@ -71,17 +71,17 @@ const GROUP_SECTIONS: [(&str, &str); 18] = [
     ("replay", "`gx replay`"),
     ("log", "`gx log proof` / `gx log consistency`"),
     ("key", "`gx key gen` / `gx key list`"),
-    // ---- (sem: SEM-gx-cli-2242) intentionally untranslated: exact-match twin of exit.rs SEM-gx-cli-516 ----
+    // ---- (sem: SEM-gx-cli-2242) exact-match twin of exit.rs SEM-gx-cli-516; English since 2026-08-26 (req/835 §4) ----
     (
         "key",
-        "🔴 `gx key revoke` / `gx key rotate`（v0.2.1 追記・2026-08-13）",
+        "🔴 `gx key revoke` / `gx key rotate` (v0.2.1 addendum, 2026-08-13)",
     ),
     ("policy", "`gx policy lint` / `gx policy test`"),
     // ---- 🔴 v0.3-d (req/159 §D) — the two P3 sections, paired at last (sem: SEM-gx-cli-2243, SEM-gx-cli-2244) ----
-    ("wrap", "🔴 `gx wrap`（v0.2.6 追記・P3・req/119 §2）"),
+    ("wrap", "🔴 `gx wrap` (v0.2.6 addendum, P3, req/119 §2)"),
     (
         "verdict-checkpoint",
-        "🔴 `gx verdict-checkpoint issue` / `gx verdict-checkpoint verify` / `gx verdict-checkpoint list`（v0.2.6 追記・P3/FR-M04・req/119 §4）",
+        "🔴 `gx verdict-checkpoint issue` / `gx verdict-checkpoint verify` / `gx verdict-checkpoint list` (v0.2.6 addendum, P3/FR-M04, req/119 §4)",
     ),
     // ---- 🔴 R3 (`req/38` §160 ruling 2, DR-43-8) — the door beside the LEDGER_DISAGREES gate ----
     (

@@ -219,13 +219,13 @@ pub const HAND2_EXITS: [ExitRow; 12] = [
 /// in the document that describes them (`gx receipt coverage`'s own precedent for placing a section
 /// by adjacency to what it is about, not by arrival date).
 ///
-/// 🔴 **Three section strings below carry Japanese** (`（v0.2.1 追記・2026-08-13）` and the two
-/// P3 addenda), and one of them recurs in [`SPEC_44_EXIT_ADDITIONS`]. They are kept in Japanese
-/// on purpose, character for character with `req/spec/40-architecture/44-api-spec.md`'s own
-/// `#### ` lines: `probes/doubt/tests/m6_exit_matrix.rs` reads both sides and compares them
-/// verbatim, so translating the strings here without touching the canon file turns that probe
-/// red — the same identity discipline `gx-substrate-conformance/src/contracts.rs` states for
-/// 51 §7's table.
+/// 🔴 **Three section strings below carried Japanese provenance markers until 2026-08-26**
+/// (req/835 §4), and one of them recurs in [`SPEC_44_EXIT_ADDITIONS`]. They are exact-match
+/// copies, character for character, of `req/spec/40-architecture/44-api-spec.md`'s own `#### `
+/// lines: `probes/doubt/tests/m6_exit_matrix.rs` reads both sides and compares them verbatim, so
+/// the canon headings, these literals and every verbatim quoter moved to English in one commit —
+/// the same identity discipline `gx-substrate-conformance/src/contracts.rs` states for 51 §7's
+/// table. The Japanese originals sit verbatim in the maintainers' ledger.
 pub const SPEC_44_EXITS: [(&str, &[u8]); 19] = [
     // ---- 🔴 **R44 lane B, item 7** (`req/603` §8, `req/38` §369) — 44 §1.2's nineteenth section,
     // and the one placed first in the document: everything after it presumes the `.gx/` this verb
@@ -255,15 +255,15 @@ pub const SPEC_44_EXITS: [(&str, &[u8]); 19] = [
     ("`gx key gen` / `gx key list`", &[0, 1]),
     // ---- 🔴 **v0.2.6 doc batch** (req/38 §72 item 1) — 44 §1.2's fourteenth section ----
     (
-        "🔴 `gx key revoke` / `gx key rotate`（v0.2.1 追記・2026-08-13）",
+        "🔴 `gx key revoke` / `gx key rotate` (v0.2.1 addendum, 2026-08-13)",
         &[0, 1],
     ),
     ("`gx policy lint` / `gx policy test`", &[0, 1]),
     ("`gx serve`", &[0, 1]),
     // ---- 🔴 **v0.2.6 doc batch** (req/38 §72 item 5) — P3's two new §1.2 sections ----
-    ("🔴 `gx wrap`（v0.2.6 追記・P3・req/119 §2）", &[0, 1, 7]),
+    ("🔴 `gx wrap` (v0.2.6 addendum, P3, req/119 §2)", &[0, 1, 7]),
     (
-        "🔴 `gx verdict-checkpoint issue` / `gx verdict-checkpoint verify` / `gx verdict-checkpoint list`（v0.2.6 追記・P3/FR-M04・req/119 §4）",
+        "🔴 `gx verdict-checkpoint issue` / `gx verdict-checkpoint verify` / `gx verdict-checkpoint list` (v0.2.6 addendum, P3/FR-M04, req/119 §4)",
         &[0, 1, 7],
     ),
     // ---- 🔴 **R3** (`req/38` §160 ruling 2, DR-43-8) — 44 §1.2's seventeenth section ----
@@ -587,7 +587,7 @@ pub const SPEC_44_EXIT_ADDITIONS: [ExitAddition; 7] = [
     },
     // ---- 🔴 **v0.2.6 doc batch** (req/38 §72 item 1) — the same fact, under its own heading (sem: SEM-gx-cli-519) ----
     ExitAddition {
-        section: "🔴 `gx key revoke` / `gx key rotate`（v0.2.1 追記・2026-08-13）",
+        section: "🔴 `gx key revoke` / `gx key rotate` (v0.2.1 addendum, 2026-08-13)",
         code: NOT_FOUND,
         ruling: "🔴 **v0.2.6 doc batch**, req/38 §72 item 1. When the addition above was written \
                  (M7 hand 2, 2026-08-12) 44 §1.2 had one key section — `gen`/`list` — and the \

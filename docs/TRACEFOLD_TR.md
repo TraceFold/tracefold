@@ -43,7 +43,7 @@ The reason is not modesty. What a system does is always easier to write down tha
 
 ## A note on what this report claims to be new
 
-<!-- src: req/112 §7.6 (Owner directive, verbatim) / 11 P-9 / 12 §禁止事項 -->
+<!-- src: req/112 §7.6 (Owner directive, verbatim) / 11 P-9 / 12, its "prohibitions" section -->
 
 Nothing here is presented as an invention.
 
@@ -212,9 +212,9 @@ Transition coverage is a completion condition: all 21 must be exercised by at le
 
 ### 2.4 The membrane: two rules about where authority lives
 
-<!-- src: crates/gx-canon/tests/authority_boundary.rs (則 1, verbatim header) / crates/gx-cli/src/clock.rs and crates/gx-api/tests/rule_two.rs (則 2) / 41 §6 -->
+<!-- src: crates/gx-canon/tests/authority_boundary.rs (Rule 1, verbatim header) / crates/gx-cli/src/clock.rs and crates/gx-api/tests/rule_two.rs (Rule 2) / 41 §6 -->
 
-Correct ordering in a pipeline is worth very little if a component can step around the pipeline. Two structural rules — the project calls them 則 1 and 則 2, *rule one* and *rule two* — say where the ability to do certain things is allowed to exist. Tests that scan source text enforce both. Not review.
+Correct ordering in a pipeline is worth very little if a component can step around the pipeline. Two structural rules — the project calls them Rule 1 and Rule 2 — say where the ability to do certain things is allowed to exist. Tests that scan source text enforce both. Not review.
 
 **Rule one — the surfaces hold no semantic authority.** A *surface* is a crate that ships a dependency on the engine; in the current workspace, `gx-cli` and `gx-api`. Across their sources, three counters must read zero:
 

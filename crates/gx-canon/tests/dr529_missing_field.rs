@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
-//! `req/529` residual cell — **canon × 欠落field (missing-field)**, fired live.
+//! `req/529` residual cell — **canon × missing-field**, fired live.
 //!
 //! `req/529` §2's grid marks this cell `✘` (empty) and `req/534` §1's honest disclosure names it
 //! among the cells "not individually fired... census-level inference, not live fire". This file

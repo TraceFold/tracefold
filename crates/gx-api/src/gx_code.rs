@@ -81,73 +81,73 @@ pub const GX_CODES: [GxCode; 12] = [
         code: "VALIDATION_ERROR",
         status: 422,
         cli_exit: 1,
-        meaning: "リクエスト不正",
+        meaning: "malformed request", // (sem: SEM-gx-api-481)
     },
     GxCode {
         code: "NOT_FOUND",
         status: 404,
         cli_exit: 6,
-        meaning: "対象ID不在",
+        meaning: "target id absent", // (sem: SEM-gx-api-482)
     },
     GxCode {
         code: "NOT_ADMITTED",
         status: 403,
         cli_exit: 2,
-        meaning: "Verdict≠Admitでcommit不可（非record-only）",
+        meaning: "commit refused while Verdict≠Admit (non-record-only)", // (sem: SEM-gx-api-483)
     },
     GxCode {
         code: "PRECONDITION_CHANGED",
         status: 409,
         cli_exit: 3,
-        meaning: "CAS失敗（CON-2）",
+        meaning: "CAS failure (CON-2)", // (sem: SEM-gx-api-484)
     },
     GxCode {
         code: "APPLY_FAILED",
         status: 422,
         cli_exit: 5,
-        meaning: "adapter.apply失敗",
+        meaning: "adapter.apply failure", // (sem: SEM-gx-api-485)
     },
     GxCode {
         code: "ESCALATION_PENDING",
         status: 409,
         cli_exit: 4,
-        meaning: "Escalated状態のまま操作不可",
+        meaning: "no operation while still Escalated", // (sem: SEM-gx-api-486)
     },
     GxCode {
         code: "INVERSE_UNAVAILABLE",
         status: 409,
         cli_exit: 1,
-        meaning: "undo対象の逆deltaが利用不可",
+        meaning: "the undo target's inverse delta is unavailable", // (sem: SEM-gx-api-487)
     },
     GxCode {
         code: "IDEMPOTENCY_CONFLICT",
         status: 409,
         cli_exit: 1,
-        meaning: "同一Idempotency-Keyで異なるリクエスト本文",
+        meaning: "a different request body under the same Idempotency-Key", // (sem: SEM-gx-api-488)
     },
     GxCode {
         code: "ADAPTER_ERROR",
         status: 502,
         cli_exit: 1,
-        meaning: "substrate adapter内部エラー",
+        meaning: "substrate adapter internal error", // (sem: SEM-gx-api-489)
     },
     GxCode {
         code: "POLICY_ERROR",
         status: 500,
         cli_exit: 1,
-        meaning: "Cedar評価自体の失敗（policyバグ等）",
+        meaning: "failure of Cedar evaluation itself (e.g. a policy bug)", // (sem: SEM-gx-api-490)
     },
     GxCode {
         code: "UNAUTHORIZED",
         status: 401,
         cli_exit: 1,
-        meaning: "認証失敗（§2.6）",
+        meaning: "authentication failure (§2.6)", // (sem: SEM-gx-api-491)
     },
     GxCode {
         code: "INTERNAL",
         status: 500,
         cli_exit: 1,
-        meaning: "分類不能な内部エラー",
+        meaning: "unclassifiable internal error", // (sem: SEM-gx-api-492)
     },
 ];
 
