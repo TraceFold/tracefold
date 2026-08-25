@@ -95,6 +95,11 @@ pub struct FaceDeclaration {
 /// The fourth question is never `CanMeasure` here. The actor reaches gx as a flag on the wrapped
 /// entry (`--actor-key` / `--actor-model`), which is somebody writing a name down, so the strongest
 /// honest word for it is [`FacePosture::OnlyDeclared`].
+/// 🔴 **`cfg(feature = "mcp")`** (`req/817`): the argument is `gx_mcp_wire`'s route report, and
+/// `gx-mcp-wire` is one of the four crates `req/789` §3 holds private, so the public distribution
+/// builds without this function. Nothing else in this module depends on the wire — the postures and
+/// the four questions above are the whole face and they stay.
+#[cfg(feature = "mcp")]
 #[must_use]
 pub fn posture_from_route(
     route: Option<&gx_mcp_wire::config::Report>,

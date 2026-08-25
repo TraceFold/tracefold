@@ -12,9 +12,9 @@
 //! > (grounded in 42 §3.13, verbatim: "the journal is the engine's internal in-progress pipeline record … **not published externally**"). The table
 //! > takes M5H2-7's denominator shape = turns "the journal vocabulary grew and the stream side silently drops it" RED (sem: SEM-gx-api-263)
 //!
-//! [`EVENT_MAP`] is that place. Every one of the thirteen has a row, each row is either an event
+//! [`EVENT_MAP`] is that place. Every one of the fifteen has a row, each row is either an event
 //! vocabulary or a reason for staying inside, and [`MAP_COVERS_THE_JOURNAL`] is a **compile-time**
-//! assertion that the thirteen rows are the thirteen kinds, in order. A fourteenth record added to
+//! assertion that the fifteen rows are the fifteen kinds, in order. A sixteenth record added to
 //! gx-engine tomorrow stops this crate from compiling, which is the difference between a map and a
 //! description of one.
 //!
@@ -253,7 +253,7 @@ const fn str_eq(a: &str, b: &str) -> bool {
 ///
 /// `gx_engine::store::JOURNAL_RECORD_KINDS` is the engine's own declaration and gx-engine's
 /// `journal_vocabulary.rs` already ties it to the variants. Tying **this** table to that array means
-/// a fourteenth record cannot be added without a hand deciding, in this file, whether it is published
+/// a sixteenth record cannot be added without a hand deciding, in this file, whether it is published
 /// — which is the whole of "the journal vocabulary grew and the stream side silently drops it" turning RED (sem: SEM-gx-api-279), one step
 /// earlier than red: the crate does not build.
 pub const MAP_COVERS_THE_JOURNAL: () = {
@@ -443,7 +443,7 @@ fn receipt_data(receipt: &gx_witness::Receipt, kind: &str) -> Option<serde_json:
 /// 🔴 One journal record, as the events 44 §2.2 publishes for it.
 ///
 /// **No `_` arm.** `EngineJournalRecord` is not `#[non_exhaustive]`, so this `match` is the second
-/// mechanical half of M6-12 (the first is [`MAP_COVERS_THE_JOURNAL`]): a fourteenth variant is a
+/// mechanical half of M6-12 (the first is [`MAP_COVERS_THE_JOURNAL`]): a sixteenth variant is a
 /// compile error here as well as there, and the two failures say different things — one that the
 /// table has no row, the other that the projection has no decision.
 ///

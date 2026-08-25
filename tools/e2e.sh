@@ -1845,12 +1845,29 @@ say "target  $CARGO_TARGET_DIR"
 # sources (warm deps via the shared target -- the same declared warmness as gap note 3)
 # and copied to where the fixture looks, exactly what tools/audit_p3_run.sh stage 1 does
 # on the working tree.
-say "staging mcp_probe_server (audit_p3 fixture) into the clone's target/debug"
-( cd -- "$clone" && cargo build --locked -p gx-mcp-wire --features probe-bin --bin mcp_probe_server ) \
-    > "$work/fixture-build.log" 2>&1 || halt 12 "the audit fixture did not build -- log: $work/fixture-build.log"
-mkdir -p -- "$clone/target/debug"
-cp -- "$CARGO_TARGET_DIR/debug/mcp_probe_server" "$clone/target/debug/" \
-    || halt 12 "the audit fixture did not land in the clone's target/debug"
+# 🔴 **req/817 -- the fixture's crate is not in every tree this script can be run in.**
+#
+# `gx-mcp-wire` is one of the four crates `req/789` §3 holds private, so it is absent from the
+# public distribution -- and `tools/e2e.sh` itself IS in the public sync set. Before this guard the
+# script halted 12 on a public clone at exactly this line, which made the published repository ship
+# an end-to-end script that could not reach its own first test. (Found by running it in a
+# public-shaped tree, not by reading the sync manifest -- the same way req/818 F1 was found.)
+#
+# The guard is a skip and it is loud: a tree that HAS the crate must still build the fixture, and a
+# halt there is still a halt. Only a tree that genuinely does not carry the crate skips it, and it
+# says which suites go unmeasured as a result rather than reporting a green that covered less.
+if [ -f "$clone/crates/gx-mcp-wire/Cargo.toml" ]; then
+    say "staging mcp_probe_server (audit_p3 fixture) into the clone's target/debug"
+    ( cd -- "$clone" && cargo build --locked -p gx-mcp-wire --features probe-bin --bin mcp_probe_server ) \
+        > "$work/fixture-build.log" 2>&1 || halt 12 "the audit fixture did not build -- log: $work/fixture-build.log"
+    mkdir -p -- "$clone/target/debug"
+    cp -- "$CARGO_TARGET_DIR/debug/mcp_probe_server" "$clone/target/debug/" \
+        || halt 12 "the audit fixture did not land in the clone's target/debug"
+else
+    say "SKIP mcp_probe_server (audit_p3 fixture): this tree carries no crates/gx-mcp-wire"
+    say "     -- it is private (req/789 §3), so the audit_p3_a2/a3/a6 probes that need a real MCP"
+    say "     server are NOT measured in this run. Everything else below still is."
+fi
 
 log="$work/cargo-test.log"
 say "running cargo test --workspace --locked --no-fail-fast in the clone"

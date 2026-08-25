@@ -246,6 +246,10 @@ enum Command {
     ///
     /// 🔴 stdout carries MCP frames and nothing else while this verb runs (the transport
     /// specification forbids anything else there), so its own reporting is on **stderr**.
+    ///
+    /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — absent from the public distribution, which is
+    /// built without `gx-mcp-wire` (`req/789` §3 holds it private).
+    #[cfg(feature = "mcp")]
     Wrap {
         /// The server command and its arguments, after `--`.
         #[arg(last = true, value_name = "CMD [ARGS]...")]
@@ -343,6 +347,9 @@ enum Command {
     ///
     /// 🔴 It points no route at gx and states nothing about what a route could observe. Those are
     /// `req/535` §8's P-1b and P-1c, and the answer names them rather than leaving them off.
+    ///
+    /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — see `Wrap` above.
+    #[cfg(feature = "mcp")]
     Attach {
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
@@ -370,6 +377,10 @@ enum Command {
     /// happened, an operator restores it, and a separate process verifies the restore offline.
     /// Not one of 44 §1.1's thirteen (ruling 2: reported as an addition, the shape `gx wrap` itself (sem: SEM-gx-cli-427)
     /// took at P3).
+    ///
+    /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — the loop runs through the real `gx wrap`
+    /// membrane, so it goes where `Wrap` goes. See `Wrap` above.
+    #[cfg(feature = "mcp")]
     Demo {
         /// 44 §1.2's flag. `gx demo` prints its own narrative regardless; this covers the trailing
         /// summary line only.
@@ -379,6 +390,9 @@ enum Command {
     /// 🔴 Hidden — the notes server `gx demo` (and the `gx undo` step inside it) spawn as **this
     /// same binary's own child** (ruling 1: bundled in the one artefact rather than shipped as a (sem: SEM-gx-cli-428)
     /// second executable). Not part of 44 §1.1's thirteen and not meant to be run directly.
+    ///
+    /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — see `Wrap` above.
+    #[cfg(feature = "mcp")]
     #[command(hide = true, name = "__demo-notes-server")]
     DemoNotesServer,
     /// 🔴 **P5** (`req/134` §1 item 7, ruling 2; sem: SEM-gx-cli-429) — the eight lines 21 §10-4 fixes ("what this build
@@ -403,6 +417,10 @@ enum Command {
     /// catalogue supplies whether writing is permitted at all and the invocation supplies where,
     /// and the report carries `write_targets_are_declared: false` so a reader is not left to infer
     /// which half came from a file. See the `gx-confine` crate root.
+    ///
+    /// 🔴 **`cfg(feature = "confine")`** (`req/817`) — absent from the public distribution, which is
+    /// built without `gx-confine` (`req/789` §3 holds it private).
+    #[cfg(feature = "confine")]
     Confine {
         /// The tool whose declaration decides whether any write is permitted.
         ///
@@ -1055,6 +1073,7 @@ fn main() -> ExitCode {
     // end of this process's stdout, and a `println!` into a closed pipe panics (Rust's `print!`
     // family does not return a `Result`). Found by running `gx demo` for real, not by reading the
     // MCP transport specification a second time.
+    #[cfg(feature = "mcp")]
     if matches!(cli.command, Command::DemoNotesServer) {
         return match gx_cli::demo::serve_notes() {
             Ok(outcome) => settled(outcome.code),
@@ -1195,9 +1214,17 @@ fn settled(code: u8) -> ExitCode {
     //
     // 🔴 **R16** — three summands, one per crate in this binary that holds a standard stream. A
     // fourth road appearing without a summand here is red in D-6 rather than in the next audit.
+    // 🔴 **`req/817`** — three summands when `gx-mcp-wire` is in the build, two when it is not. The
+    // public distribution holds no `gx-mcp-wire` (`req/789` §3), so it holds no third stream either,
+    // and R16's "one summand per crate in this binary that holds a standard stream" is satisfied by
+    // the crates that are actually in the binary rather than by a constant.
+    #[cfg(feature = "mcp")]
+    let wire_undelivered = gx_mcp_wire::notes::notes_undelivered();
+    #[cfg(not(feature = "mcp"))]
+    let wire_undelivered = 0;
     let _sentences_with_nowhere_to_go = gx_cli::emit::notes_undelivered()
         + gx_api::notes::notes_undelivered()
-        + gx_mcp_wire::notes::notes_undelivered();
+        + wire_undelivered;
     ExitCode::from(code)
 }
 
@@ -1318,35 +1345,56 @@ fn mcp_wiring(cli: &Cli) -> Result<gx_cli::session::McpWiring> {
     let Some(command) = &cli.mcp_server else {
         return Ok(gx_cli::session::McpWiring::default());
     };
-    let env = gx_cli::wrap::environment(&cli.mcp_server_env)?;
-    let client = std::sync::Arc::new(
-        gx_mcp_wire::StdioClient::spawn_with_env(command, &cli.mcp_server_arg, &env).map_err(
-            |e| Error::Usage {
-                detail: e.to_string(),
-            },
-        )?,
-    );
-    let handshake = client.initialize().map_err(|e| Error::Usage {
-        detail: e.to_string(),
-    })?;
-    let endpoint = cli
-        .mcp_endpoint
-        .clone()
-        .unwrap_or_else(|| gx_mcp_wire::stdio_endpoint(command));
-    let catalogue =
-        gx_cli::wrap::catalogue(&cli.mcp_restore, cli.mcp_restore_catalogue.as_deref())?;
-    // stderr, not stdout: 44 §1.3 fixes stdout to the command's single JSON object, and which
-    // server a verb connected to is a note an operator needs and a pipe does not. The count is the
-    // catalogue's own (`declared()`), so a `--mcp-restore-catalogue` file's entries are in it.
-    gx_cli::note!(
-        "gx: connected to {command:?} as {endpoint:?} over MCP {} ({} restorable tool(s) declared)",
-        handshake.revision,
-        catalogue.declared()
-    );
-    Ok(gx_cli::session::McpWiring::wired(
-        std::sync::Arc::new(gx_mcp_wire::WireTransport::new(client, endpoint)),
-        catalogue,
-    ))
+    // 🔴 **`cfg(not(feature = "mcp"))`** (`req/817`) — the public distribution is built without
+    // `gx-mcp-wire` (`req/789` §3 holds it private), so it has no MCP transport to build. The flag
+    // is still accepted by the parser (it is `global = true` on every verb), so the honest answer
+    // is a refusal that names the reason, not a silent `McpWiring::default()` — a run that named a
+    // server and then quietly spoke to nothing is the shape `reads_the_mcp_wiring`'s own audit
+    // (R19 / `req/279` H-02) was written to stop.
+    #[cfg(not(feature = "mcp"))]
+    {
+        Err(Error::Usage {
+            detail: format!(
+                "`--mcp-server` was given ({command:?}), but this build carries no MCP transport: \
+                 it was compiled without the `mcp` feature, so `gx wrap`, `gx attach`, \
+                 `gx detach` and `gx demo` are absent from it. Build with `--features mcp` to \
+                 speak MCP"
+            ),
+        })
+    }
+    #[cfg(feature = "mcp")]
+    {
+        let env = gx_cli::wrap::environment(&cli.mcp_server_env)?;
+        let client = std::sync::Arc::new(
+            gx_mcp_wire::StdioClient::spawn_with_env(command, &cli.mcp_server_arg, &env).map_err(
+                |e| Error::Usage {
+                    detail: e.to_string(),
+                },
+            )?,
+        );
+        let handshake = client.initialize().map_err(|e| Error::Usage {
+            detail: e.to_string(),
+        })?;
+        let endpoint = cli
+            .mcp_endpoint
+            .clone()
+            .unwrap_or_else(|| gx_mcp_wire::stdio_endpoint(command));
+        let catalogue =
+            gx_cli::wrap::catalogue(&cli.mcp_restore, cli.mcp_restore_catalogue.as_deref())?;
+        // stderr, not stdout: 44 §1.3 fixes stdout to the command's single JSON object, and which
+        // server a verb connected to is a note an operator needs and a pipe does not. The count is
+        // the catalogue's own (`declared()`), so a `--mcp-restore-catalogue` file's entries are in
+        // it.
+        gx_cli::note!(
+            "gx: connected to {command:?} as {endpoint:?} over MCP {} ({} restorable tool(s) declared)",
+            handshake.revision,
+            catalogue.declared()
+        );
+        Ok(gx_cli::session::McpWiring::wired(
+            std::sync::Arc::new(gx_mcp_wire::WireTransport::new(client, endpoint)),
+            catalogue,
+        ))
+    }
 }
 
 /// 🔴 **R19 / `req/279` H-02 (c)** (`req/284` §1.1) — which verbs read the six MCP globals.
@@ -1373,7 +1421,7 @@ fn reads_the_mcp_wiring(command: &Command) -> bool {
         | Command::Undo { .. }
         // 🔴 R19's three: 43 T-5's ruling verb and the long-lived HTTP surface.
         | Command::Escalation { .. }
-        | Command::Serve { .. }
+        | Command::Serve { .. } => true,
         // 🔴 **S③** (`req/493`) — `gx confine` reads `--mcp-restore` / `--mcp-restore-catalogue`
         // and **only** those two of the six. The catalogue is the whole input to its derivation:
         // whether the named tool may write at all is a question only that file answers. It opens
@@ -1381,24 +1429,33 @@ fn reads_the_mcp_wiring(command: &Command) -> bool {
         // homeless here as on `gx cancel` — which is why this arm goes through
         // [`confine_catalogue`] rather than [`mcp_wiring`], and why that function refuses the
         // four it does not read instead of accepting and dropping them (audit 19's finding).
-        | Command::Confine { .. } => true,
+        //
+        // 🔴 Its own arm since `req/817`: the variant is `cfg(feature = "confine")`, and a `cfg`
+        // cannot be written on one alternative inside an `|`-chain.
+        #[cfg(feature = "confine")]
+        Command::Confine { .. } => true,
         // 🔴 `gx wrap` names its server **after `--`** and carries its own `--server-env`,
         // `--endpoint`, `--restore` and `--restore-catalogue`. The globals are a second spelling it
         // does not read, and two spellings of "which server" on one command is the ambiguity this
         // refusal exists to prevent.
+        //
+        // 🔴 `req/817`: `Wrap`/`Attach`/`Demo`/`DemoNotesServer` are `cfg(feature = "mcp")`, so
+        // they carry their own arms here for the same reason `Confine` does above. The answer is
+        // unchanged — false, they read none of the six globals.
+        #[cfg(feature = "mcp")]
         Command::Wrap { .. }
         // 🔴 **P-1a** — `gx attach` places a directory and starts nothing. Pointing a route at the
         // membrane is `gx wrap --adopt-config`'s and is a separate invocation (`req/535` §8's
         // P-1b), so the six globals have nowhere to go here for `gx cancel`'s reason exactly.
         | Command::Attach { .. }
-        // Read verbs, key management, policy linting, the demo walk and the two local repairs:
-        // none of them opens a road to a server, and `gx cancel` in particular does not (43 T-7
-        // aborts a row and applies nothing).
-        | Command::Cancel { .. }
+        | Command::Demo { .. }
+        | Command::DemoNotesServer => false,
+        // Read verbs, key management, policy linting and the two local repairs: none of them opens
+        // a road to a server, and `gx cancel` in particular does not (43 T-7 aborts a row and
+        // applies nothing).
+        Command::Cancel { .. }
         | Command::Policy { .. }
         | Command::Draft { .. }
-        | Command::Demo { .. }
-        | Command::DemoNotesServer
         | Command::Limits { .. }
         | Command::VerdictCheckpoint { .. }
         | Command::Receipt { .. }
@@ -1452,7 +1509,13 @@ fn refuse_unused_mcp_flags(cli: &Cli) -> Result<()> {
     if given.is_empty() {
         return Ok(());
     }
-    let wrap_note = if matches!(cli.command, Command::Wrap { .. }) {
+    // 🔴 `req/817`: `Command::Wrap` is `cfg(feature = "mcp")`. A build without it has no `gx wrap`
+    // to point the reader at, so the note falls through to the general one.
+    #[cfg(feature = "mcp")]
+    let is_wrap = matches!(cli.command, Command::Wrap { .. });
+    #[cfg(not(feature = "mcp"))]
+    let is_wrap = false;
+    let wrap_note = if is_wrap {
         ". `gx wrap` names its server after `--` and carries its own `--server-env`, \
          `--endpoint`, `--restore` and `--restore-catalogue`; use those"
     } else {
@@ -1716,6 +1779,9 @@ fn run(cli: &Cli) -> Result<Outcome> {
                 signing_key: signing_key.clone(),
             },
         ),
+        // 🔴 `cfg(feature = "mcp")` (`req/817`) — the four arms below are the verbs the public
+        // distribution does not carry; see this crate's `Cargo.toml` `[features]`.
+        #[cfg(feature = "mcp")]
         Command::Attach {
             json: _,
             route_config,
@@ -1751,15 +1817,19 @@ fn run(cli: &Cli) -> Result<Outcome> {
                 },
             )
         }
+        #[cfg(feature = "mcp")]
         Command::Wrap { .. } => wrap_cmd(cli),
+        #[cfg(feature = "mcp")]
         Command::Demo { json: _ } => gx_cli::demo::run(),
         // 🔴 Unreachable in practice: `main` intercepts this variant before calling `run` (see
         // `main`'s own comment on that branch, right above its `match Cli::try_parse()`). The arm
         // stays for exhaustiveness -- `Command` is matched elsewhere too, and a variant with no
         // arm here is a compile error the day this function's shape changes -- and it calls the
         // same function `main`'s early branch does, so the two paths cannot answer differently.
+        #[cfg(feature = "mcp")]
         Command::DemoNotesServer => gx_cli::demo::serve_notes(),
         Command::Limits { json } => gx_cli::limits::run(*json),
+        #[cfg(feature = "confine")]
         Command::Confine {
             tool,
             allow_write,
@@ -2025,6 +2095,9 @@ fn serve_cmd(cli: &Cli, spec: &gx_cli::serve::ServeSpec) -> Result<Outcome> {
 /// go that audit 19 measured on `gx escalation approve`. Saying `true` in that function and
 /// stopping there would have this verb accept `--mcp-server` and drop it — the failure R19 exists
 /// to close, reintroduced by a verb added after it.
+/// 🔴 **`cfg(feature = "confine")`** (`req/817`) — its only caller is the `Command::Confine` arm,
+/// which is gated the same way; the public distribution carries neither.
+#[cfg(feature = "confine")]
 fn confine_cmd(cli: &Cli, spec: &gx_cli::confine::ConfineSpec) -> Result<Outcome> {
     let homeless: Vec<&str> = [
         (cli.mcp_server.is_some(), "--mcp-server"),
@@ -2057,6 +2130,9 @@ fn confine_cmd(cli: &Cli, spec: &gx_cli::confine::ConfineSpec) -> Result<Outcome
     gx_cli::confine::run(&catalogue, spec, &project(cli)?, cli.pretty)
 }
 
+/// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — its only caller is the `Command::Wrap` arm, which is
+/// gated the same way; the public distribution carries neither.
+#[cfg(feature = "mcp")]
 fn wrap_cmd(cli: &Cli) -> Result<Outcome> {
     let Command::Wrap {
         server,
@@ -2230,6 +2306,9 @@ fn wrap_cmd(cli: &Cli) -> Result<Outcome> {
 }
 
 /// Read a JSON document a command was pointed at.
+/// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — read only by [`wrap_cmd`], which is gated the same
+/// way, so a build without the `mcp` feature carries neither.
+#[cfg(feature = "mcp")]
 fn read_json(path: &std::path::Path) -> Result<serde_json::Value> {
     let raw = std::fs::read(path).map_err(|e| Error::Io {
         action: "read",

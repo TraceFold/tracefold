@@ -19,6 +19,24 @@ publish = false                       # req/636: no crate in this workspace is a
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement (M2 hand 6, req/55 §4 H6-1).
+# 🔴 **`req/832` ATOM -1 — the postgres pack is a build-time embedding, so only a feature can
+# remove it.** `src/packs.rs` reaches `policies/postgres/deny-system-catalogs.cedar` with
+# `include_str!`, and the public distribution does not ship that directory (its `policies/` is
+# `fs`, `git`, `mcp` — measured on the clone, `req/817` §2.5). `include_str!` runs before any
+# feature does *in the crate that writes it*, which is why `req/817`'s feature work one crate up
+# (`gx-cli`'s `pg`) could not reach it: the embedding has to be gated **here**, where it is written.
+#
+# `default = ["pg"]` keeps the private tree exactly as it was — four packs, four rows, every
+# existing count unchanged. `public/crates/gx-gate/Cargo.toml` ships the same Rust with
+# `default = []`, which is the two-manifest pattern `req/817` §2.3 established for `gx-cli`,
+# extended one crate down. The feature gates **both** the embedding and its `SHIPPED_PACKS` row,
+# because gating only the first would leave the table naming a pack no build carries, and gating
+# only the second would still fail to compile.
+[features]
+default = ["pg"]
+# The shipped postgres pack (`req/446` V0-C) and its `SHIPPED_PACKS` row.
+pg = []
+
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
 gx-witness = { path = "../gx-witness", version = "0.1.0" }

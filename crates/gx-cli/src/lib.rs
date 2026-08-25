@@ -79,14 +79,28 @@ mod declaration;
 /// 🔴 **P-1a** (`req/535` §3 R-1) — `gx attach`: put `.gx/` on a tree that is already running and
 /// enumerate what was put there. The placement road is [`layout::Layout::create`]'s and is not
 /// re-implemented; what this module adds is the report that road never had.
+///
+/// 🔴 **`cfg(feature = "mcp")`** (`req/817`): this module reads an agent's MCP configuration through
+/// `gx_mcp_wire::config`, and `gx-mcp-wire` is one of the four crates `req/789` §3 holds private.
+/// The public distribution builds without it. See this crate's `Cargo.toml` `[features]`.
+#[cfg(feature = "mcp")]
 pub mod attach;
 pub mod clock;
 /// 🔴 **S③** (`req/493`) — `gx confine`, the verb that takes a kernel ruleset and becomes the
 /// command. The derivation and the Landlock call are in `gx-confine`; this module is the argument
 /// road, the report, and the `exec`.
+///
+/// 🔴 **`cfg(feature = "confine")`** (`req/817`) — `gx-confine` is private; see `attach` above.
+#[cfg(feature = "confine")]
 pub mod confine;
 pub mod consumers;
+/// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — the demo speaks JSON-RPC frames through
+/// `gx_mcp_wire::jsonrpc`; see `attach` above.
+#[cfg(feature = "mcp")]
 pub mod demo;
+/// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — undoes an `attach` through `gx_mcp_wire::config`;
+/// see `attach` above.
+#[cfg(feature = "mcp")]
 pub mod detach;
 pub mod draft;
 pub mod emit;
@@ -113,6 +127,9 @@ pub mod rng;
 pub mod serve;
 pub mod session;
 pub mod verdict;
+/// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — `gx wrap` is the road from an agent's `tools/call` to
+/// `Engine::commit`, and that road is `gx_mcp_wire`'s transport; see `attach` above.
+#[cfg(feature = "mcp")]
 pub mod wrap;
 
 /// 42 §3.1's four substrates, from the `--substrate` spelling.

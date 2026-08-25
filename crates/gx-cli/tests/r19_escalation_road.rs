@@ -22,6 +22,12 @@
 //! behind it, real single-shot verbs afterwards — and asserts on the **object on the substrate**
 //! and on the **server's own arrival log**, never on this process's own say-so.
 
+// 🔴 `req/817`: this suite exercises a verb whose mechanism is `gx-mcp-wire`,
+// one of the four crates `req/789` §3 holds private. The public distribution builds without
+// it (`default = []` there), so the whole file compiles away rather than failing to resolve
+// a crate that is not in the tree. The private build turns `mcp` on by default and runs it.
+#![cfg(feature = "mcp")]
+
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};

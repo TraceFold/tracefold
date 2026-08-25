@@ -267,9 +267,23 @@ pub fn mcp_pack() -> Result<PolicyEngine> {
 // ---------------------------------------------------------------------------
 
 /// Where the shipped postgres pack lives, relative to the repository root.
+///
+/// 🔴 Behind `pg` with the source it names (`req/832` ATOM -1). The path and the embedding are one
+/// claim -- "this build carries this file" -- so a distribution that does not carry the file must
+/// not carry the path either; a path constant surviving the embedding would let a consumer form a
+/// `PathBuf` to a file that is not there and read the resulting error as a missing *pack* rather
+/// than as a pack this build never shipped.
+#[cfg(feature = "pg")]
 pub const POSTGRES_PACK_PATH: &str = "policies/postgres/deny-system-catalogs.cedar";
 
 /// The shipped postgres pack, as the build embeds it -- **the fourth road, for the fourth pack**.
+///
+/// 🔴 **`req/832` ATOM -1 gates this, and it is the reason the feature exists.** `include_str!` is
+/// resolved while the crate is being compiled, before `cfg` has decided anything about a
+/// *dependent* crate -- so `gx-cli`'s `pg` feature could never have reached it (`req/817` §2.5),
+/// and the published tree failed here with `couldn't read .../policies/postgres/...` for every
+/// cargo build. The gate is on the embedding itself, which is the only place it can be.
+#[cfg(feature = "pg")]
 pub const POSTGRES_PACK_SOURCE: &str =
     include_str!("../../../policies/postgres/deny-system-catalogs.cedar");
 
@@ -281,6 +295,7 @@ pub const POSTGRES_PACK_SOURCE: &str =
 /// [`SHIPPED_PACKS`] changes the admissible surface by zero, and
 /// `crates/gx-gate/tests/ac_074.rs::adding_the_postgres_pack_admits_nothing_it_did_not_admit_before`
 /// runs the three-pack set and the four-pack set against the same requests to show it.
+#[cfg(feature = "pg")]
 pub const POSTGRES_PACK_POLICY_IDS: [&str; 1] = ["postgres-deny-system-catalogs"];
 
 /// 🔴 The exact string a policy in the postgres pack must compare `resource.substrate` against.
@@ -290,6 +305,7 @@ pub const POSTGRES_PACK_POLICY_IDS: [&str; 1] = ["postgres-deny-system-catalogs"
 /// checked against a value the crate produces rather than against a second copy of the literal;
 /// `ac_074.rs` closes the loop by deriving the same string from [`crate::policy::RequestView`]
 /// itself, which is the only comparison that would survive `substrate_tag` changing.
+#[cfg(feature = "pg")]
 pub const POSTGRES_SUBSTRATE_TAG: &str = "custom:postgres";
 
 /// The shipped postgres pack, parsed.
@@ -297,6 +313,7 @@ pub const POSTGRES_SUBSTRATE_TAG: &str = "custom:postgres";
 /// # Errors
 /// [`crate::Error::PolicySetUnreadable`] if the embedded source does not parse or a statement in it
 /// carries no `@id`.
+#[cfg(feature = "pg")]
 pub fn postgres_pack() -> Result<PolicyEngine> {
     PolicyEngine::parse(POSTGRES_PACK_SOURCE)
 }
@@ -336,6 +353,50 @@ pub struct ShippedPack {
     pub substrate: &'static str,
 }
 
+/// 🔴 **`req/832` ATOM -1: the table has two arities, and the three shared rows are written once.**
+///
+/// A distribution built without `pg` carries no postgres embedding (see [`POSTGRES_PACK_SOURCE`]),
+/// so its table must be three rows -- a fourth row would name a pack the build does not carry, and
+/// `crates/gx-cli/tests/defaults.rs` compares this table against what
+/// `register_default_adapters` actually registers, so a row for an absent pack turns that probe
+/// from a check into a lie (the same argument `req/817` §2.3 made for `DEFAULT_SUBSTRATES`).
+///
+/// The obvious way to write this -- two full array literals under `cfg` -- would copy the fs, git
+/// and mcp rows into two places, and two copies of one declaration drift. So each row is a `const`
+/// named once and the two arrays are assembled from them: the only difference between the private
+/// table and the public one is whether [`PG_ROW`] is in it.
+const FS_ROW: ShippedPack = ShippedPack {
+    path: FS_PACK_PATH,
+    source: FS_PACK_SOURCE,
+    policy_ids: &FS_PACK_POLICY_IDS,
+    substrate: "fs",
+};
+
+/// The git pack's row. See [`FS_ROW`] for why the rows are named.
+const GIT_ROW: ShippedPack = ShippedPack {
+    path: GIT_PACK_PATH,
+    source: GIT_PACK_SOURCE,
+    policy_ids: &GIT_PACK_POLICY_IDS,
+    substrate: "git",
+};
+
+/// The mcp pack's row. See [`FS_ROW`] for why the rows are named.
+const MCP_ROW: ShippedPack = ShippedPack {
+    path: MCP_PACK_PATH,
+    source: MCP_PACK_SOURCE,
+    policy_ids: &MCP_PACK_POLICY_IDS,
+    substrate: "mcp",
+};
+
+/// The postgres pack's row -- **the one row the `pg` feature adds**. See [`FS_ROW`].
+#[cfg(feature = "pg")]
+const PG_ROW: ShippedPack = ShippedPack {
+    path: POSTGRES_PACK_PATH,
+    source: POSTGRES_PACK_SOURCE,
+    policy_ids: &POSTGRES_PACK_POLICY_IDS,
+    substrate: POSTGRES_SUBSTRATE_TAG,
+};
+
 /// Every pack this build ships (FR-028).
 ///
 /// Three as of **M7 hand 4**. A pack file that appears under `policies/` without a row here is caught
@@ -347,32 +408,13 @@ pub struct ShippedPack {
 /// become the shipped **set**". req/38 §60 ruled that day to be this one (**the counter-ruling to
 /// R-9**) (sem: SEM-gx-gate-096), and
 /// [`shipped_pack_set`] is the value the CLI now starts from.
-pub const SHIPPED_PACKS: [ShippedPack; 4] = [
-    ShippedPack {
-        path: FS_PACK_PATH,
-        source: FS_PACK_SOURCE,
-        policy_ids: &FS_PACK_POLICY_IDS,
-        substrate: "fs",
-    },
-    ShippedPack {
-        path: GIT_PACK_PATH,
-        source: GIT_PACK_SOURCE,
-        policy_ids: &GIT_PACK_POLICY_IDS,
-        substrate: "git",
-    },
-    ShippedPack {
-        path: MCP_PACK_PATH,
-        source: MCP_PACK_SOURCE,
-        policy_ids: &MCP_PACK_POLICY_IDS,
-        substrate: "mcp",
-    },
-    ShippedPack {
-        path: POSTGRES_PACK_PATH,
-        source: POSTGRES_PACK_SOURCE,
-        policy_ids: &POSTGRES_PACK_POLICY_IDS,
-        substrate: POSTGRES_SUBSTRATE_TAG,
-    },
-];
+#[cfg(feature = "pg")]
+pub const SHIPPED_PACKS: [ShippedPack; 4] = [FS_ROW, GIT_ROW, MCP_ROW, PG_ROW];
+
+/// Every pack a build without `pg` ships -- three, and the postgres row is absent because its
+/// source is (`req/832` ATOM -1).
+#[cfg(not(feature = "pg"))]
+pub const SHIPPED_PACKS: [ShippedPack; 3] = [FS_ROW, GIT_ROW, MCP_ROW];
 
 /// 🔴 **PACK_FORMAT F3 shape 2's second conjunct, in one canonical form** (**R36**, `req/476` M-01).
 ///

@@ -33,6 +33,12 @@
 //! `attach`'s own output names them as questions this face does not answer rather than leaving
 //! them off.
 
+// 🔴 `req/817`: every test here drives `gx attach`, whose mechanism is
+// `gx-mcp-wire` -- one of the four crates `req/789` §3 holds private. The public
+// distribution does not carry the verb, so the suite compiles away rather than failing against
+// a subcommand that is deliberately absent. The private build runs it exactly as before.
+#![cfg(feature = "mcp")]
+
 mod support;
 
 use std::path::Path;

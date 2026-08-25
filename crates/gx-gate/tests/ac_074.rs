@@ -668,14 +668,20 @@ fn runner_source(text: &str) -> String {
 fn the_shipped_set_holds_every_pack() {
     let paths: Vec<&str> = SHIPPED_PACKS.iter().map(|p| p.path).collect();
     println!("SHIPPED_PACKS {paths:?}");
+    // 🔴 `req/832` ATOM -1: the expectation follows the feature, and it is built by pushing rather
+    // than by a second literal under `cfg`, so the three unconditional packs are still asserted by
+    // name in both builds -- a `cfg` over the whole `assert_eq!` would have left the public build
+    // asserting nothing at all, which is the shape of a test that passes because it stopped looking.
+    #[cfg_attr(not(feature = "pg"), allow(unused_mut))]
+    let mut expected = vec![
+        "policies/fs/deny-etc.cedar",
+        "policies/git/deny-nonbranch-refs.cedar",
+        "policies/mcp/deny-etc-resources.cedar",
+    ];
+    #[cfg(feature = "pg")]
+    expected.push("policies/postgres/deny-system-catalogs.cedar");
     assert_eq!(
-        paths,
-        vec![
-            "policies/fs/deny-etc.cedar",
-            "policies/git/deny-nonbranch-refs.cedar",
-            "policies/mcp/deny-etc-resources.cedar",
-            "policies/postgres/deny-system-catalogs.cedar"
-        ],
+        paths, expected,
         "FR-028 ships the fs pack (M3), the git pack (M7 hand 2) and the mcp pack (M7 hand 4); \
          req/446 V0-C adds the postgres pack, which is the first written against \
          `policies/PACK_FORMAT.md` and the first to declare a deny-default"

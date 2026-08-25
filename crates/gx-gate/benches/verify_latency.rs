@@ -261,6 +261,7 @@ fn latency_distribution() {
 ///
 /// Same form as `latency_distribution`: median with the denominator on the line (req/58 2.3), and
 /// no comparison against a budget.
+#[cfg(feature = "pg")]
 fn composition_cost() {
     let three: Vec<packs::ShippedPack> = packs::SHIPPED_PACKS
         .into_iter()
@@ -350,6 +351,11 @@ fn main() {
     let measuring = std::env::args().any(|a| a == "--bench");
     if measuring {
         latency_distribution();
+        // 🔴 `req/832` ATOM -1: the composition measurement is "what does a fourth pack cost",
+        // so on a build with no fourth pack there is nothing to measure -- and a run that
+        // silently compared the three-pack set against itself would report a cost of zero as
+        // though it were a finding.
+        #[cfg(feature = "pg")]
         composition_cost();
     }
     let mut criterion = Criterion::default().configure_from_args();

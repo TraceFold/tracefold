@@ -12,6 +12,10 @@ use axum::response::{IntoResponse, Response};
 use crate::gx_code;
 
 /// One refusal, in 44 §2.3's shape.
+///
+/// A struct with manual conversions rather than a thiserror enum on purpose —
+/// `docs/ERROR_TAXONOMY.md` exemption (c): this type mirrors a serialized wire object member
+/// for member, not a variant set.
 #[derive(Debug, Clone)]
 pub struct ApiError {
     /// 44 §2.3's `gx_code`, from [`crate::gx_code`] and never from a literal here.

@@ -18,6 +18,12 @@
 //! to be true for it to be vacuous, and then builds that state and watches the same predicate
 //! refuse it.
 
+// 🔴 `req/817`: every test here drives `gx attach's face`, whose mechanism is
+// `gx-mcp-wire` -- one of the four crates `req/789` §3 holds private. The public
+// distribution does not carry the verb, so the suite compiles away rather than failing against
+// a subcommand that is deliberately absent. The private build runs it exactly as before.
+#![cfg(feature = "mcp")]
+
 mod support;
 
 use std::path::{Path, PathBuf};

@@ -8,6 +8,12 @@
 //! `gx wrap` applies on top of it: a `gx_*`-named `--resource-arg` is stripped by default, a real
 //! tool argument never is, and `--forward-resource-arg` turns the default off.
 
+// 🔴 `req/817`: this suite exercises a verb whose mechanism is `gx-mcp-wire`,
+// one of the four crates `req/789` §3 holds private. The public distribution builds without
+// it (`default = []` there), so the whole file compiles away rather than failing to resolve
+// a crate that is not in the tree. The private build turns `mcp` on by default and runs it.
+#![cfg(feature = "mcp")]
+
 use gx_cli::wrap::stripped_member;
 
 #[test]

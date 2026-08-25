@@ -227,6 +227,10 @@ impl ServeOutcome {
 }
 
 /// What went wrong before there was a server.
+///
+/// Manual `Display` on purpose — `docs/ERROR_TAXONOMY.md` exemption (c): the startup refusal
+/// beside the wire-shaped [`crate::problem::ApiError`], in a crate that does not carry
+/// thiserror.
 #[derive(Debug)]
 pub enum ServeError {
     /// The runtime would not build.

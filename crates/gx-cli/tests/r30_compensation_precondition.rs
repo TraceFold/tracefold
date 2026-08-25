@@ -77,6 +77,12 @@
 //! also does not claim attribution: this fixture's third party is a write, and the engine cannot
 //! tell it from this transformation's own half-landed apply — both land on `WorldMovedBeneath`.
 
+// 🔴 `req/817`: this suite exercises a verb whose mechanism is `gx-mcp-wire`,
+// one of the four crates `req/789` §3 holds private. The public distribution builds without
+// it (`default = []` there), so the whole file compiles away rather than failing to resolve
+// a crate that is not in the tree. The private build turns `mcp` on by default and runs it.
+#![cfg(feature = "mcp")]
+
 use std::path::{Path, PathBuf};
 
 use gx_cli::wrap::apply_failed_clause;

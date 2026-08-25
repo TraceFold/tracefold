@@ -8,6 +8,12 @@
 //! Deny arm) under `EnforcementMode::RecordOnly` and measures, on the real server, that the tool call
 //! the ordinary path would have refused **reaches the server anyway**.
 
+// 🔴 `req/817`: this suite exercises a verb whose mechanism is `gx-mcp-wire`,
+// one of the four crates `req/789` §3 holds private. The public distribution builds without
+// it (`default = []` there), so the whole file compiles away rather than failing to resolve
+// a crate that is not in the tree. The private build turns `mcp` on by default and runs it.
+#![cfg(feature = "mcp")]
+
 #[path = "support/audit_p3_support.rs"]
 mod audit_p3_support;
 

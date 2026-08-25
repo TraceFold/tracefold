@@ -25,6 +25,17 @@
 //!   gate that never goes red, which `INHERITED_PRINCIPLES.md` §3d refuses. So the negative control
 //!   is here beside it: a deliberately id-colliding composition, which the set builder must refuse.
 
+// 🔴 `req/832` ATOM -1: this whole suite is about the postgres pack (`req/446` V0-C), and a build
+// without the `pg` feature does not embed one -- `gx_gate::packs` gates the `include_str!` because
+// that is the only place it can be gated (`req/817` §2.5). So the file compiles away publicly
+// rather than naming constants that are not there.
+//
+// 🔴 **Declared coverage loss, not a silent one**: two tests here are set-wide rather than
+// postgres-specific (`every_shipped_pack_declares_its_default`, `composition_order_moves_no_verdict
+// _and_no_deciding_id`) and they go unrun in a `pg`-less build. They are named in `req/832` §ATOM-1
+// rather than left for a later reader to discover as a hole.
+#![cfg(feature = "pg")]
+
 use gx_core::{
     Actor, ChangeContext, Cid, CompositionMetadata, DeltaRef, IntentId, ObjectId, ObjectSnapshot,
     PlannedDeltaBytes, ReprKind, Subject, SubstrateKind, Timestamp, Transformation,

@@ -1,3 +1,22 @@
+# 🔴 **This file is the PUBLIC workspace root** (`req/817`), staged at `public/Cargo.toml` and
+# synced to `Cargo.toml` in github.com/TraceFold/tracefold. It is the private root with the five
+# member paths the public tree does not contain removed, and nothing else changed.
+#
+# Why it exists: `req/789` §3 holds four crates private (`gx-adapter-mysql`,
+# `gx-adapter-postgres`, `gx-confine`, `gx-mcp-wire`), and `probes/` is not in the sync set at
+# all. Until `req/817` the public `Cargo.toml` was the private one verbatim, so it declared 19
+# members while a public clone carried 14 -- and cargo refuses to load a workspace whose member
+# manifest is missing. Measured on an anonymous fresh clone before this fix: `cargo metadata`
+# **exit 101**, `cargo build --workspace` **exit 101**. Every cargo command in the published
+# repository failed before it read a line of Rust, which also meant `tools/e2e.sh` could not run.
+#
+# A workspace member list cannot be put behind a feature -- cargo resolves it while parsing the
+# manifest -- so the public tree needs its own root, and this is that file. `crates/gx-cli`'s
+# dependencies on the three private crates are handled the other way, by cargo features: see
+# `public/crates/gx-cli/Cargo.toml` and the `[features]` block in the private one.
+#
+# 🔴 Keep this in step with the private `Cargo.toml`. It is the same file minus five lines; a
+# change to the private root that is not reflected here ships a stale public workspace.
 [workspace]
 resolver = "2"
 # 🔴 **S③ (`req/493` §4 item 1)** adds `crates/gx-confine`, the eighteenth member: the
@@ -12,7 +31,6 @@ resolver = "2"
 # fragment of the prose as a crate. Measured, not assumed: that is what this lane's first attempt
 # did.
 members = [
-    "probes/doubt",
     "crates/gx-core",
     "crates/gx-canon",
     "crates/gx-witness",
@@ -23,11 +41,7 @@ members = [
     "crates/gx-adapter-fs",
     "crates/gx-adapter-git",
     "crates/gx-adapter-mcp",
-    "crates/gx-adapter-postgres",
-    "crates/gx-adapter-mysql",
-    "crates/gx-mcp-wire",
     "crates/gx-engine",
-    "crates/gx-confine",
     "crates/gx-cli",
     "crates/gx-api",
     "sdk/wasm-verify",

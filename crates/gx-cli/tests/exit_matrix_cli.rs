@@ -43,6 +43,13 @@ use gx_cli::exit::{
 /// pending on purpose — the `receipt` group's codes are `[0, 1, 6, 7]` and coverage's are
 /// `[0, 1, 6]`, so folding it in would pair one section's codes to another's — and this lane pays
 /// the separate group `req/589` §8 declined inside P-2 I's coordinate budget.
+///
+/// 🔴 **Three section strings below carry Japanese** (`（v0.2.1 追記・2026-08-13）` and the two
+/// P3 addenda). Kept in Japanese on purpose: they are exact-match twins of `SPEC_44_EXITS` in
+/// `crates/gx-cli/src/exit.rs`, which itself quotes `req/spec/40-architecture/44-api-spec.md`'s
+/// `#### ` headings character for character under `probes/doubt/tests/m6_exit_matrix.rs`'s
+/// verbatim comparison — translating them here alone breaks the pairing, and translating all
+/// three sides means rewriting the canon's own headings, which no maintenance lane owns.
 const GROUP_SECTIONS: [(&str, &str); 18] = [
     ("attach", "`gx attach`"),
     ("submit", "`gx submit`"),

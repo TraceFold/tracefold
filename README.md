@@ -4,6 +4,7 @@
 
 ### Undo, but proven.
 
+**Tracefold** is verified undo and offline-verifiable receipts for AI agent actions, in Rust.
 An agent's change is held with a checked inverse **before** it lands, and every verdict
 becomes a receipt anyone can verify offline — without trusting whoever issued it.
 

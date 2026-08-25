@@ -305,8 +305,13 @@ fn the_test_fixture_pack_is_a_pack() {
 // 🔴 AC-PP-10 (req/446) — a scenario file can say which statement decided it
 // ---------------------------------------------------------------------------
 
+// 🔴 `req/832` ATOM -1: this group is gated on `pg`, because its subject is the shipped postgres
+// pack and a build without the `pg` feature does not carry one (`gx_gate::packs` gates the
+// embedding, so `POSTGRES_PACK_PATH` is not there to name). The rest of this file is not gated --
+// `gx policy lint`/`test` are pack-agnostic and their tests run in both distributions.
 /// The shipped postgres pack — the deny-default one, and therefore the pack whose scenarios
 /// **cannot be written at all** without `deny_by_no_policy`.
+#[cfg(feature = "pg")]
 fn postgres_pack() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
@@ -315,6 +320,7 @@ fn postgres_pack() -> std::path::PathBuf {
         .join(gx_gate::packs::POSTGRES_PACK_PATH)
 }
 
+#[cfg(feature = "pg")]
 fn pg_case(name: &str, locator: &str, extra: serde_json::Value) -> serde_json::Value {
     let mut case = serde_json::json!({
         "name": name,
@@ -341,6 +347,7 @@ const BUSINESS: &str = "postgres://main/public.orders?id=7";
 /// AC-PP-10 exists to close. The test asserts the weakness rather than working around it, so that
 /// if `Deny` ever stopped being satisfied by Cedar's third rule this row would say so.
 #[test]
+#[cfg(feature = "pg")]
 fn an_arm_only_deny_cannot_tell_a_refusal_from_an_absence() {
     let dir = scratch("pp_v0_weak_expectation");
     let scenarios = write_json(
@@ -382,6 +389,7 @@ fn an_arm_only_deny_cannot_tell_a_refusal_from_an_absence() {
 
 /// 🔴 **AC-PP-10, the fix**: naming the deciding statement makes the two rows distinguishable.
 #[test]
+#[cfg(feature = "pg")]
 fn expect_policy_id_separates_a_named_refusal_from_an_unnamed_one() {
     let dir = scratch("pp_v0_named_expectation");
     let right = write_json(
@@ -464,6 +472,7 @@ fn expect_policy_id_separates_a_named_refusal_from_an_unnamed_one() {
 /// something else" are different facts, and E-M3-3 is the standing rule against giving them one
 /// face. A contradictory scenario is a third thing again — the question itself is malformed.
 #[test]
+#[cfg(feature = "pg")]
 fn a_scenario_that_describes_no_verdict_is_refused_as_usage() {
     let dir = scratch("pp_v0_contradiction");
     let both = write_json(

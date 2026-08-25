@@ -33,6 +33,12 @@
 //! `#!` line. Windows is measured zero times here as it is everywhere else in this crate, and
 //! `docs/LIMITS.md` says so.
 
+// 🔴 `req/817`: every test here drives `gx wrap`, whose mechanism is
+// `gx-mcp-wire` -- one of the four crates `req/789` §3 holds private. The public
+// distribution does not carry the verb, so the suite compiles away rather than failing against
+// a subcommand that is deliberately absent. The private build runs it exactly as before.
+#![cfg(feature = "mcp")]
+
 #![cfg(unix)]
 
 use std::os::unix::fs::PermissionsExt;

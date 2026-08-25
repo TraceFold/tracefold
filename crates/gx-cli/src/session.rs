@@ -105,7 +105,15 @@ pub const ADAPTER_VERSION: &str = concat!("gx-cli ", env!("CARGO_PKG_VERSION"));
 /// (`gx_adapter_postgres::db::connect`), so nothing about registering it was ever blocked on a
 /// deployment supplying a transport — the gap `req/136` §4-1 found was an omission (no crate in
 /// this repository ever called `engine.register_adapter` with one), not a deferral with a reason.
+/// 🔴 **Three, not four, without the `pg` feature** (`req/817`). `gx-adapter-postgres` is one of
+/// the four crates `req/789` §3 holds private, so the public distribution does not register it and
+/// must not declare it either — this constant is the declaration `defaults.rs` compares against
+/// what actually registers, and a declaration that named an adapter the binary cannot build would
+/// turn that probe from a check into a lie. The pair stays honest in both builds.
+#[cfg(feature = "pg")]
 pub const DEFAULT_SUBSTRATES: [&str; 4] = ["fs", "git", "mcp", "custom:postgres"];
+#[cfg(not(feature = "pg"))]
+pub const DEFAULT_SUBSTRATES: [&str; 3] = ["fs", "git", "mcp"];
 
 /// 🔴 Why the third of 44 §1.2's three substrates is not in [`DEFAULT_SUBSTRATES`], and what would
 /// change that.
@@ -209,12 +217,21 @@ pub fn register_default_adapters_with<E: gx_engine::EvidenceSource>(
     engine: &mut Engine<E>,
     mcp: &McpWiring,
 ) -> Vec<String> {
-    let adapters: [std::sync::Arc<dyn gx_substrate::SubstrateAdapter>; 4] = [
+    // 🔴 A `Vec` and not a `[_; 4]` since `req/817`: the postgres arm is `cfg(feature = "pg")`
+    // because `gx-adapter-postgres` is one of the four crates `req/789` §3 holds private, so the
+    // public distribution registers three adapters here and not four. The count is read from
+    // `adapters.len()` below rather than written down twice, so the two cannot drift.
+    // `mut` is used only by the `pg` push below, so a build without that feature does not need it.
+    #[cfg_attr(not(feature = "pg"), allow(unused_mut))]
+    let mut adapters: Vec<std::sync::Arc<dyn gx_substrate::SubstrateAdapter>> = vec![
         std::sync::Arc::new(gx_adapter_fs::FsAdapter::new()),
         std::sync::Arc::new(gx_adapter_git::GitAdapter::new()),
         std::sync::Arc::new(mcp.adapter()),
-        std::sync::Arc::new(gx_adapter_postgres::PostgresAdapter::new()),
     ];
+    #[cfg(feature = "pg")]
+    adapters.push(std::sync::Arc::new(
+        gx_adapter_postgres::PostgresAdapter::new(),
+    ));
     let mut registered = Vec::with_capacity(adapters.len());
     for adapter in adapters {
         registered.push(substrate_tag(&adapter.kind()));
@@ -762,8 +779,38 @@ pub fn open_engine_wired_accepting<E: gx_engine::EvidenceSource>(
     // A `GX_CONFINEMENT` this build cannot read stops the run here, before a journal is touched.
     // See `crate::confine::read_declaration` for why the alternative (assume unconfined) is the
     // reading that puts an assumption inside a signature.
+    #[cfg(feature = "confine")]
     let mut engine = Engine::open_anchored(&journal, gate, evidence, anchor)?
         .with_confinement(crate::confine::from_environment()?);
+    // 🔴 **`cfg(not(feature = "confine"))`** (`req/817`) — the public distribution is built without
+    // `gx-confine` (`req/789` §3 holds it private), so this binary has no `gx confine` and no reader
+    // for `GX_CONFINEMENT`.
+    //
+    // It refuses instead of falling through to the engine's `unconfined()` default, for exactly the
+    // reason `crate::confine::read_declaration` refuses an unreadable value: something set that
+    // variable, and recording "no confinement" because this build cannot read it would put that
+    // assumption inside a signature (`req/493` §1 AC-6). A build that cannot honour the declaration
+    // says so; it does not quietly issue receipts that claim the process was unconfined.
+    //
+    // With the variable unset there is nothing to honour, and the engine's own default
+    // (`ConfinementContext::unconfined()`) is the same value the confined build would compute.
+    #[cfg(not(feature = "confine"))]
+    let mut engine = {
+        if let Some(raw) = std::env::var_os("GX_CONFINEMENT") {
+            return Err(Error::Usage {
+                detail: format!(
+                    "`GX_CONFINEMENT` is set to {raw:?}, but this build carries no confinement \
+                     reader: it was compiled without the `confine` feature, so `gx confine` and \
+                     the `GX_CONFINEMENT` grammar are both absent. gx refuses rather than \
+                     assuming the process is unconfined -- a value it cannot read was set by \
+                     something, and reading it as \"no confinement\" would put that assumption \
+                     inside a signature (`req/493` §1 AC-6). Build with `--features confine` to \
+                     honour it"
+                ),
+            });
+        }
+        Engine::open_anchored(&journal, gate, evidence, anchor)?
+    };
     // 🔴 The pair, in two lines: the set above and the registry here (req/38 §60's R-9 paired ruling; sem: SEM-gx-cli-230). The
     // engine still declares no adapter — N-13 is about `gx-engine`'s manifest and is unmoved; this
     // is the caller putting adapters in its registry, which req/88 §1 ruled is the CLI's job.

@@ -218,6 +218,14 @@ pub const HAND2_EXITS: [ExitRow; 12] = [
 /// other verb's road to a working `.gx/` runs through this one first, so its section precedes theirs
 /// in the document that describes them (`gx receipt coverage`'s own precedent for placing a section
 /// by adjacency to what it is about, not by arrival date).
+///
+/// 🔴 **Three section strings below carry Japanese** (`（v0.2.1 追記・2026-08-13）` and the two
+/// P3 addenda), and one of them recurs in [`SPEC_44_EXIT_ADDITIONS`]. They are kept in Japanese
+/// on purpose, character for character with `req/spec/40-architecture/44-api-spec.md`'s own
+/// `#### ` lines: `probes/doubt/tests/m6_exit_matrix.rs` reads both sides and compares them
+/// verbatim, so translating the strings here without touching the canon file turns that probe
+/// red — the same identity discipline `gx-substrate-conformance/src/contracts.rs` states for
+/// 51 §7's table.
 pub const SPEC_44_EXITS: [(&str, &[u8]); 19] = [
     // ---- 🔴 **R44 lane B, item 7** (`req/603` §8, `req/38` §369) — 44 §1.2's nineteenth section,
     // and the one placed first in the document: everything after it presumes the `.gx/` this verb

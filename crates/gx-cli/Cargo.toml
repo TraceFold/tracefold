@@ -1,3 +1,10 @@
+# 🔴 **This file is the PUBLIC `crates/gx-cli/Cargo.toml`** (`req/817`), staged at
+# `public/crates/gx-cli/Cargo.toml` and synced over `crates/gx-cli/Cargo.toml` in
+# github.com/TraceFold/tracefold. It is the private manifest with the three private-crate
+# dependency lines removed and `default` emptied. The Rust source is **identical** in both trees --
+# every use of those three crates sits behind `cfg(feature = ...)`.
+#
+# Keep it in step with the private `crates/gx-cli/Cargo.toml`.
 # 41 §2's twelfth crate and 44 §1's surface: "gx submit|plan|verify|commit|undo|cancel|escalation|
 # receipt|replay|log|key|policy|serve (per 44)" (sem: SEM-gx-cli-381).
 #
@@ -43,6 +50,43 @@ path = "src/main.rs"
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement (M2 hand 6, req/55 §4 H6-1).
+# 🔴 **Features — the three verbs whose mechanism is not in the public distribution** (`req/817`).
+#
+# `req/789` §3 holds four crates private (`gx-adapter-mysql`, `gx-adapter-postgres`, `gx-confine`,
+# `gx-mcp-wire`); three of them are dependencies of this binary. Until `req/817` the public
+# `Cargo.toml` declared them anyway, with hard `path` dependencies onto directories a public clone
+# does not contain, so **every** cargo command in a fresh public clone exited 101 before it read a
+# line of Rust (measured: `cargo metadata` and `cargo build --workspace` both 101).
+#
+# Cargo resolves an `optional` path dependency whether or not its feature is on (measured this lane:
+# a missing path is a 101 with the feature OFF as well), so "optional" alone does not fix a public
+# clone -- the public manifest must not name the dependency at all. What the features buy is that
+# **one source tree** compiles in both places: every `use` of these three crates sits behind
+# `cfg(feature = ...)`, the private manifest turns all three on by `default` below, and the public
+# manifest (`public/crates/gx-cli/Cargo.toml`) ships the same source with `default = []` and the
+# three dependency lines removed.
+#
+# This is the "write down what you cannot have" posture applied to the manifest itself: the public
+# CLI does not pretend to carry `gx wrap`/`gx attach`/`gx detach`/`gx confine`/postgres sessions, and
+# it does not silently drop them either -- the feature names are declared there with the reason.
+[features]
+# 🔴 **`req/817` — empty in the public distribution.** The three features below name crates this
+# tree does not carry, so none of them can be turned on here. They are still *declared*, so that
+# the `cfg(feature = ...)` in the shared source is a known cfg rather than an unexpected one, and
+# so that this file states plainly which verbs are absent and why rather than leaving a reader to
+# infer it from a missing subcommand.
+#
+# Turning one on will not work in this tree: the crate it needs is not here and the build will say
+# so. That is the intended answer -- "you cannot have this here" said out loud, which is the same
+# posture the CLI itself takes when it refuses `--mcp-server` or `GX_CONFINEMENT`.
+default = []
+# `gx wrap`, `gx attach`, `gx detach`, `gx demo`'s MCP arm, and `gx wrap --check-config`.
+mcp = []  # needs `gx-mcp-wire`, not in this distribution
+# `gx confine` (derivation + the Landlock arm).
+confine = []  # needs `gx-confine`, not in this distribution
+# `--substrate postgres` sessions.
+pg = []  # needs `gx-adapter-postgres`, not in this distribution
+
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }  # ids, `Cid::from_text`, `Intent`, `b64`
 
@@ -132,7 +176,14 @@ gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
 # Neither crate adds an external package: `gx-mcp-wire` declares `serde`/`serde_json`, which this
 # binary already carries, and refuses a linked MCP client library for AC-051's reason.
 gx-adapter-mcp = { path = "../gx-adapter-mcp", version = "0.1.0" }
-gx-mcp-wire = { path = "../gx-mcp-wire", version = "0.1.0" }
+# 🔴 **optional, behind the `mcp` feature** (`req/817`): `gx-mcp-wire` is one of the four crates
+# `req/789` §3 holds private, so it is absent from the public distribution. The dependency is
+# `optional` and the source that names it is `cfg(feature = "mcp")`, which is what lets one source
+# tree build in both places. `default` below turns it on, so the private build is unchanged.
+# 🔴 `req/817`: `gx-mcp-wire` is not in the public distribution (`req/789` §3) and is therefore not
+# declared here at all. Cargo resolves an `optional` path dependency even when its
+# feature is off (measured), so leaving the line in with `optional = true` would
+# still make every cargo command in a public clone fail.
 
 # 🔴 **S③** (`req/493` §4 item 2) — `gx confine`'s derivation and its Landlock arm.
 #
@@ -150,7 +201,11 @@ gx-mcp-wire = { path = "../gx-mcp-wire", version = "0.1.0" }
 # External packages: **+3** (`landlock`, `enumflags2`, `enumflags2_derive`), all
 # `MIT OR Apache-2.0`. req/89 §2.3's 277 does move, and this is the line that says so rather than
 # a comment elsewhere claiming it did not.
-gx-confine = { path = "../gx-confine", version = "0.1.0" }
+# 🔴 **optional, behind the `confine` feature** (`req/817`) — same reason as `gx-mcp-wire` above.
+# 🔴 `req/817`: `gx-confine` is not in the public distribution (`req/789` §3) and is therefore not
+# declared here at all. Cargo resolves an `optional` path dependency even when its
+# feature is off (measured), so leaving the line in with `optional = true` would
+# still make every cargo command in a public clone fail.
 
 # 🔴 **v0.2.7 Lane A** (`req/137` §A1 item 1, `req/38` §81 ruling 1; sem: SEM-gx-cli-403) — the fourth adapter, closing the
 # gap `req/136` §4-1 named gotcha75: `gx-adapter-postgres` had been a workspace member since P1
@@ -193,7 +248,11 @@ gx-confine = { path = "../gx-confine", version = "0.1.0" }
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement (M2 hand 6, req/55 §4 H6-1) — the same line every other adapter's Cargo.toml carries.
-gx-adapter-postgres = { path = "../gx-adapter-postgres", version = "0.1.0" }
+# 🔴 **optional, behind the `pg` feature** (`req/817`) — same reason as `gx-mcp-wire` above.
+# 🔴 `req/817`: `gx-adapter-postgres` is not in the public distribution (`req/789` §3) and is therefore not
+# declared here at all. Cargo resolves an `optional` path dependency even when its
+# feature is off (measured), so leaving the line in with `optional = true` would
+# still make every cargo command in a public clone fail.
 
 # 🔴 Declared **after** M6-27's five-point measurement and not before (req/38 §47 M6-27 adopted (a):
 # "measure the five dependency points before declaring"; sem: SEM-gx-cli-406). The numbers are in req/89 §2; the short form is that `clap` 4.6.6

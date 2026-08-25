@@ -45,6 +45,12 @@
 //!   moved the catalogue parse ahead of the spawn, so that shape is a usage error first. The audit
 //!   measured the same thing and said so.
 
+// 🔴 `req/817`: this suite exercises a verb whose mechanism is `gx-mcp-wire`,
+// one of the four crates `req/789` §3 holds private. The public distribution builds without
+// it (`default = []` there), so the whole file compiles away rather than failing to resolve
+// a crate that is not in the tree. The private build turns `mcp` on by default and runs it.
+#![cfg(feature = "mcp")]
+
 #![cfg(unix)]
 
 mod support;

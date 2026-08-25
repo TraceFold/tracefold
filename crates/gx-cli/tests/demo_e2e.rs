@@ -16,6 +16,12 @@
 //        wherever the workspace floor runs, which is WSL2 Ubuntu-24.04 per this project's own
 //        convention (`crates/gx-cli/src/demo.rs`'s module header).
 
+// 🔴 `req/817`: every test here drives `gx demo`, whose mechanism is
+// `gx-mcp-wire` -- one of the four crates `req/789` §3 holds private. The public
+// distribution does not carry the verb, so the suite compiles away rather than failing against
+// a subcommand that is deliberately absent. The private build runs it exactly as before.
+#![cfg(feature = "mcp")]
+
 use std::path::PathBuf;
 use std::process::Command;
 

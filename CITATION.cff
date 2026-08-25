@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you cite this work, cite the technical report below, and name the commit you measured — figures here are pinned to commits, not to the project."
+title: "Tracefold"
+type: software
+authors:
+  - name: "Glovrex"
+repository-code: "https://github.com/TraceFold/tracefold"
+url: "https://glovrex.com"
+license: Apache-2.0
+abstract: "Verified undo and offline-verifiable receipts for AI agent actions. An agent's change is held with a checked inverse before it lands, and every verdict becomes a signed receipt anyone can re-check offline, without trusting whoever issued it."
+keywords:
+  - undo
+  - reversibility
+  - provenance
+  - receipts
+  - verification
+  - ai-agents
+preferred-citation:
+  type: report
+  title: "Tracefold Technical Report (v0.1)"
+  authors:
+    - name: "Glovrex"
+  year: 2026
+  month: 8
+  url: "https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md"
+  notes: "Draft v2, drafted 2026-08-13. Not peer reviewed. All quantitative claims are pinned to named commits in §5 of the report."

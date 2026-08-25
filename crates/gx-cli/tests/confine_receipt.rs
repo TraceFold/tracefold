@@ -25,6 +25,12 @@
 //! that a stranger with no network can check it. So this suite opens `.gx/receipts/<tid>.commit.json`,
 //! decodes the DSSE payload, and reads the member out of **the bytes the signature covers**.
 
+// 🔴 `req/817`: this suite exercises a verb whose mechanism is `gx-confine`,
+// one of the four crates `req/789` §3 holds private. The public distribution builds without
+// it (`default = []` there), so the whole file compiles away rather than failing to resolve
+// a crate that is not in the tree. The private build turns `confine` on by default and runs it.
+#![cfg(feature = "confine")]
+
 mod support;
 
 use std::path::Path;

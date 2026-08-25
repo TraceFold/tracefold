@@ -1,0 +1,22 @@
+# Tracefold
+
+> Verified undo and offline-verifiable receipts for AI agent actions. An agent's change is held with a checked inverse before it lands, and every verdict becomes a signed receipt anyone can re-check offline — no network, no account, no trust in the issuer.
+
+Tracefold is a Rust workspace; the CLI binary is `gx`. Not released: the `tracefold` names on npm and crates.io are empty 0.0.1 placeholders holding the name. What runs today is a build from source.
+
+## Docs
+
+- [README](https://github.com/TraceFold/tracefold/blob/main/README.md): build steps, offline receipt verification, the measured floor, and the limits stated before the claims.
+- [Technical report](https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md): the calculus, the receipt format, what was measured and under which conditions, related work, and every non-claim this project makes about itself.
+- [Limits](https://github.com/TraceFold/tracefold/blob/main/docs/LIMITS.md): what this does not cover, by declaration rather than oversight; a test fails if it drifts from the code.
+
+## Site
+
+- [glovrex.com](https://glovrex.com): writing, including a 30-second offline tamper check you can reproduce.
+- [Site llms.txt](https://glovrex.com/llms.txt)
+
+## Numbers, with their dates
+
+- Test floor 2,602 probes across 454 suites — frozen harness, fresh clone, one machine, single run, 25 August 2026. The commands to re-derive every figure sit in the README above the numbers; run them at any commit and you get whatever is true there.
+- 117 theorems machine-checked in Lean, 12 of them counterexamples, 1 carried axiom, 0 `sorry` — 25 August 2026.
+- Not measured: Windows native, OneDrive, SMB — zero runs, declared rather than discovered.

@@ -292,6 +292,9 @@ fn a_refusal_that_ran_prints_and_a_refusal_that_did_not_stays_quiet() {
 /// `["wrap", …, "--", <command>, …]` — `config::is_wrapped` keys on `args[0] == "wrap"`); the
 /// green test below gets the same shape from the adopt road itself, so the two arms triangulate
 /// the fixture against the product's own writer.
+/// 🔴 `cfg(feature = "mcp")` (`req/817`) — drives `gx wrap --check-config`, and `gx wrap` is absent
+/// from the public distribution (`gx-mcp-wire` is private, `req/789` §3).
+#[cfg(feature = "mcp")]
 #[test]
 fn check_config_with_a_residual_direct_entry_exits_seven_and_names_it() {
     let dir = scratch("exit_check_config_red");
@@ -357,6 +360,9 @@ fn check_config_with_a_residual_direct_entry_exits_seven_and_names_it() {
 /// so the green arm drives the two flags as the pair they are documented to be. A hand-built
 /// "clean" (sem: SEM-gx-cli-1669) fixture could drift from what adopt actually writes and this test would never know;
 /// this way, if adopt's output ever stops satisfying its own checker, the pair goes RED here.
+/// 🔴 `cfg(feature = "mcp")` (`req/817`) — drives `gx wrap --adopt-config` / `--check-config` as a
+/// pair; both are absent from the public distribution.
+#[cfg(feature = "mcp")]
 #[test]
 fn check_config_after_adopt_config_exits_zero() {
     let dir = scratch("exit_check_config_green");

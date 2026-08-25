@@ -23,6 +23,12 @@
 //! `GX_ADAPTER_POSTGRES_DSN_DEFAULT` must name a reachable postgres server
 //! (`tools/pg_local.sh start` then `eval "$(bash tools/pg_local.sh env)"`, req/38 §77).
 
+// 🔴 `req/817`: this suite exercises a verb whose mechanism is `gx-adapter-postgres`,
+// one of the four crates `req/789` §3 holds private. The public distribution builds without
+// it (`default = []` there), so the whole file compiles away rather than failing to resolve
+// a crate that is not in the tree. The private build turns `pg` on by default and runs it.
+#![cfg(feature = "pg")]
+
 mod support;
 
 use std::path::{Path, PathBuf};
