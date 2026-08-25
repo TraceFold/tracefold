@@ -3457,7 +3457,9 @@ stated sequence. `req/wire/fixtures/observation.jsonl` carries 19 vectors, of wh
 or escalations (10 negative, 1 escalate — counted by the consuming test
 `crates/gx-core/tests/observation_class.rs`, which drives the envset subset against the codec; the
 drafted row in `req/wire/limits_rows.md` said 9 and the measured number is 11, corrected here per
-`req/836`).
+`req/836`). `crates/gx-core/tests/observation_class.rs` has **seven** probes and lives in the
+private tree only — its bed sits under `req/wire/`, which the published tree does not carry
+(`req/839`).
 
 **Why.** We never run the workload and we cannot read the platform (SS273, `req/733` §3). Everything
 about the operation reaches us because somebody chose to report it.
@@ -3507,7 +3509,8 @@ an attestation would un-attest history.
 **What holds in the meantime.** The two refusals are **typed** — `inverse-not-executable-at-substrate`
 and `append-only-class`, `gx_engine::Error`'s own kinds, constructible engine-side only
 (`crates/gx-canon/tests/authority_boundary.rs` counts constructions in the secondary surfaces and
-holds them at 0) — so the absence is declared at the exact point a caller would otherwise assume a
+holds them at 0; `crates/gx-canon/tests/authority_boundary.rs` has **nine** probes) — so the
+absence is declared at the exact point a caller would otherwise assume a
 capability. The one class where a real invert does hold is config in `adapter` mode, where the blob
 lives in a repo the git/fs adapter covers and AC-050's bit-equal round-trip applies as it does for any
 file; the `substrate: {adapter|declared}` field exists so the two are never conflated.
@@ -3526,6 +3529,8 @@ on differently would be vocabulary grown for its own sake.
 `generic-ci`), what it **declared** it reports, and — when it presented one — that its public key is
 a decodable ed25519 key. `req/wire/fixtures/attach_source.jsonl` carries 10 vectors (5 positive,
 5 negative), driven by `crates/gx-api/tests/attach_sources.rs`.
+`crates/gx-api/tests/attach_sources.rs` has **four** probes and lives in the private tree only,
+for `observation_class.rs`'s reason above (`req/839`).
 
 **Why.** `declared_coverage` is the source's own claim; verifying it would require reading the
 platform, which SS273 rules out permanently. `coverage_verified` is present on every registry

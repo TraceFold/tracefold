@@ -73,6 +73,12 @@ fn repo_root() -> PathBuf {
 const PRIVATE_TREE_ONLY: &[&str] = &[
     "probes/doubt/tests/declaration_writer_doubt.rs",
     "crates/gx-witness/tests/boundary_attest.rs",
+    // 🔴 **req/839** — the two req/824 fixture-driven suites read `req/wire/fixtures/*.jsonl`
+    // at runtime and `req/wire/` does not ship, so the suites are withheld from the published
+    // tree (`tools/pub_sync_dryrun.sh` HAND_FLOOR) and their rows are held against the private
+    // tree, exactly as the two above.
+    "crates/gx-core/tests/observation_class.rs",
+    "crates/gx-api/tests/attach_sources.rs",
 ];
 
 /// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
@@ -136,7 +142,16 @@ fn value_of(word: &str) -> usize {
 /// An entry is added when a block makes a numeric claim about a suite, and it is **never removed
 /// when the anchor moves past that block** — which is the whole point. The correction the page owes
 /// is checked by [`the_page_carries_a_current_statement_for_every_registered_suite`].
-const REGISTERED: [(&str, &str); 31] = [
+const REGISTERED: [(&str, &str); 34] = [
+    // 🔴 **req/824 A1-A4 / req/839** — the three suites the 2026-08-26 blocks name. Found RED by
+    // the first *public* fresh-clone run after the A1-A4 sync (arm d, three unregistered paths):
+    // the LIMITS blocks landed in `e1a0ab71`/`16863593` without their registry rows, and the
+    // private AFTER legs of both lanes ran targeted suites in which arm d's red was not read back
+    // — the convention this file makes mechanical caught it at the next full run, which is its
+    // job. Two of the three are private-tree-only rows (see `PRIVATE_TREE_ONLY`).
+    ("crates/gx-core/tests/observation_class.rs", "seven"),
+    ("crates/gx-canon/tests/authority_boundary.rs", "nine"),
+    ("crates/gx-api/tests/attach_sources.rs", "four"),
     // 🔴 **R40 / `req/553` M-01 + L-02 (`req/38` §328)** — this release's two suites, registered in
     // the commit that writes them, which is the convention this file exists to make mechanical
     // rather than remembered. Both blocks R40 stacks state a probe count, and both counts are held
