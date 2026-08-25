@@ -1,13 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-020 (FR-020) — generate a key, save it, load it, and verify a receipt with what came back.
+//! (sem: SEM-gx-witness-158, SEM-gx-witness-159)
 //!
-//! AC-020 逐語: 「Given: `gx_witness::keys`のEd25519鍵生成ライブラリAPI（M2時点ではCLI結線前のため
-//! ライブラリレベルで検証する）。When: 鍵ペアを生成→ファイルへ保存→再ロードし、gx-witnessが（署名は
-//! 常にエンジン内部処理であり独立した「署名コマンド」は存在しない）パイプライン経由で発行したReceipt
-//! に対し、ロードした鍵で検証関数を呼ぶ。Then: 生成→保存→ロード→検証の往復が成功する。CLIレベルの
-//! `gx key gen`/`gx receipt verify`による再確認はM6のE2E AC（AC-054, AC-057）で行う。」判定方法
-//! `unit + integration（ライブラリAPI直接呼び出し）`, M2.
+//! AC-020 verbatim: "Given: `gx_witness::keys`'s Ed25519 key-generation library API (at M2, before
+//! the CLI is wired up, so it is verified at the library level). When: generate a key pair → save
+//! to a file → reload it, and call the verification function with the loaded key against a Receipt
+//! gx-witness issued (signing is always internal engine processing; no independent "sign command"
+//! exists) via the pipeline. Then: the round trip of generate → save → load → verify succeeds.
+//! Reconfirmation at the CLI level via `gx key gen`/`gx receipt verify` happens in M6's E2E AC
+//! (AC-054, AC-057)." Judgement method: `unit + integration (direct library API calls)`, M2.
 //!
-//! FR-020 itself ends 「往復が **CLI経由で** テストできる」, which the AC reads down to a library
+//! FR-020 itself ends "the round trip can be tested **via the CLI**", which the AC reads down to a library
 //! round trip for M2 and hands to M6. req/49 §3 M2-14 raised that as an erratum and no ruling has
 //! landed; this file implements the AC's reading, which is the only one available before a CLI
 //! exists.

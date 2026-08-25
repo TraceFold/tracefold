@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! What a caller asks for, before anything has been planned.
 //!
 //! Spec: 42 §3.3 for the five fields, 42 §1.3 for the projection every one of them is inside,
@@ -14,14 +16,16 @@
 //!
 //! # `goal`, and the dependency that is not here
 //!
-//! 42 §3.3 types `goal` as `serde_json::Value`, and 41 §2 allows this crate 「serde, thiserror
-//! 程度」. **E-M4-2** 逐語: 「`Intent` 5 field は gx-core・`goal` は **canonical DAG-CBOR opaque bytes
-//! 運搬型**(E-M2-2/E-M3-1 と同型・serde_json 依存 0)」. So the field is [`GoalBytes`], and it is the
-//! third carrier of the same shape in this crate after [`crate::FingerprintBytes`] and
+//! 42 §3.3 types `goal` as `serde_json::Value`, and 41 §2 allows this crate "serde, thiserror and
+//! not much more". **E-M4-2**, verbatim: "the five `Intent` fields are gx-core; `goal` is a
+//! **carrier type of canonical DAG-CBOR opaque bytes** (the same shape as E-M2-2/E-M3-1; zero
+//! serde_json dependency)" (quoted in SEM-gx-core-054). So the field is [`GoalBytes`], and it is
+//! the third carrier of the same shape in this crate after [`crate::FingerprintBytes`] and
 //! [`crate::PlannedDeltaBytes`] -- adapter-defined content the core moves without reading (P-6).
 //!
-//! The reading loses nothing the spec asserted. 42 §3.3's own gloss of the field is 「adapter固有の
-//! 意図記述」 and its three examples (a diff, a commit intent, tool-call arguments) are all
+//! The reading loses nothing the spec asserted. 42 §3.3's own gloss of the field is "an
+//! adapter-specific description of intent" (sem: SEM-gx-core-055) and its three examples (a diff, a
+//! commit intent, tool-call arguments) are all
 //! adapter grammar; what a JSON `Value` would have added is a second canonical form beside the
 //! DAG-CBOR one 42 §2.1 fixes, in the one crate 41 §6 forbids to know an encoder at all.
 
@@ -43,8 +47,9 @@ use core::fmt;
 pub struct GoalBytes(pub Vec<u8>);
 
 /// Opaque, like [`crate::PlannedDeltaBytes`]'s: a goal is an adapter's grammar, so a `{:?}` of it in
-/// a log line is both unreadable and the one place where P-6's 「byte 列としてのみ扱う」 would quietly
-/// stop being true. The length is printed because the length is not the content.
+/// a log line is both unreadable and the one place where P-6's "handled only as a byte string"
+/// (sem: SEM-gx-core-056) would quietly stop being true. The length is printed because the length
+/// is not the content.
 impl fmt::Debug for GoalBytes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "GoalBytes(opaque, {} bytes)", self.0.len())
@@ -79,8 +84,9 @@ impl serde::Serialize for GoalBytes {
 
 /// The submit input: five fields, all of them part of what the intent *is* (42 §3.3, 42 §1.3).
 ///
-/// 42 §1.3's row is 「`substrate`, `locator`, `goal`, `context`, `actor`」 with no exclusion and the
-/// reason 「Intent自体が独立の意図記述であり除外規則なし」. That makes the projection the whole struct,
+/// 42 §1.3's row is "`substrate`, `locator`, `goal`, `context`, `actor`" with no exclusion and the
+/// reason "an Intent is itself an independent description of intent, so there is no exclusion rule"
+/// (quoted in SEM-gx-core-057). That makes the projection the whole struct,
 /// so the two field sets have to stay equal -- `crates/gx-canon/tests/intent_identity.rs` holds
 /// them against each other in the A-10 form (**I-1**).
 ///

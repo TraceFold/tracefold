@@ -1,11 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-032 (FR-032) — the three verdicts land in the three states, and the two that are not verdicts
 //! land somewhere else.
 //!
-//! 34 AC-032 逐語: 「Given: Candidate状態のT。When: `verify`ステップでモック`Gate::verify`が
-//! Admit/Deny/Escalateをそれぞれ返す3ケース。Then: Tの状態がそれぞれAdmitted/Denied/Escalatedへ
-//! 一意に遷移する。」 unit（3ケース）
+//! 34 AC-032, verbatim (sem: SEM-gx-engine-417): "Given: T in the `Candidate` state. When: the
+//! `verify` step's mocked `Gate::verify` returns Admit/Deny/Escalate respectively, in three cases.
+//! Then: T's state transitions uniquely to Admitted/Denied/Escalated respectively." unit (3 cases)
 //!
-//! # 「モック`Gate::verify`」, and why these gates are real
+//! # "mocked `Gate::verify`", and why these gates are real (sem: SEM-gx-engine-417)
 //!
 //! 41 §4 declares `pub struct Gate`, not a trait, and **E-M3-3** made `verify` fallible without
 //! making it replaceable. There is nothing to mock. What there is instead is a gate that can be
@@ -16,8 +18,8 @@
 //! That is a stronger reading of the criterion than a mock would give, and it is worth saying why
 //! rather than treating it as a convenience: a mock would prove that this file's `match` has three
 //! arms. Configuring the real gate proves that the three arms are reachable *through* the gate the
-//! engine actually calls, which is the claim FR-032 makes (「`Gate::verify`を呼び出し…結果を
-//! Transformationの状態に反映」).
+//! engine actually calls, which is the claim FR-032 makes ("calls `Gate::verify` ... and reflects
+//! the result in the Transformation's state"; sem: SEM-gx-engine-418).
 //!
 //! # The other two answers
 //!
@@ -111,7 +113,8 @@ fn ac_032_deny_goes_to_denied() {
 
 /// Case 3: the gate escalates, and the transformation is `Escalated` (T-4c).
 ///
-/// The trigger is **E-M3-4**: 「`invert_available=false → Escalate` を M3 の最小生成規則にする」, so
+/// The trigger is **E-M3-4**: "`invert_available=false → Escalate` is M3's minimal generating
+/// rule" (sem: SEM-gx-engine-419), so
 /// the adapter is the one whose `invert` answers `Ok(None)`. That the *engine* is what asks the
 /// adapter is this hand's addition -- 41 §4 gives `GateInput` the field and 43 schedules
 /// `adapter.invert` at T-10b, so the question has to be asked earlier than 43 asks it (M5H2-6).
@@ -131,7 +134,7 @@ fn ac_032_escalate_goes_to_escalated() {
 
 /// The three are **distinct** states, and the journal says which one each was.
 ///
-/// 「一意に遷移する」 is a statement about a function, and a function is not measured by three
+/// "transitions uniquely" (sem: SEM-gx-engine-420) is a statement about a function, and a function is not measured by three
 /// separate assertions that each hold on their own: an implementation that answered `Admitted`
 /// always would pass case 1 and fail cases 2 and 3, but one that keyed off the locator would pass
 /// all three. So the three runs are compared with each other, and the `Verdict` records are read
@@ -201,7 +204,8 @@ fn ac_032_the_three_cases_are_three_distinct_recorded_verdicts() {
     }
 }
 
-/// The evidence a source hands over is the evidence the gate is given (FR-032's 「evidence収集後」).
+/// The evidence a source hands over is the evidence the gate is given (FR-032's "after evidence
+/// is collected"; sem: SEM-gx-engine-421).
 ///
 /// AC-016 states this for `GateInput`'s slot; this is the same claim one layer up, where the slot
 /// is filled. The gate is given a policy set that reads `context.evidence_count` through ASM-60-1's
@@ -248,8 +252,8 @@ when { context.evidence_count > 0 };
 
 /// 🔴 **T-4d**: the collector cannot be reached and the posture is `FailClosed` (the default).
 ///
-/// This is the behavioural half of **M5-03 採(a)**'s 「`Err` が `VerifierUnavailable` の唯一の
-/// producer」 -- the source scan in `engine_shape.rs` says the word is written once, and this says
+/// This is the behavioural half of **M5-03, adopted (a)**'s "`Err` is the sole producer of
+/// `VerifierUnavailable`" (sem: SEM-gx-engine-422) -- the source scan in `engine_shape.rs` says the word is written once, and this says
 /// the one road is the collector's. AC-036 is hand 6's; the mechanism is here.
 #[test]
 fn t_4d_an_unreachable_collector_aborts_fail_closed() {
@@ -278,10 +282,11 @@ fn t_4d_an_unreachable_collector_aborts_fail_closed() {
 
 /// 🔴 **T-4e**: the same failure under an explicit `FailOpen` opt-in.
 ///
-/// 43 T-4e: 「当該Transformationに限りrecord-onlyモード相当へ降格して続行；`enforced=false`と
-/// `fail_posture_engaged=true`を必ずreceiptに刻む；journal: `Verdict{id, Admit,
-/// fail_posture_engaged=true}`」. The receipt is hand 4's -- **E-M2-7** already put the field in
-/// `ReceiptPayload`, which is why req/78's M5-12 was ruled 不採 -- and the journal is this hand's.
+/// 43 T-4e: "for this Transformation alone, degrade to the record-only-mode equivalent and carry
+/// on; `enforced=false` and `fail_posture_engaged=true` must be stamped into the receipt;
+/// journal: `Verdict{id, Admit, fail_posture_engaged=true}`" (sem: SEM-gx-engine-423).
+/// The receipt is hand 4's -- **E-M2-7** already put the field in
+/// `ReceiptPayload`, which is why req/78's M5-12 was ruled not adopted -- and the journal is this hand's.
 ///
 /// `verdict_digest` is `None`, and that is the point of the field being an `Option`: the gate was
 /// never asked, so there is no verdict to identify.
@@ -332,13 +337,14 @@ fn t_4e_an_unreachable_collector_degrades_under_an_explicit_fail_open() {
     assert!(recorded.2, "and the record says why");
 }
 
-/// 🔴 **E-M5-5** (M5-23 採(a)): the gate's ⊥ is `Aborted`, and `RecordOnly` does not reach it.
+/// 🔴 **E-M5-5** (M5-23, adopted (a); sem: SEM-gx-engine-424): the gate's ⊥ is `Aborted`, and `RecordOnly` does not reach it.
 ///
-/// > `RecordOnly` は `Deny` にのみ効き、⊥(Err)には効かない——⊥は「判定が存在しない」ので常に
-/// > `Aborted`(fail-closed)
+/// > `RecordOnly` only takes effect on `Deny`, not on ⊥(Err) -- ⊥ is "no verdict exists", so it is
+/// > always `Aborted` (fail-closed) (sem: SEM-gx-engine-424)
 ///
 /// The gate here is `Gate::unconfigured()`, which answers `Err(Unevaluable)` -- req/29 §4's rule
-/// that 「an empty `policies/` directory and a working deployment must not look the same」. The
+/// that "an empty `policies/` directory and a working deployment must not look the same"
+/// (sem: SEM-gx-engine-425). The
 /// engine is put in `RecordOnly`, the mode that carries a *refusal* through to a commit, and it
 /// makes no difference: ⊥ is not a refusal.
 ///
@@ -383,8 +389,8 @@ fn e_m5_5_the_gates_bottom_aborts_whatever_the_enforcement_mode_says() {
 /// `verify` refuses a state 43 T-3 does not offer it from.
 ///
 /// 43 T-3's from-state is `Candidate` and nothing else. Verifying twice, or verifying something
-/// already denied, is a caller error and is refused rather than repeated -- 「skip と pass を同じ顔に
-/// しない」 at the level of a transition.
+/// already denied, is a caller error and is refused rather than repeated -- "don't give skip and
+/// pass the same face" (sem: SEM-gx-engine-426) at the level of a transition.
 #[test]
 fn verify_is_refused_from_every_state_but_candidate() {
     let mut e = engine(

@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `commutation`: whether two changes are independent, decided from the payloads alone.
 //!
-//! Spec: 41 §4 for the method, 42 §3.6 for `Conflicts{residual}` (「`residual`は「独立でない部分」を表す
-//! `DeltaRef`」), 43 §8 for what an engine does with the answer, ASM-2 for why the question is
-//! independence and not a difference. The rulings are **M4-25 採(a)+反射=Conflicts**, **M4-14** (the
+//! Spec: 41 §4 for the method, 42 §3.6 for `Conflicts{residual}` ("`residual` stands for the `DeltaRef` that represents
+//! the 'part that is not independent'"), 43 §8 for what an engine does with the answer, ASM-2 for why the question is
+//! independence and not a difference. The rulings are **M4-25, adopted (a) + reflexive = Conflicts**, **M4-14** (the (sem: SEM-gx-adapter-git-024)
 //! residual's referent) and **E-M4-8** (a payload is kept, which gives the referent somewhere to be).
 //!
 //! # 🔴 The footprint of a git change is its **branch**, and this is where that costs something
 //!
-//! `gx-adapter-fs` answers 「do these two name two positions?」, because a whole-file replacement's
+//! `gx-adapter-fs` answers "do these two name two positions?", because a whole-file replacement's (sem: SEM-gx-adapter-git-025)
 //! footprint is its file. A git change's footprint is larger than its object: rewriting one entry
 //! rewrites its tree, mints a commit and **moves the branch**, so two changes to two different files
 //! on one branch are not parallel-independent — the second has to be rebuilt on the first.
@@ -21,20 +23,20 @@
 //! be built on a tip the first had already moved.
 //!
 //! Nothing here reads a repository. That is a property of this grammar rather than a virtue of this
-//! module — the footprint is in the locator — and it is what makes AC-053's 「engineパイプライン外」
+//! module -- the footprint is in the locator -- and it is what makes AC-053's "outside the engine pipeline" (sem: SEM-gx-adapter-git-026)
 //! easy: there is nothing a pipeline could supply.
 //!
-//! # 対称 (**M4-25 採(a)**), and where the symmetry stops
+//! # Symmetry (**M4-25, adopted (a)**), and where the symmetry stops (sem: SEM-gx-adapter-git-027)
 //!
 //! The **verdict** is symmetric by construction: it is `scope(a) == scope(b)`, a question about an
 //! unordered pair, computed in one place from two values one function produced.
 //!
 //! 🔴 The **residual** is not, and cannot be. `Conflicts` carries the change that is held back, and
-//! 「held back」 is a fact about an order: 43 §8 has the engine keep `T2` waiting with `blocked_by: T1`
+//! "held back" is a fact about an order: 43 §8 has the engine keep `T2` waiting with `blocked_by: T1` (sem: SEM-gx-adapter-git-028)
 //! and calls `adapter.commutation(T1.delta, T2.delta)`. So `commutation(a, b)` names `b`. That
 //! satisfies the harness's **L6** (which compares the two directions as *answers*) and not the literal
 //! `==` in the trait's contract row — the same two readings `gx-adapter-fs` raised in `req/75` §2, and
-//! this adapter inherits the seam rather than deciding it (裁定禁).
+//! this adapter inherits the seam rather than deciding it (no ruling permitted here). (sem: SEM-gx-adapter-git-029)
 
 use gx_core::{Commutation, DeltaRef, SubstrateKind};
 use gx_substrate::{Error, PlannedDelta, Result};
@@ -93,7 +95,7 @@ fn operation_of(delta: &PlannedDelta) -> Result<(Position, GitOp)> {
 /// [`crate::plan`] writes the two are the same value, which `tests/git_commutation.rs` asserts rather
 /// than assumes.
 ///
-/// 🔴 The residual is the **whole** of the second delta. 42 §3.6 calls it 「独立でない部分」, and on one
+/// 🔴 The residual is the **whole** of the second delta. 42 §3.6 calls it "the part that is not independent", and on one (sem: SEM-gx-adapter-git-030)
 /// branch there is no proper part: every operation this grammar writes moves the branch, so nothing of
 /// the later change is independent of the earlier one.
 fn mint(operation: &(Position, GitOp)) -> Result<DeltaRef> {

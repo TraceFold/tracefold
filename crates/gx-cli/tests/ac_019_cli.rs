@@ -1,19 +1,21 @@
-//! **AC-019, re-confirmed through the CLI** (51 §15 M6 行 / req/88 §7).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! **AC-019, re-confirmed through the CLI** (51 §15 M6 row / req/88 §7; sem: SEM-gx-cli-2203).
 //!
-//! AC-019 逐語: 「Given: Ed25519鍵で署名済みReceipt r。When: rのバイト列表現からランダムな1bitを反転
-//! したr'を検証。Then: `Err(SignatureInvalid)`。未改変rは`Ok`。」判定方法 `property（ランダムbit位置×
-//! 複数回）`, M2.
+//! AC-019 verbatim: "Given: a Receipt r signed with an Ed25519 key. When: verifying r' obtained by flipping a random 1 bit in
+//! r's byte-string representation. Then: `Err(SignatureInvalid)`. An unmodified r is `Ok`." Judgment method
+//! `property (random bit position × multiple rounds)` (sem: SEM-gx-cli-2204), M2.
 //!
 //! # What changes when the criterion moves to a command line
 //!
 //! `Err(SignatureInvalid)` is a Rust value and a process has an exit status, so the CLI half of
-//! AC-019 is 「the refusal is 44 §1.2's `7=無効`, and the object on stdout says the **signature** is
-//! what refused」. That second half matters: a flipped bit inside the signed payload could plausibly
+//! AC-019 is "the refusal is 44 §1.2's `7=invalid`, and the object on stdout says the **signature** is
+//! what refused" (sem: SEM-gx-cli-2205). That second half matters: a flipped bit inside the signed payload could plausibly
 //! be reported as a malformed CID or a bad schema, and gx-witness verifies the signature over the
 //! raw envelope bytes **before** decoding anything precisely so that it is not.
 //!
 //! The property here is over bit **positions**, not over random keys: every byte of the signed
-//! payload is flipped in turn, which is a superset of 「ランダムな1bit位置×複数回」 for a fixture of
+//! payload is flipped in turn, which is a superset of "random bit position × multiple rounds" (sem: SEM-gx-cli-2206) for a fixture of
 //! this size and is deterministic, so a failure names the byte.
 
 mod support;
@@ -30,7 +32,7 @@ fn ac_019_cli_every_flipped_bit_in_the_signed_payload_is_refused() {
     let key_path = write_public_key(&dir, &key);
     let receipt = issue(&verdict_payload(VerdictKind::Admit, &key, 300), &key);
 
-    // 「未改変rは`Ok`」 first, so that a fixture which never verified would not read as a hundred
+    // "an unmodified r is `Ok`" (sem: SEM-gx-cli-2207) first, so that a fixture which never verified would not read as a hundred
     // successful detections.
     let clean = write_json(
         &dir.join("clean.json"),
@@ -44,7 +46,10 @@ fn ac_019_cli_every_flipped_bit_in_the_signed_payload_is_refused() {
         .arg("--key")
         .arg(&key_path));
     println!("AC019_CLI_CLEAN exit={} {}", out.code, out.json());
-    assert_eq!(out.code, 0, "AC-019's 「未改変rは`Ok`」");
+    assert_eq!(
+        out.code, 0,
+        "AC-019's \"an unmodified r is `Ok`\" (sem: SEM-gx-cli-2208)"
+    );
 
     let bytes = receipt.envelope.payload.len();
     let mut caught = 0usize;
@@ -90,8 +95,8 @@ fn ac_019_cli_every_flipped_bit_in_the_signed_payload_is_refused() {
 /// A flip in the **signature** is caught too, and is not a different question.
 ///
 /// `DsseEnvelope::verify` asks for the named key's signature and checks that one, so a corrupted
-/// `sig` and a corrupted `keyid` both arrive at `SignatureInvalid` — 「a verifier that named the part
-/// which failed would be telling a forger which part to fix」.
+/// `sig` and a corrupted `keyid` both arrive at `SignatureInvalid` — "a verifier that named the part
+/// which failed would be telling a forger which part to fix" (sem: SEM-gx-cli-2209).
 #[test]
 fn ac_019_cli_a_flipped_signature_is_refused_the_same_way() {
     let dir = scratch("ac019_cli_sig");

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Strategies shared by the property tests of the wire face.
 //!
 //! This is a directory module rather than a top-level `tests/*.rs` file on purpose: cargo builds
@@ -30,7 +32,7 @@ pub fn any_text() -> impl Strategy<Value = String> {
     prop_oneof![
         6 => ".*",
         1 => Just(String::new()),
-        1 => Just("\u{30D5}\u{30A1}".to_string()),      // NFC: ファ (precomposed)
+        1 => Just("\u{30D5}\u{30A1}".to_string()),      // NFC: the precomposed katakana "fa" (sem: SEM-gx-canon-118)
         1 => Just("\u{30D5}\u{3099}\u{30A1}".to_string()), // NFD: same glyphs, decomposed
         1 => Just("\u{3000}".to_string()),               // fullwidth space
         1 => Just("\u{200B}a\u{200D}b".to_string()),     // zero-width space / joiner
@@ -131,7 +133,7 @@ pub fn any_object_snapshot() -> impl Strategy<Value = ObjectSnapshot> {
 }
 
 /// All ten fields of 41 §3 vary, including the two that stay out of the IdentityView (`id` and
-/// `created_at`). The wire face carries everything (A-4 面1); leaving them fixed here would hide
+/// `created_at`). The wire face carries everything (A-4 face 1) (sem: SEM-gx-canon-119); leaving them fixed here would hide
 /// exactly the fields the identity face is required to drop later.
 ///
 /// # `created_at` draws from `0..` and not from `i64`, since M3 hand 6
@@ -141,7 +143,7 @@ pub fn any_object_snapshot() -> impl Strategy<Value = ObjectSnapshot> {
 /// sample a panic in the generator rather than a case. What narrowed is the draw, not the claim:
 /// `created_at` still varies over 2^63 values and the identity face still has to drop it, which is
 /// what the properties reading this strategy assert. The other end is untouched, so
-/// `i64::MAX` is still reachable and 「未来でない」 is still nobody's check here (that one is M5's).
+/// `i64::MAX` is still reachable and "not in the future" is still nobody's check here (sem: SEM-gx-canon-120) (that one is M5's).
 pub fn any_transformation() -> impl Strategy<Value = Transformation> {
     (
         any_transformation_id(),
@@ -206,8 +208,8 @@ pub fn sample_object_snapshot() -> ObjectSnapshot {
 
 /// The transformation the identity-face tests project.
 ///
-/// AC-011 names its input as 「同一intent Iから構築した同一論理内容のTransformation値x
-/// (`{"kind":"fs.write","path":"/tmp/x","content":"hello"}`相当)」. `Intent` is not implemented in
+/// AC-011 names its input as "a Transformation value x of identical logical content, built
+/// from the same intent I (equivalent to `{"kind":"fs.write","path":"/tmp/x","content":"hello"}`)" (sem: SEM-gx-canon-121). `Intent` is not implemented in
 /// M1 (42 §3.3 is step 4's explicit non-scope), so what is reproduced here is the shape that
 /// intent would produce: an `Fs` substrate, the locator `/tmp/x`, and a delta reference standing
 /// in for the write. `model` is a placeholder string rather than any product's name (ASM-05-6).

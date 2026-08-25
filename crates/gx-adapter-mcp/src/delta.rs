@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The MCP delta grammar: a sequence of tool calls, in canonical DAG-CBOR.
 //!
-//! Spec: 42 §3.4 for `PlannedDelta.payload` (「adapterのみが解釈するopaqueな変更記述」), 42 §2.1 for what
+//! Spec: 42 §3.4 for `PlannedDelta.payload` ("an opaque description of the change that only the adapter interprets"), 42 §2.1 for what (sem: SEM-gx-adapter-mcp-141)
 //! canonical means. The rulings this module carries over from the fs and git grammars are
-//! **M4-13 採(a)** (a sequence whose accepted length is one), **M4-07 採(c)** (the free monoid) and
+//! **M4-13, adopted (a)** (a sequence whose accepted length is one), **M4-07, adopted (c)** (the free monoid) and (sem: SEM-gx-adapter-mcp-142)
 //! **N-14** (no parser of an adapter's own -- the payload goes through gx-canon, which 41 §6 makes the
 //! only encoder).
 //!
@@ -13,28 +15,37 @@
 //! op      := { "arguments": bytes, "locator": text, "tool": text }
 //! ```
 //!
-//! 「call the tool named `tool`, at the server the locator names, with these arguments; the object this
-//! change is about is the resource the locator names」. `gx-adapter-git` writes two shapes because its
+//! "call the tool named `tool`, at the server the locator names, with these arguments; the object this (sem: SEM-gx-adapter-mcp-143)
+//! change is about is the resource the locator names". `gx-adapter-git` writes two shapes because its (sem: SEM-gx-adapter-mcp-144)
 //! forward change (a commit) and its inverse (a reference reset) are different operations on different
 //! things. Here they are not: **the inverse of a tool call is another tool call**, the compensating one
 //! a [`crate::catalogue::Catalogue`] declares, and a `kind` field distinguishing them would be a
-//! discriminant with no reader -- 52 契約 2's 「誰も頼んでいない」 at the size of a field.
+//! a discriminant with no reader -- 52 contract 2's "nobody asked for this" at the size of a field. (sem: SEM-gx-adapter-mcp-145)
 //!
 //! What tells a forward call from an inverse is therefore **the escrow**, which is where 43 T-10b puts
 //! it, and not a word in the payload.
 //!
 //! ## The restore convention (normative)
 //!
-//! An inverse has to carry the body: 42 §5 逐語 「digest-onlyでは実際のundoが物理的に不可能なため」. This
+//! An inverse has to carry the body: 42 §5, verbatim: "since a digest-only form makes an actual undo physically impossible". This (sem: SEM-gx-adapter-mcp-146)
 //! grammar carries it inside `arguments`, as [`restore_arguments`] builds it -- canonical DAG-CBOR of
 //! `{ "contents": bytes, "uri": text }`. The two field names are **MCP's own**: a `resources/read`
 //! result is a list of contents each carrying its `uri`, so a restore tool that already speaks the
 //! protocol is being handed the shape it already reads. Inventing a third spelling would have made the
 //! deployment translate between two conventions that mean one thing.
 //!
-//! ## What 「連結が witness」 means when the payload is a CBOR array
+//! 🔴 **Scope narrowed by A2 (req/38 §92, ruling 1), not removed**: this form is right for a restore tool (sem: SEM-gx-adapter-mcp-147)
+//! that *reads* the `resources/read` pair (the fs/notes demo, req/136's mock) and demonstrably wrong
+//! for a structured-argument API tool -- req/152 §5 measured github-mcp-server refusing exactly these
+//! two members with "missing required parameter". It remains the **default** (a catalogue entry with (sem: SEM-gx-adapter-mcp-148)
+//! no template), and a [`crate::catalogue::RestoreTemplate`] is the declared alternative: the inverse's
+//! `arguments` are then UTF-8 JSON of the restore tool's own members, the same encoding a forward
+//! call's arguments already travel in, resolved at escrow time in `crate::invert`. Both shapes are
+//! this grammar's `arguments` bytes; nothing about `McpOp` or the payload changes between them.
 //!
-//! **M4-07 採(c)** makes composition a free monoid over the sequence: **N-14** requires canonical
+//! ## What "concatenation is the witness" means when the payload is a CBOR array (sem: SEM-gx-adapter-mcp-149)
+//!
+//! **M4-07, adopted (c)** makes composition a free monoid over the sequence: **N-14** requires canonical (sem: SEM-gx-adapter-mcp-150)
 //! DAG-CBOR and a CBOR array carries its length in its head, so two payloads do not concatenate as
 //! bytes. The monoid operation is on the **sequences**: `decode`, concatenate, `encode` -- the same
 //! shape the other two adapters have, for the same reason.
@@ -47,7 +58,7 @@ use gx_substrate::{Error, Result};
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// How many operations v0.1 accepts (**M4-13 採(a)**, read for tool calls).
+/// How many operations v0.1 accepts (**M4-13, adopted (a)**, read for tool calls). (sem: SEM-gx-adapter-mcp-151)
 ///
 /// One. Two calls in one delta are two **effects**, and an adapter that ran them under one delta would
 /// be one where a failure between them leaves a change half made with no vocabulary to say so. The
@@ -55,10 +66,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// legal *value* of the grammar (that is what makes the monoid free) and an illegal *v0.1 payload*.
 pub const MAX_OPS: usize = 1;
 
-/// How large a **forward** payload this adapter is willing to plan (**M4H5-4 採(b)**, read for MCP).
+/// How large a **forward** payload this adapter is willing to plan (**M4H5-4, adopted (b)**, read for MCP). (sem: SEM-gx-adapter-mcp-152)
 ///
-/// The payload travels through a gate and into a journal -- **E-M4-8**: 「`PlannedDelta.payload` は保管
-/// する(必須)」 -- so an unbounded plan is a cost nobody declared in a place nobody chose. One
+/// The payload travels through a gate and into a journal -- **E-M4-8**: "`PlannedDelta.payload` is stored (sem: SEM-gx-adapter-mcp-153)
+/// (mandatory)" -- so an unbounded plan is a cost nobody declared in a place nobody chose. One (sem: SEM-gx-adapter-mcp-154)
 /// declaration, as §33 requires, and `tests/mcp_delta.rs` asserts there is no second.
 ///
 /// **1 MiB**, the number the other two adapters measured against this repository's own population. The
@@ -66,12 +77,12 @@ pub const MAX_OPS: usize = 1;
 /// client sends, and the bound is here to be reachable rather than to be tight.
 pub const MAX_FORWARD_PAYLOAD_BYTES: usize = 1024 * 1024;
 
-/// How large an **escrowed inverse** this adapter is willing to carry back (**M4-21 採(a)**).
+/// How large an **escrowed inverse** this adapter is willing to carry back (**M4-21, adopted (a)**). (sem: SEM-gx-adapter-mcp-155)
 ///
 /// 🔴 **Declared here and deliberately not declared by `gx-adapter-git`.** req/99 §3 D-4 is the rule:
 /// a git inverse carries an object id, because a git object database is content-addressed and the old
-/// content is already in it, so a ceiling there could not be reached by any input and would be 「a
-/// refusal nobody asked for」 (52 契約 2). An MCP server offers no such store. The inverse of a tool
+/// content is already in it, so a ceiling there could not be reached by any input and would be "a (sem: SEM-gx-adapter-mcp-156)
+/// refusal nobody asked for" (52 contract 2). An MCP server offers no such store. The inverse of a tool (sem: SEM-gx-adapter-mcp-157)
 /// call carries **the resource's prior contents**, exactly as an fs inverse carries the old file, so
 /// the ceiling is reachable, is declared, and `invert` answers `Ok(None)` over it -- which **E-M3-4**
 /// turns into an escalation to a person.
@@ -159,11 +170,11 @@ impl<'de> Deserialize<'de> for Bytes {
 /// What an intent's `goal` says, in this adapter's grammar (42 §3.3, P-6).
 ///
 /// 42 §3.3 gives an [`gx_core::Intent`] a `locator` and a `goal` and says nothing about what the goal
-/// *is*: the bytes are carried opaquely by [`gx_core::GoalBytes`] (**E-M4-2**) and 「what this adapter's
-/// grammar says about those bytes」 is the whole of the interpretation P-6 reserves to an adapter. For
+/// *is*: the bytes are carried opaquely by [`gx_core::GoalBytes`] (**E-M4-2**) and "what this adapter's (sem: SEM-gx-adapter-mcp-158)
+/// grammar says about those bytes" is the whole of the interpretation P-6 reserves to an adapter. For (sem: SEM-gx-adapter-mcp-159)
 /// `gx-adapter-fs` and `gx-adapter-git` a goal is the object's new content. **Here it is the tool
-/// call**, because FR-046's subject is 「tool-call intent」 -- what an agent asked to do is 「call this
-/// tool with these arguments」, and a proxy that decided which tool realises a desired file content
+/// call**, because FR-046's subject is "tool-call intent" -- what an agent asked to do is "call this (sem: SEM-gx-adapter-mcp-160)
+/// tool with these arguments", and a proxy that decided which tool realises a desired file content (sem: SEM-gx-adapter-mcp-161)
 /// would be deciding, not gating.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ToolIntent {
@@ -207,19 +218,19 @@ impl ToolIntent {
     ///
     /// # Errors
     /// [`Error::NotPlannable`] when the bytes are not this adapter's goal grammar. `NotPlannable` and
-    /// not `PayloadUnreadable`: a goal is an **argument to `plan`**, and 「no delta plans this intent
-    /// against this snapshot」 is exactly what 41 §4 documents for a `plan` that cannot proceed. A
+    /// not `PayloadUnreadable`: a goal is an **argument to `plan`**, and "no delta plans this intent (sem: SEM-gx-adapter-mcp-162)
+    /// against this snapshot" is exactly what 41 §4 documents for a `plan` that cannot proceed. A (sem: SEM-gx-adapter-mcp-163)
     /// payload is a different value with a different reader.
     pub fn decode(goal: &[u8]) -> Result<Self> {
         let decoded: Self = cbor::decode(goal).map_err(|e| Error::NotPlannable {
             detail: format!(
                 "the goal of an mcp intent is a canonical DAG-CBOR `{{arguments, tool}}` (this \
-                 adapter's grammar for 「tool-call intent」, FR-046): {e}"
+                 adapter's grammar for \"tool-call intent\", FR-046): {e} (sem: SEM-gx-adapter-mcp-164)"
             ),
         })?;
         if decoded.tool.is_empty() {
             return Err(Error::NotPlannable {
-                detail: "the goal names no tool, and 「call the empty tool」 is not a change this \
+                detail: "the goal names no tool, and \"call the empty tool\" is not a change this (sem: SEM-gx-adapter-mcp-165) \
                          adapter can plan"
                     .to_string(),
             });
@@ -228,7 +239,7 @@ impl ToolIntent {
     }
 }
 
-/// The arguments an inverse hands to a restore tool (module documentation, 「the restore convention」).
+/// The arguments an inverse hands to a restore tool (module documentation, "the restore convention"). (sem: SEM-gx-adapter-mcp-166)
 ///
 /// # Errors
 /// [`Error::NotDigestible`] when the pair has no canonical form.
@@ -258,19 +269,56 @@ pub struct McpOp {
     arguments: Bytes,
     /// The position, normalised (crate root's `≈`).
     locator: String,
+    /// 🔴 The members still owed to `arguments`, each with the do-time source that will supply it
+    /// (two-phase escrow, `req/38` §98, ruling 1 / §99, ruling 2). (sem: SEM-gx-adapter-mcp-167)
+    ///
+    /// Empty for every forward call and for every complete inverse — and **absent from the wire
+    /// when empty** (`skip_serializing_if`), so the canonical DAG-CBOR of every payload this
+    /// grammar wrote before this field existed is byte-identical still (the CID of an existing
+    /// delta does not move; `tests/mcp_delta.rs` pins the raw bytes). Non-empty only in a
+    /// **partial escrowed inverse**: the completion step (`McpAdapter` as
+    /// `gx_substrate::InverseCompletion`) reads these declarations out of the escrowed value
+    /// itself and fills `arguments` from the journalled observation — the instructions travel
+    /// inside the escrow because a recovery may hold the journal and the blob store and nothing
+    /// else.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pending: std::collections::BTreeMap<String, crate::catalogue::ArgSource>,
     /// The tool to call, as the server publishes it.
     tool: String,
 }
 
 impl McpOp {
-    /// 「Call `tool` at the server `locator` names, with `arguments`」.
+    /// "Call `tool` at the server `locator` names, with `arguments`". (sem: SEM-gx-adapter-mcp-168)
     #[must_use]
     pub fn call(locator: String, tool: String, arguments: Vec<u8>) -> Self {
         Self {
             arguments: Bytes(arguments),
             locator,
+            pending: std::collections::BTreeMap::new(),
             tool,
         }
+    }
+
+    /// The partial form: the same call, still owed the named do-time members (two-phase escrow).
+    #[must_use]
+    pub fn call_pending(
+        locator: String,
+        tool: String,
+        arguments: Vec<u8>,
+        pending: std::collections::BTreeMap<String, crate::catalogue::ArgSource>,
+    ) -> Self {
+        Self {
+            arguments: Bytes(arguments),
+            locator,
+            pending,
+            tool,
+        }
+    }
+
+    /// The members still owed, with their do-time sources. Empty for every complete operation.
+    #[must_use]
+    pub fn pending(&self) -> &std::collections::BTreeMap<String, crate::catalogue::ArgSource> {
+        &self.pending
     }
 
     /// The tool's name.
@@ -296,7 +344,7 @@ impl McpOp {
     /// One place, so that `apply`, `invert` and `commutation` cannot disagree about which server a
     /// payload names. [`crate::plan`] already normalises what it writes, and normalising again is free
     /// (L7's idempotence) and is what stops a hand-written payload from reaching a server with a
-    /// spelling no gate ever saw -- M3-10 fixed a policy pack's effective range at 「locator 級」, so two
+    /// spelling no gate ever saw -- M3-10 fixed a policy pack's effective range at "the locator level", so two (sem: SEM-gx-adapter-mcp-169)
     /// spellings of one position would be two policy subjects and one resource.
     ///
     /// # Errors
@@ -310,8 +358,8 @@ impl McpOp {
     /// The one shape, checked.
     ///
     /// A payload that names no tool is a payload this grammar did not write, and running it would mean
-    /// asking a server to do 「」. [`Error::PayloadUnreadable`] is the variant for 「this claims to belong
-    /// here and does not parse」, which is exactly what it is.
+    /// asking a server to do "". [`Error::PayloadUnreadable`] is the variant for "this claims to belong (sem: SEM-gx-adapter-mcp-170)
+    /// here and does not parse", which is exactly what it is. (sem: SEM-gx-adapter-mcp-171)
     ///
     /// # Errors
     /// [`Error::PayloadUnreadable`].
@@ -327,7 +375,7 @@ impl McpOp {
     }
 }
 
-/// A sequence of operations: the free monoid of **M4-07 採(c)**.
+/// A sequence of operations: the free monoid of **M4-07, adopted (c)**. (sem: SEM-gx-adapter-mcp-172)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct McpDelta {
     ops: Vec<McpOp>,
@@ -371,9 +419,9 @@ impl McpDelta {
     ///
     /// Three refusals, spelled differently on purpose:
     ///
-    /// * a sequence longer than [`MAX_OPS`] is **未対応** -- the grammar can say it and this version
+    /// * a sequence longer than [`MAX_OPS`] is **unsupported** -- the grammar can say it and this version (sem: SEM-gx-adapter-mcp-173)
     ///   will not run it. That is [`Error::Unimplemented`], the one variant the shared harness reads
-    ///   as 「無い」 (**§31 M4H3-4 (b)**), which is what stops a caller from reading the refusal as
+    ///   as "none" (**§31 M4H3-4 (b)**), which is what stops a caller from reading the refusal as (sem: SEM-gx-adapter-mcp-174)
     ///   damage;
     /// * the empty sequence is the monoid's unit and describes no change: legal as a value, not as a
     ///   v0.1 payload ([`Error::PayloadUnreadable`]);

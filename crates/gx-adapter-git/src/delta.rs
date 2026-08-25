@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The git delta grammar: a sequence of operations, in canonical DAG-CBOR.
 //!
-//! Spec: 42 §3.4 for `PlannedDelta.payload` (「adapterのみが解釈するopaqueな変更記述」), 42 §2.1 for what
-//! canonical means. The rulings this module carries over from the fs grammar are **M4-13 採(a)** (a
-//! sequence whose accepted length is one), **M4-07 採(c)** (the free monoid) and **N-14** (no parser
+//! Spec: 42 §3.4 for `PlannedDelta.payload` ("an opaque description of the change that only the adapter interprets"), 42 §2.1 for what
+//! canonical means. The rulings this module carries over from the fs grammar are **M4-13, adopted (a)** (a
+//! sequence whose accepted length is one), **M4-07, adopted (c)** (the free monoid) and **N-14** (no parser (sem: SEM-gx-adapter-git-031)
 //! of an adapter's own -- the payload goes through gx-canon, which 41 §6 makes the only encoder).
 //!
 //! # Two operations, and why the second one exists
@@ -13,12 +15,12 @@
 //!          | { "kind": "reset", "locator": text, "target": text }
 //! ```
 //!
-//! * **`content`** is a change to the file the locator names: 「the entry at this path, on this
-//!   branch, becomes these bytes」 (or, with `null`, 「is not in the tree」). Applying it writes a blob,
-//!   a tree and a commit, and moves the branch to that commit. This is **AC-050**'s 「commit操作
-//!   delta」.
-//! * **`reset`** is a change to the branch itself: 「this branch points at this commit」. Applying it
-//!   moves one reference and writes no object. This is **AC-050**'s 「branch操作delta」, and it is also
+//! * **`content`** is a change to the file the locator names: "the entry at this path, on this
+//!   branch, becomes these bytes" (or, with `null`, "is not in the tree"). Applying it writes a blob,
+//!   a tree and a commit, and moves the branch to that commit. This is **AC-050**'s "commit-operation
+//!   delta". (sem: SEM-gx-adapter-git-032)
+//! * **`reset`** is a change to the branch itself: "this branch points at this commit". Applying it
+//!   moves one reference and writes no object. This is **AC-050**'s "branch-operation delta", and it is also (sem: SEM-gx-adapter-git-033)
 //!   what [`crate::invert`] produces, because AC-050 asks for HEAD to come back **bit-equal** and only
 //!   a reset can do that (a revert commit restores the tree and moves HEAD forward).
 //!
@@ -26,9 +28,9 @@
 //! That is what keeps an inverse a statement about the same object as the delta it inverts
 //! (**E-M4-32**: `invert` refuses a `pre` naming another object, and the comparison is on locators).
 //!
-//! ## What 「連結が witness」 means when the payload is a CBOR array
+//! ## What "concatenation is the witness" means when the payload is a CBOR array (sem: SEM-gx-adapter-git-034)
 //!
-//! **M4-07 採(c)** makes composition a free monoid over the sequence: **N-14** requires canonical
+//! **M4-07, adopted (c)** makes composition a free monoid over the sequence: **N-14** requires canonical (sem: SEM-gx-adapter-git-035)
 //! DAG-CBOR and a CBOR array carries its length in its head, so two payloads do not concatenate as
 //! bytes. The monoid operation is on the **sequences**: `decode`, concatenate, `encode`. The same
 //! shape `gx-adapter-fs` has, for the same reason, and `tests/git_delta.rs` measures the
@@ -42,7 +44,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use core::fmt;
 
-/// How many operations v0.1 accepts (**M4-13 採(a)**, read for git).
+/// How many operations v0.1 accepts (**M4-13, adopted (a)**, read for git). (sem: SEM-gx-adapter-git-036)
 ///
 /// One, and the reason is the same shape the fs adapter's is: a delta whose application is one
 /// reference move is a delta an engine can reason about, and two moves of one branch are two commits
@@ -51,18 +53,18 @@ use core::fmt;
 /// what makes the monoid free) and an illegal *v0.1 payload*.
 pub const MAX_OPS: usize = 1;
 
-/// How deep a tree path this version acts on (crate root, 「What v0.1 does not close」).
+/// How deep a tree path this version acts on (crate root, "What v0.1 does not close"). (sem: SEM-gx-adapter-git-037)
 ///
 /// One component. A nested path means rebuilding every tree between the file and the root, which is
 /// *n* object writes for one change and *n* more shapes for a partial failure to take; 42's delta is
-/// 「一つの変更」 and this version keeps that literal. Enforced in [`crate::locator::parse`], so the
-/// refusal is 「that is not a position」 rather than 「the change failed」.
+/// "a single change" and this version keeps that literal. Enforced in [`crate::locator::parse`], so the
+/// refusal is "that is not a position" rather than "the change failed". (sem: SEM-gx-adapter-git-038)
 pub const MAX_PATH_DEPTH: usize = 1;
 
-/// How large a **forward** payload this adapter is willing to plan (**M4H5-4 採(b)**, read for git).
+/// How large a **forward** payload this adapter is willing to plan (**M4H5-4, adopted (b)**, read for git). (sem: SEM-gx-adapter-git-039)
 ///
-/// The goal bytes travel through a gate and into a journal -- **E-M4-8**: 「`PlannedDelta.payload` は
-/// 保管する(必須)」 -- so an unbounded plan is a cost nobody declared in a place nobody chose. One
+/// The goal bytes travel through a gate and into a journal -- **E-M4-8**: "`PlannedDelta.payload` is
+/// stored (mandatory)" -- so an unbounded plan is a cost nobody declared in a place nobody chose. One (sem: SEM-gx-adapter-git-040)
 /// declaration, as §33 requires, and `tests/git_delta.rs` asserts there is no second.
 ///
 /// **1 MiB**, the same number the fs adapter measured this repository's own population against
@@ -71,7 +73,7 @@ pub const MAX_PATH_DEPTH: usize = 1;
 ///
 /// 🔴 **There is no matching escrow ceiling, and its absence is a finding.** The crate root argues it
 /// in full: an fs inverse carries the whole old file, a git inverse carries an object id, and a
-/// constant no input can reach would be a refusal nobody asked for (52 契約 2).
+/// constant no input can reach would be a refusal nobody asked for (52 contract 2). (sem: SEM-gx-adapter-git-041)
 pub const MAX_FORWARD_PAYLOAD_BYTES: usize = 1024 * 1024;
 
 /// A file's contents.
@@ -240,7 +242,7 @@ impl GitOp {
     /// payload names. [`crate::plan`] already normalises what it writes, and normalising again is
     /// free (L7's idempotence) and is what stops a hand-written payload from reaching a repository
     /// with a spelling no gate ever saw -- M3-10 fixed a policy pack's effective range at
-    /// 「locator 級」, so two spellings of one position would be two policy subjects and one branch.
+    /// the "locator level", so two spellings of one position would be two policy subjects and one branch. (sem: SEM-gx-adapter-git-042)
     ///
     /// # Errors
     /// [`Error::NotAPosition`] for a locator that names fewer than three parts, a relative
@@ -255,8 +257,8 @@ impl GitOp {
     ///
     /// A `reset` with no target and a `content` with one are both payloads this grammar did not
     /// write, and reading either as the other would let a hand-made payload turn a file change into a
-    /// branch move. [`Error::PayloadUnreadable`] is the variant for 「this claims to belong here and
-    /// does not parse」, which is exactly what these are.
+    /// branch move. [`Error::PayloadUnreadable`] is the variant for "this claims to belong here and
+    /// does not parse", which is exactly what these are. (sem: SEM-gx-adapter-git-043)
     ///
     /// # Errors
     /// [`Error::PayloadUnreadable`].
@@ -284,7 +286,7 @@ impl GitOp {
     }
 }
 
-/// A sequence of operations: the free monoid of **M4-07 採(c)**.
+/// A sequence of operations: the free monoid of **M4-07, adopted (c)**. (sem: SEM-gx-adapter-git-044)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GitDelta {
     ops: Vec<GitOp>,
@@ -328,9 +330,9 @@ impl GitDelta {
     ///
     /// Three refusals, spelled differently on purpose:
     ///
-    /// * a sequence longer than [`MAX_OPS`] is **未対応** -- the grammar can say it and this version
+    /// * a sequence longer than [`MAX_OPS`] is **unimplemented** -- the grammar can say it and this version
     ///   will not run it. That is [`Error::Unimplemented`], the one variant the shared harness reads
-    ///   as 「無い」 (**§31 M4H3-4 (b)**), which is what stops a caller from reading the refusal as
+    ///   as "none" (**§31 M4H3-4 (b)**), which is what stops a caller from reading the refusal as (sem: SEM-gx-adapter-git-045)
     ///   damage;
     /// * the empty sequence is the monoid's unit and describes no change: legal as a value, not as a
     ///   v0.1 payload ([`Error::PayloadUnreadable`]);

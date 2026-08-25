@@ -1,53 +1,63 @@
-//! What an adapter can refuse to do, and why that vocabulary cannot be gx-core's.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! What an adapter can refuse to do, and why that vocabulary cannot be gx-core's. (sem:
+//! SEM-gx-substrate-069, SEM-gx-substrate-070, SEM-gx-substrate-071, SEM-gx-substrate-072,
+//! SEM-gx-substrate-073, SEM-gx-substrate-074, SEM-gx-substrate-075, SEM-gx-substrate-076,
+//! SEM-gx-substrate-077, SEM-gx-substrate-078, SEM-gx-substrate-079, SEM-gx-substrate-080,
+//! SEM-gx-substrate-081, SEM-gx-substrate-082, SEM-gx-substrate-083, SEM-gx-substrate-084,
+//! SEM-gx-substrate-085, SEM-gx-substrate-086)
 //!
-//! Spec: 41 §6 for 「エラーは thiserror で型化」 and for the layer rule these variants exist to keep,
-//! 41 §4 for the seven `# Errors` sections each one is the vocabulary of. The ruling is **E-M4-28**
-//! (`req/38_ERRATA_2026-08-07.md` §30 M4H2-2 採(a)).
+//! Spec: 41 §6 for "errors are typed with thiserror" and for the layer rule these variants exist to
+//! keep, 41 §4 for the seven `# Errors` sections each one is the vocabulary of. The ruling is
+//! **E-M4-28** (`req/38_ERRATA_2026-08-07.md` §30 M4H2-2, adopted (a)).
 //!
 //! # The layer split
 //!
-//! §30 逐語: 「外界の失敗(「読めなかった」)は adapter 層の語彙・引数の拒否は gx-core の語彙、という
-//! **層の分離が 41 §6 の実装形**」. gx-core says the same thing from its own side -- 「The crate does no
+//! §30, verbatim: "a failure of the outside world ('could not be read') is the adapter layer's
+//! vocabulary; a rejected argument is gx-core's vocabulary -- **that layer split is 41 §6's
+//! implementation form**". gx-core says the same thing from its own side -- "The crate does no
 //! I/O (41 §6), so there is no error here that comes from the outside world -- every variant is a
-//! rejected argument」 -- and that sentence is why hand 2 could compile the trait against
+//! rejected argument" -- and that sentence is why hand 2 could compile the trait against
 //! [`gx_core::Result`] and still leave an fs adapter with no way to report a file it could not read
 //! (req/71 §2 M4H2-2).
 //!
 //! So this enum is **the outside world**, plus [`Error::Core`], which carries a lower refusal
 //! outward without relabelling it. The two vocabularies are disjoint by construction and
 //! `crates/gx-substrate/tests/substrate_error.rs` asserts that they stay so: a name in both would
-//! leave a caller unable to tell 「the argument was wrong」 from 「the world would not answer」, which
+//! leave a caller unable to tell "the argument was wrong" from "the world would not answer", which
 //! is the same confusion E-M4-15 refused to encode in a `bool`.
 //!
 //! # Why it arrives in hand 3 rather than in hand 4
 //!
-//! §30 again: 「**手4 でなく手3 冒頭**にするのは、conformance harness を誤った Result 型の上に建てて
-//! から差し替える手戻りを避けるため」. The harness in `gx-substrate-conformance` calls all seven
+//! §30 again: "putting it **at the start of hand 3 rather than hand 4** is to avoid the rework of
+//! building the conformance harness on the wrong `Result` type and then swapping it out". The
+//! harness in `gx-substrate-conformance` calls all seven
 //! methods and folds their failures into a report; building that on a `Result` that has to change
 //! would mean writing it twice.
 //!
 //! # Which failure each variant is for
 //!
 //! One row per variant, naming the method whose documented failure it spells. The table is the
-//! reason the vocabulary is ten words and not eleven: 52 契約 2 forbids inventing a refusal nobody
-//! asked for, and `every_variant_is_the_vocabulary_of_a_documented_failure` compares this table with
-//! the enum so that a variant added without a documented failure behind it is a red test rather than
-//! a word that accumulates. Eight of the ten arrived with hands 3-5; **E-M4-32** and **M4H5-5 採(b)**
-//! (req/38 §33) added the last two, and both of them are refusals of an *argument* that gx-core could
-//! not have spelled -- what counts as 「a position」 and 「the same object」 is an adapter's convention.
+//! reason the vocabulary is ten words and not eleven: 52 contract 2 forbids inventing a refusal
+//! nobody asked for, and `every_variant_is_the_vocabulary_of_a_documented_failure` compares this
+//! table with the enum so that a variant added without a documented failure behind it is a red test
+//! rather than a word that accumulates. Eight of the ten arrived with hands 3-5; **E-M4-32** and
+//! **M4H5-5, adopted (b)** (req/38 §33) added the last two, and both of them are refusals of an
+//! *argument* that gx-core could not have spelled -- what counts as "a position" and "the same
+//! object" is an adapter's convention.
 //!
 //! | variant | where the failure is documented | the clause it spells |
 //! |---|---|---|
-//! | `ApplyFailed` | `SubstrateAdapter::apply` | 「When the delta cannot be applied」(43 T-11 turns it into `AbortReason::ApplyFailed`) |
-//! | `Core` | every method | 下層 gx-core の拒否をそのまま外へ運ぶ(`From<gx_core::Error>`) |
-//! | `ForeignDelta` | `apply` / `invert` / `commutation` | 「two substrates」——別 adapter が書いた delta |
-//! | `LocatorMismatch` | `SubstrateAdapter::invert` | delta と `pre` が別 object を指す=engine の配線 bug(**E-M4-32**) |
-//! | `NotAPosition` | `apply` / `invert` / `commutation` の位置引数 | 「引数が位置でない」——適用の失敗ではない(**M4H5-5 採(b)**) |
-//! | `NotDigestible` | [`crate::PlannedDelta::new`] | gx-canon がこの射影に canonical form を与えられない(42 §1.1) |
-//! | `NotPlannable` | `SubstrateAdapter::plan` | 「When no delta can be planned for this intent against this snapshot」 |
-//! | `PayloadUnreadable` | `invert` / `commutation` | 「a payload this adapter did not write」——同一 substrate で文法が読めない |
-//! | `Unimplemented` | 41 §4 の 7 method のうち、その adapter がまだ持たない物 | 「未実装」を panic でも `Ok` でもなく値で言う——harness はこれだけを「無い」に写す(§31 M4H3-4(b)) |
-//! | `Unreadable` | `snapshot` / `precondition` | 「Whatever the adapter cannot read or cannot name」/「When the scope cannot be read」 |
+//! | `ApplyFailed` | `SubstrateAdapter::apply` | "When the delta cannot be applied" (43 T-11 turns it into `AbortReason::ApplyFailed`) |
+//! | `Core` | every method | carries the lower gx-core refusal straight outward (`From<gx_core::Error>`) |
+//! | `ForeignDelta` | `apply` / `invert` / `commutation` | "two substrates" -- a delta another adapter wrote |
+//! | `LocatorMismatch` | `SubstrateAdapter::invert` | the delta and `pre` name different objects = an engine wiring bug (**E-M4-32**) |
+//! | `NotAPosition` | the position argument of `apply` / `invert` / `commutation` | "the argument is not a position" -- not a failure to apply (**M4H5-5, adopted (b)**) |
+//! | `NotDigestible` | [`crate::PlannedDelta::new`] | gx-canon cannot give this projection a canonical form (42 §1.1) |
+//! | `NotPlannable` | `SubstrateAdapter::plan` | "When no delta can be planned for this intent against this snapshot" |
+//! | `PayloadUnreadable` | `invert` / `commutation` | "a payload this adapter did not write" -- the grammar cannot be read within the same substrate |
+//! | `Unimplemented` | whichever of 41 §4's 7 methods this adapter does not yet have | says "unimplemented" as a value rather than as a panic or an `Ok` -- the harness maps only this one to "NOT_SUPPLIED" (§31 M4H3-4(b)) |
+//! | `Unreadable` | `snapshot` / `precondition` | "Whatever the adapter cannot read or cannot name" / "When the scope cannot be read" |
 
 use gx_core::SubstrateKind;
 
@@ -80,7 +90,7 @@ pub enum Error {
     /// No delta realises this intent against this snapshot (`plan`).
     ///
     /// Not the same as a delta that changes nothing: an empty change is a delta and would be
-    /// returned as one. This is 「the goal cannot be reached from here」, which is a fact about the
+    /// returned as one. This is "the goal cannot be reached from here", which is a fact about the
     /// pair (**E-M4-4**) and not about the intent alone.
     #[error("no delta plans this intent against this snapshot: {detail}")]
     NotPlannable { detail: String },
@@ -115,9 +125,9 @@ pub enum Error {
     /// the type system says so. Hand 5 answered `Ok(None)` here and raised the reading against itself
     /// (req/74 §2 M4H5-1); §33 took the other case:
     ///
-    /// > 「delta と無関係な pre を渡すのは engine の配線 bug であり、`Ok(None)`→Escalate は bug を
-    /// > 「逆が構成できない」という正当な業務条件に化けさせて隠す(E-M4-27 が `Ok(false)` を拒んだのと
-    /// > 同じ論法)」
+    /// > "passing a `pre` unrelated to the delta is an engine wiring bug, and `Ok(None)`->Escalate
+    /// > hides that bug by disguising it as the legitimate business condition 'the inverse cannot be
+    /// > constructed' (the same argument E-M4-27 used to refuse `Ok(false)`)"
     ///
     /// So the two answers now mean two things nobody can confuse: [`Option::None`] is a *real*
     /// business condition (the escrow ceiling, an old content already gone) that **E-M3-4** escalates
@@ -129,9 +139,10 @@ pub enum Error {
     )]
     LocatorMismatch { expected: String, got: String },
 
-    /// A locator that is not a position this adapter can act on (**M4H5-5 採(b)**).
+    /// A locator that is not a position this adapter can act on (**M4H5-5, adopted (b)**).
     ///
-    /// 「引数が位置でない」 rather than 「適用に失敗した」. Hand 5 spelled the fs adapter's refusal of a
+    /// "the argument is not a position" rather than "the apply failed". Hand 5 spelled the fs
+    /// adapter's refusal of a
     /// relative locator [`Error::ApplyFailed`] and raised it (req/74 §2 M4H5-5): 43 T-11 turns that
     /// variant into `AbortReason::ApplyFailed`, so borrowing it would record a change that failed
     /// where no change was ever describable. It is the same three-way argument [`Error::Unimplemented`]
@@ -141,7 +152,7 @@ pub enum Error {
     /// What counts as a position is the adapter's (**ASM-69-3** makes it an absolute path for fs
     /// v0.1), which is why the word lives here and not in gx-core: gx-core refuses arguments it can
     /// judge on its own, and no locator convention is one of them. Both spellings are carried, since a
-    /// caller reading 「that is not a position」 needs to see what the normalisation made of what they
+    /// caller reading "that is not a position" needs to see what the normalisation made of what they
     /// wrote.
     #[error(
         "{locator:?} normalises to {normalised:?}, which is not a position this adapter can act on"
@@ -153,7 +164,7 @@ pub enum Error {
     /// Distinct from [`Error::ForeignDelta`]: there the delta belonged to somebody else, here it
     /// claims to belong here and does not parse -- a version the adapter no longer writes, or bytes
     /// that were damaged. 41 §4's `invert` documentation names the difference this preserves:
-    /// 「Cannot be answered」 and 「the answer is no inverse」 are different, which is why `invert`
+    /// "Cannot be answered" and "the answer is no inverse" are different, which is why `invert`
     /// returns `Result<Option<_>>` and this is the `Err` half.
     #[error("this adapter cannot read the payload it was handed: {detail}")]
     PayloadUnreadable { detail: String },
@@ -161,7 +172,8 @@ pub enum Error {
     /// gx-canon has no canonical form for a value this crate had to name.
     ///
     /// Reachable from [`crate::PlannedDelta::new`], which mints a delta's own `DeltaRef` from its
-    /// projection (**M4H1-3** 採(a), req/38 §29). The same variant name gx-gate uses for the same
+    /// projection (**M4H1-3**, adopted (a), req/38 §29). The same variant name gx-gate uses for the
+    /// same
     /// fact, and the same reading: a value that cannot be encoded has no identity, which is a
     /// statement about the record rather than about the change.
     #[error("gx-canon cannot give this value an identity: {detail}")]
@@ -171,17 +183,18 @@ pub enum Error {
     ///
     /// An adapter is built one hand at a time -- `gx-adapter-fs` gets `kind`/`snapshot`/`plan`/
     /// `precondition` in M4 hand 4 and `apply`/`invert` in hand 5 (req/69 §6.2) -- and the three
-    /// spellings of 「not yet」 available to the hand in between are all worse than this one. `todo!()`
+    /// spellings of "not yet" available to the hand in between are all worse than this one. `todo!()`
     /// and `unimplemented!()` panic, and 41 §6 counts a panic as a bug; returning
     /// [`Error::ApplyFailed`] would say the delta could not be applied, which is a claim about the
     /// delta; and answering `Ok` with something invented is the fail-open req/29 §4 forbids.
     ///
-    /// It is a permanent word rather than a scaffold. 51 §7's completion condition is 「各adapterは
-    /// 上記7契約すべてに合格しない限りM4/M7完了条件を満たさない」, and an adapter that has not
-    /// implemented a method has not failed a contract -- it has left it **unmeasured**, which is the
-    /// distinction §31 M4H3-4 (b) split `is_conformant` and `is_complete` to carry. The harness reads
-    /// this variant and reports 「無い」; every other refusal it reports as a failure. That mapping is
-    /// the reason 「未実装」 needs a name of its own instead of borrowing one.
+    /// It is a permanent word rather than a scaffold. 51 §7's completion condition is "no adapter
+    /// satisfies the M4/M7 completion condition unless it passes all seven of the above contracts",
+    /// and an adapter that has not implemented a method has not failed a contract -- it has left it
+    /// **unmeasured**, which is the distinction §31 M4H3-4 (b) split `is_conformant` and
+    /// `is_complete` to carry. The harness reads this variant and reports "NOT_SUPPLIED"; every
+    /// other refusal it reports as a failure. That mapping is the reason "unimplemented" needs a
+    /// name of its own instead of borrowing one.
     ///
     /// The method is carried so that a report line names which of the seven, and `detail` says which
     /// hand or version owns it.
@@ -193,7 +206,8 @@ pub enum Error {
 ///
 /// The form is gx-core's, which took it from gx-gate: one declaration, [`Error::kind`] exhaustive
 /// with no `_` arm, and a test that reads the enum out of the source rather than matching on it.
-/// The refusal 「宣言外の code は構成時拒否」 is by type here as it is in gx-core -- the vocabulary *is*
+/// The refusal "code outside the declaration is refused at construction time" is by type here as it
+/// is in gx-core -- the vocabulary *is*
 /// the enum, an enum is closed, so a kind outside this table is not refused, it is unconstructible.
 ///
 /// Sorted, so that adding a name is an insertion a reviewer sees rather than an append.
@@ -226,8 +240,8 @@ impl Error {
     ///
     /// [`Error::Core`] answers `"Core"` rather than the inner variant's name. The inner name belongs
     /// to gx-core's vocabulary and this table has to stay disjoint from it (`Display` is
-    /// `transparent`, so nothing is hidden from a reader); `e.kind()` answers 「whose refusal is
-    /// this」 and `e.to_string()` answers 「which one」.
+    /// `transparent`, so nothing is hidden from a reader); `e.kind()` answers "whose refusal is
+    /// this" and `e.to_string()` answers "which one".
     #[must_use]
     pub fn kind(&self) -> &'static str {
         match self {
@@ -248,8 +262,9 @@ impl Error {
 /// The `Result` 41 §4's seven signatures return (**E-M4-28**).
 ///
 /// 41 §4 writes a bare `Result<..>` and every crate in this workspace declares its own, so the bare
-/// name resolves to 「the crate's own」 by precedent (gx-canon, gx-core, gx-gate, gx-log, gx-witness).
-/// Until hand 3 this one resolved to gx-core's, which compiled and could not say 「読めなかった」.
+/// name resolves to "the crate's own" by precedent (gx-canon, gx-core, gx-gate, gx-log, gx-witness).
+/// Until hand 3 this one resolved to gx-core's, which compiled and could not say "could not be
+/// read".
 pub type Result<T> = core::result::Result<T, Error>;
 
 #[cfg(test)]

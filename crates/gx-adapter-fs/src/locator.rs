@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Lexical locator normalisation: the `≈` of 42 §2.3, as a function (**E-M4-12**).
 //!
 //! The five clauses are in the crate root, where 42 §2.3 requires them and where an implementor
@@ -27,7 +29,7 @@ pub const SEPARATOR: char = '/';
 /// Absolute and relative inputs differ in one clause: a leading `..` that cannot cancel is **kept**
 /// in a relative locator and **dropped** at the root. Both are in the crate root, and the second is
 /// the one that closes a fail-open path -- M3-10 fixed a v0.1 policy pack's effective range at
-/// 「locator 級」, so `/etc/../../etc/passwd` has to arrive at the gate as `/etc/passwd` or a
+/// the "locator level", so `/etc/../../etc/passwd` has to arrive at the gate as `/etc/passwd` or a (sem: SEM-gx-adapter-fs-088)
 /// `/etc/**` forbid is a contest of spellings.
 #[must_use]
 pub fn normalize(locator: &str) -> String {
@@ -59,7 +61,7 @@ pub fn normalize(locator: &str) -> String {
     if absolute {
         format!("/{body}")
     } else if body.is_empty() {
-        // A relative locator that cancelled itself out is 「here」, and `.` is its one spelling.
+        // A relative locator that cancelled itself out is "here", and `.` is its one spelling. (sem: SEM-gx-adapter-fs-089)
         ".".to_string()
     } else {
         body
@@ -88,7 +90,7 @@ mod tests {
         assert_eq!(normalize("/././"), "/");
     }
 
-    /// A relative locator that cancels itself out is 「here」.
+    /// A relative locator that cancels itself out is "here". (sem: SEM-gx-adapter-fs-090)
     #[test]
     fn a_relative_locator_that_cancels_out_is_here() {
         assert_eq!(normalize("a/.."), ".");

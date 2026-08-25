@@ -1,0 +1,16 @@
+# NFR-012 (req/130 §1 item3, AC-P2-4) -- fail-open fixture for `secret_scan.rs`.
+#
+# Every line below is a deliberately fake, non-functional value written for exactly one purpose:
+# proving that `crates/gx-cli/tests/secret_scan.rs`'s scanner does not silently report zero
+# findings (ruling 3: "planted fail-open check"; sem: SEM-gx-cli-1300). This directory is allowlisted by path -- excluded
+# from the dev-tree gate, `the_dev_tree_has_zero_secret_scan_findings` -- rather than deleted after
+# the test runs (ruling 3: "a fixture-only allowlist rather than removal after the check"; sem: SEM-gx-cli-1301). None of these values has
+# ever unlocked anything: the AWS line is AWS's own published documentation placeholder
+# (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html), and the rest
+# are invented strings that happen to match this scanner's own rules.
+
+-----BEGIN RSA PRIVATE KEY-----
+AWS_KEY=AKIAIOSFODNN7EXAMPLE
+GH_TOKEN=github_pat_11ABCDEFGHIJKLMNOPQRSTUV0123456789abcdefghijklmnopqrstuvwxyz
+Authorization: Bearer thisisadeliberatelyplantedfaketoken123
+contact: oops.leak@definitely-not-glovrex-fixture.io

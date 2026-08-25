@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-021 (FR-021) — the log is append-only, and its public surface says so.
 //!
-//! AC-021 逐語: 「Given: 追記済みgx-log公開API表面。When: API一覧をスナップショットテストで走査。
-//! Then: エントリ改変・削除用のpublic関数が存在しない（append/read系のみ）。」
+//! AC-021 verbatim: "Given: gx-log's public API surface, already appended-to. When: the API list
+//! is walked by a snapshot test. Then: no public function exists for editing or deleting an entry
+//! (append/read family only)." (sem: SEM-gx-log-103)
 //!
 //! # Why a source scan rather than a doc test
 //!
@@ -14,8 +17,8 @@
 //!    fails this file until somebody writes its name down, which is the point: the moment where a
 //!    mutating API would be added is the moment a human has to state that it is not one.
 //! 2. **shape** — exactly one public function takes `&mut self`, and it is `append`. That is the
-//!    stronger half. A name list is a promise about vocabulary; 「one writer, and it appends」 is a
-//!    property of the type, and it is what makes 「改変・削除用の public 関数が存在しない」
+//!    stronger half. A name list is a promise about vocabulary; "one writer, and it appends" is a
+//!    property of the type, and it is what makes "no public function exists for editing or deleting" (sem: SEM-gx-log-104)
 //!    checkable rather than a matter of reading each signature and being satisfied.
 //!
 //! Neither is a claim about *storage*. Whether the bytes on disk can be edited is AC-069's and
@@ -31,8 +34,8 @@ use std::path::{Path, PathBuf};
 /// * `tile.rs` — `new`, `append`, `len`, `is_empty`, `entry`, `entries`, `leaf_hashes`, `root`,
 ///   `root_at`, `tile`, `leaf`, `leaf_hash`, `node_hash`
 /// * `proof.rs` — `prove_inclusion`, `prove_inclusion_at`, `verify_inclusion`,
-///   `verify_inclusion_of`, `prove_consistency`, `verify_consistency`, `checkpoint_signing_bytes`,
-///   `unsigned_checkpoint`
+///   `verify_inclusion_of`, `root_of_inclusion` (H-09), `prove_consistency`, `verify_consistency`,
+///   `checkpoint_signing_bytes`, `unsigned_checkpoint`
 /// * `store.rs` (hand 3, AC-069) — `open`, `append`, `log`, `path`, `recovery`, and
 ///   `AppendOutcome::entry`, whose name the tree already declares
 ///
@@ -45,7 +48,7 @@ use std::path::{Path, PathBuf};
 /// `LedgerLeaf` it rebuilt from the receipt, rather than about a `LedgerEntry` only the log can
 /// produce. No behaviour moved with it — the two share one body — and nothing about this list's
 /// promise changes: the surface is still append and read.
-/// 🔴 M7 hand 5 adds one, `cached_subtree_roots`, and it **reads** (**FR-M7-2 案 A**). It answers with
+/// 🔴 M7 hand 5 adds one, `cached_subtree_roots`, and it **reads** (**FR-M7-2 option A**). It answers with (sem: SEM-gx-log-105)
 /// the roots of the completed 256-leaf tiles the log has folded — derived state, never a second way
 /// in.
 /// It is public for a reason this suite is itself an instance of: a value nothing can look at is a
@@ -69,18 +72,70 @@ use std::path::{Path, PathBuf};
 /// writer whether or not it shares a spelling with the first.
 const PUBLIC_FUNCTIONS: &[&str] = &[
     "append",
+    // 🔴 **R6 / DR-43-11** (`src/head.rs`): `HeadStore::at` names the file and the origin its
+    // checkpoints are signed under. A **constructor** in the sense `LedgerStore::open` is one, and
+    // deliberately not an opener — it touches no filesystem until `read` or `write` is called, so
+    // that a caller holding one has not yet decided whether this project keeps a head.
+    "at",
     "audit_verdict_chain",
     "cached_subtree_roots",
     "checkpoint_signing_bytes",
     "checkpoints",
+    // 🔴 **Phase B / `req/682`**: `witness_audit::classify_extension` answers whether an older
+    // checkpoint is a prefix of a newer one, given the consistency proof over their two sizes. A
+    // **read** in FR-021's sense — a pure function of two checkpoints and a proof, touching no log —
+    // in `verify_consistency`'s standing: it names a fork rather than deciding storage.
+    "classify_extension",
+    // 🔴 **R6 / DR-43-11**: `head::compare` answers whether the project in front of the caller is
+    // behind the head it has already published. A **read** in FR-021's sense and a pure function —
+    // it takes numbers and returns a reason, touches no log, and is separate from the store so
+    // that the comparison has one implementation for `open`, `catch_up` and `gx repair`.
+    "compare",
+    // 🔴 **R6 / DR-43-11**: `RolledBack::detail` is the one sentence every face prints. A **read**
+    // of a value, in `Error::kind`'s standing — `req/38` §156 ruling 2(a) fixes the *code* at
+    // `LEDGER_DISAGREES` on all five faces, so the difference has to live in the detail and the
+    // detail has to have exactly one spelling.
+    // 🔴 **R7 / `req/232` M-02**: `head::declaration_digest` is the digest a project's
+    // `.gx/VERSION` is recorded under. A **read** in FR-021's sense — a pure function of some bytes
+    // — and it lives here because 41 §6 puts every hash in gx-canon and gx-cli, which owns the
+    // layout, deliberately does not name that crate.
+    "declaration_digest",
+    // 🔴 **R9 / `req/236` H-04**: `head::declaration_lines` splits `.gx/VERSION` into the lines
+    // that are `key=value` and the lines that are not, after decoding (byte-order marks and UTF-16
+    // included), trimming and dropping blanks. A **read** in FR-021's sense — a pure function of
+    // some bytes — and it is public because the *parse* and the *digest* have to be one reading:
+    // `req/236` H-04 measured them being two, with the parse in front and five byte shapes an
+    // ordinary editor produces stopping every verb before the digest was ever taken.
+    "declaration_lines",
+    "detail",
+    // 🔴 **Phase B / `req/682`**: `witness_audit::detect_equivocation` scans a set of signed
+    // checkpoints for a matching `tree_size` under one origin with a differing root. A **read** in
+    // FR-021's sense — a pure function over a slice, touching no log and deciding nothing about
+    // storage — in `audit_verdict_chain`'s standing: it answers *what contradicts itself*.
+    "detect_equivocation",
     "entries",
     "entry",
+    // 🔴 **R6 / DR-43-11**: `PersistedHead::floor` takes the numbers a door compares off the
+    // document. A **read**, and fallible because a `journal_head` this process cannot decode is a
+    // corrupted detector rather than an absent one.
+    "floor",
+    // 🔴 **R6 / DR-43-11**: hex, both ways, for the 32-byte chain head the head file records. A
+    // **read** in FR-021's sense (pure), and here rather than in `gx-canon` because it is a
+    // rendering of bytes for a JSON document and not a canonical encode — 41 §6 governs the bytes a
+    // digest is taken over, and nothing here is hashed.
+    "from_hex",
     "is_empty",
+    // 🔴 **DR-43-7** (`req/38` §153): whether this store came through `open_read_only`. A **read**
+    // in FR-021's sense — it answers about the handle and touches no log — and it exists because
+    // one `LedgerStore` field is handed to both readers and writers: `gx_engine`'s engine re-opens
+    // a moved ledger read-only for a `GET` and has to notice, on the next write, that it is holding
+    // the reader's door.
+    "is_read_only",
     // 🔴 M6 hand 5, **M6-09**: `Error::kind()` answers which of `ERROR_KINDS` a refusal is. A
     // **read** in FR-021's sense and not an entry at all — it names a value this crate already
     // produced and touches no log. The array it answers from arrived for the same ruling: 44 §2.3's
     // twelve `gx_code`s need a denominator, and a refusal vocabulary nobody declared is a
-    // vocabulary nobody can prove was covered (E-M2-23's 「crate 毎 Error 語彙表を 1 箇所宣言」,
+    // vocabulary nobody can prove was covered (E-M2-23's "declare a per-crate Error vocabulary table in one place" (sem: SEM-gx-log-106),
     // unpaid here until now).
     "kind",
     "leaf",
@@ -90,21 +145,88 @@ const PUBLIC_FUNCTIONS: &[&str] = &[
     "log",
     "new",
     "node_hash",
+    // 🔴 **R8 / `req/234` H-02**: the **read** the digest above is taken over --
+    // `.gx/VERSION` reduced to what it declares (line endings, surrounding space, blank lines
+    // and a BOM removed, `key = value` trimmed on both halves). A pure function of some bytes,
+    // exactly as FR-021 uses the word: it opens nothing and appends nothing. It exists because
+    // the eighth audit took a provably intact project offline with a trailing newline.
+    "normalise_declaration",
     "open",
+    // 🔴 **DR-43-7** (`req/38` §153, `req/215` H-03): `open` is a writer's door and repairs a torn
+    // tail; this one does not create, does not truncate and does not repair. A **read**, and the
+    // one `gx log proof`, `gx replay`, `gx verdict-checkpoint list` and `gx serve`'s start-up gate
+    // now use — `req/215` measured all four shortening a ledger from 120 bytes to 0 on the way past.
+    "open_read_only",
+    // 🔴 **R5 / `req/227` M-04**: the same reader's door for a chain that is **not there**. A
+    // **read** in FR-021's sense and, unlike `open_read_only`, one that cannot even open a file —
+    // it answers "no file, no checkpoints" without creating one. It exists because `gx repair`'s
+    // report opened on a narrower set of projects than `gx repair --yes` did: a project missing
+    // `.gx/ledger/journal.verdicts` answered `INTERNAL` to the diagnosis and had the file grown
+    // back by the repair.
+    "open_read_only_or_absent",
+    // 🔴 **R6 / DR-43-11**: the namespace `PersistedHead::checkpoint` is signed under, read off the
+    // store. A **read**. It travels with the store rather than being a constant here because 42
+    // §3.11 makes the origin "what stops a checkpoint of one log from verifying against another's
+    // key", and an operator running two logs needs two namespaces.
+    "origin",
     "path",
+    // 🔴 **R6 / `req/229` M-02**: whether a `LedgerStore` has a file behind it. A **read**, and it
+    // exists because `open_read_only_or_absent` can now answer with a store over a path that is not
+    // there — `gx repair`'s report says `ledger_present: false` rather than refusing to open.
+    "present",
     "prove_consistency",
     "prove_inclusion",
     "prove_inclusion_at",
+    // 🔴 **DR-43-7** (`req/215` M-05): where `open` copied the file before it removed the torn
+    // tail. A **read** — it answers about what a previous open did — and the consumer is `gx
+    // serve`'s start-up line, which said nothing about a silent repair until now.
+    "quarantined",
+    // 🔴 **R6 / DR-43-11**: `HeadStore::read` returns the recorded head, or `None` for a project
+    // that has never recorded one. A **read**, and the one place the difference between "absent"
+    // and "malformed" is decided: absence is safe (this project made no statement about its past)
+    // and a broken document is a refusal (somebody replaced the detector).
+    "read",
+    // 🔴 **DR-43-6** (`req/215` H-02): how many bytes of the file this store has turned into
+    // leaves. A **read**, and the ledger's half of the change-detector that lets `Engine::catch_up`
+    // notice a ledger that moved while the journal did not.
+    "read_offset",
     "recovery",
     "root",
     "root_at",
+    // 🔴 **H-09** (`req/222` §4 row 6): the root an inclusion proof and its leaf *reach*, which is
+    // a **read** of the proof and touches no log. `verify_inclusion_of` became one equality over
+    // it, so the surface grew by a name and not by a second walk. It exists because a receipt
+    // older than the anchor needs its own root as the left-hand end of RFC 6962 §2.1.2's
+    // consistency check, and computing it from the receipt is what keeps that end unforgeable.
+    "root_of_inclusion",
+    // 🔴 **R3 / `req/222` H-05** — a read: it re-reads the last framed record and compares.
+    // 🔴 **R7 / DR-43-11 (b)**: `PersistedHead::stated` renders this document's own numbers as the
+    // witness they are signed as. A **read** of a value — it hashes nothing and touches no log —
+    // and it is the half of the signature check that makes an edited field fail by construction.
+    "stated",
+    "tail_unchanged",
     "tile",
+    // 🔴 **R6 / DR-43-11**: see `from_hex`.
+    "to_hex",
     "unsigned_checkpoint",
     "unsigned_verdict_checkpoint",
     "verdict_checkpoint_signing_bytes",
     "verify_consistency",
     "verify_inclusion",
     "verify_inclusion_of",
+    // 🔴 **R7 / DR-43-11 (b)**: `PersistedHead::witness_payload` is the byte string
+    // `witness_signature` covers. A **read**, and public for `checkpoint_signing_message`'s reason
+    // one crate up: a verifier that has to rebuild a message from a doc comment is two
+    // implementations checking two different things.
+    "witness_payload",
+    // 🔴 **R6 / DR-43-11**: `HeadStore::write` installs the recorded head. **The one entry in this
+    // list that is neither an append nor a read**, and it is declared as the exception rather than
+    // filed under a word that would not fit: `.gx/checkpoints/head.json` is a *replace*, done by
+    // temporary file + fsync + rename + directory fsync, because a high-water mark is one value and
+    // an append-only history of it would have the same prefix problem the mark exists to solve.
+    // FR-021's append/read dichotomy is about the **log**, and this file is not the log — it is a
+    // statement *about* the log, and `LedgerStore`/`TileLog` are untouched by it.
+    "write",
 ];
 
 /// Verbs that would mean the log is not append-only.
@@ -275,11 +397,11 @@ fn ac_021_no_public_function_is_named_for_a_mutation() {
 /// A `&mut self` method is the only way a caller can change what the log holds, so this is a check
 /// on the *capability* rather than on the vocabulary.
 ///
-/// # Why this reads 「every writer is `append`」 rather than 「there is one writer」
+/// # Why this reads "every writer is `append`" rather than "there is one writer" (sem: SEM-gx-log-107)
 ///
 /// Hand 2 asserted `writers.len() == 1`, because gx-log held one type that could be written to.
 /// Hand 3 adds a second -- `LedgerStore`, the durable log of AC-069, which wraps the in-memory
-/// `TileLog` -- so a literal 「one」 would now be a count of types rather than a statement about
+/// `TileLog` -- so a literal "one" (sem: SEM-gx-log-108) would now be a count of types rather than a statement about
 /// capability, and it would go on being satisfied by a crate that grew a `set_root` on a third
 /// type as long as the second one lost its writer. The invariant hand 2 was reaching for is that
 /// **the only thing any writer does is append**, so that is what is asserted, and the count is
@@ -347,7 +469,7 @@ fn ac_021_the_scan_actually_reads_a_surface() {
 
 /// M2H1-6: the tree is gx's own, and the manifest shows it.
 ///
-/// req/38 §9 rules 「手 2 は rs_merkle を使わず自前 merkle」 on three grounds -- gx hashes with
+/// req/38 §9 rules "hand 2 does not use rs_merkle; it is a homegrown merkle" (sem: SEM-gx-log-109) on three grounds -- gx hashes with
 /// BLAKE3 (35 DR-3) while `rs_merkle` drags in a second SHA-256 implementation (req/50 §6 measured
 /// the duplicated `sha2` subtree), 42 §3.11's domain separation is no library's default, and the
 /// licence claim did not check out at three points. The dependency was dropped when the self-written

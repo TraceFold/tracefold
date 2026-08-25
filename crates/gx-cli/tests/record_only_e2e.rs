@@ -1,14 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **DR-2's other half, through the binary** — the E2E hand 3 could not write (M6H3-9).
 //!
-//! req/38 §50 M6H3-9 採(a): 「書込可能 path を deny する **test 用 policy pack fixture**+
-//! `gx verify --policy <PATH>`(44 拡張=E-M6-12)。**record-only E2E の完成は手4 の DoD へ**」.
+//! req/38 §50 M6H3-9 adopted (a) (sem: SEM-gx-cli-2212): "a **test-only policy pack fixture** that denies a writable path"+
+//! `gx verify --policy <PATH>` (44 extension = E-M6-12). **record-only E2E's completion goes to hand 4's DoD** (sem: SEM-gx-cli-2213)".
 //!
 //! # What hand 3 measured, and where it had to stop
 //!
 //! 44 §1.2's `gx commit` carries a **normative** paragraph:
 //!
-//! > **[DR-2感度]** record-onlyモード下でVerdict=Denyの対象を`commit`した場合、適用は通すが
-//! > `Receipt.enforced=false`が刻まれ、**exit codeは0**
+//! > **[DR-2 sensitivity]** when `commit` is run under record-only mode on a target whose Verdict=Deny, the apply goes through, but
+//! > `Receipt.enforced=false` is stamped, and **the exit code is 0** (sem: SEM-gx-cli-2214)
 //!
 //! Hand 3 measured the enforcing half through the binary — `gx verify` exits 2, `gx commit` exits 2,
 //! and the substrate is byte-identical before and after — and measured T-8r **inside the engine**,
@@ -51,13 +53,13 @@ fn enforced_a_denied_change_is_refused_and_nothing_is_written() {
     );
     assert_eq!(
         verified.code, 2,
-        "44 §1.2: 「2=Deny」. stderr: {}",
+        "44 §1.2: \"2=Deny\" (sem: SEM-gx-cli-2215). stderr: {}",
         verified.stderr
     );
     assert_eq!(verified.json()["kind"], "Deny");
     assert_eq!(
         committed.code, 2,
-        "44 §1.2: 「2=Denyで未Admitのため拒否（non-record-onlyかつVerdict≠Admit）」: {}",
+        "44 §1.2: \"2=Deny, refused because not yet Admitted (non-record-only and Verdict≠Admit)\" (sem: SEM-gx-cli-2216): {}",
         committed.stdout
     );
     assert_eq!(
@@ -71,12 +73,12 @@ fn enforced_a_denied_change_is_refused_and_nothing_is_written() {
 ///
 /// Three facts, and each one of them fails a different plausible wrong implementation:
 ///
-/// * **exit 0** — 44's [DR-2感度] paragraph says so in as many words. An implementation that read
+/// * **exit 0** — 44's [DR-2 sensitivity] paragraph says so in as many words (sem: SEM-gx-cli-2217). An implementation that read
 ///   `Denied` and refused would make the paragraph name an outcome no `gx` invocation can produce;
-/// * **the file moved** — DR-2 is 「適用は**通す**」, so a record-only mode that merely logged and
+/// * **the file moved** — DR-2 is "the apply **goes through**" (sem: SEM-gx-cli-2218), so a record-only mode that merely logged and
 ///   refused would be the enforcing posture wearing a different name;
-/// * **`enforced=false` on the receipt** — INV-S5's whole point: 「適用は通ったが、ポリシー上は拒否
-///   されていた」 has to survive as a **third-party-verifiable** fact, not as a log line.
+/// * **`enforced=false` on the receipt** — INV-S5's whole point: "the apply went through, but under policy it was refused"
+///   (sem: SEM-gx-cli-2219) has to survive as a **third-party-verifiable** fact, not as a log line.
 #[test]
 fn record_only_a_denied_change_is_applied_and_the_receipt_says_it_was_not_enforced() {
     let fixture = pipeline_named(
@@ -100,7 +102,7 @@ fn record_only_a_denied_change_is_applied_and_the_receipt_says_it_was_not_enforc
         verified.json()["record_only"]
     );
     // The verdict is still `Deny` — record-only is not a permission, it is a posture about what to
-    // do with a refusal (43 §4: 「`FailPosture`と`EnforcementMode`は独立設定軸」).
+    // do with a refusal (43 §4: "`FailPosture` and `EnforcementMode` are independent configuration axes" (sem: SEM-gx-cli-2220)).
     assert_eq!(verified.json()["kind"], "Deny");
     assert_eq!(verified.json()["record_only"], true);
 
@@ -114,7 +116,7 @@ fn record_only_a_denied_change_is_applied_and_the_receipt_says_it_was_not_enforc
     );
     assert_eq!(
         committed.code, 0,
-        "🔴 44 §1.2 [DR-2感度]: 「適用は通すが`Receipt.enforced=false`が刻まれ、**exit codeは0**」. \
+        "🔴 44 §1.2 [DR-2 sensitivity]: \"the apply goes through, but `Receipt.enforced=false` is stamped, **the exit code is 0**\" (sem: SEM-gx-cli-2221). \
          stdout: {} stderr: {}",
         committed.stdout, committed.stderr
     );
@@ -128,7 +130,7 @@ fn record_only_a_denied_change_is_applied_and_the_receipt_says_it_was_not_enforc
     assert_eq!(
         fixture.target_contents(),
         "after\n",
-        "「適用は通す」 — a record-only mode that refused would be the enforcing posture renamed"
+        "\"the apply goes through\" (sem: SEM-gx-cli-2222) — a record-only mode that refused would be the enforcing posture renamed"
     );
 
     // 🔴 And the fact reaches the **stored** receipt, which is what a third party is handed.

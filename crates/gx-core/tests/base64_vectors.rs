@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! RFC 4648 §10's own vectors, and the JSON face they give every raw byte string (**M2H1-4**).
 //!
-//! `req/38_ERRATA_2026-08-07.md` §9 left hand 5 one question: 「raw bytes(sig/FingerprintBytes)の
-//! JSON 綴りは**手 5(receipt の JSON 面)で決める**。既定推奨=base64」. This file is the answer, and
+//! `req/38_ERRATA_2026-08-07.md` §9 left hand 5 one question: "the JSON spelling of raw bytes
+//! (sig / FingerprintBytes) is **decided by hand 5, the receipt's JSON face**; the default
+//! recommendation is base64" (quoted in SEM-gx-core-130). This file is the answer, and
 //! it is checked in two directions -- against the standard's table, and against the two types the
 //! ruling names.
 //!
@@ -9,16 +12,19 @@
 //!
 //! A golden file produced by running the code it tests records what the code does, which is the one
 //! thing already known. `req/06_OSS_OBSERVATION_2026-08-06.md` made the same complaint of the DSSE
-//! spec repository -- 「**spec repoに専用test vector無し**…機械検証可能な参照vectorがspecに無く
-//! 実装間ドリフトのリスクが構造的に残る」 -- and named 「spec-levelで値入りtest vector(input→期待
-//! byte列)をcrateに同梱」 as what gx should do instead. [`RFC_4648_S10`] is that: seven pairs
+//! spec repository -- "**no dedicated test vectors in the spec repo** ... with no machine-checkable
+//! reference vector in the spec, the risk of drift between implementations remains structurally"
+//! -- and named "ship spec-level test vectors with values (input -> expected bytes) inside the
+//! crate" as what gx should do instead (both quoted in SEM-gx-core-131). [`RFC_4648_S10`] is
+//! that: seven pairs
 //! transcribed from the standard's own section 10, none of them produced here.
 //!
 //! # What this file does not check
 //!
 //! Nothing here hashes, encodes canonically, or signs. base64 is a rendering for formats that have
 //! no byte type; 42 §2.1's canonical rules are about DAG-CBOR and the binary face is untouched
-//! (`req/38_ERRATA_2026-08-07.md` §9: 「DAG-CBOR 面が byte-string(major type 2)である事は既決」).
+//! (`req/38_ERRATA_2026-08-07.md` §9: "that the DAG-CBOR face is a byte-string (major type 2) is
+//! already decided"; sem: SEM-gx-core-132).
 
 use gx_core::{b64, DsseSignature, FingerprintBytes};
 
@@ -114,7 +120,8 @@ fn base64_refuses_every_spelling_that_is_not_the_one() {
 
 /// `DsseSignature.sig` in JSON is a base64 string, and in DAG-CBOR it is still bytes.
 ///
-/// The second half is the one the ruling calls 「既決として動かさない」, and it is asserted here
+/// The second half is the one the ruling calls "already decided; do not move it" (sem:
+/// SEM-gx-core-133), and it is asserted here
 /// rather than assumed: gx-core cannot name a DAG-CBOR encoder (that is gx-canon), so what is
 /// checked is the *shape serde is asked for* -- a JSON value that is a string, and a serializer
 /// that is not human-readable receiving bytes rather than a sequence. `gx-canon`'s own suites hold

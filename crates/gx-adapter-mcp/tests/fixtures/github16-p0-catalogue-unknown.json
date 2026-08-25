@@ -1,0 +1,24 @@
+{
+  "$server": {
+    "name": "github-mcp-server",
+    "version": "v1.9.0",
+    "features": [],
+    "toolsets": ["context", "repos", "issues", "pull_requests", "users", "gists"]
+  },
+  "$on_read_failure": "unknown",
+  "update_gist": {
+    "restored_by": "update_gist",
+    "read_by": {
+      "by_tool": "get_gist",
+      "arguments": {
+        "gist_id": { "forward": "gist_id" }
+      },
+      "identity": ["gist:", { "answer": "/id" }]
+    },
+    "arguments": {
+      "gist_id": { "forward": "gist_id" },
+      "filename": { "forward": "filename" },
+      "content": { "prior_json": ["/files/", { "forward": "filename" }, "/content"] }
+    }
+  }
+}

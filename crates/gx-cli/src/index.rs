@@ -1,21 +1,25 @@
-//! `.gx/index/` — **M6-02 採(b)**: the CLI's cache of 44 §0's id-resolution.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! `.gx/index/` — **M6-02 adopted (b)**: the CLI's cache of 44 §0's id-resolution. (sem: SEM-gx-cli-027)
 //!
 //! # What this is a cache *of*
 //!
-//! [`gx_engine::Engine::resolved`] (**M6-02 採(a)**) is the answer. This is a copy of it on disk, and
+//! [`gx_engine::Engine::resolved`] (**M6-02 adopted (a)**) is the answer (sem: SEM-gx-cli-028). This is a copy of it on disk, and
 //! it exists because the two are consulted at different moments: the engine's map is rebuilt when a
 //! journal is opened, and a CLI that only wants to turn a `gx1:` argument into a
 //! `TransformationId` — `gx receipt show <IntentId>`, say — would otherwise have to open a journal
 //! to answer a question about a name.
 //!
-//! req/56 §2's row for this directory is the licence for it existing at all: 「`.gx/index/` — key
-//! index 等の**再生成可能な索引** — derived・消して良いと宣言 — 消えたら再生成」. So it is written where
+//! req/56 §2's row for this directory is the licence for it existing at all: "`.gx/index/` — a
+//! **regenerable index**, such as a key index — derived, declared safe to delete — regenerate if
+//! it goes missing" (sem: SEM-gx-cli-029). So it is written where
 //! a lost file costs a re-open and never where a lost file costs a fact.
 //!
 //! # 🔴 The word this module does not use
 //!
-//! req/38 §47 puts a condition on this design: 「手 1 の `.gx/index/` 設計は **`supersede` を予約語に
-//! 使わず**、非 canonical 注記の将来席を塞がない」. 23 §3.1's `ReVerificationRecord` is a different
+//! req/38 §47 puts a condition on this design: "hand 1's `.gx/index/` design **does not use
+//! `supersede` as a reserved word**, so as not to block a future seat for non-canonical
+//! annotation" (sem: SEM-gx-cli-030). 23 §3.1's `ReVerificationRecord` is a different
 //! concept from 43 T-12's edge and avoids the word on purpose; an index that spent the token on the
 //! T-12 relation would take the seat the annotation layer has not been designed into yet.
 //! `probes/doubt/tests/m6_surface_doubt.rs` scans this file for it.
@@ -40,8 +44,8 @@ const FILE: &str = "intent_to_transformation.json";
 
 /// The on-disk form: text ids, in `gx1:` (42 §1.2), sorted.
 ///
-/// Text rather than bytes because 42 §1.2 makes `gx1:<base32>` the form for 「CLI/API/ログの人間可読
-/// 表示・JSON埋め込み」, and because a cache a person can read with `cat` is a cache a person can
+/// Text rather than bytes because 42 §1.2 makes `gx1:<base32>` the form for "human-readable
+/// display in the CLI/API/log, and JSON embedding" (sem: SEM-gx-cli-031), and because a cache a person can read with `cat` is a cache a person can
 /// delete with confidence — which req/56 §2 explicitly invites them to do.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Wire {
@@ -81,11 +85,11 @@ impl ResolutionIndex {
     /// 🔴 Forget one — **E-M6-14**'s other half.
     ///
     /// `gx draft discard` removes the body, and a cache still resolving that `IntentId` would make
-    /// `gx plan` fail with 「the draft is missing」 for an intent somebody deliberately put down: a
+    /// `gx plan` fail with "the draft is missing" for an intent somebody deliberately put down: a (sem: SEM-gx-cli-032)
     /// 44 §1.4 **6** that reads like corruption. `true` when something was there.
     ///
     /// It is a *removal from a cache* rather than a retraction of anything: the engine's own
-    /// `resolved` map is the authority (M6-02 採(a)) and is rebuilt from the journal, which this
+    /// `resolved` map is the authority (M6-02 adopted (a); sem: SEM-gx-cli-033) and is rebuilt from the journal, which this
     /// does not touch.
     pub fn forget(&mut self, intent: &IntentId) -> bool {
         self.entries.remove(intent).is_some()
@@ -105,8 +109,8 @@ impl ResolutionIndex {
 
     /// Read the cache, treating **every** failure as an empty cache.
     ///
-    /// 🔴 This is the one place in this crate where 「読めない」 and 「無い」 are deliberately the same
-    /// answer, and the reason is req/56 §2's own cell: this directory is 「derived・消して良いと宣言」.
+    /// 🔴 This is the one place in this crate where "cannot be read" and "does not exist" are deliberately the same
+    /// answer, and the reason is req/56 §2's own cell: this directory is "derived, declared safe to delete" (sem: SEM-gx-cli-034).
     /// A corrupted cache and an absent cache have the identical correct repair — rebuild from the
     /// journal — so refusing on the first would be a hand-written failure mode on a path the
     /// specification promises is disposable. E-M4-35's rule is about **source** data, and the
@@ -162,7 +166,7 @@ impl ResolutionIndex {
     }
 }
 
-/// What [`ResolutionIndex::load`] found. req/56 §5's 「必ず申告」, one file down.
+/// What [`ResolutionIndex::load`] found. req/56 §5's "always declare" (sem: SEM-gx-cli-035), one file down.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Freshness {
     /// There was a cache and it was read whole.
@@ -188,12 +192,12 @@ impl Freshness {
 
 /// The parser 44 §0's id-resolution starts with: a `gx1:` string, without knowing which id it is.
 ///
-/// 🔴 **則 1 (i) lives or dies here.** 44 §0 asks the CLI to accept 「`IntentId`と`TransformationId`の
-/// いずれの`gx1:...`値も」, and the naive way to do that is to compute something. This does not: it
+/// 🔴 **Rule 1 (i) lives or dies here.** 44 §0 asks the CLI to accept "either `IntentId`'s or
+/// `TransformationId`'s `gx1:...` value" (sem: SEM-gx-cli-036), and the naive way to do that is to compute something. This does not: it
 /// **parses** with [`gx_core::Cid::from_text`], which is in gx-core precisely because 42 §1.2 makes
 /// the text form a display concern rather than an identity one. Which of the two an id is cannot be
-/// told from its bytes (42 §1.1: 「どの型を指すかはRust側の型…で判別する・自己記述タグは付与しない」),
-/// so the answer is 「a `Cid`, and the caller decides」 — and the caller deciding is
+/// told from its bytes (42 §1.1: "which type it names is decided by the Rust-side type … ; no
+/// self-describing tag is attached" (sem: SEM-gx-cli-037)), so the answer is "a `Cid`, and the caller decides" — and the caller deciding is
 /// [`ResolutionIndex::get`] finding it or not.
 ///
 /// # Errors
@@ -211,14 +215,15 @@ pub fn parse_id(text: &str) -> Result<Cid> {
 /// Given a parsed id, the two ways it might be read.
 ///
 /// Returned as a pair rather than as a guess, because guessing is what 44 §0 does **not** ask for:
-/// the rule is 「いずれの値も受理し…`plan()`完了後は正準の`TransformationId`へ解決する」, which is a
+/// the rule is "accept either value … after `plan()` completes, resolve to the canonical
+/// `TransformationId`" (sem: SEM-gx-cli-038), which is a
 /// resolution against a store and not an inspection of the bytes.
 #[must_use]
 pub fn both_readings(id: Cid) -> (IntentId, TransformationId) {
     (IntentId(id), TransformationId(id))
 }
 
-/// 🔴 What this module deliberately does **not** provide: a one-call 「resolve this argument」.
+/// 🔴 What this module deliberately does **not** provide: a one-call "resolve this argument" (sem: SEM-gx-cli-039).
 ///
 /// 44 §0's rule has three steps — parse, look up, fall back to the engine — and the third one is
 /// where the authority is (`Engine::resolved`). A helper here that folded all three would put the

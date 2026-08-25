@@ -1,7 +1,7 @@
 {
   "id": "FA-2",
   "kind": "false-admit",
-  "statement": "/etc という node 自体への fs 変換も admit してはならない(配下だけ守って親を通す穴を塞ぐ)",
+  "statement": "an fs transformation to the /etc node itself must not be admitted either (closes the hole of protecting only what's under it while letting the parent through) (sem: SEM-gx-gate-325)",
   "expected": "MUST_DENY",
   "expected_reason": {
     "source": "Policy",
@@ -15,7 +15,7 @@
     "invert_available": true,
     "evidence": 0
   },
-  "why": "手 5 が足した `resource.locator == \"/etc\"` の disjunct が守っている唯一の入力。glob `like \"/etc/*\"` は node 自体に match しないので、disjunct が消えると /etc/passwd を拒みながら /etc 丸ごと置換を通す形へ戻る。",
+  "why": "the one input the disjunct `resource.locator == \"/etc\"` that hand 5 added protects. The glob `like \"/etc/*\"` does not match the node itself, so if the disjunct disappears the pack reverts to refusing /etc/passwd while letting a wholesale replacement of /etc through. (sem: SEM-gx-gate-326)",
   "spec_anchor": "34 AC-028 / req/65 §3.2 / req/38 §24 G-6",
   "origin": "gx self-authored for M3 hand 6",
   "control": {
@@ -27,6 +27,6 @@
       "evidence": 0
     },
     "expected": "MUST_ADMIT",
-    "note": "拒否の境界は「/etc という node」であって「/etc で始まる文字列」ではない。== と like の両方が偽になる 1 文字違いの対照で、pack が prefix 一致へ広がったら赤くなる"
+    "note": "the refusal boundary is 'the node /etc', not 'a string starting with /etc'. A one-character-different control where both == and like are false; goes red if the pack widens to a prefix match (sem: SEM-gx-gate-327)"
   }
 }

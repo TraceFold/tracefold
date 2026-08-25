@@ -1,13 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-007 (FR-007) — walking the provenance DAG through `parents`.
 //!
-//! AC-007 逐語: 「Given: `T1(parents=[])`, `T2(parents=[T1.id])`, `T3(parents=[T2.id])`。When:
-//! 親子辿りユーティリティ`ancestors(T3.id)`を呼ぶ。Then: 戻り値が`[T2.id, T1.id]`の順で
-//! 一致する。」
+//! AC-007, verbatim (quoted in SEM-gx-core-116): "Given: `T1(parents=[])`, `T2(parents=[T1.id])`,
+//! `T3(parents=[T2.id])`. When: the parent-walking utility `ancestors(T3.id)` is called. Then: the
+//! return value matches `[T2.id, T1.id]` in that order."
 //!
 //! The AC writes the call with one argument. It cannot literally have one: reaching T2 from
 //! T3.id means looking a transformation up, and 41 §6 forbids this crate from doing any I/O. The
-//! resolver is therefore a parameter, which is the shape req/31 §7 already fixed --「gx-core は
-//! I/O を持てないので、T-14 の `ancestors` と同じく解決子を引数で受ける純関数にする」-- and the
+//! resolver is therefore a parameter, which is the shape req/31 §7 already fixed -- "gx-core cannot
+//! have I/O, so like T-14's `ancestors` it is a pure function that takes the resolver as an
+//! argument" (quoted in SEM-gx-core-117) -- and the
 //! store that backs the closure is the caller's problem, as it must be.
 
 use gx_core::{

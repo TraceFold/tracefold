@@ -1,51 +1,53 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **AC-067 / NFR-004** — what the proxy **adds** to a passthrough tool call, measured against the
 //! same effect caused without it.
 //!
-//! 34 AC-067 逐語: 「Given: `gx-adapter-mcp`プロキシ経由のnon-gated（passthrough）tool-call呼び出しと
-//! direct呼び出し。When: 両者のレイテンシを比較ベンチマークする。Then: プロキシが追加するレイテンシが
-//! **p99 ≤ 30ms**。」 裁定 #15 (`req/38` §56) fixes the environment: **WSL native worktree を正**, docker は
-//! 参考。req/98 §6-8 fixes the form: median + 回数 + 分母, and 単発値を閾値と比べない。
+//! 34 AC-067, verbatim: "Given: a non-gated (passthrough) tool-call invocation via the `gx-adapter-mcp` proxy, and (sem: SEM-gx-adapter-mcp-226)
+//! a direct invocation. When: benchmark-compare the latency of both. Then: the latency the proxy adds is (sem: SEM-gx-adapter-mcp-227)
+//! **p99 <= 30ms**." Ruling #15 (`req/38` §56) fixes the environment: **the WSL native worktree is canonical**, docker is (sem: SEM-gx-adapter-mcp-228)
+//! reference only. req/98 §6-8 fixes the form: median + count + denominator, and a single value is never compared against the threshold. (sem: SEM-gx-adapter-mcp-229)
 //!
-//! # 判定条件 (numbers の前に書かれた物・RED-first の bench 版)
+//! # The judgment condition (written before the numbers -- the bench version of RED-first) (sem: SEM-gx-adapter-mcp-230)
 //!
 //! ```text
-//! ADDED(i)  := proxy(i) - direct(i)        (同一 iteration の対・対応のある差)
+//! ADDED(i)  := proxy(i) - direct(i)        (a paired difference within the same iteration) (sem: SEM-gx-adapter-mcp-231)
 //! AC-067    := p99( ADDED ) <= 30 ms
 //! ```
 //!
-//! **対応のある差**を取るのは、2 つの分布の p99 を引き算しても「proxy が追加した物」にはならないから
-//! である (p99 同士の差は、どの 1 回についても成り立たない数字になりうる)。同一 iteration で direct と
-//! proxy を交互に走らせ、その差の分布を報告する。
+//! Taking the **paired difference** is because subtracting the p99 of two distributions does not give "what the proxy added" -- (sem: SEM-gx-adapter-mcp-232)
+//! (a difference between two p99 values can be a number that holds for no single run). direct and (sem: SEM-gx-adapter-mcp-233)
+//! proxy are run alternately within one iteration, and the distribution of their difference is reported. (sem: SEM-gx-adapter-mcp-234)
 //!
-//! 🔴 **p99 を gate に使うのは、AC-067 がそう書いてあるから**である。M5H7-6 の「gate に使うなら median
-//! か p90・p99 は記録のみ」は 33 の**暫定値** (NFR-003 の 100 commits/s) についての規律であり、34 の AC が
-//! 逐語で p99 を書いている本項には効かない。∴ 三者とも印字し、**判定は p99**、median と p90 は隣に置く。
+//! 🔴 **p99 is used as the gate because AC-067 says so, in as many words.** M5H7-6's "if used as a gate, median (sem: SEM-gx-adapter-mcp-235)
+//! or p90; p99 is record-only" is a discipline about 33's **provisional number** (NFR-003's 100 commits/s), and does not apply to (sem: SEM-gx-adapter-mcp-236)
+//! this section, where 34's AC writes p99 verbatim. ∴ all three are printed, **the judgment is p99**, and median and p90 are placed beside it. (sem: SEM-gx-adapter-mcp-237)
 //!
-//! # 二つの arm が何をしているか、そして何をしていないか
+//! # What the two arms do, and what they do not (sem: SEM-gx-adapter-mcp-238)
 //!
-//! | arm | 何が起きるか |
+//! | arm | what happens | (sem: SEM-gx-adapter-mcp-239)
 //! |---|---|
-//! | **direct** | fixture server の resource へ、その tool 自身の効果を直接書く。`FakeServer` の `WRITE_TOOL` 分岐の本体そのもの——プロキシを経由せずに server へ届いた client が起こす変化。 |
-//! | **proxy** | `Engine` の submit → plan → verify(gate=permit) → canonicalize → commit。gate 判定・canonical encode・ledger append・receipt 署名・journal 書き込みが全部この中に在り、tool call は commit の中で **1 回**だけ出る (AC-051 の D-5)。 |
+//! | **direct** | writes the tool's own effect directly to the fixture server's resource. The body of `FakeServer`'s `WRITE_TOOL` branch itself -- the change a client reaching the server without going through the proxy would cause. | (sem: SEM-gx-adapter-mcp-240)
+//! | **proxy** | `Engine`'s submit -> plan -> verify(gate=permit) -> canonicalize -> commit. The gate verdict, canonical encode, ledger append, receipt signing and journal write are all inside this, and the tool call comes out **exactly once**, inside the commit (AC-051's D-5). | (sem: SEM-gx-adapter-mcp-241)
 //!
-//! **どちらの arm も wire を持たない。** この crate は JSON-RPC を framing せず、fixture server は同一
-//! process に居る (`src/lib.rs`「What v0.1 does not close」)。∴ socket・framing・server の実処理時間は
-//! **両 arm に共通で、差では相殺される**。AC-067 が訊いているのは 「プロキシが**追加する**レイテンシ」
-//! なので、共通項が両側に無い事は差にとって中立である——が、比率 (「何倍遅い」) は本計器から読めない。
-//! 読めるのは**絶対値の追加分**だけであり、AC-067 が閾値を絶対値 (30ms) で書いているのはそのためだと
-//! 読める。
+//! **Neither arm has a wire.** This crate frames no JSON-RPC, and the fixture server is in the same (sem: SEM-gx-adapter-mcp-242)
+//! process (`src/lib.rs`, "What v0.1 does not close"). ∴ the socket, framing and the server's own processing time are (sem: SEM-gx-adapter-mcp-243)
+//! **common to both arms and cancel out in the difference**. What AC-067 asks is "the latency the proxy **adds**" (sem: SEM-gx-adapter-mcp-244)
+//! so a common term absent from both sides is neutral to the difference -- but a ratio ("how many times slower") cannot be read from this instrument. (sem: SEM-gx-adapter-mcp-245)
+//! What can be read is only **the absolute added amount**, which is presumably why AC-067 writes its threshold as an absolute value (30ms) -- (sem: SEM-gx-adapter-mcp-246)
+//! that is the reading. (sem: SEM-gx-adapter-mcp-247)
 //!
-//! **fsync は測定環境の性質である。** journal と ledger は書き込みのたびに fsync する (NFR-009)。既定の
-//! sandbox は tmpfs (`/dev/shm`) で、そこでの fsync はほぼ無料である。∴ `GLOVREX_BENCH_ROOT` を ext4 の
-//! path へ向けた **第 2 の arm** を並べる (`tools/m7h5_bench.sh ac067_disk`)。tmpfs の数字だけを出せば
-//! 「30ms を余裕で下回る」が filesystem についての主張になってしまう。
+//! **fsync is a property of the measurement environment.** The journal and ledger fsync on every write (NFR-009). The default (sem: SEM-gx-adapter-mcp-248)
+//! sandbox is tmpfs (`/dev/shm`), where fsync is nearly free. ∴ a **second arm** pointing `GLOVREX_BENCH_ROOT` at ext4 is placed (sem: SEM-gx-adapter-mcp-249)
+//! alongside it (`tools/m7h5_bench.sh ac067_disk`). Reporting only the tmpfs number would turn (sem: SEM-gx-adapter-mcp-250)
+//! "comfortably under 30ms" into a claim about the filesystem. (sem: SEM-gx-adapter-mcp-251)
 //!
 //! # decay
 //!
-//! `Engine` は見た transformation を表に持ち、43 §8 の conflict 検査がその subject の兄弟を歩く
-//! (M6-07 採(b) の subject 索引の後でも、兄弟数は増える)。この adapter の footprint は **server 全体**
-//! なので、全 iteration が 1 つの subject に載る=兄弟数が iteration 数まで伸びる最悪形である。∴ bucket
-//! ごとに印字し、**判定は全 bucket を含む全体の p99**で行う (最後の bucket が最も遅い側)。
+//! `Engine` keeps a table of the transformations it has seen, and 43 §8's conflict check walks that subject's siblings (sem: SEM-gx-adapter-mcp-252)
+//! (even after M6-07, adopted (b)'s subject index, the sibling count still grows). This adapter's footprint is the **whole server** (sem: SEM-gx-adapter-mcp-253)
+//! so every iteration lands on one subject -- the worst shape, where the sibling count grows to the iteration count. ∴ (sem: SEM-gx-adapter-mcp-254)
+//! print per bucket, and **judge on the overall p99 across every bucket** (the last bucket is the slower side). (sem: SEM-gx-adapter-mcp-255)
 
 #[path = "../tests/support/mod.rs"]
 mod support;
@@ -60,13 +62,13 @@ use gx_engine::{Engine, InjectedEvidence, Lifecycle};
 
 use support::{FakeServer, RewindableLog, SERVER, WRITE_TOOL};
 
-/// 34 AC-067 の閾値。
+/// 34 AC-067's threshold. (sem: SEM-gx-adapter-mcp-256)
 const BUDGET: Duration = Duration::from_millis(30);
 
-/// 🔴 **§62 R-7**: 判定を **exit code** にする(結線先=`tools/ci.sh` stage 10・既定 off)。
+/// 🔴 **§62 R-7**: the verdict becomes an **exit code** (wired to `tools/ci.sh` stage 10, default off). (sem: SEM-gx-adapter-mcp-257)
 ///
-/// budget は `GLOVREX_AC067_BUDGET_MS` で動かせ、使った値と**出所**が数字の隣に印字される
-/// (`BUDGET_SOURCE`)——緩めた走行と宣言どおりの走行が同じに読めてはならない(req/29 §4)。
+/// The budget can be moved by `GLOVREX_AC067_BUDGET_MS`, and the value used and **its source** are printed beside the number (sem: SEM-gx-adapter-mcp-258)
+/// (`BUDGET_SOURCE`) -- a loosened run and a run at the declared value must never read the same (req/29 §4). (sem: SEM-gx-adapter-mcp-259)
 fn budget() -> (Duration, String) {
     match std::env::var("GLOVREX_AC067_BUDGET_MS")
         .ok()
@@ -77,32 +79,32 @@ fn budget() -> (Duration, String) {
     }
 }
 
-/// 🔴 **§62 R-1**: この判定が **gate になるのは journal が tmpfs に在る時だけ**である。
+/// 🔴 **§62 R-1**: this verdict **becomes a gate only when the journal lives on tmpfs**. (sem: SEM-gx-adapter-mcp-260)
 ///
-/// §62 逐語: 「journal/ledger が tmpfs に在る時、proxy の追加 p99 は budget 30ms の 2.6〜6.5%…
-/// ext4(WSL2 VHD)では p99 163.8 ms=5.5 倍割る」「ext4 の数字は proxy の code でなく **fsync 15.1
-/// 回 × 単価 5.9 ms** についての数字である事…を判定文の一部とする」。
+/// §62, verbatim: "when the journal/ledger live on tmpfs, the proxy's added p99 is 2.6-6.5% of the 30ms budget... (sem: SEM-gx-adapter-mcp-261)
+/// on ext4 (WSL2 VHD) p99 is 163.8ms, 5.5x over" "the ext4 number is not about the proxy's code but about **15.1 fsync (sem: SEM-gx-adapter-mcp-262)
+/// calls at 5.9ms each**... and this fact is made part of the judgment sentence itself". (sem: SEM-gx-adapter-mcp-263)
 ///
-/// ∴ ext4 の上でこの stage を赤にすれば、CI は 「proxy が遅い」 と読める形で **disk の性質**を
-/// 報告する事になる。裁定が付けた条件を、それを消費する側にも同じ形で置く: filesystem が tmpfs
-/// でなければ**測って記録し、判定はしない**——そして「判定しなかった」を出力に名前つきで出す。
-/// 黙って緑になる skip は §30 の病そのものである。
+/// ∴ turning this stage red on ext4 would make CI report **a disk property** in a shape that reads as "the proxy is slow". (sem: SEM-gx-adapter-mcp-264)
+/// The condition the ruling attached is placed the same way on the consuming side too: when the filesystem is not tmpfs, (sem: SEM-gx-adapter-mcp-265)
+/// **measure and record, but do not judge** -- and print "no judgment made" in the output, by name. (sem: SEM-gx-adapter-mcp-266)
+/// A skip that silently turns green is precisely §30's disease. (sem: SEM-gx-adapter-mcp-267)
 fn gated_on(filesystem: &str) -> bool {
     matches!(filesystem, "tmpfs" | "ramfs")
 }
 
-/// 既定の iteration 数。`GLOVREX_BENCH_CALLS` で動かせる。
+/// The default iteration count. Can be moved by `GLOVREX_BENCH_CALLS`. (sem: SEM-gx-adapter-mcp-268)
 const DEFAULT_CALLS: usize = 400;
 
-/// bucket 幅 (iteration 数)。decay を 1 本の線ではなく段で見るため。
+/// The bucket width (iteration count). So decay is seen in steps rather than as one line. (sem: SEM-gx-adapter-mcp-269)
 const BUCKET: usize = 100;
 
 /// A fixed instant: 41 §6 injects time at the engine boundary, and a bench that read a clock the
 /// engine is supposed to be given would be measuring `clock_gettime`.
 const AT: Timestamp = Timestamp(1_754_000_000_000_000_000);
 
-/// 何も拒まない pack。AC-067 の Given が 「non-gated（passthrough）」 だからであって、gate を測ら
-/// ないためではない——gate の**判定そのもの**は proxy arm の中に在り、その cost は追加分に含まれる。
+/// A pack that refuses nothing. Because AC-067's Given is "non-gated (passthrough)", not because the gate is not (sem: SEM-gx-adapter-mcp-270)
+/// being measured -- the gate's **verdict itself** is inside the proxy arm, and its cost is part of the added amount. (sem: SEM-gx-adapter-mcp-271)
 const PERMIT_ALL: &str = r#"@id("permit-everything")
 permit (principal, action, resource);
 "#;
@@ -125,7 +127,7 @@ fn calls() -> usize {
 /// The filesystem mounted over `path`, read from `/proc/self/mountinfo`.
 ///
 /// Printed with the numbers: a run that fell back to a disk must not be readable as a run that did
-/// not, and 裁定 #15's 「正は 1 つ」 is about exactly this kind of ambiguity.
+/// not, and ruling #15's "there is exactly one canonical value" is about exactly this kind of ambiguity. (sem: SEM-gx-adapter-mcp-272)
 fn filesystem_of(path: &Path) -> String {
     let target = path
         .canonicalize()
@@ -188,7 +190,7 @@ fn intent_for(locator: &str, tool: &str, arguments: &[u8]) -> Intent {
     )
 }
 
-/// Nearest-rank percentiles with the sample count beside them (req/98 §6-8's 「median+回数+分母」).
+/// Nearest-rank percentiles with the sample count beside them (req/98 §6-8's "median + count + denominator"). (sem: SEM-gx-adapter-mcp-273)
 fn report(tag: &str, name: &str, samples: &mut [Duration]) -> (Duration, Duration, Duration) {
     assert!(!samples.is_empty(), "a distribution needs samples");
     samples.sort_unstable();
@@ -232,7 +234,7 @@ fn main() {
     report("AC067_PROXY", "whole run", &mut proxy);
     let (p50, p90, p99) = report("AC067_ADDED", "proxy - direct", &mut added);
 
-    // decay を段で見る: bucket ごとの追加分。判定には使わない (判定は全体の p99)。
+    // Decay seen in steps: the added amount per bucket. Not used for judgment (the judgment is the overall p99). (sem: SEM-gx-adapter-mcp-274)
     let paired: Vec<Duration> = proxy
         .iter()
         .zip(&direct)
@@ -253,15 +255,15 @@ fn main() {
     println!(
         "AC067_VERDICT p99_added={p99:.3?} budget={budget:?} BUDGET_SOURCE={budget_source} \
          pass={pass} gated={gated} journal_fs={filesystem} p50_added={p50:.3?} \
-         p90_added={p90:.3?} n={n}  (対応のある差の分布・34 AC-067 は p99 を逐語で書く)"
+         p90_added={p90:.3?} n={n}  (the distribution of a paired difference; 34 AC-067 writes p99 verbatim) (sem: SEM-gx-adapter-mcp-275)"
     );
 
-    // 🔴 §62 R-1 の条件を、それを消費する側でも同じ形に保つ。
+    // 🔴 §62 R-1's condition is kept the same shape on the consuming side too. (sem: SEM-gx-adapter-mcp-276)
     if !gated {
         println!(
-            "AC067_NOT_GATED journal_fs={filesystem} — 記録のみ。§62 R-1: ext4 の数字は proxy の \
-             code についてではなく fsync 15.1 回 × 単価 5.9 ms についての数字であり、それで CI を \
-             赤にすれば disk の性質を proxy の性質として報告する事になる"
+            "AC067_NOT_GATED journal_fs={filesystem} -- record only. §62 R-1: the ext4 number is not about the proxy's (sem: SEM-gx-adapter-mcp-277) \
+             code, but about 15.1 fsync calls at 5.9ms each, and turning CI red on it (sem: SEM-gx-adapter-mcp-278) \
+             would report a disk property as a proxy property (sem: SEM-gx-adapter-mcp-279)"
         );
         return;
     }
@@ -293,7 +295,7 @@ fn run(n: usize) -> (Vec<Duration>, Vec<Duration>, String) {
     if measuring() {
         println!(
             "AC067_GENERATOR calls={n} bucket={BUCKET} journal_fs={} journal={} server=in-process \
-             (no wire on either arm: framing と socket は両 arm に無く、差では相殺される)",
+             (no wire on either arm: neither has framing or a socket, and they cancel out in the difference) (sem: SEM-gx-adapter-mcp-280)",
             filesystem_of(&dir),
             dir.display()
         );

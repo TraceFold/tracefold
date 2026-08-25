@@ -1,33 +1,38 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-042** — INV-S1 over generated execution traces (FR-032/033/034/036/037).
 //!
-//! 34 AC-042 逐語:
-//!
-//! > Given: ランダムなverdict系列・TTL経過・record-only切替を含む状態機械の実行トレースを生成する
-//! > model-basedテスト（proptest状態機械戦略）。When: 生成された全トレースのうち`Committed`へ到達した
-//! > Transformationを抽出する。Then: 各々が経路上で必ず`Admitted ∧ Canonicalized`（RecordOnly例外時は
-//! > `Denied ∧ enforced=false ∧ Canonicalized`）を経由している。これに違反する経路が1件でも生成されれば
-//! > テスト失敗とする（43 INV-S1）。 | property（model-based state machine test）
+//! 34 AC-042, verbatim: "Given: a model-based test (proptest state-machine strategy) that generates
+//! execution traces of a state machine, including a random verdict sequence, TTL elapse, and
+//! record-only toggling. When: extract, from every generated trace, the Transformations that
+//! reached `Committed`. Then: each one must pass through `Admitted ∧ Canonicalized` on its path (or,
+//! under the RecordOnly exception, `Denied ∧ enforced=false ∧ Canonicalized`). If even one
+//! violating path is generated, the test fails (43 INV-S1). | property (model-based state machine
+//! test)" (sem: SEM-gx-engine-522)
 //!
 //! # Why this file is plain `proptest` and not `proptest-state-machine`
 //!
-//! **M5-15 採(b)** (req/38 §37): 「素の proptest で `Vec<Event>` 生成の自前 model(**external 238 不変**・
-//! model-based crate を足さない)」. A `proptest-state-machine` dependency would move the external
-//! package count for a generator this file can write in forty lines, and 34's 「proptest状態機械戦略」
-//! names a *strategy*, not a crate. So the trace is a `Vec<Event>`, the model is the
+//! **M5-15, adopted (b)** (req/38 §37): "a hand-rolled model generating `Vec<Event>` with plain
+//! proptest (**external-count stays 238** -- no model-based crate is added)" (sem:
+//! SEM-gx-engine-523). A `proptest-state-machine` dependency would move the external package
+//! count for a generator this file can write in forty lines, and 34's "proptest state-machine
+//! strategy" names a *strategy*, not a crate. So the trace is a `Vec<Event>`, the model is the
 //! [`Model`] struct below, and the two are stepped side by side.
 //!
-//! The ruling also asked for honesty about what the hand-rolled form costs: 「shrinking の質の低下は
-//! 正直に記録し」. What proptest shrinks here is the `Vec<Event>` — it removes events and shrinks the
-//! numbers inside them — so a counterexample arrives as a *short trace*, which is the readable form.
-//! What it cannot do is shrink across the engine-level configuration and the trace at once with any
-//! notion of which is 「simpler」; that axis is a plain 4-tuple of booleans and is printed verbatim
-//! beside the trace when a case fails ([`Config`]'s `Debug`).
+//! The ruling also asked for honesty about what the hand-rolled form costs: "any degradation in
+//! shrinking quality is honestly recorded" (sem: SEM-gx-engine-524). What proptest shrinks
+//! here is the `Vec<Event>` — it removes events and shrinks the numbers inside them — so a
+//! counterexample arrives as a *short trace*, which is the readable form. What it cannot do is
+//! shrink across the engine-level configuration and the trace at once with any notion of which is
+//! "simpler" (sem: SEM-gx-engine-525); that axis is a plain 4-tuple of booleans and is printed
+//! verbatim beside the trace when a case fails ([`Config`]'s `Debug`).
 //!
 //! # Two claims, and only the second one is AC-042
 //!
 //! 1. **The model agrees with the engine.** After every event, the model's predicted [`Lifecycle`]
-//!    for every transformation equals `Engine::state`. This is the 「model-based」 half: a property
-//!    that only read the engine's own answers would be asking the implementation to grade itself.
+//!    for every transformation equals `Engine::state`. This is the "model-based" half (sem:
+//!    SEM-gx-engine-526): a property that only read the engine's own answers would be asking
+//!    the implementation to grade itself.
 //! 2. **INV-S1 holds of every `Committed` transformation** — and this is read out of the
 //!    **journal**, not out of the in-memory table, because 43 §7 makes the journal the truth and the
 //!    table a cache. [`path_of`] rebuilds the road each transformation walked from the records it
@@ -65,7 +70,8 @@ const TICK: i64 = 400_000_000;
 /// 🔴 Chosen against [`TICK`] rather than for readability. At `TTL = 3 * TICK` the first `Elapse`
 /// in a trace killed every waiting transformation, and the first tuning run reached `Committed`
 /// **once in sixty-four traces** — a property that is technically true and measures nothing (34's
-/// Then quantifies over 「`Committed`へ到達したTransformation」). At twelve ticks an expiry takes
+/// Then quantifies over "a Transformation that reached `Committed`" (sem: SEM-gx-engine-527).
+/// At twelve ticks an expiry takes
 /// several `Elapse` events, so both the expiry road and the commit road are walked. The counts are
 /// printed by the test so that a future change to either constant shows up as a number rather than
 /// as a silent loss of coverage.
@@ -77,9 +83,9 @@ const TTL: i64 = 12 * TICK;
 
 /// One step of a generated execution trace.
 ///
-/// 34's Given names three ingredients and each has an event: 「ランダムなverdict系列」 is
-/// [`Event::Submit`]'s `denied` flag plus [`Config`], 「TTL経過」 is [`Event::Elapse`] and
-/// [`Event::Reap`], and 「record-only切替」 is [`Event::Toggle`].
+/// 34's Given names three ingredients and each has an event: "a random verdict sequence" (sem:
+/// SEM-gx-engine-528) is [`Event::Submit`]'s `denied` flag plus [`Config`], "TTL elapse" is
+/// [`Event::Elapse`] and [`Event::Reap`], and "record-only toggling" is [`Event::Toggle`].
 #[derive(Clone, Debug)]
 enum Event {
     /// T-1 and T-2 for a new transformation. `denied` picks a locator the invariant refuses.
@@ -306,8 +312,8 @@ fn canonicalized_enforced(
 
 /// 🔴 34 AC-042's Then, as a function of one transformation's road.
 ///
-/// > 各々が経路上で必ず`Admitted ∧ Canonicalized`（RecordOnly例外時は`Denied ∧ enforced=false ∧
-/// > Canonicalized`）を経由している
+/// > each one must pass through `Admitted ∧ Canonicalized` on its path (under the RecordOnly
+/// > exception, `Denied ∧ enforced=false ∧ Canonicalized`) (sem: SEM-gx-engine-529)
 ///
 /// Read as an ordered claim rather than a set membership: `Canonicalized` must be **on** the road,
 /// and the state immediately before it must be the admission (T-8) or the record-only denial
@@ -551,8 +557,9 @@ fn run_trace(name: &str, cfg: Config, trace: &[Event]) -> Result<Run, TestCaseEr
                     model.expire(*i);
                 }
                 match model.rows[*i].state {
-                    // 🔴 43 T-7's idempotency column: 「二重キャンセルは無効操作として無視（既に
-                    // Aborted）」. `cancel` answers `Ok` with the abort already recorded and writes
+                    // 🔴 43 T-7's idempotency column: "a duplicate cancel is ignored as a no-op
+                    // (already Aborted)" (sem: SEM-gx-engine-530). `cancel` answers `Ok` with
+                    // the abort already recorded and writes
                     // no second record — which is **not** the `InvalidState` the model first
                     // predicted, and is the second disagreement this file's red run reported.
                     Lifecycle::Aborted(reason) => {
@@ -672,7 +679,8 @@ fn mode_of(record_only: bool) -> EnforcementMode {
 
 /// 43 T-7's from-set, which 44 §1.2 repeats verbatim — **minus `Draft`**.
 ///
-/// `Draft` is in both documents and is not here, because **M5-17 採(b)** puts the draft phase in the
+/// `Draft` is in both documents and is not here, because **M5-17, adopted (b)** (sem:
+/// SEM-gx-engine-531) puts the draft phase in the
 /// journal alone: the engine's table has no row until T-2, so `cancel` on a draft answers
 /// `NotFound` rather than `InvalidState`. This model never holds a `Draft` row for the same reason,
 /// so the arm would be unreachable as well as wrong; **E-M5-14** removed `Draft` from T-7's sibling
@@ -698,7 +706,8 @@ fn ruler_actor() -> Actor {
 
 /// 🔴 **AC-042** over generated traces.
 ///
-/// The case count is 34's 「全生成ケース」 with 51 §3's budget in mind: each case opens an engine on
+/// The case count is 34's "every generated case" (sem: SEM-gx-engine-532) with 51 §3's budget
+/// in mind: each case opens an engine on
 /// a fresh scratch directory and walks up to twenty entry points, so the cost per case is
 /// milliseconds rather than microseconds and the count is set here rather than taken from
 /// `ProptestConfig::default()` (256).
@@ -747,7 +756,8 @@ fn ac_042_inv_s1_holds_over_every_generated_trace() {
         stats.traces, stats.events, stats.committed, stats.record_only_commits, stats.comparisons
     );
     // A property that never reached the state it is about is a property that passed by vacuity.
-    // 34's Then is over 「`Committed`へ到達したTransformation」, so at least one must exist, and the
+    // 34's Then is over "a Transformation that reached `Committed`" (sem: SEM-gx-engine-533),
+    // so at least one must exist, and the
     // record-only exception clause needs at least one of its own or the parenthesis is unwalked.
     assert!(
         stats.committed > 0,
@@ -812,12 +822,14 @@ fn ac_042_the_criterion_function_rejects_the_roads_43_forbids() {
 ///
 /// Its first form asserted that `.gitignore` carried `proptest-regressions`, and it was **red on
 /// arrival for the wrong reason**. This repository *deliberately* commits `*.proptest-regressions`:
-/// req/38 §21 **C-10** ruled 「`policy_determinism.proptest-regressions` の 2 seed は**残す**…出所
-/// (red-first の空射影)が §4 C-10 に明記されている事が残す条件」, and §22 D-10 and §23 E-10 repeat
+/// req/38 §21 **C-10** ruled "`policy_determinism.proptest-regressions`'s 2 seeds are **kept**...
+/// the condition for keeping them is that the provenance (the red-first empty projection) is
+/// spelled out in §4 C-10" (sem: SEM-gx-engine-534), and §22 D-10 and §23 E-10 repeat
 /// the ruling for two more files. Six are tracked today. A probe that demanded they be ignored
 /// would have made a hand-8 preference outrank three rulings — so it was rewritten to the rule that
 /// actually holds, and the near-miss is written down rather than quietly dropped (req/38 §21's own
-/// sentence: 「出所を書かずに残すのが一番悪い」).
+/// sentence: "keeping something without writing down its provenance is the worst thing you can
+/// do") (sem: SEM-gx-engine-535).
 ///
 /// What is true of **this** suite is narrower and is a property of its own configuration:
 /// [`ac_042_inv_s1_holds_over_every_generated_trace`] sets `failure_persistence: None`, because a

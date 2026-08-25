@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Which of the three verdicts a receipt is about, as a type rather than a string (**E-M3-2**).
 //!
 //! Spec: 41 §4 for `Verdict`'s three arms, 42 §3.10 for the receipt field that names one,
@@ -11,8 +13,9 @@
 //! gx-witness**. Read literally, gx-witness would have had to name gx-gate to type its own
 //! discriminant, and the two crates would form the cycle E-M2-1 removed once already:
 //!
-//! > 「M3-13(採用): `VerdictKind`(3 値 enum)を **gx-core** へ、`Verdict`(payload つき)は gx-gate。
-//! > gx-witness の `VERDICT_KINDS` 文字列検査は型検査へ置換(H5-8 満期)。循環 0 が機械条件」
+//! > M3-13 (adopted): `VerdictKind` (the three-valued enum) goes to **gx-core**; `Verdict` (with
+//! > payload) stays in gx-gate. gx-witness's `VERDICT_KINDS` string check is replaced by a type
+//! > check (H5-8 matures). Zero cycles is the mechanical condition. (quoted in SEM-gx-core-101)
 //!
 //! Same rule as `Cid` (A-1), `InclusionProof` (E-M2-1) and `PlannedDeltaBytes` (E-M3-1): **the data
 //! comes down, the computation stays up**. The three names are here; the payloads each arm carries
@@ -23,8 +26,9 @@
 //!
 //! M2 hand 5 could not write this type (req/49 §1 N-03 forbade minting an M5 name early), so
 //! `receipt.rs` carried `pub const VERDICT_KINDS: [&str; 3]` and refused an unknown spelling at
-//! *verification* time. The ruling recorded the debt as 「M3 で `VerdictKind` が生えたら型化へ
-//! 寄せる」, and this is the hand it falls due. The difference is when the error is found: a
+//! *verification* time. The ruling recorded the debt as "once `VerdictKind` grows in M3, move it
+//! over to a type" (sem: SEM-gx-core-102), and this is the hand it falls due. The difference is
+//! when the error is found: a
 //! payload whose `kind` is `"Admitted"` now fails to decode, where before it decoded and was
 //! rejected two calls later.
 

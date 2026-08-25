@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The Cedar policy set, the request it is asked, and the escalation ticket (42 §3.8, FR-025).
 //!
 //! Spec: 32 FR-025 for the evaluation, 34 AC-025 for the two cases, 42 §3.8 for the field tables,
@@ -8,10 +10,10 @@
 //!
 //! # The mapping, in one table (ASM-60-1)
 //!
-//! req/38 §19 rules the shape and req/60 §5.2 asks this hand to write it down: 「最小写像
-//! (actor→principal・ChangeContext+order→action・pre.locator+substrate→resource・残り→context)を
-//! **ASM-60-1** として起票・entity schema は M3 で持たない」. What the primary fixes is that
-//! 「P, A, and R are entity references, while C is a record」
+//! req/38 §19 rules the shape and req/60 §5.2 asks this hand to write it down: "file the minimal
+//! mapping (actor->principal, ChangeContext+order->action, pre.locator+substrate->resource, the
+//! rest->context) as **ASM-60-1**; no entity schema in M3" (sem: SEM-gx-gate-106). What the primary fixes is that
+//! "P, A, and R are entity references, while C is a record"
 //! (<https://docs.cedarpolicy.com/auth/authorization.html>), so every row below lands in the only
 //! slot its Cedar type admits:
 //!
@@ -22,7 +24,7 @@
 //! | `pre.substrate` + `pre.locator()` | resource | `GxResource::"<substrate>:<locator>"` + attributes `substrate`, `locator` | the id names it; the two attributes are what a policy can compare (see below) |
 //! | `t.order()` | context.`order` | Long | 0, 1 or 2 (ASM-6). AC-029's order-2 case is reachable from a policy as `context.order == 2` |
 //! | `invert_available` | context.`invert_available` | Bool | FR-043 / AC-048; **E-M3-4** makes `false` the escalation trigger, in hand 4 |
-//! | `evidence` | context.`evidence_count`, context.`evidence_kinds` | Long, Set\<String\> | the 「evidence 要約」 of ASM-60-1. The bodies stay out: 42 §5 keeps evidence in its own store and gx-gate mints no CID |
+//! | `evidence` | context.`evidence_count`, context.`evidence_kinds` | Long, Set\<String\> | the "evidence summary" of ASM-60-1 (sem: SEM-gx-gate-107). The bodies stay out: 42 §5 keeps evidence in its own store and gx-gate mints no CID |
 //!
 //! **Why the resource carries attributes.** `like` is Cedar's only string matcher and it is defined
 //! over strings, not over entity references (<https://docs.cedarpolicy.com/policies/syntax-operators.html>).
@@ -30,19 +32,19 @@
 //! AC-025 asks for `/etc/**`. The locator is put on the entity rather than into the context because
 //! ASM-60-1 maps it to the **resource**: a fact reachable at two spellings is two facts to keep in
 //! step. The store that carries it holds exactly the three entities the mapping names, and no
-//! schema -- 「entity schema は M3 で持たない」 -- which the primary permits: entity data is needed
-//! 「when a policy references entity attributes」, schema is the validator's tool.
+//! schema -- "no entity schema in M3" -- which the primary permits: entity data is needed
+//! "when a policy references entity attributes", schema is the validator's tool. (sem: SEM-gx-gate-108)
 //!
-//! **Where `order` went.** The ruling reads 「ChangeContext+order→action」 with the note that
-//! 「order は context 側でも可=手 2 で確定」. It is in the context: an action id that concatenated the
-//! order would make the common policy -- 「this kind of change」 -- unwritable without enumerating
+//! **Where `order` went.** The ruling reads "ChangeContext+order->action" with the note that
+//! "order may also live on the context side -- settled by hand 2" (sem: SEM-gx-gate-109). It is in the context: an action id that concatenated the
+//! order would make the common policy -- "this kind of change" -- unwritable without enumerating
 //! three ids, while `context.order` is a Long a policy can compare and range over.
 //!
 //! # What this module does not build
 //!
-//! Resolution. 42 §3.8: 「`status: Pending | Approved | Rejected`, `resolved_by`, `resolved_at` は
-//! `TicketId` をキーとした engine ストアの別テーブルで管理し、`EscalationTicket` 自体の CID には
-//! 含めない」. req/60 §1 N-03 keeps that table out of M3 entirely -- FR-058's implementation crates
+//! Resolution. 42 §3.8: "`status: Pending | Approved | Rejected`, `resolved_by`, `resolved_at` are
+//! managed in a separate engine-store table keyed by `TicketId`, and are not included in
+//! `EscalationTicket`'s own CID" (sem: SEM-gx-gate-110). req/60 §1 N-03 keeps that table out of M3 entirely -- FR-058's implementation crates
 //! are gx-engine, gx-cli and gx-api. **This file builds the vessel and nothing that fills it.**
 //!
 //! The invariant registry (hand 3), the meet of the two systems (AC-027, hand 4) and the shipped
@@ -66,7 +68,7 @@ use crate::{Error, GateInput, Result};
 ///
 /// `IdentityView = {transformation, reasons, required_approval}` (42 §1.3) -- `id` itself is
 /// excluded as self-referential and `created_at` by ASM-4. **Nothing in this hand computes one.**
-/// Minting a CID goes through gx-canon (41 §6: 「全 canonical encode は gx-canon 経由のみ」), which
+/// Minting a CID goes through gx-canon (41 §6: "every canonical encode goes through gx-canon only") (sem: SEM-gx-gate-111), which
 /// this crate does not name yet, so the field is supplied by whoever builds the ticket and a value
 /// here is a container rather than a claim that the ticket hashes to it. Same sentence
 /// `gx_core::Cid` carries about itself, for the same reason.
@@ -75,19 +77,20 @@ pub struct TicketId(pub Cid);
 
 /// How many approvals, and whose (42 §3.8).
 ///
-/// 42 §3.8 defers the meaning to 「32(未確定)」, and 32 is written and says nothing: req/60 §3
-/// M3-11 measured `min_approvers` / `eligible_actors` / 承認ワークフロー at **0 occurrences** in
+/// 42 §3.8 defers the meaning to "32 (unconfirmed)", and 32 is written and says nothing: req/60 §3
+/// M3-11 measured `min_approvers` / `eligible_actors` / the approval workflow (sem: SEM-gx-gate-112) at **0 occurrences** in
 /// 32, 34 and 44. The ruling fills the hole with a default rather than a design:
 ///
-/// > 「M3-11(採用=案 a): M3 は器のみ・既定値 **ASM-60-3**(min_approvers=1・eligible_actors=[]=制限
-/// > なし)・充足検査は M5(43 T-5)」
+/// > "M3-11 (adopted = option a): M3 is the vessel only; default value **ASM-60-3**
+/// > (min_approvers=1, eligible_actors=[] = no restriction); the satisfaction check is M5's (43
+/// > T-5)" (sem: SEM-gx-gate-113)
 ///
 /// So [`Default`] below *is* ASM-60-3, and it is the only place the numbers appear.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApprovalRequirement {
     /// 42 §3.8's `min_approvers: u8`.
     pub min_approvers: u8,
-    /// 42 §3.8's `eligible_actors: Vec<KeyId>`. **Empty means unrestricted, not 「nobody」**
+    /// 42 §3.8's `eligible_actors: Vec<KeyId>`. **Empty means unrestricted, not "nobody"** (sem: SEM-gx-gate-114)
     /// (ASM-60-3). The other reading would make the default ticket unresolvable, which 43's
     /// liveness invariants (INV-L, AC-045) forbid outright -- an escalation that no actor may
     /// approve reaches `Aborted(Expired)` and nothing else.
@@ -115,9 +118,10 @@ impl Default for ApprovalRequirement {
 /// condition anywhere in M3's FRs or ACs produces an `Escalate`**, and the ruling promotes the gate
 /// half of AC-048 into an M3 requirement rather than leaving the arm unreachable:
 ///
-/// > 「M3-04(採用=案 a): AC-048 の gate 側半分を M3 要件へ引き上げ——**`invert_available=false →
-/// > Escalate`** を M3 の最小生成規則にする(policy による追加条件発火は M4)。理由: 案 c(到達不能の
-/// > まま)は M5 の AC-032 が mock で通るため欠陥が M5 まで隠れる」 → **E-M3-4**
+/// > "M3-04 (adopted = option a): raise AC-048's gate-side half to an M3 requirement -- make
+/// > **`invert_available=false -> Escalate`** the minimal generation rule for M3 (a policy firing an
+/// > extra condition is M4's). Reason: option c (leave it unreachable) lets M5's AC-032 pass on a
+/// > mock, hiding the defect until M5" -> **E-M3-4** (sem: SEM-gx-gate-115)
 ///
 /// Hand 4 wrote that rule: [`crate::Gate::verify`]'s `escalate`, which is the only producer of a
 /// ticket in the crate.
@@ -136,15 +140,19 @@ pub struct EscalationTicket {
     /// 42 §1.3 excludes this from the IdentityView (self-reference); see [`TicketId`] for who
     /// computes it, which is nobody in M3 hand 1.
     pub id: TicketId,
+    /// The transformation whose decision is being raised to a human (42 §3.8) -- the join key
+    /// the resolving side (M5's ticket table, 43 T-5) answers against.
     pub transformation: TransformationId,
     /// Why it could not be decided here. Non-empty for the same reason `Verdict::Deny`'s vector is
     /// (see [`crate::Verdict::deny`]) -- but unlike that one this is a plain field, because the
     /// hand that produces tickets is hand 4 and a constructor without a producer is a constructor
     /// nothing checks.
     pub reasons: Vec<Reason>,
+    /// Who may resolve the ticket (42 §3.8). Stated by the gate, enforced by whoever runs the
+    /// approval flow -- the gate itself never resolves anything.
     pub required_approval: ApprovalRequirement,
     /// 42 §3.8 keeps the field and ASM-4 keeps it out of the CID. gx-gate cannot read a clock
-    /// (41 §6: 「乱数・時刻は engine 境界で注入」), so the value comes in from the caller.
+    /// (41 §6: "randomness and time are injected at the engine boundary") (sem: SEM-gx-gate-116), so the value comes in from the caller.
     pub created_at: Timestamp,
 }
 
@@ -154,8 +162,8 @@ pub struct EscalationTicket {
 
 /// The entity type of a principal. Every actor is one of these, whatever `Actor` variant it is.
 ///
-/// FR-006 / P-7: 「accountability does not depend on whether the actor was a person, an agent or a
-/// process」, and encoding the variant into the type name would put that branch into the scope of
+/// FR-006 / P-7: "accountability does not depend on whether the actor was a person, an agent or a
+/// process", and encoding the variant into the type name would put that branch into the scope of (sem: SEM-gx-gate-117)
 /// every policy anyone writes. What is therefore **not** visible to a policy today is the variant
 /// and an agent's `model`; that gap is raised in `req/62_M3_HAND2_REPORT_2026-08-08.md` §4 rather
 /// than closed by inventing rows ASM-60-1 does not have.
@@ -179,7 +187,7 @@ pub const CONTEXT_ORDER: &str = "order";
 /// 41 §4's `invert_available`, as a context Bool.
 pub const CONTEXT_INVERT_AVAILABLE: &str = "invert_available";
 
-/// How many evidence items were shown (the count half of ASM-60-1's 「evidence 要約」).
+/// How many evidence items were shown (the count half of ASM-60-1's "evidence summary"). (sem: SEM-gx-gate-118)
 pub const CONTEXT_EVIDENCE_COUNT: &str = "evidence_count";
 
 /// Which kinds of evidence were shown (the kinds half), as a Set of 42 §3.7's four variant names.
@@ -187,21 +195,22 @@ pub const CONTEXT_EVIDENCE_KINDS: &str = "evidence_kinds";
 
 /// The annotation a policy declares its id with.
 ///
-/// Cedar's primary: 「@id is not special in the Cedar language, it behaves like any other
+/// Cedar's primary: "@id is not special in the Cedar language, it behaves like any other (sem: SEM-gx-gate-119)
 /// annotation. The Cedar CLI uses the @id annotation to set policy IDs, but other interfaces, such
-/// as the Cedar APIs, have other ways to set policy IDs」
+/// as the Cedar APIs, have other ways to set policy IDs" (sem: SEM-gx-gate-120)
 /// (<https://docs.cedarpolicy.com/policies/syntax-policy.html>). gx takes the CLI's convention at
 /// the API level, and [`PolicyEngine::parse`] refuses a policy without one -- see there for why a
 /// positional id would reach a receipt's CID.
 pub const POLICY_ID_ANNOTATION: &str = "id";
 
-// The sentinel `cedar:default-deny` stood here until hand 4. Cedar's third rule -- 「Otherwise
-// (i.e., no policy is satisfied), the final result is Deny」, with an empty list of determining
+// The sentinel `cedar:default-deny` stood here until hand 4. Cedar's third rule -- "Otherwise
+// (i.e., no policy is satisfied), the final result is Deny", with an empty list of determining (sem: SEM-gx-gate-121)
 // policies (<https://docs.cedarpolicy.com/auth/authorization.html>) -- produced a refusal that 42
 // §3.8's four `ReasonSource` variants could not name, so hand 2 spelled the absence as a policy id
 // and refused any pack that claimed it. **E-M3-11** replaced the spelling with a variant
 // ([`crate::ReasonSource::NoPolicyApplied`]), and the ruling required both halves in one hand:
-// 「実装は手 4 … で variant へ置換・sentinel 綴りは同時に削除」. With nothing to impersonate, the
+// "the implementation is replaced by a variant in hand 4 ... and the sentinel spelling is deleted
+// at the same time" (sem: SEM-gx-gate-122). With nothing to impersonate, the
 // parse-time refusal went too -- a pack may now name a policy anything, and `tests/ac_025.rs`
 // measures that a policy so named still reports as itself.
 //
@@ -247,7 +256,7 @@ impl ContextValue {
 /// module's doc, and as this struct. A doc table alone drifts silently; a `cedar_policy::Request`
 /// alone cannot be compared, because Cedar's `Request` exposes its parts as `Option<&EntityUid>`
 /// and its context not at all. So the view is the thing tests assert about
-/// (`crates/gx-gate/tests/policy_mapping.rs`), and [`RequestView::to_cedar`] is the only road from
+/// (`crates/gx-gate/tests/policy_mapping.rs`), and `RequestView::to_cedar` (private) is the only road from
 /// it to Cedar.
 ///
 /// Total and infallible: every field of `GateInput` that ASM-60-1 names has a slot, and none of the
@@ -256,7 +265,8 @@ impl ContextValue {
 ///
 /// The `planned` field of `GateInput` is deliberately absent from every row. 42 §3.4 makes a
 /// delta's payload opaque below the adapter (P-6) and req/38 §19's M3-10 fixes the consequence in
-/// words: 「v0.1 pack の実効範囲=**locator/actor/context/order 級と明記**(overclaim 禁)」. A policy
+/// words: "the v0.1 pack's effective reach is **stated explicitly as the locator/actor/context/order
+/// class** (no overclaiming)" (sem: SEM-gx-gate-123). A policy
 /// cannot see what the change does; it sees what the change is about.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RequestView {
@@ -377,7 +387,7 @@ impl RequestView {
             action.clone(),
             resource.clone(),
             context,
-            // No schema, in either place it could go. req/38 §19: 「entity schema は M3 で持たない」.
+            // No schema, in either place it could go. req/38 §19: "no entity schema in M3". (sem: SEM-gx-gate-124)
             None,
         )
         .map_err(|e| unevaluable(format!("request: {e}")))?;
@@ -454,8 +464,8 @@ fn evidence_kind(evidence: &Evidence) -> &'static str {
 
 /// What Cedar answered, in gx's vocabulary.
 ///
-/// 42 §3.7 already fixed the two words: `PolicyDecision { Allow, Deny }`, 「`cedar_policy::Decision`
-/// と同一語彙」. This type is the decision together with the policies that produced it, which is
+/// 42 §3.7 already fixed the two words: `PolicyDecision { Allow, Deny }`, "the same vocabulary as
+/// `cedar_policy::Decision`" (sem: SEM-gx-gate-125). This type is the decision together with the policies that produced it, which is
 /// what 42 §3.8's `PolicyDecisionRecord` records and what an `AdmitProof` carries into a receipt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PolicyOutcome {
@@ -473,10 +483,10 @@ impl PolicyOutcome {
 
     /// The policies that decided, by id, in id order.
     ///
-    /// The primary defines the set: 「If the decision is Allow, the determining policies are the
+    /// The primary defines the set: "If the decision is Allow, the determining policies are the (sem: SEM-gx-gate-126)
     /// permit policies that satisfy the request. Otherwise, the determining policies are the forbid
     /// policies, if any, that satisfy the request. If the decision is Deny because no policies were
-    /// satisfied (rule 3), then the list of determining policies is empty」. So every record here
+    /// satisfied (rule 3), then the list of determining policies is empty". So every record here (sem: SEM-gx-gate-127)
     /// carries the same decision the whole response did, and an empty slice on a `Deny` is Cedar's
     /// third rule rather than a lost record.
     #[must_use]
@@ -524,13 +534,17 @@ impl PolicyOutcome {
 /// `EscalationTicket`'s projection (42 §1.3: `{transformation, reasons, required_approval}`).
 ///
 /// `id` is out because it is what the projection computes, and `created_at` is out by ASM-4 -- 42
-/// §3.8 says so in the table itself: 「`created_at`はASM-4によりIdentityViewから除外——フィールド
-/// 自体は残るがCID計算には寄与しない」. Two escalations of the same change, for the same reasons,
+/// §3.8 says so in the table itself: "`created_at` is excluded from the IdentityView by ASM-4 --
+/// the field itself remains but does not contribute to the CID computation" (sem: SEM-gx-gate-128). Two escalations of the same change, for the same reasons,
 /// requiring the same approval, are therefore one ticket whenever they were raised.
 #[derive(Debug, Serialize)]
 pub struct EscalationTicketView<'a> {
+    /// [`EscalationTicket::transformation`], identity-bearing.
     pub transformation: TransformationId,
+    /// [`EscalationTicket::reasons`], identity-bearing: the same change escalated for different
+    /// reasons is a different ticket.
     pub reasons: &'a [Reason],
+    /// [`EscalationTicket::required_approval`], identity-bearing.
     pub required_approval: &'a ApprovalRequirement,
 }
 
@@ -549,13 +563,13 @@ impl IdentityView for EscalationTicket {
     }
 }
 
-/// A parsed `PolicySet` and the authorizer that asks it questions (41 §4: 「Cedar PolicySet」).
+/// A parsed `PolicySet` and the authorizer that asks it questions (41 §4: "Cedar PolicySet"). (sem: SEM-gx-gate-129)
 ///
 /// # What is not re-implemented here
 ///
-/// Cedar's decision. req/60 §7.2: 「**Cedar の決定を gx の test が再実装しない**。期待値は『Cedar が
-/// こう決めた』ではなく『**gx の写像がこの request を作り、その決定が Verdict のこの枝へ写った**』を
-/// 測る」, and 46 §1 puts Cedar's own formalisation outside the project's scope. What this type owns
+/// Cedar's decision. req/60 §7.2: "**a gx test does not re-implement Cedar's decision**. What is
+/// measured is not 'Cedar decided this' but '**gx's mapping built this request, and its decision
+/// mapped onto this branch of the Verdict**'" (sem: SEM-gx-gate-130), and 46 §1 puts Cedar's own formalisation outside the project's scope. What this type owns
 /// is the mapping in, the two words out, and the one judgement gx makes for itself: an evaluation
 /// that produced errors is not a decision.
 pub struct PolicyEngine {
@@ -578,8 +592,8 @@ impl PolicyEngine {
     ///
     /// # Why the annotation is required
     ///
-    /// `PolicySet::from_str` names policies by position -- 「Policy ids will default to "policy*"
-    /// with numbers from 0」 (docs.rs, cedar-policy 4.12.0). gx puts the deciding policy's id into
+    /// `PolicySet::from_str` names policies by position -- "Policy ids will default to 'policy*'
+    /// with numbers from 0" (docs.rs, cedar-policy 4.12.0) (sem: SEM-gx-gate-131). gx puts the deciding policy's id into
     /// `PolicyDecisionRecord`, 42 §1.3 puts that record inside `AdmitProof`'s IdentityView, and an
     /// `AdmitProof` reaches a receipt's CID (42 §3.10). A positional id would therefore make the
     /// identity of a proof depend on the order statements happen to be written in, and moving two
@@ -654,6 +668,22 @@ impl PolicyEngine {
         self.policies.num_of_policies()
     }
 
+    /// 🔴 **R36 / `req/476` M-01** — how many of them are `permit`, as **Cedar** counts them.
+    ///
+    /// [`crate::packs::declares_its_default`] is the caller, and the reason this is here rather
+    /// than there is that "how many permits does this pack ship" is a question about the parsed
+    /// policy set and only looks like a question about text. Answering it from the text is what
+    /// F3 did until R36, and a `permit` written on the same line as its `@id` annotation was
+    /// invisible to it: the pack shipped a permit, declared no permit default, and passed the
+    /// clause whose entire subject is that a pack must declare its default out loud.
+    #[must_use]
+    pub fn permit_count(&self) -> usize {
+        self.policies
+            .policies()
+            .filter(|p| p.effect() == cedar_policy::Effect::Permit)
+            .count()
+    }
+
     /// Whether the set is empty. Cedar's default-deny answers every request against it.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -666,18 +696,18 @@ impl PolicyEngine {
     /// [`Error::Unevaluable`] when the mapping cannot be turned into a Cedar request, and -- the
     /// judgement gx makes for itself -- when Cedar's diagnostics carry any evaluation error.
     ///
-    /// Cedar's own rule is to skip a policy that errored: 「skip on error: if a policy's evaluation
-    /// returns error, the policy does not factor into the authorization response; it is skipped」,
-    /// with the escape hatch named in the same paragraph -- 「applications can always choose to look
+    /// Cedar's own rule is to skip a policy that errored: "skip on error: if a policy's evaluation
+    /// returns error, the policy does not factor into the authorization response; it is skipped",
+    /// with the escape hatch named in the same paragraph -- "applications can always choose to look (sem: SEM-gx-gate-132)
     /// at the authorization response's diagnostics and take a different decision if an evaluated
-    /// policy produces errors」 (<https://docs.cedarpolicy.com/auth/authorization.html>). For an
+    /// policy produces errors" (<https://docs.cedarpolicy.com/auth/authorization.html>) (sem: SEM-gx-gate-133). For an
     /// authorization service, skipping is the safer default; for a gate whose forbid policy is the
     /// thing standing between an agent and `/etc/passwd`, a skipped forbid is a fail-open, and one
     /// that leaves the response looking exactly like a clean Allow. `Decision::Deny` carries the
-    /// mirror image of the same problem -- docs.rs, 4.12.0: 「This is also returned if sufficiently
+    /// mirror image of the same problem -- docs.rs, 4.12.0: "This is also returned if sufficiently (sem: SEM-gx-gate-134)
     /// fatal errors are encountered such that no decision could be safely reached; for example,
-    /// errors parsing the policies」 -- so a Deny read without its diagnostics can mean 「refused」
-    /// or 「broken」. **E-M3-3** says those two must not be one verdict, so both fold into `Err`.
+    /// errors parsing the policies" -- so a Deny read without its diagnostics can mean "refused"
+    /// or "broken" (sem: SEM-gx-gate-135). **E-M3-3** says those two must not be one verdict, so both fold into `Err`.
     pub fn evaluate(&self, input: &GateInput<'_>) -> Result<PolicyOutcome> {
         let view = RequestView::of(input);
         let (request, entities) = view.to_cedar(input.t.id)?;
@@ -712,7 +742,7 @@ impl PolicyEngine {
         // Sorted, because the iterator's order is not part of Cedar's contract and this vector
         // reaches a CID through `AdmitProof` (E-M3-9 sorts it again there; sorting here is what
         // makes the *outcome* a function of the input, which is what the determinism property
-        // measures). Duplicates are not folded -- H4-3: 「多重度は畳まない・順序のみ正準化」.
+        // measures). Duplicates are not folded -- H4-3: "multiplicity is not folded; only order is canonicalized". (sem: SEM-gx-gate-136)
         let mut ids: Vec<String> = response
             .diagnostics()
             .reason()
@@ -726,8 +756,8 @@ impl PolicyEngine {
                 policy_id,
                 decision,
                 // 42 §3.8 keeps diagnostics by digest, and minting one goes through gx-canon
-                // (41 §6). gx-gate does not name gx-canon: 「the hand that mints one is the hand
-                // that adds the edge」, and this hand mints nothing.
+                // (41 §6). gx-gate does not name gx-canon: "the hand that mints one is the hand
+                // that adds the edge" (sem: SEM-gx-gate-137), and this hand mints nothing.
                 diagnostics_digest: None,
             })
             .collect();

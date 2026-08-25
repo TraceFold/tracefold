@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Fixtures shared by M5 hand 1's suites.
 //!
 //! Not a test target: cargo builds one integration binary per `.rs` file directly under `tests/`,
@@ -50,8 +52,8 @@ pub fn fp(seed: u64) -> FingerprintRecord {
 
 /// A distinguishable ruler: the `Actor` 43 T-5's human decision is attributed to.
 ///
-/// `Human`, not `Agent`: 43 T-7's guard names 「Actor::Human{key}相当」 and AC-071 asks for the
-/// 裁定者. P-7 keeps accountability independent of the variant, so nothing in the engine branches
+/// `Human`, not `Agent`: 43 T-7's guard names "the equivalent of `Actor::Human{key}`" and AC-071 asks
+/// for the ruling actor (sem: SEM-gx-engine-928). P-7 keeps accountability independent of the variant, so nothing in the engine branches
 /// on it -- the variant is what a deployment writes down about who ruled.
 pub fn ruler(seed: u8) -> gx_core::Actor {
     gx_core::Actor::Human {
@@ -72,6 +74,7 @@ pub fn provenance(seed: u64) -> Provenance {
             correlation_id: None,
             engine_version: format!("0.1.{seed}"),
             adapter_version: "test".to_string(),
+            confinement: Some(gx_witness::receipt::ConfinementContext::unconfined()),
         },
         input_objects: vec![ObjectId(cid(seed))],
         intent_digest: Some(cid(seed + 1)),
@@ -98,6 +101,9 @@ pub fn every_variant() -> Vec<EngineJournalRecord> {
             delta_cid: cid(11),
             fp0: fp(1),
             parents: Vec::new(),
+            // 🔴 **DR-46-33** — non-`Unknown` so the flag reaches the wire in the sample, in
+            // `pending`/`reads_attested`'s reason above (skip_serializing_if drops `Unknown`).
+            input_generation: gx_core::BoundaryStage::LlmOriginated,
             at: Timestamp(101),
         },
         EngineJournalRecord::VerifyStarted {
@@ -116,6 +122,11 @@ pub fn every_variant() -> Vec<EngineJournalRecord> {
             kind: VerdictKind::Deny,
             reason: "the policy set forbids this locator".to_string(),
             actor: ruler(1),
+            // 🔴 **DR-46-31** — `Some` on purpose. The field is `skip_serializing_if`
+            // (E-M5-13's shape, so pre-DR-46-31 journals still encode byte-identically), and
+            // `None` would take that arm: `journal_identity.rs` compares the encoder's keys
+            // against the struct's fields and would find the field declared and never written.
+            verdict_digest: Some(cid(17)),
             at: Timestamp(104),
         },
         EngineJournalRecord::Canonicalized {
@@ -133,14 +144,44 @@ pub fn every_variant() -> Vec<EngineJournalRecord> {
             provenance: provenance(20),
             at: Timestamp(106),
         },
+        // `pending: true` so the flag reaches the wire in the sample (skip_serializing_if
+        // omits `false`, and the identity probes compare encoder keys against struct fields).
         EngineJournalRecord::InverseEscrowed {
             transformation: tid(1),
             inverse_cid: Some(cid(14)),
+            pending: true,
+            // 🔴 **DR-46-26** — non-empty on purpose. `reads` is `skip_serializing_if` (E-M5-13's
+            // shape, so that journals written before this field still encode byte-identically), and
+            // an empty vector would take that arm — `journal_identity.rs` compares the encoder's
+            // keys against the struct's fields and would find the field declared and never written.
+            reads: baseline_reads(),
+            // 🔴 **DR-46-26** — `true` here, and this fixture is about the **wire shape** rather
+            // than about a reachable engine state. `undetermined` is `skip_serializing_if`, so the
+            // default is not written at all and A-10's key count would never see the field; the
+            // same reason `pending` is `true` two lines up. The combination `Some(cid) + true` is
+            // one this crate's writer never produces (an inverse was constructed, so C-25 answered
+            // `True`), and `replay.rs` says exactly what it does with a foreign journal that spells
+            // it: folds it to the CID's own side.
+            undetermined: true,
+            // 🔴 **DR-46-34** — `true` for `undetermined`'s reason one line up: the flag is
+            // `skip_serializing_if = "is_false"`, so `false` is not written at all and A-10's key
+            // count would never see the field the lane just declared.
+            reads_attested: true,
             at: Timestamp(107),
         },
         EngineJournalRecord::ApplyStarted {
             transformation: tid(1),
             delta_cid: cid(11),
+            at: Timestamp(108),
+        },
+        EngineJournalRecord::ApplyObserved {
+            transformation: tid(1),
+            observation_cid: cid(15),
+            at: Timestamp(108),
+        },
+        EngineJournalRecord::InverseCompleted {
+            transformation: tid(1),
+            inverse_cid: Some(cid(16)),
             at: Timestamp(108),
         },
         EngineJournalRecord::Committed {
@@ -164,9 +205,25 @@ pub fn every_variant() -> Vec<EngineJournalRecord> {
 
 /// The same twelve with **one field changed**, one entry per field: `(variant, field, record)`.
 ///
-/// This is the I-1 half of the defence req/78 §6.0-5 asks for -- 「1 field だけ違う 2 値の digest が
-/// 異なる」を全 field 分 -- and it is written out rather than generated because a generator would
+/// This is the I-1 half of the defence req/78 §6.0-5 asks for -- "two values that differ in exactly
+/// one field digest differently" (sem: SEM-gx-engine-929) -- for every field -- and it is written out rather than generated because a generator would
 /// need to know the field list, which is the thing being checked.
+/// 🔴 **DR-46-26** — the read-set entries `every_variant`'s `InverseEscrowed` carries.
+///
+/// One function rather than a literal in each place, because `journal_identity.rs`'s I-1 gate
+/// requires every mutant to differ from the baseline in **one** field: two copies of this value
+/// that drifted apart would make every `InverseEscrowed` mutant a two-field mutant, and the gate
+/// would then be measuring nothing while staying green.
+///
+/// Non-empty on purpose: the field is `skip_serializing_if = "Vec::is_empty"` (E-M5-13's shape),
+/// so an empty vector is not written at all and A-10's key count would never see it.
+pub fn baseline_reads() -> Vec<gx_core::ReadEntry> {
+    vec![gx_core::ReadEntry {
+        digest: cid(15),
+        locator: "fixture://escrow/read/one".to_string(),
+    }]
+}
+
 pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalRecord)> {
     vec![
         (
@@ -206,6 +263,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 delta_cid: cid(11),
                 fp0: fp(1),
                 parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
                 at: Timestamp(101),
             },
         ),
@@ -219,6 +277,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 delta_cid: cid(11),
                 fp0: fp(1),
                 parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
                 at: Timestamp(101),
             },
         ),
@@ -232,6 +291,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 delta_cid: cid(99),
                 fp0: fp(1),
                 parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
                 at: Timestamp(101),
             },
         ),
@@ -245,6 +305,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 delta_cid: cid(11),
                 fp0: fp(9),
                 parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
                 at: Timestamp(101),
             },
         ),
@@ -258,6 +319,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 delta_cid: cid(11),
                 fp0: fp(1),
                 parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
                 at: Timestamp(999),
             },
         ),
@@ -271,6 +333,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 delta_cid: cid(11),
                 fp0: fp(1),
                 parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
                 at: Timestamp(101),
             },
         ),
@@ -284,6 +347,23 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 delta_cid: cid(11),
                 fp0: fp(1),
                 parents: vec![tid(9)],
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
+                at: Timestamp(101),
+            },
+        ),
+        (
+            // 🔴 **DR-46-33** — the join's result reaches the digest, so a rebuild that reproduced
+            // a different `input_generation` would not reproduce the leaf (43 §7-3b).
+            "Planned",
+            "input_generation",
+            EngineJournalRecord::Planned {
+                transformation: tid(1),
+                intent_id: iid(1),
+                locator: "/tmp/one".to_string(),
+                delta_cid: cid(11),
+                fp0: fp(1),
+                parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::DeterministicReplay,
                 at: Timestamp(101),
             },
         ),
@@ -338,7 +418,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
         ),
         // 🔴 The T-4e shape, and the reason `verdict_digest` is an `Option`. Both differences from
         // the baseline are the ones 43 T-4e writes, and both have to move the digest: a journal in
-        // which 「the gate admitted this」 and 「nothing was reachable, so we continued」 hash alike is
+        // which "the gate admitted this" and "nothing was reachable, so we continued" (sem: SEM-gx-engine-930) hash alike is
         // a journal in which INV-S5's distinction is not recorded.
         (
             "Verdict",
@@ -381,6 +461,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 kind: VerdictKind::Deny,
                 reason: "the policy set forbids this locator".to_string(),
                 actor: ruler(1),
+                verdict_digest: Some(cid(17)),
                 at: Timestamp(104),
             },
         ),
@@ -392,6 +473,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 kind: VerdictKind::Admit,
                 reason: "the policy set forbids this locator".to_string(),
                 actor: ruler(1),
+                verdict_digest: Some(cid(17)),
                 at: Timestamp(104),
             },
         ),
@@ -406,6 +488,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 kind: VerdictKind::Deny,
                 reason: "a different sentence entirely".to_string(),
                 actor: ruler(1),
+                verdict_digest: Some(cid(17)),
                 at: Timestamp(104),
             },
         ),
@@ -417,6 +500,35 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 kind: VerdictKind::Deny,
                 reason: "the policy set forbids this locator".to_string(),
                 actor: ruler(2),
+                verdict_digest: Some(cid(17)),
+                at: Timestamp(104),
+            },
+        ),
+        // 🔴 **DR-46-31** — two mutants, for the same reason `Verdict.verdict_digest` has two.
+        // "a different proof" and "no proof recorded" are different records: the second is a
+        // pre-DR-46-31 journal, which `replay.rs` degrades rather than repairs, and a journal that
+        // hashed the two alike would let one be re-encoded as the other.
+        (
+            "HumanDecision",
+            "verdict_digest",
+            EngineJournalRecord::HumanDecision {
+                transformation: tid(1),
+                kind: VerdictKind::Deny,
+                reason: "the policy set forbids this locator".to_string(),
+                actor: ruler(1),
+                verdict_digest: Some(cid(18)),
+                at: Timestamp(104),
+            },
+        ),
+        (
+            "HumanDecision",
+            "verdict_digest(None)",
+            EngineJournalRecord::HumanDecision {
+                transformation: tid(1),
+                kind: VerdictKind::Deny,
+                reason: "the policy set forbids this locator".to_string(),
+                actor: ruler(1),
+                verdict_digest: None,
                 at: Timestamp(104),
             },
         ),
@@ -428,6 +540,7 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 kind: VerdictKind::Deny,
                 reason: "the policy set forbids this locator".to_string(),
                 actor: ruler(1),
+                verdict_digest: Some(cid(17)),
                 at: Timestamp(999),
             },
         ),
@@ -520,6 +633,10 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
             EngineJournalRecord::InverseEscrowed {
                 transformation: tid(9),
                 inverse_cid: Some(cid(14)),
+                pending: true,
+                reads: baseline_reads(),
+                undetermined: false,
+                reads_attested: true,
                 at: Timestamp(107),
             },
         ),
@@ -529,10 +646,14 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
             EngineJournalRecord::InverseEscrowed {
                 transformation: tid(1),
                 inverse_cid: Some(cid(99)),
+                pending: true,
+                reads: baseline_reads(),
+                undetermined: false,
+                reads_attested: true,
                 at: Timestamp(107),
             },
         ),
-        // 🔴 **E-M5-9**: 「an inverse was escrowed」 and 「we asked and there is none」 must not hash
+        // 🔴 **E-M5-9**: "an inverse was escrowed" and "we asked and there is none" (sem: SEM-gx-engine-931) must not hash
         // alike. This is the row that says the erratum reached the digest and not only the type.
         (
             "InverseEscrowed",
@@ -540,6 +661,25 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
             EngineJournalRecord::InverseEscrowed {
                 transformation: tid(1),
                 inverse_cid: None,
+                pending: true,
+                reads: baseline_reads(),
+                undetermined: false,
+                reads_attested: true,
+                at: Timestamp(107),
+            },
+        ),
+        // 🔴 Two-phase escrow (req/38 §99, ruling 2-1) (sem: SEM-gx-engine-932): a partial escrow and a complete one must
+        // not hash alike — the pending flag reaches the digest, not only the type.
+        (
+            "InverseEscrowed",
+            "pending",
+            EngineJournalRecord::InverseEscrowed {
+                transformation: tid(1),
+                inverse_cid: Some(cid(14)),
+                pending: false,
+                reads: baseline_reads(),
+                undetermined: false,
+                reads_attested: true,
                 at: Timestamp(107),
             },
         ),
@@ -549,7 +689,64 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
             EngineJournalRecord::InverseEscrowed {
                 transformation: tid(1),
                 inverse_cid: Some(cid(14)),
+                pending: true,
+                reads: baseline_reads(),
+                undetermined: false,
+                reads_attested: true,
                 at: Timestamp(999),
+            },
+        ),
+        // 🔴 **DR-46-26**: the read-set reaches the digest, and not only the wire. A journal that
+        // hashed two escrows alike while they attested different objects would let a rebuild
+        // reproduce a leaf from the wrong reads — which is the whole reason the field is here.
+        // 🔴 **DR-46-26**: the discriminator reaches the digest. Two escrows that answered
+        // different C-25 values must not hash alike, or a replay could not tell them apart from
+        // the record either -- which is the defect this field exists to close.
+        (
+            "InverseEscrowed",
+            "undetermined",
+            EngineJournalRecord::InverseEscrowed {
+                transformation: tid(1),
+                inverse_cid: Some(cid(14)),
+                pending: true,
+                reads: baseline_reads(),
+                undetermined: false,
+                reads_attested: true,
+                at: Timestamp(107),
+            },
+        ),
+        (
+            "InverseEscrowed",
+            "reads",
+            EngineJournalRecord::InverseEscrowed {
+                transformation: tid(1),
+                inverse_cid: Some(cid(14)),
+                pending: true,
+                reads: vec![gx_core::ReadEntry {
+                    digest: cid(16),
+                    locator: "fixture://escrow/read/two".to_string(),
+                }],
+                undetermined: false,
+                reads_attested: true,
+                at: Timestamp(107),
+            },
+        ),
+        // 🔴 **DR-46-34**: the *provenance* of an empty `reads` reaches the digest, and not only
+        // the wire. `reads` is `skip_serializing_if = "Vec::is_empty"`, so a journal that predates
+        // 42 §3.13's field and a journal that recorded an empty read-set encode the same `reads`
+        // — this flag is the only thing between them, and a digest that hashed the two alike would
+        // let a rebuild attest "the escrow read nothing" on the strength of a gap in a file.
+        (
+            "InverseEscrowed",
+            "reads_attested",
+            EngineJournalRecord::InverseEscrowed {
+                transformation: tid(1),
+                inverse_cid: Some(cid(14)),
+                pending: true,
+                reads: baseline_reads(),
+                undetermined: false,
+                reads_attested: false,
+                at: Timestamp(107),
             },
         ),
         (
@@ -576,6 +773,70 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
             EngineJournalRecord::ApplyStarted {
                 transformation: tid(1),
                 delta_cid: cid(11),
+                at: Timestamp(999),
+            },
+        ),
+        (
+            "ApplyObserved",
+            "transformation",
+            EngineJournalRecord::ApplyObserved {
+                transformation: tid(9),
+                observation_cid: cid(15),
+                at: Timestamp(108),
+            },
+        ),
+        (
+            "ApplyObserved",
+            "observation_cid",
+            EngineJournalRecord::ApplyObserved {
+                transformation: tid(1),
+                observation_cid: cid(99),
+                at: Timestamp(108),
+            },
+        ),
+        (
+            "ApplyObserved",
+            "at",
+            EngineJournalRecord::ApplyObserved {
+                transformation: tid(1),
+                observation_cid: cid(15),
+                at: Timestamp(999),
+            },
+        ),
+        (
+            "InverseCompleted",
+            "transformation",
+            EngineJournalRecord::InverseCompleted {
+                transformation: tid(9),
+                inverse_cid: Some(cid(16)),
+                at: Timestamp(108),
+            },
+        ),
+        (
+            "InverseCompleted",
+            "inverse_cid",
+            EngineJournalRecord::InverseCompleted {
+                transformation: tid(1),
+                inverse_cid: Some(cid(99)),
+                at: Timestamp(108),
+            },
+        ),
+        // The fold and the completion must not hash alike (§99, ruling 2-4's two outcomes) (sem: SEM-gx-engine-933).
+        (
+            "InverseCompleted",
+            "inverse_cid(None)",
+            EngineJournalRecord::InverseCompleted {
+                transformation: tid(1),
+                inverse_cid: None,
+                at: Timestamp(108),
+            },
+        ),
+        (
+            "InverseCompleted",
+            "at",
+            EngineJournalRecord::InverseCompleted {
+                transformation: tid(1),
+                inverse_cid: Some(cid(16)),
                 at: Timestamp(999),
             },
         ),
@@ -800,8 +1061,13 @@ impl gx_substrate::SubstrateAdapter for StubAdapter {
         &self,
         delta: &gx_substrate::PlannedDelta,
         _pre: &gx_core::ObjectSnapshot,
-    ) -> gx_substrate::Result<Option<gx_substrate::PlannedDelta>> {
-        Ok(self.invertible.then(|| delta.clone()))
+    ) -> gx_substrate::Result<gx_substrate::InvertOutcome> {
+        // 🔴 **DR-46-26** — `from_option` and not a hand-built outcome, on purpose: this stub
+        // stands in for the read-free adapters, and `from_option` is the one place their
+        // `Some`→`True` / `None`→`False` derivation lives.
+        Ok(gx_substrate::InvertOutcome::from_option(
+            self.invertible.then(|| delta.clone()),
+        ))
     }
 
     fn commutation(
@@ -815,14 +1081,14 @@ impl gx_substrate::SubstrateAdapter for StubAdapter {
 
 /// A `SubstrateAdapter` that counts every call and delegates to [`StubAdapter`].
 ///
-/// 🔴 The **behavioural** half of **E-M5-2**'s 「adapter は呼ばない(機械検査つき)」. The structural
+/// 🔴 The **behavioural** half of **E-M5-2**'s "it does not call an adapter (with a machine check)" (sem: SEM-gx-engine-934). The structural
 /// half is `tests/store_shape.rs`, which reads `replay.rs` and finds no adapter named and no adapter
 /// parameter; this one runs a scenario, takes the totals, replays, and takes them again. Two
 /// instruments because they fail for different reasons: a scan cannot see a call made through a
 /// collaborator, and a counter cannot see a road nobody walked in this test.
 ///
-/// The counters are per method rather than one total, because 「replay read the substrate」 and
-/// 「replay wrote to the substrate」 are different accidents and a single number would report them
+/// The counters are per method rather than one total, because "replay read the substrate" and
+/// "replay wrote to the substrate" (sem: SEM-gx-engine-935) are different accidents and a single number would report them
 /// as the same one.
 #[derive(Clone, Debug, Default)]
 pub struct CountingAdapter {
@@ -908,7 +1174,7 @@ impl gx_substrate::SubstrateAdapter for CountingAdapter {
         &self,
         delta: &gx_substrate::PlannedDelta,
         pre: &gx_core::ObjectSnapshot,
-    ) -> gx_substrate::Result<Option<gx_substrate::PlannedDelta>> {
+    ) -> gx_substrate::Result<gx_substrate::InvertOutcome> {
         self.counts.invert.fetch_add(1, Ordering::SeqCst);
         self.inner.invert(delta, pre)
     }
@@ -930,12 +1196,12 @@ impl gx_substrate::SubstrateAdapter for CountingAdapter {
 /// A `SubstrateAdapter` with a **world that moves** — hand 4's fixture.
 ///
 /// [`StubAdapter`] answers as a function of its arguments, which is what AC-030 needs and what
-/// AC-034 cannot use: 「別プロセスで対象ファイルへ書き込みを行い`Fingerprint₁≠Fingerprint₀`となる
-/// 状況を注入」 requires a substrate whose state can change between `plan` and `commit`. So this one
+/// AC-034 cannot use: "inject a situation in which a separate process writes to the target file and
+/// `Fingerprint₁ != Fingerprint₀`" (sem: SEM-gx-engine-936) requires a substrate whose state can change between `plan` and `commit`. So this one
 /// holds its world in an `Arc<Mutex<Vec<u8>>>` and every snapshot digests what is in it.
 ///
 /// 🔴 **Still not `gx-adapter-fs`** (N-13, `ENGINE_ADAPTER_DECLARATIONS=0`). The injection AC-034
-/// asks for is 「別プロセス」 against a real file; against an in-memory substrate the faithful form
+/// asks for is "a separate process" (sem: SEM-gx-engine-937) against a real file; against an in-memory substrate the faithful form
 /// is a **separate writer** the engine does not know about, which `tests/ac_034.rs` spawns as a
 /// thread. What the criterion is measuring is that the CAS sees a change it did not make, and a
 /// thread that mutates the world through a handle the engine never reads is exactly that. The
@@ -952,6 +1218,15 @@ pub struct CommitAdapter {
     kind: SubstrateKind,
     world: Arc<Mutex<Vec<u8>>>,
     refusals: Arc<Mutex<VecDeque<bool>>>,
+    /// 🔴 **R30 / `req/372` M-01** — the applications that **do the work and then refuse**.
+    ///
+    /// [`CommitAdapter::refusing`] returns before it touches the world, so a probe built on it
+    /// drives a forward apply that changed nothing — and since R30 the engine tells that case
+    /// apart from every other and declines to send a compensation for an effect that does not
+    /// exist. The criterion AC-038 is about (the escrowed inverse **is** applied) needs the other
+    /// shape, and this is it: the commonest real failure, where the call worked and the answer was
+    /// lost coming back.
+    fails_after_the_effect: Arc<Mutex<VecDeque<bool>>>,
     counts: Arc<Counts>,
     invertible: bool,
     /// 43 §8's other answer. See [`CommitAdapter::conflicting`].
@@ -959,8 +1234,8 @@ pub struct CommitAdapter {
     /// Which component of the fingerprint this adapter contradicts itself about, after the first
     /// answer. See [`CommitAdapter::miswired`] and [`CommitAdapter::rescoping`]. **M5 hand 7**.
     drift: Option<Drift>,
-    /// How many times `precondition` has been asked, which is how [`Drift`] knows 「after the
-    /// first」. Its own counter rather than [`Counts::precondition`]: a probe reads that one, and a
+    /// How many times `precondition` has been asked, which is how [`Drift`] knows "after the
+    /// first" (sem: SEM-gx-engine-938). Its own counter rather than [`Counts::precondition`]: a probe reads that one, and a
     /// fixture whose behaviour depended on a number a probe may also reset would be two things.
     preconditions: Arc<AtomicUsize>,
 }
@@ -968,17 +1243,17 @@ pub struct CommitAdapter {
 /// What a mis-wired adapter contradicts itself about (**M5 hand 7**, 43 T-13).
 ///
 /// `Fingerprint::cas_eq` has three answers and two of them are refusals (**E-M4-27**): a `substrate`
-/// mismatch and, when the substrates agree, a `scope` mismatch. Both are 「実装エラー」 rather than
-/// facts about the world, and **M5-24 採(a)** folds both to `Aborted(InternalError)` — 43 T-13. The
+/// mismatch and, when the substrates agree, a `scope` mismatch. Both are "an implementation error" (sem: SEM-gx-engine-939) rather than
+/// facts about the world, and **M5-24 adopted (a)** folds both to `Aborted(InternalError)` — 43 T-13. The
 /// two arms are separate variants because the refusals are answered in order and a fixture that
 /// only ever produced the first would leave the second unwalked.
 #[derive(Clone, Copy, Debug)]
 pub enum Drift {
     /// The registry filed this adapter under one substrate and it reports another — one deployment
-    /// wiring two adapters into one slot, which is the accident 43 T-13 calls 「バグ級の失敗」.
+    /// wiring two adapters into one slot, which is the accident 43 T-13 calls "a bug-class failure" (sem: SEM-gx-engine-940).
     Substrate,
-    /// The substrate agrees and the scope does not: the same adapter naming 「対象に干渉しうる周辺
-    /// 状態」 two different ways between `plan` and `commit`, which makes the two fingerprints
+    /// The substrate agrees and the scope does not: the same adapter naming "the surrounding state
+    /// that can interfere with the target" (sem: SEM-gx-engine-940) two different ways between `plan` and `commit`, which makes the two fingerprints
     /// incomparable rather than unequal (42 §3.5).
     Scope,
 }
@@ -993,6 +1268,7 @@ impl CommitAdapter {
                 kind: SubstrateKind::Fs,
                 world: Arc::clone(&world),
                 refusals: Arc::new(Mutex::new(VecDeque::new())),
+                fails_after_the_effect: Arc::new(Mutex::new(VecDeque::new())),
                 counts: Arc::clone(&counts),
                 invertible: true,
                 conflicting: false,
@@ -1002,6 +1278,25 @@ impl CommitAdapter {
             counts,
             world,
         )
+    }
+
+    /// 🔴 **R30 / `req/372` M-01** — make the next `n` applications **perform the change and then
+    /// answer an error**.
+    ///
+    /// The order is the whole point of the method: [`CommitAdapter::refusing`] returns before the
+    /// world is touched and this one returns after it. Since R30 the engine reads the object the
+    /// instant an apply fails, so those two produce different outcomes — `NotAttempted` with
+    /// `WorldNeverMoved` for the first, and the compensation actually running for the second.
+    #[must_use]
+    pub fn failing_after_the_effect(self, script: &[bool]) -> Self {
+        {
+            let mut failures = self
+                .fails_after_the_effect
+                .lock()
+                .expect("the post-effect failure script is not poisoned");
+            failures.extend(script.iter().copied());
+        }
+        self
     }
 
     /// Make the next `n` applications refuse (43 T-10c's injection).
@@ -1019,9 +1314,9 @@ impl CommitAdapter {
 
     /// An adapter whose `invert` answers `None` — which E-M3-4 turns into an `Escalate` at T-3.
     ///
-    /// 🔴 Hand 4 wrote 「it never reaches a commit in v0.1」 beside this. Hand 6 is where that stops
+    /// 🔴 Hand 4 wrote "it never reaches a commit in v0.1" (sem: SEM-gx-engine-941) beside this. Hand 6 is where that stops
     /// being true: T-5 lets a person approve the escalation, the transformation walks on to
-    /// `Committing`, and 43 T-10b's 「inverse構成可能（`Some`）」 guard does not open — which is the
+    /// `Committing`, and 43 T-10b's "an inverse can be constructed (`Some`)" (sem: SEM-gx-engine-941) guard does not open — which is the
     /// path **E-M5-9** exists for. `tests/supersede.rs` is where it is walked.
     #[must_use]
     pub fn without_inverse(mut self) -> Self {
@@ -1031,8 +1326,8 @@ impl CommitAdapter {
 
     /// An adapter whose `commutation` answers `Conflicts` for every pair (43 §8).
     ///
-    /// AC-045's second clause -- 「`Conflicts`による待機中のTransformationでもTTLが作用し無期限に
-    /// ならないことを確認する」 -- cannot be constructed without one: 43 §8's waiting is entered on
+    /// AC-045's second clause -- "confirm that even a Transformation waiting because of `Conflicts`
+    /// is still subject to the TTL and does not wait indefinitely" (sem: SEM-gx-engine-942) -- cannot be constructed without one: 43 §8's waiting is entered on
     /// this answer and on no other. Every pair rather than a scripted one, because what the
     /// criterion measures is the **TTL while waiting**, and a script would make the waiting depend
     /// on call order.
@@ -1047,11 +1342,11 @@ impl CommitAdapter {
     /// The **first** `precondition` answers honestly — T-2 has to record a `Fingerprint₀` for there
     /// to be a comparison at all — and every one after it reports [`SubstrateKind::Git`]. So the CAS
     /// at T-10a compares two fingerprints from two substrates, `cas_eq` answers
-    /// `Err(FingerprintSubstrateMismatch)` (**E-M4-27**), and **M5-24 採(a)** folds that to
+    /// `Err(FingerprintSubstrateMismatch)` (**E-M4-27**), and **M5-24, adopted (a)**, folds that to (sem: SEM-gx-engine-943)
     /// `Aborted(InternalError)`.
     ///
-    /// The drift is here, in a fixture, and **not** in the engine: 「engine 内で作るのは配線 bug の
-    /// 再現」 — a shipping line that could build two disagreeing fingerprints would be the bug T-13
+    /// The drift is here, in a fixture, and **not** in the engine: "constructing it inside the engine
+    /// would be a reproduction of a wiring bug" (sem: SEM-gx-engine-944) — a shipping line that could build two disagreeing fingerprints would be the bug T-13
     /// receives, so the injection is made where hand 5 made its recovery shim, inside the test.
     #[must_use]
     pub fn miswired(mut self) -> Self {
@@ -1061,7 +1356,7 @@ impl CommitAdapter {
 
     /// The same accident one clause down: the substrates agree and the scopes do not.
     ///
-    /// 42 §3.5 calls a scope mismatch 「意味を持たない」 comparison, and `cas_eq` answers
+    /// 42 §3.5 calls a scope mismatch a comparison that "has no meaning" (sem: SEM-gx-engine-945), and `cas_eq` answers
     /// `Err(FingerprintScopeMismatch)` only when the substrates already agree — so this arm is
     /// unreachable while [`CommitAdapter::miswired`] is in force, and the two are separate fixtures
     /// for that reason.
@@ -1135,9 +1430,25 @@ impl gx_substrate::SubstrateAdapter for CommitAdapter {
                 detail: "the injected substrate refused this application (43 T-10c)".to_string(),
             });
         }
+        let fail_after_the_effect = self
+            .fails_after_the_effect
+            .lock()
+            .expect("the post-effect failure script is not poisoned")
+            .pop_front()
+            .unwrap_or(false);
         let mut world = self.world.lock().expect("the world is not poisoned");
         world.clone_from(&delta.payload().to_vec());
         let digest = digest_of(&world);
+        // 🔴 **R30 / `req/372` M-01** — the change is made and the answer is an error anyway.
+        // `gx-substrate`'s own `ApplyFailed` doc permits exactly this ("a non-atomic `apply` can
+        // fail halfway"), and it is what a lost response looks like from the engine's side.
+        if fail_after_the_effect {
+            drop(world);
+            return Err(gx_substrate::Error::ApplyFailed {
+                detail: "the injected substrate performed this application and then refused it                          (43 T-10c, req/372 M-01)"
+                    .to_string(),
+            });
+        }
         Ok(gx_substrate::AppliedDelta::new(
             delta.reference().clone(),
             Fingerprint::new(self.kind.clone(), "/tmp/world".to_string(), digest)?,
@@ -1154,12 +1465,12 @@ impl gx_substrate::SubstrateAdapter for CommitAdapter {
         &self,
         _delta: &gx_substrate::PlannedDelta,
         _pre: &gx_core::ObjectSnapshot,
-    ) -> gx_substrate::Result<Option<gx_substrate::PlannedDelta>> {
+    ) -> gx_substrate::Result<gx_substrate::InvertOutcome> {
         self.counts.invert.fetch_add(1, Ordering::SeqCst);
         if !self.invertible {
-            return Ok(None);
+            return Ok(gx_substrate::InvertOutcome::none(Vec::new()));
         }
-        // The inverse is 「put the world back as it is now」, which is what makes the rollback of
+        // The inverse is "put the world back as it is now" (sem: SEM-gx-engine-946), which is what makes the rollback of
         // 43 T-10c a real undo rather than a token: applying it after a failed forward apply
         // restores the bytes the snapshot was taken over.
         let world = self
@@ -1167,10 +1478,10 @@ impl gx_substrate::SubstrateAdapter for CommitAdapter {
             .lock()
             .expect("the world is not poisoned")
             .clone();
-        Ok(Some(gx_substrate::PlannedDelta::new(
-            self.kind.clone(),
-            world,
-        )?))
+        Ok(gx_substrate::InvertOutcome::inverted(
+            gx_substrate::PlannedDelta::new(self.kind.clone(), world)?,
+            Vec::new(),
+        ))
     }
 
     fn commutation(
@@ -1180,7 +1491,7 @@ impl gx_substrate::SubstrateAdapter for CommitAdapter {
     ) -> gx_substrate::Result<gx_core::Commutation> {
         self.counts.commutation.fetch_add(1, Ordering::SeqCst);
         if self.conflicting {
-            // 42 §3.4's `residual` is 「the part of `b` that does not commute past `a`」; a fixture
+            // 42 §3.4's `residual` is "the part of `b` that does not commute past `a`" (sem: SEM-gx-engine-947); a fixture
             // that has no residual to name reports `a`'s own reference, which is enough for 43 §8
             // (the engine reads the discriminant and not the payload -- M4H6-4).
             return Ok(gx_core::Commutation::Conflicts {
@@ -1199,7 +1510,7 @@ impl gx_substrate::SubstrateAdapter for CommitAdapter {
 ///
 /// The binary is located through `CARGO_BIN_EXE_crash_probe`, which cargo sets for an integration
 /// test of the package that declares the `[[bin]]` — the same road `tests/ac_030.rs` takes to
-/// `engine_id_probe`, so the two E2Es agree on what 「別プロセス」 costs to arrange.
+/// `engine_id_probe`, so the two E2Es agree on what "a separate process" (sem: SEM-gx-engine-948) costs to arrange.
 pub fn probe(args: &[&str]) -> String {
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_crash_probe"))
         .args(args)
@@ -1217,7 +1528,7 @@ pub fn probe(args: &[&str]) -> String {
 
 /// Start `crash_probe run` armed for `point`, wait for it to reach the point, and **kill it**.
 ///
-/// `Child::kill` is `SIGKILL` on Unix, which is 51 §8.1's 「`kill -9`を実プロセスに送信する」 with no
+/// `Child::kill` is `SIGKILL` on Unix, which is 51 §8.1's "send `kill -9` to a real process" (sem: SEM-gx-engine-949) with no
 /// signal number written down anywhere. The wait is on the marker file rather than on a duration:
 /// the child writes it after everything the injection point promises has been fsynced, so the kill
 /// lands in the same place on every one of AC-043's ten trials instead of in a race (51 §13-4).
@@ -1245,8 +1556,8 @@ pub fn kill_at(dir: &Path, point: &str, goal: &str) -> String {
     // Found by M6 hand 6, under `cargo nextest`, and it is a race rather than a flake: this hand
     // added seven suites, two of which spawn a `gx serve` process and four of which run
     // multi-threaded tokio runtimes, so the window between `create` and `write` finally got
-    // scheduled through. Retrying the suite would have hidden it (req/88 §8.2: 「それでも落ちたら
-    // flaky でなく実バグ」 — and its converse, that a failure which retries away is still a defect
+    // scheduled through. Retrying the suite would have hidden it (req/88 §8.2: "if it still fails,
+    // that is not flaky, it is a real bug", sem: SEM-gx-engine-950) — and its converse, that a failure which retries away is still a defect
     // somewhere). Raised as **M6H6-14**.
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     let marker = loop {
@@ -1290,18 +1601,37 @@ pub fn need(stdout: &str, key: &str) -> String {
 /// `crate::replay` writes `[u32 big-endian length][payload]`, and this walks that framing so a test
 /// can truncate the file **exactly one record short**. That is how the one window no adapter seam
 /// can reach is built: a crash after `ledger.append` and before the `Committed` record (43 §7-3b).
+///
+/// 🔴 **R5 / DR-43-9** — a journal written by this version begins with `JOURNAL_MAGIC` and stores
+/// a 32-byte chain link after every payload, so the walk skips the marker and steps over the link.
+/// The marker's own offset is **not** a boundary: truncating there would leave a file with no
+/// framing at all, which is a different experiment from "one record short". A journal without the
+/// marker is walked in the old framing, because the fixtures that build one by hand are testing
+/// exactly that.
 pub fn record_boundaries(bytes: &[u8]) -> Vec<usize> {
     let mut out = Vec::new();
-    let mut at = 0usize;
+    // 🔴 **R30 / `req/372` M-02** — both chained framings, because this helper walks the file's
+    // shape and the shape is identical: what the marker's version distinguishes is the record
+    // vocabulary, not the framing. Sniffing only `GXJRNL01` made every journal this build writes
+    // look legacy here, and the offsets that follow were then wrong by the marker's eight bytes
+    // plus a link per record.
+    let chained = bytes.starts_with(gx_engine::JOURNAL_MAGIC)
+        || bytes.starts_with(gx_engine::replay::JOURNAL_MAGIC_V2);
+    let link = if chained { 32 } else { 0 };
+    let mut at = if chained {
+        gx_engine::JOURNAL_MAGIC.len()
+    } else {
+        0
+    };
     while at + 4 <= bytes.len() {
         out.push(at);
         let mut header = [0u8; 4];
         header.copy_from_slice(&bytes[at..at + 4]);
         let length = u32::from_be_bytes(header) as usize;
-        if length == 0 || at + 4 + length > bytes.len() {
+        if length == 0 || at + 4 + length + link > bytes.len() {
             break;
         }
-        at += 4 + length;
+        at += 4 + length + link;
     }
     out
 }
@@ -1343,8 +1673,8 @@ pub fn digest_of(bytes: &[u8]) -> Cid {
 
 /// An intent for `locator`, with everything else held fixed.
 ///
-/// Held fixed on purpose: `IntentId` is the CID of all five fields (42 §1.3 row 2, 「除外規則なし」),
-/// so a fixture that varied one silently would make AC-030's 「同一intent」 mean something weaker
+/// Held fixed on purpose: `IntentId` is the CID of all five fields (42 §1.3 row 2, "no exclusion
+/// rule", sem: SEM-gx-engine-951), so a fixture that varied one silently would make AC-030's "the same intent" mean something weaker
 /// than it says.
 pub fn intent(locator: &str, goal: &str) -> gx_core::Intent {
     gx_core::Intent::new(
@@ -1388,7 +1718,7 @@ pub fn gate(policies: &str) -> gx_gate::Gate {
 /// smallest thing that fixes that without a `Box<dyn>`: the trait has no `dyn`-safe blanket impl on
 /// `Box`, and adding one to the crate for a test's convenience would be shipping API for a fixture.
 ///
-/// AC-037's 「全mode×全verdict組合せ」 is what needs it — the degraded admission of 43 T-4e is one
+/// AC-037's "every mode x every verdict combination" (sem: SEM-gx-engine-952) is what needs it — the degraded admission of 43 T-4e is one
 /// of the rows, and it is reached by a collector that cannot be reached.
 pub enum MaybeEvidence {
     Reachable(gx_engine::InjectedEvidence),
@@ -1396,7 +1726,7 @@ pub enum MaybeEvidence {
 }
 
 impl MaybeEvidence {
-    /// A source that answers with nothing, successfully (44 §1.2's 省略時).
+    /// A source that answers with nothing, successfully (44 §1.2's "when omitted", sem: SEM-gx-engine-953).
     pub fn none() -> Self {
         MaybeEvidence::Reachable(gx_engine::InjectedEvidence::none())
     }
@@ -1425,15 +1755,16 @@ impl gx_engine::EvidenceSource for MaybeEvidence {
 /// An invariant that refuses **one exact planned payload** (41 §4, 42 §3.8).
 ///
 /// 🔴 AC-040's second case needs a gate that admits a change and denies its undo:
-/// 「T_uに対応するinvariant/policyを故意にDenyへ設定した別ケースでは、T_uが`Committed`へ到達せず
-/// `Denied`のままとなり、undoもgatingを免除されないことを確認する」. Cedar cannot express it. ASM-60-1's
+/// "in a separate case where the invariant/policy corresponding to `T_u` is deliberately set to Deny,
+/// confirm that `T_u` does not reach `Committed` and stays `Denied`, and that undo is not exempted
+/// from gating either" (sem: SEM-gx-engine-954). Cedar cannot express it. ASM-60-1's
 /// request carries a locator, a substrate, an order and `invert_available`, and an undo agrees with
 /// the change it undoes on **all four** — same object, same substrate, order 0, invertible. The one
 /// thing that differs is the delta itself, and 41 §4 hands that to an [`gx_gate::InvariantCheck`]
 /// as `GateInput.planned`.
 ///
 /// So the discriminator is the payload, which is honest for this fixture: the forward delta writes
-/// 「after」 and the escrowed inverse writes 「before」, and a deployment refusing 「put it back」 is
+/// "after" and the escrowed inverse writes "before" (sem: SEM-gx-engine-955), and a deployment refusing "put it back" is
 /// exactly the policy AC-040 asks to be exercised. P-6 keeps the engine from reading those bytes;
 /// an invariant a deployment registered is the layer that may.
 pub struct DenyPayload {

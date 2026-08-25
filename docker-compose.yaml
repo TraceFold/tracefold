@@ -1,7 +1,7 @@
-# 47 §1(c) — **評価用**の最小 compose。
+# 47 §1(c) — the minimal compose file **for evaluation**. (sem: SEM-docker-compose.yaml-001)
 #
-#   > **(c) `docker-compose.yaml`** — 評価用。`gx serve`コンテナ + ledger用named volume（`gx-log`の
-#   > 追記専用tile store永続化）の最小構成。単一マシンでの動作確認・PoC・小口顧客の初回導入を意図する
+#   > **(c) `docker-compose.yaml`** — for evaluation. A `gx serve` container + a named volume for
+#   > the ledger (persisting `gx-log`'s append-only tile store); for single-machine functional checks, PoCs, and a small customer's first install (sem: SEM-docker-compose.yaml-002)
 #
 # 47 §6 makes this and the single static binary the **only** two v0.1-required artefacts. There is no
 # signed image (47 §1(b)) and no Helm chart (47 §1(d)) in this repository, and req/88 §1 N-10 keeps
@@ -12,12 +12,12 @@
 # ---------------------------------------------------------------------------
 #
 # `gx serve` **refuses to bind anywhere but loopback**, without an override flag. That is not an
-# oversight; it is §53 M6H6-6 採(a):
+# oversight; it is §53 M6H6-6, adopted (a): (sem: SEM-docker-compose.yaml-003)
 #
-#   > **M6H6-6 採(a) v0.1**: 非 loopback bind の無条件拒否。(b) `--allow-remote-bind` は authorization
-#   > 実装と同窓
+#   > **M6H6-6, adopted (a), v0.1**: unconditional refusal of any non-loopback bind. (b)
+#   > `--allow-remote-bind` shares a window with the authorization implementation (sem: SEM-docker-compose.yaml-004)
 #
-# v0.1 has no authorization layer (M5H6-4 採(a)): the Bearer token is one static string and no
+# v0.1 has no authorization layer (M5H6-4, adopted (a)): the Bearer token is one static string and no (sem: SEM-docker-compose.yaml-005)
 # request is tied to an `Actor`, so a socket on a routable interface is a socket on which anyone can
 # `cancel` somebody else's transformation.
 #
@@ -29,7 +29,7 @@
 #   1. **`network_mode: host`** (this file). The container shares the host's network namespace, so
 #      the loopback `gx serve` binds to *is the evaluator's own loopback* and `127.0.0.1:8080` works
 #      from the host with the fail-closed rule completely intact. This is exactly 47 §1(c)'s stated
-#      audience — 「単一マシンでの動作確認・PoC」 — and on a single machine host networking is not a
+#      audience — "single-machine functional checks, PoCs" — and on a single machine host networking is not a (sem: SEM-docker-compose.yaml-006)
 #      compromise, it is the shape of the deployment.
 #      Caveat, because it is a real one: host networking is native on Linux and is a **recent and
 #      optional** feature of Docker Desktop on Windows and macOS. On a Desktop without it, this file
@@ -37,10 +37,10 @@
 #   2. **M6H6-6 (b)'s `--allow-remote-bind`**, which does not exist in v0.1 and whose window §53 tied
 #      to the authorization work. A compose that published a port would need it.
 #
-# 🔴 So 47 §1(c) and M6H6-6 採(a) are in tension, and this is the first artefact where the tension is
-# load-bearing rather than theoretical. req/95 raises it (**M6H7**), because 「compose で配る」 and
-# 「loopback 以外を拒む」 cannot both be unconditional. Note also that M5H6-4(b)'s firing condition —
-# 「HTTP が loopback 以外に bind される時」 — is what a published port *is*: an operator who reaches
+# 🔴 So 47 §1(c) and M6H6-6 (adopted (a)) are in tension, and this is the first artefact where the tension is
+# load-bearing rather than theoretical. req/95 raises it (**M6H7**), because "ship it via compose" and
+# "refuse anything but loopback" cannot both be unconditional. Note also that M5H6-4(b)'s firing condition —
+# "when HTTP binds anywhere but loopback" — is what a published port *is*: an operator who reaches (sem: SEM-docker-compose.yaml-007)
 # for `ports:` here has met the condition, and the refusal is what makes them notice.
 #
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@
 #   * `docker compose build` needs the measured static binary at
 #     `target/x86_64-unknown-linux-gnu/release/gx` (see `Dockerfile`, and `tools/m6h7_dist.sh
 #     static` for the build and its `readelf` evidence).
-#   * `gx serve` refuses to start without a Bearer token (44 §2.5 是 「必須」) and without a signing
+#   * `gx serve` refuses to start without a Bearer token (44 §2.5 makes it "required") and without a signing (sem: SEM-docker-compose.yaml-008)
 #     key. Create both into the volume once:
 #
 #       docker compose run --rm gx key gen --out /project/.gx/keys/engine.json
@@ -87,8 +87,8 @@ services:
       - --signing-key
       - ${GX_SIGNING_KEY_ID:?run `docker compose run --rm gx key gen --json` first and export its key_id}
     environment:
-      # 🔴 req/56 §3 puts private keys in the **user home** — 「秘密鍵=`~/.gx/keys/`(user home・0600)。
-      # project 側は**公開 keyid の参照のみ**」 — and a `scratch` image has no `/etc/passwd`, so
+      # 🔴 req/56 §3 puts private keys in the **user home** — "private key = `~/.gx/keys/` (user home, 0600).
+      # the project side holds **only a reference to the public keyid**" — and a `scratch` image has no `/etc/passwd`, so (sem: SEM-docker-compose.yaml-009)
       # nothing resolves a home for it. `KeyStore::user` refuses to guess (it errors when neither
       # `HOME` nor `USERPROFILE` is set), which is the right refusal and makes this line mandatory
       # rather than optional.
@@ -100,7 +100,7 @@ services:
       # 47 §1(c)'s named volume: the append-only tile store and everything else req/56 §2 puts under
       # `.gx/` (ledger, checkpoints, evidence, receipts, index, drafts, config.toml, VERSION).
       # 🔴 One volume for the whole directory rather than one per subdirectory: 47 §4's backup
-      # runbook is 「tile storeのファイルレベルsnapshot取得」 followed by `gx log consistency`, and a
+      # runbook is "take a file-level snapshot of the tile store" followed by `gx log consistency`, and a (sem: SEM-docker-compose.yaml-010)
       # snapshot that captured the ledger without the checkpoints it is verified against would be a
       # backup that cannot be checked.
       - gx-state:/project/.gx

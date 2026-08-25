@@ -1,11 +1,14 @@
-//! 🔴 **M6-08 採(a)** — `verify`'s `mode` is a **per-call** override, and it overrides.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-08 adopted (a)** (sem: SEM-gx-engine-842) — `verify`'s `mode` is a **per-call** override, and it overrides.
 //!
 //! req/38 §47 adopted (a) with 44 §1.2's own words as the reason:
 //!
-//! > `--record-only`: DR-2 record-onlyモードを**本コマンド単位で**強制（グローバル設定の上書き）
+//! > `--record-only`: forces DR-2's record-only mode **per this command**, overriding the global
+//! > setting (sem: SEM-gx-engine-843)
 //!
-//! and named the shape that must **not** be taken (b): 「serve が request ごとに `&mut self` で mode
-//! を差し替える=並行 request 間で mode が漏れる（最悪の fail-open）」. An argument cannot leak; a field
+//! and named the shape that must **not** be taken (b): "serve swaps the mode per request via
+//! `&mut self` -- the mode leaks between concurrent requests (the worst fail-open)" (sem: SEM-gx-engine-843). An argument cannot leak; a field
 //! reassignment can. So the parameter exists, and this file is what makes its existence a fact rather
 //! than a signature.
 //!
@@ -17,8 +20,8 @@
 //! > `Lifecycle::Denied => mode == EnforcementMode::RecordOnly`
 //!
 //! A `Denied` transformation is **terminal** under `Enforce` (43 §1) and is **still going to apply
-//! something** under `RecordOnly` (43 §1's own exception, 「ただしrecord-onlyモード時のみ§3の例外分岐
-//! でCanonicalizedへ進む」). So it is in flight in one mode and not in the other, and a second
+//! something** under `RecordOnly` (43 §1's own exception, "but only under record-only mode does §3's
+//! exception branch advance to `Canonicalized`" (sem: SEM-gx-engine-844)). So it is in flight in one mode and not in the other, and a second
 //! transformation over the same subject either waits for it or does not.
 //!
 //! That is the whole experiment: **one engine, one default, two answers, decided by the argument.**
@@ -42,7 +45,7 @@ const ALLOWED: &str = "a change nobody objects to";
 ///
 /// `conflicting` is 43 §8's precondition: waiting is entered on `Commutation::Conflicts` and on
 /// nothing else, so an adapter that always commutes would make both halves of the experiment answer
-/// 「no conflict」 for a reason that has nothing to do with the mode.
+/// "no conflict" (sem: SEM-gx-engine-845) for a reason that has nothing to do with the mode.
 fn engine_with(name: &str) -> Engine<InjectedEvidence> {
     let dir = scratch(name);
     let (adapter, _counts, _world) = CommitAdapter::new("before");
@@ -120,12 +123,12 @@ fn the_mode_argument_overrides_the_engines_own_for_one_call() {
         override_state,
         Lifecycle::Candidate,
         "under `RecordOnly` the same `Denied` row is still going to apply something, so 43 §8 holds \
-         the second transformation behind it — 「新たな状態は追加しない」, it stays a Candidate"
+         the second transformation behind it -- \"no new state is added\" (sem: SEM-gx-engine-846), it stays a Candidate"
     );
     assert_eq!(
         overridden.blocked_by(&t2_again),
         Some(denied_again),
-        "and it says which transformation it is waiting for (43 §8's 「`blocked_by`という内部注釈」)"
+        "and it says which transformation it is waiting for (43 §8's \"an internal annotation named `blocked_by`\") (sem: SEM-gx-engine-847)"
     );
 
     // 🔴 The half that makes it a *per-call* override rather than a setter: **the engine did not
@@ -138,7 +141,7 @@ fn the_mode_argument_overrides_the_engines_own_for_one_call() {
         "the argument overrode one evaluation and set nothing"
     );
 
-    // And the proof that the override is not simply 「everything waits」: the same engine, the same
+    // And the proof that the override is not simply "everything waits" (sem: SEM-gx-engine-848): the same engine, the same
     // call, with `None`, still answers about a row that is not blocked.
     let third = intent("/tmp/record-only-other.txt", ALLOWED);
     overridden.submit(&third, 3, AT).expect("T-1");
@@ -156,9 +159,9 @@ fn the_mode_argument_overrides_the_engines_own_for_one_call() {
 
 /// 🔴 The other half of DR-2, at the transition that carries it: **T-8r**.
 ///
-/// 43 §4: 「Record-onlyモード（`EnforcementMode::RecordOnly`, substrate単位または全体設定）:
-/// `Denied`からもT-8r経由で`Canonicalized→Committing→Committed`へ進める。ただし receipt には必ず
-/// `enforced=false` を刻む」.
+/// 43 §4: "Record-only mode (`EnforcementMode::RecordOnly`, per-substrate or global): even from
+/// `Denied`, via T-8r, advance to `Canonicalized → Committing → Committed`. But the receipt must
+/// always carry `enforced=false`." (sem: SEM-gx-engine-849)
 ///
 /// This is the path `gx commit --record-only` drives, and it is measured **here** rather than
 /// through the binary for a reason worth writing down: the CLI's only route to a `Verdict::Deny` in
@@ -168,6 +171,11 @@ fn the_mode_argument_overrides_the_engines_own_for_one_call() {
 /// and the road past it is walked here, with a fixture adapter and a temporary directory. Raised as
 /// **M6H3-9**: what a record-only E2E needs is a policy pack fixture over a writable path, and 44
 /// §1.2 gives `gx verify` no `--policy`.
+///
+/// 🔴 **Corrected by `docs/LIMITS.md` v0.5-k (`req/318` §(b), ruling `req/38` §350 item 8), quoted
+/// rather than restated:** "`gx wrap` **has** `--policy`, and the suites already ship a pack
+/// fixture over a writable path. The blocker does not hold on this surface, and it is recorded
+/// here rather than left standing."
 #[test]
 fn record_only_is_what_opens_t8r_and_the_receipt_says_so() {
     let mut engine = engine_with("record_only_t8r").with_mode(EnforcementMode::RecordOnly);
@@ -185,8 +193,8 @@ fn record_only_is_what_opens_t8r_and_the_receipt_says_so() {
     assert_eq!(
         engine.enforced(&denied),
         Some(false),
-        "43 §4: 「receipt には必ず `enforced=false` を刻む」 — which is what makes 「適用は通ったが\
-         ポリシー上は拒否されていた」 third-party verifiable (P-7, INV-S5)"
+        "43 §4: \"the receipt must always carry `enforced=false`\" -- which is what makes \"the apply \
+         went through, but policy had denied it\" third-party verifiable (P-7, INV-S5) (sem: SEM-gx-engine-850)"
     );
 
     // The control, on an engine that is not in record-only: the same row, the same call, refused.
@@ -206,9 +214,9 @@ fn record_only_is_what_opens_t8r_and_the_receipt_says_so() {
 /// 🔴 A per-call `RecordOnly` opens T-8r on an engine whose own posture is `Enforce`.
 ///
 /// **E-M6-20** (req/38 §52) put `record_only` in 44 §2.2's commit body, and a long-lived server has
-/// no other road to it: `Engine::with_mode` is a builder consumed at `open`, and the alternative —
-/// 「serve が request ごとに `&mut self` で mode を差し替える」 — is the form §47 M6-08 ruled
-/// 「**採ってはならない**」 because a posture written onto shared state leaks into the next request.
+/// no other road to it: `Engine::with_mode` is a builder consumed at `open`, and the alternative --
+/// "serve swapping the mode via `&mut self` per request" -- is the form §47 M6-08 ruled **must not be
+/// adopted** (sem: SEM-gx-engine-851) because a posture written onto shared state leaks into the next request.
 /// So `canonicalize` takes the argument `verify` already took, and this is the pair of runs that
 /// shows it is an **override** and not a default: one engine, one posture, two answers.
 #[test]
@@ -216,9 +224,9 @@ fn a_per_call_record_only_opens_t8r_on_an_enforcing_engine() {
     let mut engine = engine_with("record_only_per_call_canonicalize");
     let denied = deny_one(&mut engine, "/tmp/record-only-per-call.txt");
 
-    let refused = engine
-        .canonicalize(&denied, AT, None)
-        .expect_err("`None` means 「this engine's posture」, which is Enforce");
+    let refused = engine.canonicalize(&denied, AT, None).expect_err(
+        "`None` means \"this engine's posture\" (sem: SEM-gx-engine-852), which is Enforce",
+    );
     println!("PER_CALL_NONE refused={:?}", refused.kind());
     assert_eq!(refused.kind(), "InvalidState");
 
@@ -239,8 +247,8 @@ fn a_per_call_record_only_opens_t8r_on_an_enforcing_engine() {
 
 /// 🔴 And the override runs the other way: `Some(Enforce)` refuses on a record-only engine.
 ///
-/// One direction alone would leave 「the argument is read」 and 「the argument is only ever read as
-/// permission」 indistinguishable. 44 §2.2's body is `bool`, so `false` has to **mean** something, and
+/// One direction alone would leave "the argument is read" and "the argument is only ever read as
+/// permission" (sem: SEM-gx-engine-853) indistinguishable. 44 §2.2's body is `bool`, so `false` has to **mean** something, and
 /// what it means is that a caller can insist on enforcement on a server configured not to enforce.
 #[test]
 fn a_per_call_enforce_refuses_on_a_record_only_engine() {

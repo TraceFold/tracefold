@@ -1,15 +1,20 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **H-3** / **E-M2-23** — gx-core's error vocabulary, declared in one place and compared with the
 //! enum it is supposed to name.
 //!
-//! `req/38_ERRATA_2026-08-07.md` §25 逐語: 「**H-3(M4 窓)**: gx-core の Error 語彙表は次に gx-core を
-//! 触る手(M4 冒頭=H-1 実装と同窓)で E-M2-23 形に。compile 網羅 match は当面の実効体として可」. The
+//! `req/38_ERRATA_2026-08-07.md` §25, verbatim: "**H-3 (M4 window)**: gx-core's Error vocabulary
+//! table takes the E-M2-23 form in the next hand that touches gx-core (the start of M4 = the same
+//! window as the H-1 implementation). An exhaustive compile-time match is acceptable as the interim
+//! effective form" (quoted in SEM-gx-core-152). The
 //! interim body is `compose_range.rs`'s `the_error_vocabulary_this_hand_widened_is_eight_variants`,
 //! a `match` with no `_` arm; req/66 §4 raised the missing table and this file is the table's other
 //! half.
 //!
 //! # The form, and the one place it differs from gx-gate's
 //!
-//! E-M2-23 asks for 「1 箇所宣言+宣言外 code は構成時拒否+宣言と実 variant の突合」.
+//! E-M2-23 asks for "one declaration + a code outside the declaration is refused at construction +
+//! reconciliation of the declaration with the real variants" (sem: SEM-gx-core-153).
 //!
 //! * **One declaration** and **the reconciliation** are the same here as in
 //!   `crates/gx-gate/tests/error_vocabulary.rs`: `ERROR_KINDS` is declared once, and the variants

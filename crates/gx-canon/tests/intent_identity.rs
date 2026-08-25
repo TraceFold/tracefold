@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **I-1** applied to the projection M4 hand 1 creates: `Intent` (42 §1.3, row 2).
 //!
-//! req/69 §6.0-5 makes this a condition of the hand rather than a nicety: 「**新しい IdentityView
-//! 射影には I-1 形の防御を同 turn で置く**…いずれも A-10 形(canonical encode の map key 数 assert)+
-//! 「1 field だけ違う 2 値の digest が異なる」を全 field 分。M3 は同じ穴を 3 箇所に開けたまま tag 窓へ
-//! 来て、監査が拾った」.
+//! req/69 §6.0-5 makes this a condition of the hand rather than a nicety: "**a new IdentityView
+//! projection gets an I-1-shaped defense placed in the same turn**… both in A-10 shape (an
+//! assert on the canonical encode's map key count) + "two values differing in only one field
+//! have different digests", for every field. M3 left the same hole open in three places and it
+//! reached the tag window before an audit caught it." (sem: SEM-gx-canon-095)
 //!
 //! # Why the two halves are both needed
 //!
@@ -15,8 +18,8 @@
 //!
 //! # Why `Intent`'s mirror is strict
 //!
-//! 42 §1.3's row has an empty exclusion column and the reason 「Intent自体が独立の意図記述であり除外
-//! 規則なし」. `Transformation` may legitimately drop `id` and `created_at`; `Intent` may drop
+//! 42 §1.3's row has an empty exclusion column and the reason "Intent itself is an independent
+//! description of intent, with no exclusion rule" (sem: SEM-gx-canon-096). `Transformation` may legitimately drop `id` and `created_at`; `Intent` may drop
 //! nothing. So the two field sets are not merely related, they are equal, and the assertion below
 //! says so with `assert_eq` rather than with a subset check.
 //!
@@ -107,7 +110,7 @@ fn the_intent_projection_declares_the_five_keys_of_42_1_3() {
 ///
 /// The count above is a literal and a literal is a claim a hand can keep true by editing it. This
 /// is the same claim held against `Intent` itself: a sixth field added to the struct and not to
-/// `IntentView` would be a field outside the intent's own name, which 42 §1.3's 「除外規則なし」
+/// `IntentView` would be a field outside the intent's own name, which 42 §1.3's "no exclusion rule" (sem: SEM-gx-canon-097)
 /// forbids by construction rather than by review.
 #[test]
 fn the_intent_projection_has_one_key_per_field_of_the_struct() {
@@ -115,7 +118,7 @@ fn the_intent_projection_has_one_key_per_field_of_the_struct() {
     assert_eq!(
         debug_field_names(&intent),
         view_keys(&intent),
-        "`Intent` and `IntentView` declare different field sets (42 §1.3: 「除外規則なし」)"
+        "`Intent` and `IntentView` declare different field sets (42 §1.3: \"no exclusion rule\") (sem: SEM-gx-canon-098)"
     );
 }
 
@@ -241,7 +244,7 @@ fn two_goals_of_the_same_length_are_two_intents() {
     assert_ne!(digest_of(&one), digest_of(&other));
 }
 
-/// 「同一intent→同一IntentId」 (42 §3.3): the name is a function of the value.
+/// "same intent → same IntentId" (sem: SEM-gx-canon-099) (42 §3.3): the name is a function of the value.
 #[test]
 fn the_same_intent_has_the_same_id() {
     assert_eq!(digest_of(&base_intent()), digest_of(&base_intent()));

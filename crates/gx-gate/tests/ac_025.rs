@@ -1,18 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-025 (FR-025) — the two cases, decided by the pack the criterion names by path.
 //!
-//! AC-025 逐語: 「Given: Cedar PolicySet(`policies/fs/deny-etc.cedar`: `/etc/**`への書き込みを拒否)。
-//! When: `/etc/passwd`への書き込みTransformationを評価。Then: Cedar評価結果がDeny相当に写像される。
-//! `/tmp/x`へは Admit相当。」 判定方法: 「unit(2ケース)」.
+//! AC-025 verbatim: "Given: a Cedar PolicySet (`policies/fs/deny-etc.cedar`: refuses writes to
+//! `/etc/**`). When: a write Transformation to `/etc/passwd` is evaluated. Then: the Cedar
+//! evaluation result maps to the Deny equivalent. `/tmp/x` maps to the Admit equivalent." Judgment
+//! method: "unit (2 cases)". (sem: SEM-gx-gate-190)
 //!
-//! 「Deny 相当」 is read at both ends. The narrow reading is the one the criterion states -- Cedar's
-//! decision arrives as `PolicyDecision::Deny`, the vocabulary 42 §3.7 already fixed as 「`cedar_policy
-//! ::Decision`と同一語彙」 -- and the wider one is that the same evaluation, taken through
+//! "The Deny equivalent" is read at both ends. The narrow reading is the one the criterion states --
+//! Cedar's decision arrives as `PolicyDecision::Deny`, the vocabulary 42 §3.7 already fixed as "the
+//! same vocabulary as `cedar_policy::Decision`" (sem: SEM-gx-gate-191) -- and the wider one is that the same evaluation, taken through
 //! `Gate::verify`, comes out of the arm of `Verdict` that matches. Both are asserted, because the
 //! first without the second would leave the mapping true and unreachable.
 //!
-//! What is **not** asserted here is that Cedar decides correctly. req/60 §7.2: 「Cedar の決定を gx の
-//! test が再実装しない。期待値は…『gx の写像がこの request を作り、その決定が Verdict のこの枝へ写った』
-//! を測る」. So the expectations below are about which policy id answered and which arm was taken --
+//! What is **not** asserted here is that Cedar decides correctly. req/60 §7.2: "a gx test does not
+//! re-implement Cedar's decision. What is measured is ... 'gx's mapping built this request, and its
+//! decision mapped onto this branch of the Verdict'" (sem: SEM-gx-gate-192). So the expectations below are about which policy id answered and which arm was taken --
 //! facts about the mapping -- and never about Cedar's algorithm, which 46 §1 puts outside the
 //! project's scope.
 
@@ -30,8 +33,9 @@ use gx_witness::{Evidence, PolicyDecision, TestOutcome};
 
 /// The path AC-025 writes, resolved from this crate rather than from the working directory.
 ///
-/// M3-16's ruling put the directory at the repository root -- 「`policies/` は **root 直下**(AC-025 の
-/// 逐語 path 優先・出荷物は req/ 下に置かない)」 -- so this is `<root>/policies/fs/deny-etc.cedar` and
+/// M3-16's ruling put the directory at the repository root -- "`policies/` is **directly under
+/// root** (AC-025's verbatim path takes priority; shipped artifacts are not placed under req/)"
+/// (sem: SEM-gx-gate-193) -- so this is `<root>/policies/fs/deny-etc.cedar` and
 /// the test fails loudly if the file moves. `tools/e2e.sh` clones the repository and runs the same
 /// suite, so a pack that git does not hold cannot pass here either.
 fn pack_path() -> PathBuf {
@@ -56,7 +60,7 @@ fn cid(seed: u64) -> Cid {
     Cid(raw)
 }
 
-/// One change, by an agent, at order 0. The criterion says 「書き込み」 and gx has no other kind:
+/// One change, by an agent, at order 0. The criterion says "a write" and gx has no other kind: (sem: SEM-gx-gate-194)
 /// every `Transformation` is a change to the thing it names (P-1).
 fn change() -> Transformation {
     Transformation::new(
@@ -119,6 +123,10 @@ fn ac_025_a_change_to_etc_passwd_is_denied() {
         planned: &planned,
         evidence: &collected,
         invert_available: true,
+        // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+        // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+        // varying this field alone moves no verdict) about the field and not about this fixture.
+        decided_at: Timestamp(0),
     };
 
     let outcome = engine
@@ -155,6 +163,7 @@ fn ac_025_a_change_to_etc_passwd_is_denied() {
         planned: &planned,
         evidence: &collected,
         invert_available: true,
+        decided_at: Timestamp(0),
     };
     let verdict = Gate::with_policies(pack())
         .verify(input)
@@ -191,6 +200,7 @@ fn ac_025_a_change_to_tmp_x_is_admitted() {
         planned: &planned,
         evidence: &collected,
         invert_available: true,
+        decided_at: Timestamp(0),
     };
 
     let outcome = engine.evaluate(&input).expect("evaluable");
@@ -212,6 +222,7 @@ fn ac_025_a_change_to_tmp_x_is_admitted() {
         planned: &planned,
         evidence: &collected,
         invert_available: true,
+        decided_at: Timestamp(0),
     };
     let verdict = Gate::with_policies(pack())
         .verify(input)
@@ -263,8 +274,8 @@ fn the_pack_names_its_policies_by_annotation() {
 
 /// A substrate this pack does not speak for reaches Cedar's third rule.
 ///
-/// 「Otherwise (i.e., no policy is satisfied), the final result is Deny」 and 「the list of
-/// determining policies is empty」 (docs.cedarpolicy.com/auth/authorization.html). The fs pack scopes
+/// "Otherwise (i.e., no policy is satisfied), the final result is Deny" and "the list of
+/// determining policies is empty" (docs.cedarpolicy.com/auth/authorization.html) (sem: SEM-gx-gate-195). The fs pack scopes
 /// both of its statements to `resource.substrate == "fs"`, so a git transformation evaluated against
 /// it alone is refused by nothing in particular -- which is the safe answer, and the case 42 §3.8's
 /// four `ReasonSource` variants could not name. **E-M3-11** gave it one, and hand 2's sentinel
@@ -281,6 +292,7 @@ fn a_substrate_the_pack_does_not_speak_for_is_denied_by_no_policy() {
         planned: &planned,
         evidence: &[],
         invert_available: false,
+        decided_at: Timestamp(0),
     };
 
     let outcome = pack().evaluate(&input).expect("evaluable");
@@ -304,10 +316,10 @@ fn a_substrate_the_pack_does_not_speak_for_is_denied_by_no_policy() {
 
 /// A policy may now be called `cedar:default-deny`, and it still reports as itself (**E-M3-11**).
 ///
-/// Hand 2 refused that name at parse time, because it was the string it used to mean 「no policy
-/// decided」 and a pack claiming it could have put a false `Policy{..}` row in a receipt. The
-/// variant removed the collision, so the refusal was removed with it (req/38 §21 C-3: 「sentinel
-/// 綴りは同時に削除」). What must stay true is that the two cases are still told apart, and that is
+/// Hand 2 refused that name at parse time, because it was the string it used to mean "no policy
+/// decided" and a pack claiming it could have put a false `Policy{..}` row in a receipt. The
+/// variant removed the collision, so the refusal was removed with it (req/38 §21 C-3: "the sentinel
+/// spelling is deleted at the same time") (sem: SEM-gx-gate-196). What must stay true is that the two cases are still told apart, and that is
 /// what this measures: the once-forbidden name decides a request as an ordinary policy, and its
 /// reason names it -- while the request no policy answers gets `NoPolicyApplied` above.
 #[test]
@@ -329,6 +341,7 @@ fn the_name_hand_2_reserved_is_now_an_ordinary_policy_id() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect("evaluable");
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The transformation itself, and the identifiers that address it.
 //!
 //! Spec: 41 §3 for `Transformation`, `Subject`, `IntentId`, `TransformationId`; 42 §0 for this
@@ -15,8 +17,8 @@ use std::collections::{BTreeSet, VecDeque};
 /// The highest order v0.1 admits (ASM-6, DR-7 DEFAULT: <=2).
 ///
 /// A constant rather than a type-level bound, because the ceiling is a decision record's value
-/// and decision records move. FR-003 says so in as many words: an over-high order 「コンパイル時
-/// 型検査を通過してもランタイムでErrorを返す」.
+/// and decision records move. FR-003 says so in as many words: an over-high order "passes the
+/// compile-time type check and still returns an Error at runtime" (sem: SEM-gx-core-086).
 pub const MAX_ORDER: u8 = 2;
 
 /// 41 §3: fixed at `submit` time (43 T-1, the Draft transition) and immutable afterwards. Same
@@ -48,7 +50,10 @@ pub struct Timestamp(pub i64);
 /// of a transformation expressible at all (P-2) without a second struct.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Subject {
+    /// An order-0 subject: the transformation acts on an object's state.
     Object(ObjectId),
+    /// An order >= 1 subject: the transformation acts on another transformation (P-2's
+    /// higher-order case, admitted up to order 2 in v0.1 by DR-7).
     Transformation(TransformationId),
 }
 
@@ -87,11 +92,16 @@ pub struct Transformation {
     /// v0.1 admits <= 2 (ASM-6, DR-7); the check lives in `Transformation::with_order`, and this
     /// field is private so that nothing can set it without going there (F-2).
     order: u8,
+    /// What the transformation acts on: an object at order 0, a transformation above (41 §3).
     pub subject: Subject,
     /// The expected post-state digest, fixed by `plan()`. `None` while still a Draft.
     pub target: Option<Cid>,
+    /// The change itself, by reference. The core never reads the payload behind it (ASM-16).
     pub delta: DeltaRef,
+    /// Why the change happened -- classification carried alongside, not interpreted here
+    /// (P-3, 42 §3.2).
     pub context: ChangeContext,
+    /// Who caused it, keyed by the same `KeyId` a receipt names (FR-006).
     pub actor: Actor,
     /// The provenance and composition DAG (C-2, C-6). Traversed by `ancestors`.
     pub parents: Vec<TransformationId>,
@@ -141,8 +151,9 @@ where
 /// §1, and req/31 §7).
 ///
 /// 46 §2.1's Lean `compose` builds four fields -- `id`, `order`, `src`, `dst` -- and says so in as
-/// many words: 「provenance/context/actor 等は F0 の定理には非負荷なので opaque metadata として型に
-/// 持たせず省略する」. 41 §3's `Transformation` has ten. The five that the composite's own shape
+/// many words: "provenance/context/actor and the like carry no load in F0's theorems, so they are
+/// omitted from the type as opaque metadata" (quoted in SEM-gx-core-087). 41 §3's `Transformation`
+/// has ten. The five that the composite's own shape
 /// does not determine are gathered here and supplied by the caller, because gx-core is not the
 /// layer that decides what a composed change *means*; the engine is, in M5.
 ///
@@ -153,8 +164,9 @@ where
 ///
 /// # The range those two are allowed to be in (**E-M3-13**)
 ///
-/// That erratum gap became `req/38_ERRATA_2026-08-07.md` §7's open item -- 「合成後 `created_at` /
-/// `intent_id` の許容値域が未定義のまま `compose()` は無検査で通す(46B WARN)」 -- and §22 closes it
+/// That erratum gap became `req/38_ERRATA_2026-08-07.md` §7's open item -- "with the admissible
+/// range of the composite's `created_at` / `intent_id` undefined, `compose()` passes them unchecked
+/// (46B WARN)" (quoted in SEM-gx-core-088) -- and §22 closes it
 /// as **D-6 / E-M3-13**, with two predicates on this struct and a third on composition:
 ///
 /// | # | predicate | checked by | refusal |
@@ -166,11 +178,13 @@ where
 /// Two candidate predicates are **deliberately absent**, and their absence is checked in
 /// `crates/gx-core/tests/compose_range.rs` so that it stays a decision rather than an oversight:
 ///
-/// * 「the composite's intent is one of `f`'s and `g`'s」 (④) was **not adopted**. req/38 §22 逐語:
-///   「**④(intent ∈ {f,g})は不採用**——`CompositionMetadata` の doc 自身が「両者が別 intent から
-///   来うる」と書き、合成物が新しい intent を持つ読みを spec は禁じていない」. The doc it means is the
+/// * "the composite's intent is one of `f`'s and `g`'s" (④) was **not adopted**. req/38 §22,
+///   verbatim: "**④ (intent ∈ {f,g}) is not adopted** -- `CompositionMetadata`'s own doc writes
+///   that 'the two may come from different intents', and the spec does not forbid the reading that
+///   a composite has a new intent" (quoted in SEM-gx-core-089). The doc it means is the
 ///   `intent_id` field below, and it says so still.
-/// * 「`created_at` is not in the future」 needs a clock, and 41 §6 keeps clocks out of this crate.
+/// * "`created_at` is not in the future" (sem: SEM-gx-core-090) needs a clock, and 41 §6 keeps
+///   clocks out of this crate.
 ///   M5 injects one at the engine boundary, which is where that predicate belongs.
 ///
 /// [`identity`] takes this struct too and, since **E-M3-18** (M4 hand 1), checks ① and ② as well.
@@ -187,7 +201,11 @@ pub struct CompositionMetadata {
     /// The delta the composite is said to apply. Not `f.delta` and not `g.delta`: the composition
     /// of two changes is a third change, and describing it is the caller's business.
     pub delta: DeltaRef,
+    /// The composite's classification. Not derivable from `f` and `g` -- two arrows may carry
+    /// two contexts, and picking one would be the core deciding what the composite means.
     pub context: ChangeContext,
+    /// Who is accountable for the composite. Supplied, not inherited: composing two actors'
+    /// arrows is itself an act with an actor (FR-006).
     pub actor: Actor,
     /// Metadata (ASM-4), outside every IdentityView (42 §1.3-2). gx-core cannot read a clock
     /// (41 §6 forbids I/O), which is also how `req/26 §1`'s no-clock-in-a-signed-payload rule
@@ -208,10 +226,12 @@ pub struct CompositionMetadata {
 /// the id of an arrow.
 const PROVISIONAL_ID: TransformationId = TransformationId(Cid([0u8; 32]));
 
-/// The same thirty-two zero bytes, read as an `IntentId`: 「no Draft named yet」 (**E-M3-13** ②).
+/// The same thirty-two zero bytes, read as an `IntentId`: "no Draft named yet" (**E-M3-13** ②;
+/// sem: SEM-gx-core-091).
 ///
 /// Written beside [`PROVISIONAL_ID`] because it is the same convention seen from the other field,
-/// and because a reader asking 「why is *this* value special」 should find both answers in one place.
+/// and because a reader asking "why is *this* value special" (sem: SEM-gx-core-092) should find
+/// both answers in one place.
 /// The difference is what each one is allowed to reach: `id` is outside the IdentityView (42 §1.3),
 /// so a provisional one changes no CID and is handed to the callback on purpose -- while
 /// `intent_id` is inside it, so a placeholder there reaches the digest and two unrelated arrows
@@ -307,12 +327,12 @@ where
 ///
 /// # The metadata's range (**E-M3-13**, and why ③ is only here)
 ///
-/// The three predicates are tabled on [`CompositionMetadata`]. ③ -- 「a composite is not dated
-/// before the arrows it is made of」 -- is checked in this function and in no other, because this is
-/// the only place that holds `f` and `g`. [`Transformation::new`] receives a `parents` list of
-/// *ids*, and resolving an id to a value needs a store that 41 §6 forbids this crate; so `new`
-/// cannot evaluate ③ even in principle, which is what makes 「compose のみ」 a consequence rather
-/// than a choice.
+/// The three predicates are tabled on [`CompositionMetadata`]. ③ -- "a composite is not dated
+/// before the arrows it is made of" (sem: SEM-gx-core-093) -- is checked in this function and in no
+/// other, because this is the only place that holds `f` and `g`. [`Transformation::new`] receives a
+/// `parents` list of *ids*, and resolving an id to a value needs a store that 41 §6 forbids this
+/// crate; so `new` cannot evaluate ③ even in principle, which is what makes "compose only" (sem:
+/// SEM-gx-core-094) a consequence rather than a choice.
 ///
 /// The order of the checks is: composability first, then ① and ②, then ③. A pair that does not
 /// meet has no composite to have metadata about, so its refusal is the earlier fact.
@@ -378,8 +398,9 @@ where
 ///
 /// # Why it returns a `Result` anyway (**E-M3-18**)
 ///
-/// Until M4 this function was infallible, on the reading that 「returning a `Result` whose error arm
-/// is unreachable would be a lie about the API」. **E-M3-13** (M3 hand 6) made that reading false:
+/// Until M4 this function was infallible, on the reading that "returning a `Result` whose error arm
+/// is unreachable would be a lie about the API" (sem: SEM-gx-core-095). **E-M3-13** (M3 hand 6)
+/// made that reading false:
 /// the other two constructors began refusing a `created_at` below the epoch (①) and an all-zero
 /// `intent_id` (②), both of which arrive in the same [`CompositionMetadata`] this function takes, so
 /// the error arm stopped being unreachable and this became the one door of the three that admitted
@@ -387,11 +408,13 @@ where
 /// named two constructors and widening a ruling was not that hand's to do; req/66 §4 raised it and
 /// `req/38_ERRATA_2026-08-07.md` §25 ruled:
 ///
-/// > 「🔴**H-1(採用=erratum E-M3-18・実装は M4 冒頭必須 DoD)**: `identity` も `Result` 化し**全構成子
-/// > で値域を閉じる**。infallible の根拠(error 腕到達不能)は D-6 で偽になった——unchecked door が 1 つ
-/// > 残る限り「gx-core の Transformation は値域内」という不変条件は型で言えない」
+/// > 🔴 **H-1 (adopted = erratum E-M3-18; implementation is a mandatory DoD at the start of M4)**:
+/// > make `identity` return a `Result` too and **close the value range at every constructor**. The
+/// > ground for infallibility (the error arm being unreachable) became false with D-6 -- as long as
+/// > one unchecked door remains, the invariant "a gx-core Transformation is within range" cannot be
+/// > stated in the type. (quoted in SEM-gx-core-096)
 ///
-/// The check is [`CompositionMetadata::in_range`], the same function the other two call, so a later
+/// The check is `CompositionMetadata::in_range` (private), the same function the other two call, so a later
 /// decision record that moves ① or ② moves all three doors at once (req/31 §7's rule for the order
 /// ceiling, applied to the range). `crates/gx-core/tests/value_range_closure.rs` counts the doors
 /// out of this crate's source and prints `UNCHECKED_DOORS`, and `compose_range.rs`'s pin -- which
@@ -471,7 +494,8 @@ impl Transformation {
     ///
     /// # Errors
     /// [`Error::OrderExceeded`] when `order` is above [`MAX_ORDER`]. Refusing at construction is
-    /// what makes 「every place that sets an order comes through `with_order`」 a fact about the
+    /// what makes "every place that sets an order comes through `with_order`" (sem: SEM-gx-core-097)
+    /// a fact about the
     /// type instead of a convention (F-2, `req/46D_AUDIT_RULING_2026-08-07.md` §1).
     ///
     /// [`Error::CreatedAtNegative`] and [`Error::IntentIdUnset`] when the metadata is outside
@@ -537,8 +561,9 @@ impl Transformation {
     ///
     /// `req/46C_AUDIT_PRACTICAL_2026-08-07.md` §3 W-2 built a `Transformation` holding
     /// `order = 250` with no compile error and no panic, because `order` was a plain `pub` field
-    /// and a struct literal never reaches this function. 「every place that sets an order is
-    /// required to come through here」 was therefore discipline, not a fact about the type. F-2
+    /// and a struct literal never reaches this function. "every place that sets an order is
+    /// required to come through here" (sem: SEM-gx-core-098) was therefore discipline, not a fact
+    /// about the type. F-2
     /// (`req/46D_AUDIT_RULING_2026-08-07.md` §1) closes it; this is that reproduction, and it
     /// must not compile:
     ///
@@ -633,11 +658,12 @@ mod field_set {
     }
 }
 
-/// Kani harness 3 of 3 (46 §4.2, row 「`gx-core` hot path」).
+/// Kani harness 3 of 3 (46 §4.2, row "`gx-core` hot path"; sem: SEM-gx-core-099).
 ///
 /// 46 §4.2 lists the row as `compose`, `identity` and `Fingerprint` comparison. `Fingerprint` is
 /// a gx-substrate type that M1 does not define, and implementing it here to satisfy a Kani row
-/// would be the cross-milestone先行実装 `B-04` forbids. A-2 (`req/38_ERRATA_2026-08-07.md` §1)
+/// would be the cross-milestone implementing-ahead that `B-04` forbids (sem: SEM-gx-core-100).
+/// A-2 (`req/38_ERRATA_2026-08-07.md` §1)
 /// rules the `Fingerprint` third deferred to M4 and M1's Kani scope limited to `compose` and
 /// `identity`; **this module is that reduced third harness, and the omission is recorded here
 /// rather than only in a report** (ASM-10-2).

@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-013 — representation independence: the same logical value, reached differently, has one CID.
 //!
-//! 34 AC-013 verbatim: 「Given: 同一論理内容を持つJSON表現`repr_json(x)`とネイティブ構造体表現
-//! `repr_native(x)`。When: 両方をcanonicalize。Then: 得られるcanonical CIDが一致する」, with 「最低
-//! 2経路の具体例」+ property as the method. 42 §2.3's second bullet is the same requirement stated
+//! 34 AC-013 verbatim: "Given: a JSON representation `repr_json(x)` and a native struct
+//! representation `repr_native(x)` of the same logical content. When: canonicalize both.
+//! Then: the resulting canonical CIDs agree", with "at least two concrete example routes"
+//! (sem: SEM-gx-canon-033) + property as the method. 42 §2.3's second bullet is the same requirement stated
 //! as `repr₁(x) ≈ repr₂(x) → canon(repr₁ x) = canon(repr₂ x)`, and `51 §3` names the property
 //! `repr_independence`.
 //!
@@ -15,7 +18,7 @@
 //!
 //! # Why the JSON is deliberately badly formatted
 //!
-//! 42 §2.3 defines the equivalence 「JSON整形差異は無視」. So one of the routes writes the JSON out
+//! 42 §2.3 defines the equivalence "JSON formatting differences are ignored" (sem: SEM-gx-canon-034). So one of the routes writes the JSON out
 //! with its object keys reversed and whitespace scattered through it, which is a genuine second
 //! *representation* rather than the same string twice. If the CID moved under that, canonical
 //! form would be a property of the text a value arrived in rather than of the value.

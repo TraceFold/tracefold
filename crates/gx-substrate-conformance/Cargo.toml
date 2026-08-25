@@ -1,20 +1,25 @@
 # The shared contract harness 51 §7 requires of every `SubstrateAdapter`, and **E-M4-19**
 # (`req/38_ERRATA_2026-08-07.md` §28) is the erratum that puts it in 41 §2's crate table:
-# 「member 6→9(gx-substrate/gx-adapter-fs/gx-substrate-conformance)・conformance は **publish 対象外**
-# (§5 probe bin 先例)・`gx-conformance-gen`(M8)とは**別物**の注記(N-12)」.
+# "member count 6->9 (gx-substrate/gx-adapter-fs/gx-substrate-conformance); conformance is **not a
+# publish target** (the §5 probe-bin precedent); a note (N-12) that it is a **different thing** from
+# `gx-conformance-gen` (M8)" (sem: SEM-gx-substrate-conformance-001).
 #
-# 51 §7 逐語: 「`SubstrateAdapter` traitを実装する全adapter（fs, git, mcp、将来追加分含む）が満たすべき
-# 契約を、adapter非依存の共有テストハーネス`gx-substrate-conformance`（新規test-only crate、35起票対象）
-# として実装する。各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」.
+# 51 §7, verbatim (sem: SEM-gx-substrate-conformance-002): "implement, as an adapter-independent
+# shared test harness `gx-substrate-conformance` (a new test-only crate, filed under 35), the
+# contract every adapter implementing the `SubstrateAdapter` trait (fs, git, mcp, and future
+# additions) must satisfy. Each adapter crate inherits the contract tests merely by calling this
+# harness from `#[test]`."
 [package]
 name = "gx-substrate-conformance"
 description = "The adapter contract harness of 51 §7: seven contracts and the laws the rulings added."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the
+                                       # workspace (sem: SEM-gx-substrate-conformance-003)
 license = "Apache-2.0"                # 35 DR-5, DEFAULT column
 
-# **Not published.** E-M4-19 逐語: 「conformance は publish 対象外(§5 probe bin 先例)」. This crate is a
+# **Not published.** E-M4-19, verbatim (sem: SEM-gx-substrate-conformance-004): "conformance is not
+# a publish target (the §5 probe-bin precedent)". This crate is a
 # test instrument: it holds no product code, and a released version of it would be a second
 # published surface whose compatibility promises nobody has made. `probes/doubt` carries the same
 # line for the same reason.

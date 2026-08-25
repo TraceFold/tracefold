@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The core types of the transformation calculus, and nothing else.
 //!
 //! Spec: `req/spec/40-architecture/41-architecture.md` §2 for where this crate sits in
@@ -32,7 +34,8 @@
 //! this hand; the erratum is raised in req/50 §4.
 //!
 //! M2 hand 5 adds a twelfth, [`b64`], and takes the same route rather than piling into this file --
-//! **E-M2-16** ruled that preference explicitly (「lib.rs 積み増し案は可読性最優先(規律3)で却下」).
+//! **E-M2-16** ruled that preference explicitly ("the proposal to keep piling into lib.rs is
+//! rejected on readability-first, discipline 3"; sem: SEM-gx-core-063).
 //! It is the RFC 4648 §4 table M2H1-4 settles the JSON face of every raw byte string with, and it
 //! sits beside [`Cid`]'s base32 for the same reason that one is written out longhand here.
 //!
@@ -53,28 +56,61 @@
 //!
 //! * `intent` -- `Intent` and `GoalBytes` (**E-M4-2**). 42 §0 already files `Intent` under this
 //!   crate; what was missing was the type. `goal` is bytes rather than a `serde_json::Value`, which
-//!   is the same 「data comes down, computation stays up」 rule applied to an encoding: a crate that
-//!   may not know an encoder may not name a document model either.
+//!   is the same "data comes down, computation stays up" rule (sem: SEM-gx-core-064) applied to an
+//!   encoding: a crate that may not know an encoder may not name a document model either.
 //! * `fingerprint` -- gains the real `Fingerprint` beside the `FingerprintBytes` carrier
-//!   (**E-M4-1**). E-M2-2 said 「M4 が実 `Fingerprint` を定義したら満期」 and this is the maturity;
+//!   (**E-M4-1**). E-M2-2 said "it matures once M4 defines the real `Fingerprint`" (sem:
+//!   SEM-gx-core-065) and this is the maturity;
 //!   the carrier stays because it is the digest component a signed receipt has always held, so no
 //!   byte gx-witness signs moves.
 //!
 //! Both follow the rule above: no dependency, no arithmetic. The scope of a fingerprint and the
 //! digest under it are computed in gx-substrate, which is where 42 §0's `fingerprint.rs` row is
-//! re-read as 「計算の所在」.
+//! re-read as "where the computation lives" (sem: SEM-gx-core-066).
 //!
-//! M5 hand 1 adds a sixteenth on the same rule (**M5-08 採(a)**, `req/38_ERRATA_2026-08-07.md` §37):
+//! M5 hand 1 adds a sixteenth on the same rule (**M5-08, adopted (a)**,
+//! `req/38_ERRATA_2026-08-07.md` §37; sem: SEM-gx-core-067):
 //!
 //! * `enforcement` -- `EnforcementMode` and `FailPosture`, DR-2's two independent axes. 43 §10 left
-//!   their placement open for three milestones (「型自体の配置は41への追記提案として扱う」); the
+//!   their placement open for three milestones ("the placement of the types themselves is treated
+//!   as a proposed addition to 41"; sem: SEM-gx-core-068); the
 //!   engine writes them and gx-witness reads one of them off a receipt, so two crates name the type
 //!   and the type comes down. Exactly the shape of `VerdictKind` one paragraph up, and it adds no
 //!   dependency and computes nothing.
 
 #![forbid(unsafe_code)]
+// NFR-022 (33): every public item of the core vocabulary carries its meaning and its spec
+// citation. `deny` rather than `warn` so a new public item without them is unbuildable, which is
+// what turns 41 §6's quality principle from a discipline into a property (req/159 §B-2, req/166).
+#![deny(missing_docs)]
 
+//!
+//! 🔴 **DR-46-26** adds two more, and the rule that put every one of the above here is the rule
+//! that puts these two (`req/38`'s S1 ruling 3, and the relocation is **forced** rather than
+//! preferred):
+//!
+//! * `reversibility` -- `Reversibility`, C-25's three values, relocated out of `gx-adapter-mcp`.
+//!   `gx-adapter-mcp` depends on `gx-substrate`, so a trait in `gx-substrate` naming that crate's
+//!   type would cycle; and `gx-witness` (which now seats the value on a receipt) does not depend on
+//!   `gx-substrate` at all. Exactly one crate both of them already name, and this is it -- the same
+//!   argument that placed `VerdictKind` here (**E-M3-2**).
+//! * `reads` -- `ReadEntry`, relocated out of `gx-witness`. An adapter now *produces* read-set
+//!   entries (`gx_substrate::InvertOutcome`), and the boundary crate may not name the receipt
+//!   crate. `ReadSet` -- the spill threshold and the RFC 6962 tree it is paired with -- stays in
+//!   `gx-witness`: the data comes down, the computation stays up.
+//!
+//! 🔴 **DR-46-28** adds a third, by the same rule and for the same reason (`req/459` ruling 1):
+//!
+//! * `boundary` -- `DeterminismBoundary` and `BoundaryStage`, where the replay-deterministic part
+//!   of a change ends and the LLM-originated part begins. Two faces carry it and they are in
+//!   crates that cannot see each other: the **declaration** face is `gx-adapter-mcp`'s catalogue
+//!   slot and the **attest** face is `gx-witness`'s receipt payload. `gx-witness` does not depend
+//!   on `gx-substrate` and `gx-adapter-mcp` does, so this is again the one crate both already
+//!   name. Nothing there reads the world -- `DeterminismBoundary::of_stages` is arithmetic on two
+//!   values its caller already holds.
+//!
 pub mod b64;
+pub mod boundary;
 pub mod commutation;
 pub mod context;
 pub mod delta;
@@ -88,9 +124,12 @@ pub mod measure;
 pub mod object;
 pub mod planned;
 pub mod proof;
+pub mod reads;
+pub mod reversibility;
 pub mod transformation;
 pub mod verdict;
 
+pub use boundary::{BoundaryStage, DeterminismBoundary};
 pub use commutation::Commutation;
 pub use context::{Actor, ChangeContext, KeyId};
 pub use delta::DeltaRef;
@@ -104,6 +143,8 @@ pub use measure::{Lyapunov, MorphismMeasure, ObjectMeasure};
 pub use object::{ObjectId, ObjectSnapshot, ReprKind, SubstrateKind};
 pub use planned::PlannedDeltaBytes;
 pub use proof::{CheckerResultRef, Proof, ProofRef, TheoremId};
+pub use reads::ReadEntry;
+pub use reversibility::Reversibility;
 pub use transformation::{
     ancestors, composable, compose, identity, CompositionMetadata, IntentId, Subject, Timestamp,
     Transformation, TransformationId, MAX_ORDER,
@@ -126,11 +167,13 @@ use core::fmt;
 /// The derive would emit `[u8; 32]` the way serde emits any fixed array: as a sequence of
 /// thirty-two integers. In DAG-CBOR that is a 32-element list -- and above 23 each element grows
 /// a header byte, so a digest of large bytes gets longer than one of small bytes. 42 §1.1 says
-/// the opposite: 「バイナリ埋め込み（DAG-CBOR内部）では32byte byte-string（major type 2）として直接
-/// 格納」. So the binary side of the impls below calls `serialize_bytes`.
+/// the opposite: "in binary embedding (inside DAG-CBOR) it is stored directly as a 32-byte
+/// byte-string (major type 2)" (quoted in SEM-gx-core-069). So the binary side of the impls below
+/// calls `serialize_bytes`.
 ///
 /// The text side is the E-JCS-1 ruling (`req/38_ERRATA_2026-08-07.md` §5). 42 §1.2 says
-/// 「CLI/API/ログの人間可読表示・**JSON埋め込み**はすべてこの形式を正とする」, so a human-readable
+/// "human-readable display in CLI/API/logs and **JSON embedding** all take this form as canonical"
+/// (quoted in SEM-gx-core-070), so a human-readable
 /// format gets `gx1:<base32>` and not an array of numbers. That is why `is_human_readable` is
 /// consulted here and why [`Cid::to_text`] exists in this crate at all: a serializer that has to
 /// mint the spelling cannot be a layer that does not know it. req/31 §1(b) and §11 read the
@@ -152,8 +195,8 @@ const CID_TEXT_PREFIX: &str = "gx1:";
 /// written out here rather than upcased-then-lowered through some other crate's table.
 const CID_ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 
-/// 256 bits at five bits a character, rounded up. 42 §1.2 states the same number as 「32byte→52
-/// 文字」.
+/// 256 bits at five bits a character, rounded up. 42 §1.2 states the same number as "32 bytes ->
+/// 52 characters" (sem: SEM-gx-core-071).
 const CID_BODY_LEN: usize = 52;
 
 /// The four bits at the end of the 52nd character that no digest bit reaches.

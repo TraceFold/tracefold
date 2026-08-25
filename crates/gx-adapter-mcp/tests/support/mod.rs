@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! An MCP server that lives in this process, and the 51 §7 fixture over it.
 //!
-//! 51 §7 逐語: 「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」, so what an
+//! 51 §7, verbatim: "each adapter crate inherits the contract tests merely by calling this harness from `#[test]`", so what an (sem: SEM-gx-adapter-mcp-345)
 //! adapter's author writes is [`McpFixture`] and nothing else. Its length is the **third** measurement
 //! of whether the eleven-method `Fixture` of M4 hand 3 is a reasonable ask (**M4H3-9**), and
 //! `mcp_conformance.rs` prints it beside the other two.
@@ -8,8 +10,8 @@
 //! # Why the server is here rather than on a socket
 //!
 //! Because what this crate ships is a boundary, not a client: `Cargo.toml` argues that a linked MCP
-//! library would be a **second road** to a substrate whose acceptance criterion is 「バイパス手段が技術的
-//! に存在しない」. So a deployment writes the transport, and the smallest honest stand-in for one is a
+//! library would be a **second road** to a substrate whose acceptance criterion is "no bypass route technically (sem: SEM-gx-adapter-mcp-346)
+//! exists". So a deployment writes the transport, and the smallest honest stand-in for one is a (sem: SEM-gx-adapter-mcp-347)
 //! transport written here -- which also makes the fixture able to do what 51 §7 needs and a socket
 //! could not: move the substrate **behind the adapter's back** ([`gx_substrate_conformance::Fixture::disturb`])
 //! and count what arrived.
@@ -36,7 +38,7 @@ use gx_substrate_conformance::Fixture;
 
 /// The server this fixture points at.
 pub const SERVER: &str = "https://mcp.example/sse";
-/// A second server, for 51 §7's 可換 case.
+/// A second server, for 51 §7's commuting case. (sem: SEM-gx-adapter-mcp-348)
 pub const OTHER_SERVER: &str = "stdio://second-server";
 /// The resource a change is about.
 pub const SUBJECT: &str = "file:///srv/notes.md";
@@ -132,7 +134,7 @@ impl FakeServer {
     }
 
     /// How many calls arrived with an admission naming a **different** delta. Zero, always: the
-    /// counter exists so that 「the token matches」 is measured rather than assumed.
+    /// counter exists so that "the token matches" is measured rather than assumed. (sem: SEM-gx-adapter-mcp-349)
     #[must_use]
     pub fn unmatched_admissions(&self) -> usize {
         self.unmatched_admissions.load(Ordering::SeqCst)
@@ -175,7 +177,7 @@ impl ToolTransport for FakeServer {
         })
     }
 
-    fn call(&self, call: &ToolCall, admitted: &Admitted) -> Result<()> {
+    fn call(&self, call: &ToolCall, admitted: &Admitted) -> Result<Vec<u8>> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         if call.delta() != admitted.delta() {
             self.unmatched_admissions.fetch_add(1, Ordering::SeqCst);
@@ -188,17 +190,20 @@ impl ToolTransport for FakeServer {
                 detail: format!("this fixture is one server ({SERVER}) and that is another"),
             });
         }
+        // What this server answers: a minimal `{"ok":true}` — the transport contract's shape
+        // (result content bytes) without pretending this fixture assigns do-time values. The
+        // two-phase tests bring their own answering transport.
         match call.tool() {
             WRITE_TOOL => {
                 self.write_behind_the_adapter(call.resource(), call.arguments());
-                Ok(())
+                Ok(b"{\"ok\":true}".to_vec())
             }
             RESTORE_TOOL => {
                 let payload = decode_restore(call.arguments())?;
                 self.write_behind_the_adapter(&payload.uri, &payload.contents.0);
-                Ok(())
+                Ok(b"{\"ok\":true}".to_vec())
             }
-            NOTIFY_TOOL => Ok(()),
+            NOTIFY_TOOL => Ok(b"{\"ok\":true}".to_vec()),
             other => Err(Error::ApplyFailed {
                 detail: format!("this server publishes no tool called {other:?}"),
             }),
@@ -428,9 +433,9 @@ impl Fixture for McpFixture {
         Some((delta, pre))
     }
 
-    /// 51 §7's 可換 case: two calls on **two servers**.
+    /// 51 §7's commuting case: two calls on **two servers**. (sem: SEM-gx-adapter-mcp-350)
     ///
-    /// Not 「two resources」 -- the crate root argues why a tool call's footprint is its server, and
+    /// Not "two resources" -- the crate root argues why a tool call's footprint is its server, and (sem: SEM-gx-adapter-mcp-351)
     /// `mcp_commutation.rs` measures the case that difference decides.
     fn commuting_pair(&self) -> Option<(PlannedDelta, PlannedDelta)> {
         Some((
@@ -444,7 +449,7 @@ impl Fixture for McpFixture {
         ))
     }
 
-    /// 51 §7's 非可換 case: two calls on one server.
+    /// 51 §7's non-commuting case: two calls on one server. (sem: SEM-gx-adapter-mcp-352)
     fn conflicting_pair(&self) -> Option<(PlannedDelta, PlannedDelta)> {
         let subject = self.locator();
         Some((

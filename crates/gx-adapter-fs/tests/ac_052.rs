@@ -1,19 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-052 (FR-047) — two changes are independent, or one of them is held back and named.
 //!
-//! AC-052 逐語: 「Given: fs/git/mcp各adapterについて可換な2delta（例: 別ファイルへの書き込み）と非可換な
-//! 2delta（同一ファイルへの競合書き込み）。When: `adapter.commutation(a,b)`を呼ぶ。Then: 可換ペアで
-//! `Commutes`、非可換ペアで`Conflicts{residual}`（各adapter最低1組ずつ、計6ケース）。」判定方法: 「unit」.
+//! AC-052, verbatim: "Given: for each fs/git/mcp adapter, a commuting pair of 2 deltas (e.g. writes to
+//! different files) and a non-commuting pair of 2 deltas (a conflicting write to the same file). When: `adapter.commutation(a,b)` is called. Then: for a commuting pair
+//! `Commutes`, for a non-commuting pair `Conflicts{residual}` (at least one pair per adapter, 6 cases total)." Judgment method: "unit". (sem: SEM-gx-adapter-fs-126)
 //! This file is the **fs third** of those six cases; git and mcp are M7 (**N-03**).
 //!
 //! # What the criterion does not look at, and this file does
 //!
-//! AC-052 stops at the shape of the answer. req/38 §28 **M4-14** asks for one thing more -- 「手6 に
-//! 「residual CID が test harness 内で解決可能」の判別 test」 -- because `Conflicts` carries a
-//! `DeltaRef` and a reference whose referent nobody can produce is 「指し先の無い CID」. So the
+//! AC-052 stops at the shape of the answer. req/38 §28 **M4-14** asks for one thing more -- "a discrimination test in
+//! hand 6 for whether the residual CID is resolvable within the test harness" -- because `Conflicts` carries a
+//! `DeltaRef` and a reference whose referent nobody can produce is "a CID with nowhere to point". So the (sem: SEM-gx-adapter-fs-127)
 //! residual's **contents** are measured here: the CID is re-derived from the delta the adapter says
 //! is held back, and a reference nobody minted is shown not to be it.
 //!
-//! # 対称 and 反射 (**M4-25 採(a)**)
+//! # Symmetry and reflexivity (**M4-25, adopted (a)**) (sem: SEM-gx-adapter-fs-128)
 //!
 //! 41 §4 and 51 §7 leave the relation between `commutation(a,b)` and `commutation(b,a)` unwritten;
 //! §28 added it and fixed `commutation(a,a)` at `Conflicts`. L6 in the shared harness is where those
@@ -54,7 +56,7 @@ fn change(locator: &str, content: &[u8]) -> PlannedDelta {
 // AC-052's two cases
 // ---------------------------------------------------------------------------
 
-/// 可換: 「別ファイルへの書き込み」 answers `Commutes`.
+/// Commuting: "writes to different files" answers `Commutes`. (sem: SEM-gx-adapter-fs-129)
 #[test]
 fn writes_to_two_positions_are_independent() {
     let answer = verdict(&change(HERE, b"one"), &change(BESIDE, b"two"));
@@ -67,7 +69,7 @@ fn writes_to_two_positions_are_independent() {
     );
 }
 
-/// 非可換: 「同一ファイルへの競合書き込み」 answers `Conflicts{residual}`.
+/// Non-commuting: "a conflicting write to the same file" answers `Conflicts{residual}`. (sem: SEM-gx-adapter-fs-130)
 #[test]
 fn two_writes_to_one_position_conflict() {
     let answer = verdict(&change(HERE, b"one"), &change(HERE, b"two"));
@@ -88,8 +90,8 @@ fn two_writes_to_one_position_conflict() {
 /// A removal and a write at one position conflict too: the grammar's shape is not the question.
 ///
 /// Independence is about the **resource**, and both operations of this grammar take the whole file.
-/// A test that only ever paired two writes would leave 「is the verdict about the operation or about
-/// the position」 unmeasured.
+/// A test that only ever paired two writes would leave "is the verdict about the operation or about
+/// the position" unmeasured. (sem: SEM-gx-adapter-fs-131)
 #[test]
 fn a_removal_and_a_write_at_one_position_conflict() {
     let removal = support::removal(HERE);
@@ -108,7 +110,7 @@ fn a_removal_and_a_write_at_one_position_conflict() {
 /// Two spellings of one position conflict, because the verdict is taken after normalisation.
 ///
 /// **E-M4-12** is the reason this is a probe and not a detail. M3-10 fixed a v0.1 policy pack's
-/// effective range at 「locator 級」, so `/a/../a/x` and `/a/x` are one file and two subjects; a
+/// effective range at the "locator level", so `/a/../a/x` and `/a/x` are one file and two subjects; a (sem: SEM-gx-adapter-fs-132)
 /// `commutation` that compared the spellings would answer `Commutes` for two changes to one file,
 /// which is the fail-open direction (43 §8 stops on `Conflicts`).
 #[test]
@@ -133,11 +135,11 @@ fn two_spellings_of_one_position_are_one_resource() {
 
 /// **M4-14**: the residual resolves, and it resolves to the change that is held back.
 ///
-/// req/38 §28 M4-14 逐語: 「E-M4-8 の保管行が residual 本体(adapter が鋳造する `PlannedDelta`)も覆う=
-/// 「指し先の無い CID」は保管義務違反として排除。手6 に「residual CID が test harness 内で解決可能」の
-/// 判別 test」.
+/// req/38 §28 M4-14, verbatim: "the storage-obligation line of E-M4-8 also covers the residual body (the
+/// `PlannedDelta` the adapter mints) = 'a CID with nowhere to point' is excluded as a storage-obligation violation. A discrimination test in hand 6 for
+/// whether the residual CID is resolvable within the test harness". (sem: SEM-gx-adapter-fs-133)
 ///
-/// There is no delta store in M4 -- that is the engine's, in M5 (**E-M4-8**) -- so 「解決可能」 here
+/// There is no delta store in M4 -- that is the engine's, in M5 (**E-M4-8**) -- so "resolvable" here (sem: SEM-gx-adapter-fs-134)
 /// means the body can be **constructed** from what the caller already has: this adapter's residual is
 /// the second delta itself, re-minted at the normalised spelling of its position. When the payload
 /// was already normalised (everything `plan` writes is), the residual *is* `b.reference()`, and the
@@ -159,12 +161,12 @@ fn the_residual_names_the_delta_that_is_held_back() {
         &residual,
         b.reference(),
         "the residual is the later change itself: for whole-file replacement nothing of it is \
-         independent of the first, which is 42 §3.6's 「独立でない部分」 at this grammar's size"
+         independent of the first, which is 42 §3.6's 'the part that is not independent' at this grammar's size (sem: SEM-gx-adapter-fs-135)"
     );
     assert_ne!(
         &residual,
         a.reference(),
-        "the residual named the first delta, so 「後勝ち」 and 「先勝ち」 would be one answer"
+        "the residual named the first delta, so 'last wins' and 'first wins' would be one answer (sem: SEM-gx-adapter-fs-136)"
     );
 
     // The body, reconstructed rather than looked up -- the discrimination M4-14 asks for. A
@@ -189,7 +191,7 @@ fn the_residual_names_the_delta_that_is_held_back() {
     // 🔴 The residual is minted at the **position** and not at the spelling it arrived in. A payload
     // written by hand can name one position any way L7 admits, and a residual carrying the caller's
     // spelling would put a second name for one change into a receipt -- M3-10 fixed the gate's
-    // effective range at 「locator 級」, so two names are two subjects. Mutation (e) of
+    // effective range at the "locator level", so two names are two subjects. Mutation (e) of (sem: SEM-gx-adapter-fs-137)
     // `tools/verify_m4h6.sh` survived its first run because nothing here said this; the probe was
     // the thing that was wrong, and this is the repair (req/75 §1.9).
     let roundabout = spelled("/tmp/glovrex-ac052/beside/../subject", b"two");
@@ -208,7 +210,7 @@ fn the_residual_names_the_delta_that_is_held_back() {
 
 /// The half that makes the probe above a measurement: a reference nobody minted is not the residual.
 ///
-/// Without it, 「the residual resolves」 would be satisfied by an adapter that answered with a
+/// Without it, "the residual resolves" would be satisfied by an adapter that answered with a (sem: SEM-gx-adapter-fs-138)
 /// constant, which is the B-3 shape (req/67 §2.1) at the size of one CID. The mock's
 /// `a_reference_nobody_minted_does_not_resolve` (hand 3) is the same probe against a store; this is
 /// its form for an adapter that has none.
@@ -234,9 +236,9 @@ fn a_reference_nobody_minted_is_not_the_residual() {
 // M4-25: symmetry and the reflexive case
 // ---------------------------------------------------------------------------
 
-/// **M4-25 採(a)**: the verdict is the same both ways round, and the residual is not.
+/// **M4-25, adopted (a)**: the verdict is the same both ways round, and the residual is not. (sem: SEM-gx-adapter-fs-139)
 ///
-/// The first half is the ruling: 「`commutation` の**対称性を契約に**足し L6 property で測る」, and DPO
+/// The first half is the ruling: "commutation's **symmetry is added to the contract** and measured by the L6 property", and DPO (sem: SEM-gx-adapter-fs-140)
 /// parallel independence is a symmetric relation, so the asymmetric reading was never the intended
 /// one. This adapter gets it structurally -- the answer is decided by `position(a) == position(b)`,
 /// which is a question about an unordered pair -- rather than by two branches that agree.
@@ -267,13 +269,13 @@ fn the_verdict_does_not_depend_on_the_order_of_the_arguments() {
         );
         assert!(
             agree,
-            "the {name} pair answers {forward:?} one way and {backward:?} the other (M4-25 採(a))"
+            "the {name} pair answers {forward:?} one way and {backward:?} the other (M4-25, adopted (a)) (sem: SEM-gx-adapter-fs-141)"
         );
         if name == "dependent" {
             assert!(
                 !residuals_agree,
-                "the two directions named one residual, so 「held back」 stopped being a property of \
-                 the order -- which would make the seam in `req/75` §2 moot and this probe stale"
+                "the two directions named one residual, so 'held back' stopped being a property of \
+                 the order -- which would make the seam in `req/75` §2 moot and this probe stale (sem: SEM-gx-adapter-fs-142)"
             );
         }
     }
@@ -281,10 +283,10 @@ fn the_verdict_does_not_depend_on_the_order_of_the_arguments() {
 
 /// **M4-25**'s reflexive clause: `commutation(a,a)` is `Conflicts`.
 ///
-/// 「同一資源への二重干渉=保守側 fail-closed・DPO 並列独立性は同一 match で一般に不成立」. The
+/// "double interference on the same resource = the conservative side is fail-closed; DPO parallel independence generally does not hold for the same match". The (sem: SEM-gx-adapter-fs-143)
 /// conservative side matters because 43 §8 acts on the answer: a `Commutes` lets two changes proceed
 /// together, so a false `Commutes` is the fail-open direction and this is the case where the fail-open
-/// answer is easiest to produce by accident (a comparison that returns 「no difference」).
+/// answer is easiest to produce by accident (a comparison that returns "no difference"). (sem: SEM-gx-adapter-fs-144)
 #[test]
 fn a_delta_does_not_commute_with_itself() {
     let a = change(HERE, b"one");
@@ -328,10 +330,10 @@ fn a_delta_from_another_adapter_is_refused_from_either_slot() {
 
 /// `commutation` answers without reading the substrate, and the source is where that is measured.
 ///
-/// It is not an accident of this grammar but a consequence of it: under **M4-13 採(a)** every
-/// operation takes the whole file, so 「do these two touch one resource」 is decidable from the two
-/// payloads alone. That is also what makes AC-053's 「engineパイプライン外」 easy -- there is nothing
-/// for a pipeline to supply. The scan reads code lines only (§30's rule about 「無い事」 greps).
+/// It is not an accident of this grammar but a consequence of it: under **M4-13, adopted (a)** every
+/// operation takes the whole file, so "do these two touch one resource" is decidable from the two
+/// payloads alone. That is also what makes AC-053's "outside the engine pipeline" easy -- there is nothing
+/// for a pipeline to supply. The scan reads code lines only (§30's rule about "absence" greps). (sem: SEM-gx-adapter-fs-145)
 #[test]
 fn the_module_that_answers_reads_no_filesystem() {
     let src = std::fs::read_to_string(
@@ -373,8 +375,10 @@ fn the_fixture_supplies_both_of_the_two_cases() {
     use gx_substrate_conformance::Fixture;
 
     let fixture = support::FsFixture::new();
-    let (a, b) = fixture.commuting_pair().expect("51 §7's 可換 case");
-    let (c, d) = fixture.conflicting_pair().expect("51 §7's 非可換 case");
+    let (a, b) = fixture.commuting_pair().expect("51 §7's commuting case"); // (sem: SEM-gx-adapter-fs-146)
+    let (c, d) = fixture
+        .conflicting_pair()
+        .expect("51 §7's non-commuting case");
     assert_eq!(verdict(&a, &b), Commutation::Commutes);
     assert!(matches!(verdict(&c, &d), Commutation::Conflicts { .. }));
 

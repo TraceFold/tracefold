@@ -1,0 +1,91 @@
+# Example: fail CI when a delivery has no gx receipt, or the receipt does not verify offline.
+#
+# Copy this into your own repository's .github/workflows/ and adjust the env vars at the top
+# of the "verify offline" step. It is a copy-paste starting point, not a wired job in this
+# repository's own CI (this repo verifies its own receipts through its test suite instead,
+# not through this file) -- req/382.
+#
+# It assumes the delivery ships three files alongside the change: a gx commit receipt, a
+# checkpoint the recipient already trusts, and the public key that checkpoint was signed
+# with. That is the same third-party bundle docs/TUTORIAL.md's "Verify offline" section
+# walks by hand; this workflow only automates the same three-file check.
+#
+# If the receipt does not travel as a file beside the change but is attached to an OCI
+# subject, this file is the wrong tool: `.github/actions/oci-receipt-discover` (req/461,
+# DR-46-29) already pulls the referrer and hands it to the same `gx receipt verify --offline`.
+# The two cover different delivery shapes -- a file in the tree, and a referrer in a registry
+# -- and neither replaces the other.
+#
+# Limit, stated plainly (docs/LIMITS.md): a green run here means the receipt is genuine and
+# included in the log at the checkpoint's tree size. It says nothing about whether the
+# change the receipt describes was itself correct -- that judgment stays with policy and
+# review, not with this check.
+
+name: receipt-check
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      RECEIPT_FILE: receipt.json
+      CHECKPOINT_FILE: checkpoint.json
+      TRUSTED_KEY_FILE: trusted_key.json
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs the gx CLI. Built from source on purpose: as of 2026-08-22 there is no
+      # published software release to install from. `releases/latest` on TraceFold/tracefold
+      # resolves to `figures-2026-08-19`, a tag whose assets are seven PNGs -- an installer
+      # download against it answers 404, measured (req/515 §2). Building takes minutes a
+      # release would not, and that is the honest cost today.
+      #
+      # `--rev` rather than a version tag: the repository publishes no version tags yet
+      # (`figures-2026-08-19` and `brand-assets` are the only two), so a commit sha is the
+      # only pin that means anything. Replace it with a tag once one exists.
+      - name: install gx
+        run: |
+          cargo install --locked --git https://github.com/TraceFold/tracefold \
+            --rev REPLACE_WITH_A_COMMIT_SHA gx-cli
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      # Once a cargo-dist release exists, this replaces the step above and takes seconds.
+      # Left commented rather than deleted so the swap is one edit. Note the asset is named
+      # after the *package* (`gx-cli`), not the binary (`gx`) -- cargo-dist names the shell
+      # installer `<app>-installer.sh` and the app here is the package `gx-cli`. Unverified:
+      # no release has been cut, so nobody has fetched this URL and seen it work.
+      # - name: install gx (published release -- does not exist yet)
+      #   run: |
+      #     curl --proto '=https' --tlsv1.2 -LsSf \
+      #       https://github.com/TraceFold/tracefold/releases/download/<TAG>/gx-cli-installer.sh | sh
+      #     echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: receipt present
+        run: |
+          if [ ! -f "$RECEIPT_FILE" ]; then
+            echo "::error::no gx receipt at $RECEIPT_FILE -- delivery rejected"
+            exit 1
+          fi
+
+      # 44 §1.4's exit 7 ("offline verification failure") is what a bad receipt returns;
+      # this step just lets that exit code fail the job, unchanged. See
+      # crates/gx-cli/src/exit.rs for the full table.
+      #
+      # The three files below are the whole bundle only while the checkpoint names the same
+      # tree the receipt's proof does. If the log has grown since the receipt was issued --
+      # the normal case for anything but the newest entry -- the anchor is a head of a larger
+      # tree, and without a fourth file the answer is `"inclusion":"unbridged"`, which also
+      # exits 7. That is a red job for a receipt that is not actually bad. Ship a consistency
+      # proof (`gx log consistency --from <receipt tree_size> --to <checkpoint tree_size>`,
+      # docs/TUTORIAL.md §7) with the delivery and add `--consistency` here when the delivery
+      # is not always anchored at its own tree size.
+      - name: verify offline
+        run: |
+          gx receipt verify "$RECEIPT_FILE" --offline \
+            --checkpoint "$CHECKPOINT_FILE" \
+            --checkpoint-key "$TRUSTED_KEY_FILE" \
+            --key "$TRUSTED_KEY_FILE"
+          #   --consistency "$BRIDGE_FILE"

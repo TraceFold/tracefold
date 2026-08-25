@@ -1,17 +1,17 @@
 {
   "id": "A-5",
   "kind": "codec-deviation",
-  "statement": "map の key が bytewise 昇順に並んでいない byte 列は decode されない",
+  "statement": "A byte string whose map keys are not in bytewise ascending order is not decoded",
   "vector": "a2616201616102",
   "expected": "REJECT",
   "normative_basis": "IPLD-SHOULD+gx-policy",
   "tier": "Tier2",
-  "deviation": "{\"b\":1,\"a\":2} を出現順のまま書いた。要求は \"a\" が先。",
+  "deviation": "Wrote {\"b\":1,\"a\":2} in appearance order as-is. The requirement is that \"a\" comes first.",
   "spec_anchor": "ipld/ipld@a65340b spec.md L58 / RFC 8949 §4.2.1(c) / 42 §2.1-2 / req/33 §2 A-5",
   "origin": "gx self-authored from spec (req/33 §2)",
   "control": {
     "vector": "a2616101616202",
     "expected": "ACCEPT",
-    "note": "同じ map を昇順で書いた物"
+    "note": "The same map written in ascending order"
   }
 }

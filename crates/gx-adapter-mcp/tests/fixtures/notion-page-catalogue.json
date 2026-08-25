@@ -1,0 +1,8 @@
+{
+  "API-post-page": {
+    "restored_by": "API-delete-a-block",
+    "arguments": {
+      "block_id": { "do_result": "/id" }
+    }
+  }
+}

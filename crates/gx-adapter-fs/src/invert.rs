@@ -1,23 +1,25 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `invert`: the delta that puts a position back, built while the old bytes are still there.
 //!
 //! Spec: 41 §4 for the method and for DR-1(a), 42 §5 for why the escrow carries a body, 34 AC-048
 //! and AC-049 for what is measured. The rulings are **E-M4-30** (the escrow is constructed **before**
-//! `apply`), **E-M4-3** (the round trip is quantified at the one `pre` handed in), **M4-21 採(a)**
+//! `apply`), **E-M4-3** (the round trip is quantified at the one `pre` handed in), **M4-21, adopted (a)** (sem: SEM-gx-adapter-fs-050)
 //! (the payload ceiling and its `Ok(None)`) and **E-M4-5** (an engine folds `Some`/`None` into
 //! `GateInput.invert_available` at verify time).
 //!
 //! # 🔴 Why this module reads the substrate, and why the order is not negotiable
 //!
-//! **E-M4-30** (req/38 §31 M4H3-1 採(a)) 逐語:
+//! **E-M4-30** (req/38 §31 M4H3-1, adopted (a)), verbatim: (sem: SEM-gx-adapter-fs-051)
 //!
-//! > 「escrow(invert)は apply の前(43 T-10b が state machine の正本)。根拠は物理: 上書き/削除の逆は旧内容
-//! > 本体を運ぶ(42 §5 の escrow 必須理由)ので、**invert は pre が観測可能な時点でしか構成できない**——
-//! > T-10b 順が唯一 constructible であり、逐語順を満たせるのは自前履歴を持つ adapter だけ」
+//! > "escrow (invert) comes before apply (43 T-10b is state machine's canonical source). The reason is physical: the inverse of an overwrite/deletion carries the old content's
+//! > body (42 §5's reason the escrow is required), so **invert can only be constructed at the point where pre is observable** --
+//! > T-10b's order is the only constructible one, and only an adapter that keeps its own history could satisfy the verbatim order" (sem: SEM-gx-adapter-fs-052)
 //!
-//! This adapter keeps no history. The inverse of a whole-file replacement is 「put back what is here」,
-//! and 「what is here」 exists only until `apply` runs. So [`invert`] reads the position, and the caller
-//! is required by 43 T-10b to call it first. That is also why 42 §5 wants the **body**: 「digest-only
-//! では実際のundoが物理的に不可能なため」.
+//! This adapter keeps no history. The inverse of a whole-file replacement is "put back what is here",
+//! and "what is here" exists only until `apply` runs. So `invert` (private) reads the position, and the caller (sem: SEM-gx-adapter-fs-053)
+//! is required by 43 T-10b to call it first. That is also why 42 §5 wants the **body**: "because a digest-only inverse
+//! makes an actual undo physically impossible". (sem: SEM-gx-adapter-fs-054)
 //!
 //! # The inverse is a function of the state, not of the forward operation's shape
 //!
@@ -26,8 +28,8 @@
 //!
 //! | at the escrow point | inverse | the case it undoes |
 //! |---|---|---|
-//! | a file with content *c* | write *c* back | 変更 and 削除 |
-//! | nothing | remove | 作成 |
+//! | a file with content *c* | write *c* back | change and deletion |
+//! | nothing | remove | creation | (sem: SEM-gx-adapter-fs-055)
 //!
 //! The second arm also gives the right answer to a removal of something that is already gone: the
 //! forward delta is a no-op and its inverse is a removal, which is a no-op too. Nothing special-cases
@@ -38,14 +40,14 @@
 //! `pre` is an [`ObjectSnapshot`]: 42 §3.3 gives it a digest and not the bytes, so it cannot be the
 //! source of the body an inverse carries. What it is instead:
 //!
-//! 1. **the Given the law is quantified at** -- 「`invert` に渡した `pre` の 1 点」 (**E-M4-3**), which
+//! 1. **the Given the law is quantified at** -- "the one `pre` passed to `invert`" (**E-M4-3**), which (sem: SEM-gx-adapter-fs-056)
 //!    the harness writes into the property's message and `tests/ac_049.rs` into each case's;
 //! 2. **a statement of which object this question is about**. A `pre` naming another position is a
 //!    mis-wired call and is refused as one (**E-M4-32**) -- see below.
 //!
 //! It is deliberately **not** compared with the position's current digest. **E-M4-5** settled that a
 //! prediction going stale between verify and commit is folded by the CAS check into an `Abort`
-//! (「予測が外れた変換は Fingerprint 不一致で apply に到達しない」), so an adapter that refused here would
+//! ("a transformation whose prediction went wrong never reaches apply, because of a Fingerprint mismatch"), so an adapter that refused here would (sem: SEM-gx-adapter-fs-057)
 //! be turning a state machine transition into an error at a layer that does not own the decision.
 
 use gx_core::{ObjectSnapshot, SubstrateKind};
@@ -58,12 +60,12 @@ use crate::locator;
 ///
 /// # The one reason for `Ok(None)` (**E-M4-32** narrowed it to this)
 ///
-/// 41 §4 separates 「the question itself cannot be answered」 (`Err`) from 「the answer is no inverse」
+/// 41 §4 separates "the question itself cannot be answered" (`Err`) from "the answer is no inverse" (sem: SEM-gx-adapter-fs-058)
 /// (`Ok(None)`), and **E-M3-4** makes the second an escalation to a human rather than a refusal to
-/// act. §33 fixed which facts may take the second form: 「**`Ok(None)` は「同一 object の正当な構成
-/// 不能」(上限超過・旧内容破棄済み)に限定**」. For this adapter, in v0.1, that leaves exactly one:
+/// act. §33 fixed which facts may take the second form: "**`Ok(None)` is limited to 'a legitimate construction of the
+/// same object is not possible' (over the ceiling, or the old content already discarded)**". For this adapter, in v0.1, that leaves exactly one: (sem: SEM-gx-adapter-fs-059)
 ///
-/// * **The escrow ceiling** (**M4-21 採(a)**, 「AC-048 の None の実在する第 1 の理由」). An inverse
+/// * **The escrow ceiling** (**M4-21, adopted (a)**, "the 1st reason AC-048's `None` actually occurs"). An inverse (sem: SEM-gx-adapter-fs-060)
 ///   carries the whole old file, so an undoable change over a large file costs its size twice. Over
 ///   [`MAX_INVERSE_PAYLOAD_BYTES`] this adapter declines, and the change is escalated instead of
 ///   being quietly made unundoable.
@@ -72,7 +74,7 @@ use crate::locator;
 /// against itself (req/74 §2 M4H5-1). **E-M4-32** took the other case, and the argument is
 /// **E-M4-27**'s: a delta and a snapshot of two different objects is a wiring bug in whoever
 /// assembled the call, and answering `Ok(None)` would send it down the escalation path wearing the
-/// face of a legitimate business condition. An operator asked 「this change cannot be undone, proceed?」
+/// face of a legitimate business condition. An operator asked "this change cannot be undone, proceed?" (sem: SEM-gx-adapter-fs-061)
 /// would be answering the wrong question about a call that should never have been made.
 ///
 /// # Errors

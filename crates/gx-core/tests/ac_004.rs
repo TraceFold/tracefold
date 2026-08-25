@@ -1,12 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-004 (FR-004) — `ChangeContext` survives a serde round trip on every variant.
 //!
-//! AC-004 逐語: 「Given: `ChangeContext`の全variant（`Time, Evidence, Policy, Model,
-//! Representation, Substrate, Custom("x")`）をランダム生成するproptest strategy。When: 各値を
-//! serdeでencode→decode。Then: 得られた値が元の値とbit-equal（`Custom`の任意文字列を含む）。」
+//! AC-004, verbatim (quoted in SEM-gx-core-109): "Given: a proptest strategy that randomly
+//! generates every variant of `ChangeContext` (`Time, Evidence, Policy, Model, Representation,
+//! Substrate, Custom("x")`). When: each value is encoded then decoded with serde. Then: the value
+//! obtained is bit-equal to the original (including any string in `Custom`)."
 //!
 //! The AC names serde but no format, and gx-core may not name gx-canon (A-1), so the concrete
 //! format here is `serde_json` from dev-dependencies. That is deliberately *not* the canonical
-//! encoding: canonical DAG-CBOR round trips are AC-009/AC-012 on the gx-canon side (A-4 面1),
+//! encoding: canonical DAG-CBOR round trips are AC-009/AC-012 on the gx-canon side (A-4, face 1;
+//! sem: SEM-gx-core-110),
 //! and this file only asserts that the derive is present and total over the variants.
 //!
 //! "bit-equal" is read at both ends -- the decoded value equals the original, and re-encoding
@@ -24,7 +28,8 @@ fn any_change_context() -> impl Strategy<Value = ChangeContext> {
         Just(ChangeContext::Model),
         Just(ChangeContext::Representation),
         Just(ChangeContext::Substrate),
-        // Arbitrary string, not `"x"`: the AC says `Custom`の任意文字列を含む. `.*` covers the
+        // Arbitrary string, not `"x"`: the AC says "including any string in `Custom`" (sem:
+        // SEM-gx-core-111). `.*` covers the
         // empty string, quotes, and non-ASCII, which is where a hand-rolled encoder would break.
         ".*".prop_map(ChangeContext::Custom),
     ]

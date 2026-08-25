@@ -1,4 +1,17 @@
-//! The receipt: what was decided, over what, signed, and checkable by a stranger with no network.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The receipt: what was decided, over what, signed, and checkable by a stranger with no network. (sem:
+//! SEM-gx-witness-060, SEM-gx-witness-061, SEM-gx-witness-062, SEM-gx-witness-063, SEM-gx-witness-064,
+//! SEM-gx-witness-065, SEM-gx-witness-066, SEM-gx-witness-067, SEM-gx-witness-068, SEM-gx-witness-069,
+//! SEM-gx-witness-070, SEM-gx-witness-071, SEM-gx-witness-072, SEM-gx-witness-073, SEM-gx-witness-074,
+//! SEM-gx-witness-075, SEM-gx-witness-076, SEM-gx-witness-077, SEM-gx-witness-078, SEM-gx-witness-079,
+//! SEM-gx-witness-080, SEM-gx-witness-081, SEM-gx-witness-082, SEM-gx-witness-083, SEM-gx-witness-084,
+//! SEM-gx-witness-085, SEM-gx-witness-086, SEM-gx-witness-087, SEM-gx-witness-088, SEM-gx-witness-089,
+//! SEM-gx-witness-090, SEM-gx-witness-091, SEM-gx-witness-092, SEM-gx-witness-093, SEM-gx-witness-094,
+//! SEM-gx-witness-095, SEM-gx-witness-096, SEM-gx-witness-097, SEM-gx-witness-098, SEM-gx-witness-099,
+//! SEM-gx-witness-100, SEM-gx-witness-101, SEM-gx-witness-102, SEM-gx-witness-103, SEM-gx-witness-104,
+//! SEM-gx-witness-105, SEM-gx-witness-106, SEM-gx-witness-107, SEM-gx-witness-108, SEM-gx-witness-109,
+//! SEM-gx-witness-110, SEM-gx-witness-111)
 //!
 //! Spec: 42 §3.10 for the field tables and for ASM-14's two kinds, 42 §1.3 for what the payload's
 //! identity covers, 43 T-4a/b/c and T-11 for when each kind is issued, 32 FR-018 for the
@@ -8,8 +21,8 @@
 //!
 //! * **E-M2-6** (`req/38_ERRATA_2026-08-07.md` §8) -- `issued_at` leaves the signed core. 42 §3.10
 //!   lists it among the payload's fields and 43 T-11 lists what a receipt's signature covers with
-//!   no clock in it; the erratum rules 43 correct and CM-5 the principle (「signed payload から
-//!   clock read 排除」). So the timestamp is on [`Receipt`], beside the envelope, and out of
+//!   no clock in it; the erratum rules 43 correct and CM-5 the principle ("exclude the clock read
+//!   from the signed payload"). So the timestamp is on [`Receipt`], beside the envelope, and out of
 //!   [`ReceiptPayload`].
 //! * **E-M2-7** (§8) -- `fail_posture_engaged: bool` is **added**. 35 ASM-13 and 43 T-4e require a
 //!   verdict receipt to record that the fail-closed posture was engaged, and 42 §3.10's table has
@@ -26,9 +39,9 @@
 //!
 //! # The two kinds, and what offline verification does with them (ASM-14)
 //!
-//! 42 §3.10: 「`VerdictReceipt`（全`Verdict`＝Admit/Deny/Escalateで発行、43 T-4a/T-4b/T-4c）と
-//! `CommitReceipt`（commit成功時のみ発行、43 T-11）。両者とも同一の`DsseEnvelope`/`ReceiptPayload`
-//! スキーマを共有し、`ReceiptPayload.receipt_kind`で判別する」. One schema, one discriminant, and
+//! 42 §3.10: "`VerdictReceipt` (issued for every `Verdict` = Admit/Deny/Escalate, 43 T-4a/T-4b/T-4c) and
+//! `CommitReceipt` (issued only on commit success, 43 T-11). Both share the same `DsseEnvelope`/`ReceiptPayload`
+//! schema and are told apart by `ReceiptPayload.receipt_kind`". One schema, one discriminant, and
 //! two different obligations:
 //!
 //! | | `VerdictReceipt` | `CommitReceipt` |
@@ -43,19 +56,20 @@
 //!
 //! # `enforced` is not checked, and 42 says it should be
 //!
-//! 42 §3.10 writes 「`VerdictReceipt`では意味を持たないため`true`固定」 while 35 ASM-13 and 43 T-4e
-//! require a verdict-stage receipt to carry `enforced=false` together with `fail_posture_engaged=
-//! true`. req/49 §3 M2-9 raised the collision and its 既定案 is 「field を 1 本足し、`VerdictReceipt`
-//! の true 固定を**条件つきに読み替える**」; E-M2-7 (§8) adopted the first half. The second half is
+//! 42 §3.10 writes "fixed to `true` because it carries no meaning on `VerdictReceipt`" while 35
+//! ASM-13 and 43 T-4e require a verdict-stage receipt to carry `enforced=false` together with
+//! `fail_posture_engaged= true`. req/49 §3 M2-9 raised the collision and its default proposal is
+//! "add one field, and reread `VerdictReceipt`'s fixed `true` **conditionally**"; E-M2-7 (§8)
+//! adopted the first half. The second half is
 //! what this file does by *not* asserting a value: both booleans are legal on both kinds, and
 //! `tests/receipt_kind_branch.rs` pins that a verdict receipt with `enforced=false` verifies. A
-//! schema check that enforced 42's 固定 would refuse the receipt ASM-13 requires.
+//! schema check that enforced 42's fixed value would refuse the receipt ASM-13 requires.
 
 use gx_canon::cid::IdentityView;
 use gx_canon::{cbor, cid};
 use gx_core::{
-    Checkpoint, Cid, DsseSignature, FingerprintBytes, InclusionProof, KeyId, Timestamp,
-    TransformationId, VerdictKind,
+    BoundaryStage, Checkpoint, Cid, DeterminismBoundary, DsseSignature, FingerprintBytes,
+    InclusionProof, KeyId, Reversibility, Timestamp, TransformationId, VerdictKind,
 };
 use gx_log::LedgerLeaf;
 use serde::{Deserialize, Serialize};
@@ -82,15 +96,16 @@ pub enum ReceiptKind {
 /// under **gx-engine** while req/49 §1 N-03 forbade M2 from creating it -- so hand 5's typed form
 /// would have minted a reserved name early. What it did instead was declare the three literals once
 /// in a `pub const VERDICT_KINDS: [&str; 3]` and have `VerdictSummary::check` refuse anything else
-/// at verification time, with the debt written into H5-8: 「M3 で `VerdictKind` が生えたら型化へ
-/// 寄せる」.
+/// at verification time, with the debt written into H5-8: "once `VerdictKind` grows in M3, fold it
+/// into the typed form".
 ///
 /// M3 hand 1 is when that falls due. The type could not simply move to gx-gate -- this crate would
 /// then have to name the crate that names it (`GateInput.evidence: &[Evidence]`, 41 §4), which is
 /// M2-1's cycle again -- so **E-M3-2** puts `VerdictKind` in gx-core:
 ///
-/// > 「M3-13(採用): `VerdictKind`(3 値 enum)を **gx-core** へ、`Verdict`(payload つき)は gx-gate。
-/// > gx-witness の `VERDICT_KINDS` 文字列検査は型検査へ置換(H5-8 満期)。循環 0 が機械条件」
+/// > "M3-13 (adopted): `VerdictKind` (the 3-value enum) goes to **gx-core**, `Verdict` (with its
+/// > payload) is gx-gate's. gx-witness's `VERDICT_KINDS` string check is replaced by a type check
+/// > (H5-8 matured). Zero cycles is the machine condition."
 ///
 /// The check moved rather than vanishing, and it moved **earlier**: a payload whose `kind` reads
 /// `"Admitted"` now fails to decode, where before it decoded and `check_schema` refused it two
@@ -100,14 +115,14 @@ pub enum ReceiptKind {
 pub struct VerdictSummary {
     /// 42 §3.10's `"Admit"|"Deny"|"Escalate"`, as [`gx_core::VerdictKind`] (E-M3-2).
     pub kind: VerdictKind,
-    /// 42 §3.10: 「`Verdict`全体ではなくそのCID化digestを埋め込む」.
+    /// 42 §3.10: "embed its CID'd digest, not the whole `Verdict`".
     ///
     /// # Which value, for a verdict that is not `Admit` (req/49 §3 M2-10)
     ///
     /// 41 §3's `Verdict` is `Admit(AdmitProof) | Deny(Vec<Reason>) | Escalate(EscalationTicket)`,
-    /// and 42 §3.10 says only 「proof_digest」 -- which names something only the `Admit` arm has.
-    /// req/49 §3 M2-10's 既定案 is 「Deny=`Vec<Reason>`・Escalate=`EscalationTicket` の CID を取る
-    /// 規則を明記(型自体は M3)」 and no ruling has landed, so this hand writes the rule down and
+    /// and 42 §3.10 says only "`proof_digest`" -- which names something only the `Admit` arm has.
+    /// req/49 §3 M2-10's default proposal is "spell out the rule for taking the CID of
+    /// Deny=`Vec<Reason>`/Escalate=`EscalationTicket` (the type itself is M3's)" and no ruling has landed, so this hand writes the rule down and
     /// implements none of it: all three types are gx-gate (M3) and req/49 §1 N-01 forbids defining
     /// them here. What M2 can do is carry the digest and refuse a receipt that omits it, which is
     /// what the field's non-optionality does. req/54 §4 keeps the ticket open.
@@ -121,18 +136,544 @@ pub struct VerdictSummary {
 // in `VerdictSummary`'s own documentation above rather than deleted, because H5-8 recorded the
 // string form as a *dated* compromise and the date is what makes the type readable.
 
+// ---------------------------------------------------------------------------
+// DR-46-24(A): the read-set, and the granularity tag that is the condition of its existence
+// ---------------------------------------------------------------------------
+
+// 🔴 **DR-46-26** — `pub struct ReadEntry { digest: Cid, locator: String }` stood here, declared by
+// D24 in the window when a receipt was the only thing that carried one. It is now
+// [`gx_core::ReadEntry`], and the paragraph above is kept rather than deleted (no-delete) because it
+// records why the type was ever in this crate.
+//
+// The relocation is **forced by the producer**. DR-46-26 widens `SubstrateAdapter::invert` to return
+// what the escrow read, and `gx-substrate` does not depend on `gx-witness` -- adding that edge would
+// put a receipt crate (and `gx-log` behind it) into the boundary crate's transitive dependencies.
+// `ReadEntry` is `{Cid, String}` and holds nothing this crate owns, so it goes down to `gx-core`;
+// `ReadSet` below, which is paired with the spill threshold and with `gx-log`'s proof arithmetic,
+// stays. The re-export keeps `gx_witness::receipt::ReadEntry` naming the same type it always named.
+pub use gx_core::ReadEntry;
+
+/// Beyond this many distinct objects, a read-set spills from G3 to G4 (`req/38` §236 ruling 2).
+///
+/// 🔴 **The measurement disagrees with the constant, and the constant is what was ruled.**
+/// `req/350` §0 set five by arithmetic over member encodings and put the two-times crossover
+/// between five and six; `tests/d24_read_set_cost.rs` encodes the members instead and finds about
+/// **102 bytes an entry rather than 89**, which moves that crossover to between **four and five**
+/// (`n=4` → 1.878, `n=5` → 2.097). The constant stays at the ruled value because `req/350` §4-5
+/// had already withdrawn the reasoning the number came from — the two-times line is not the
+/// falsifier any more (§7-5) — and changing a ruled constant on the strength of a line nobody is
+/// steering by would be worse than recording that the two do not agree. `req/441` carries it to
+/// the Fable ruling.
+pub const READ_SET_SPILL_THRESHOLD: usize = 5;
+
+/// What the escrow read, at a granularity the reader can tell apart (**DR-46-24(A)**).
+///
+/// # Why the tag is not optional, and not a second field
+///
+/// `req/350` §4-1 made the tag the condition of the whole design:
+///
+/// > The guarantee changes silently at a threshold. The same words "read-set attested" mean
+/// > receipt-alone up to five and path-required from six. A product whose reader cannot tell the
+/// > two apart is worse than a uniformly weaker guarantee. → carrying a granularity tag (`G3`/`G4`)
+/// > as a **required field** on the receipt, and writing the difference into `docs/LIMITS.md`, is
+/// > the condition. Drop the tag and the proposal may be refused.
+///
+/// `req/440` §0-3 then ruled the shape: **one** field, with the tag inside the structure rather
+/// than beside it. That is what an enum is — the tag is the map's single key, so a reader reaches
+/// one member of the payload and the granularity is the first thing in it — and it is why the
+/// alternative (`entries` plus a `granularity` string, two fields) was refused: two fields can
+/// disagree, and this one cannot be built disagreeing.
+///
+/// # What each granularity decides, from the receipt alone
+///
+/// `req/350` §3's table, as [`ReadSet::names`] implements it: **G3 decides**, because the entries
+/// are in the signed bytes. **G4 does not** — the root is a digest, and a digest with no preimage
+/// decides nothing on its own. G4 buys back the same decision at G2's price *given the entries from
+/// somewhere else*, and the "somewhere else" is measured in [`ReadSet::PerEffectRoot`]'s own
+/// documentation.
+/// # 🔴 **DR-46-34** — and the same argument, applied to the absence
+///
+/// `req/38` §268 ruling 5 raised it and `req/472` §6 drafted it: this type used to have exactly the
+/// two members below, and every way of **not** having a read-set was spelled `Option::None` at the
+/// field. `req/498` located the producers and found the collapse total —
+///
+/// | the road | what it means | the remedy it calls for |
+/// |---|---|---|
+/// | `gx_substrate::InvertOutcome::from_option` fixes `Vec::new()` on **both** arms, and T-11 hands the empty list to [`ReadSet::from_reads`] | the escrow ran and touched no object | none; this is a property of the change |
+/// | `gx-engine`'s `rebuilt_attest` ends its `find_map` in `unwrap_or_default()` | a rebuild found **no** `InverseEscrowed` record for this transformation | the record is gone — `gx repair`, and the journal's own retention |
+/// | `gx-engine`'s `InverseEscrowed.reads` is `#[serde(default)]` (E-M5-13's shape) | the record is there and **predates** 42 §3.13's `reads` | nothing is wrong; this project is older than DR-46-26 |
+/// | `issue_verdict_receipt` writes `None` by ASM-14 | the escrow is 43 T-10b and had not run | none; the question was not asked yet |
+///
+/// The first three are `CommitReceipt` facts with three different remedies and they were one
+/// spelling. **The same ruling that put the granularity tag inside the structure puts these there
+/// too** — `req/440` §0-3's "one field, and it cannot be built disagreeing" is an argument about
+/// where a discriminator lives, and it does not stop applying because the thing being discriminated
+/// is an absence. So [`ReadSet::Nothing`], [`ReadSet::NoEscrowRecord`] and
+/// [`ReadSet::ReadsNotJournalled`] are members here rather than a second field beside `read_set`,
+/// and `Option::None` at the field narrows to the fourth row: **a receipt nobody asked**.
+///
+/// # What `None` still means, and why the rule is not tightened to forbid it
+///
+/// A `CommitReceipt` this binary issues always carries `Some`. A `CommitReceipt` **issued before
+/// this lane** carries `null`, and [`ReceiptPayload::check_schema`] deliberately does *not* refuse
+/// it: the payload of an old receipt is bytes that were signed, [`verify_offline`] is a statement
+/// about those bytes, and a schema rule that refused them would break every receipt already in the
+/// field to buy a distinction only new receipts can carry anyway. So `null` on a `CommitReceipt`
+/// reads as "issued before DR-46-34" — a fifth, historical spelling this crate decodes and no
+/// longer writes. The narrowing is enforced on the **producer** side, and
+/// `gx-engine/tests/dr4634_read_set_absence.rs` is what enforces it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReadSet {
+    /// **G3** — one entry per distinct object, in the signed bytes.
+    ///
+    /// About 102 bytes an entry (`tests/d24_read_set_cost.rs`), so a receipt carrying six of them
+    /// is roughly 2.3× the 466-byte payload `req/350` §2-3 took as its baseline.
+    PerRead(Vec<ReadEntry>),
+    /// **G4** — the root of an RFC 6962 tree over those entries, and nothing else.
+    ///
+    /// 52–53 bytes whatever `leaf_count` is, which is the whole reason the spill exists — measured,
+    /// and within a byte of the 1.116 ratio `req/350` §3 carried over from a per-effect digest
+    /// without measuring it.
+    ///
+    /// # Where the path lives: **beside the receipt, and derived rather than stored**
+    ///
+    /// `req/350` §4-4 named this the third thing it never measured. `tests/d24_read_set_cost.rs`
+    /// costs the three placements and the arithmetic decides:
+    ///
+    /// | placement | what the side artifact holds | bytes at `n=32` |
+    /// |---|---|---|
+    /// | A — every path in the receipt | — | 5,472 |
+    /// | B — the entries beside it, path derived on demand | entries | **3,266** |
+    /// | C — the paths beside it | paths (**and** the entries, to have a leaf at all) | 5,472 + 3,266 |
+    ///
+    /// A is dominated by G3 itself from `n=8` upward (2,192 bytes of paths against 1,633 bytes of
+    /// entries at `n=16`): an issuer who is willing to pay for every path has already paid more
+    /// than carrying the read-set outright, and would then still need the entries. C is B plus a
+    /// derivable quantity, because a path without its leaf verifies nothing. So the path is
+    /// **never stored** — it is a function of the entries, and [`read_set_path`] is that function.
+    /// Deriving one at `n=32` measured 86 µs (72.6 µs of leaf hashes, 13.4 µs of path), against the
+    /// ~103 ms an ext4 wrap costs (`req/350` §2-2): 0.08%.
+    PerEffectRoot {
+        /// The root of the tree over the entries' leaf hashes.
+        root: Cid,
+        /// How many entries it folds. Without it a verifier cannot tell how long a path should be,
+        /// and `gx_log::proof`'s refusal of a mis-sized path is the same arithmetic one tree down.
+        leaf_count: u64,
+    },
+    /// 🔴 **DR-46-34** — the escrow ran, and read nothing.
+    ///
+    /// `ReadSet::from_reads` answers this for an empty entry list, which is where the fact used to
+    /// become `Ok(None)`. It is the ordinary answer on the fs, git and postgres adapters, whose
+    /// `invert` builds its inverse out of the snapshot already in hand:
+    /// `InvertOutcome::from_option` fixes `Vec::new()` on both arms and says why in its own
+    /// documentation ("there is no read that could fail separately from the call itself").
+    ///
+    /// **A positive statement, not an absence.** It says the escrow was asked and answered — which
+    /// is exactly what the two members below cannot say, and is why they are not this one.
+    Nothing,
+    /// 🔴 **DR-46-34** — a rebuild that found no `InverseEscrowed` record for this transformation.
+    ///
+    /// 43 §7-3b's road re-derives the payload from the journal because the prior it digests stopped
+    /// existing when `apply` fired (42 §3.13's DR-46-26 note is the argument). Where the record is
+    /// not in the journal at all, `rebuilt_attest`'s `find_map` ends in `unwrap_or_default()` and
+    /// the road holds **nothing** about what was read — which is a different fact from
+    /// [`ReadSet::Nothing`] and calls for a different remedy: a trimmed or damaged journal (42 §5),
+    /// not a change with no reads.
+    ///
+    /// A receipt carrying this does not reproduce the digest of the receipt the ledger witnessed,
+    /// and that is the intended behaviour rather than a regression: `Engine::resume` answers
+    /// `payload_matched: Some(false)` and refuses, where before it produced a receipt that
+    /// **attested** an escrow with no reads on the strength of a record it never found.
+    NoEscrowRecord,
+    /// 🔴 **DR-46-34** — a rebuild over a journal written before 42 §3.13 carried `reads`.
+    ///
+    /// `InverseEscrowed.reads` is `#[serde(default, skip_serializing_if = "Vec::is_empty")]`
+    /// (E-M5-13's shape), so a pre-DR-46-26 record decodes with an empty list and is
+    /// indistinguishable from one that recorded an empty list — *unless something in the record
+    /// says which*. `InverseEscrowed.reads_attested` is that something, and it is a `bool` in
+    /// `undetermined`'s exact shape for `undetermined`'s exact reason.
+    ///
+    /// The distinction is worth a member because the two call for opposite conclusions. "The
+    /// escrow read nothing" is a statement about the change. "This journal does not record what
+    /// the escrow read" is a statement about the **journal**, and a reader who takes the second for
+    /// the first has been told a fact about the world by a gap in a file.
+    ReadsNotJournalled,
+}
+
+impl ReadSet {
+    /// The tag, in the spelling `req/350` §4-1 and `docs/LIMITS.md` use.
+    #[must_use]
+    pub const fn granularity(&self) -> &'static str {
+        match self {
+            ReadSet::PerRead(_) => "G3",
+            ReadSet::PerEffectRoot { .. } => "G4",
+            // 🔴 **DR-46-34** — the three absence members answer their own name rather than a `G`
+            // number. Inventing one would put a granularity where there is no set to be granular
+            // about, and `req/350` §4-1's whole point is that this string tells a reader **which
+            // guarantee** they hold. "There is no read-set, and here is which absence" is not a
+            // weaker granularity; it is a different sentence.
+            ReadSet::Nothing => "nothing",
+            ReadSet::NoEscrowRecord => "no_escrow_record",
+            ReadSet::ReadsNotJournalled => "reads_not_journalled",
+        }
+    }
+
+    /// 🔴 **DR-46-34** — does this carry a read-set at all, or is it one of the three absences.
+    ///
+    /// The predicate a caller wants before reading [`ReadSet::distinct_objects`], which answers `0`
+    /// for every absence and would otherwise let "no read-set" be read as "zero objects read" —
+    /// the same conflation, one level down from the one this DR closes.
+    #[must_use]
+    pub const fn is_attested(&self) -> bool {
+        matches!(self, ReadSet::PerRead(_) | ReadSet::PerEffectRoot { .. })
+    }
+
+    /// How many distinct objects the escrow read, at either granularity.
+    #[must_use]
+    pub fn distinct_objects(&self) -> u64 {
+        match self {
+            ReadSet::PerRead(entries) => entries.len() as u64,
+            ReadSet::PerEffectRoot { leaf_count, .. } => *leaf_count,
+            // 🔴 **DR-46-34** — `0` is true of `Nothing` as a count and is **not** a claim on the
+            // other two. Ask [`ReadSet::is_attested`] first where the difference matters.
+            ReadSet::Nothing | ReadSet::NoEscrowRecord | ReadSet::ReadsNotJournalled => 0,
+        }
+    }
+
+    /// Build the read-set the threshold calls for, or [`ReadSet::Nothing`] for an escrow that read
+    /// nothing.
+    ///
+    /// The spill is decided here and nowhere else, so the granularity on a receipt is a function of
+    /// the read-set rather than of whichever caller assembled it.
+    ///
+    /// # 🔴 **DR-46-34** — this used to return `Result<Option<Self>>`
+    ///
+    /// The `Ok(None)` arm is the coordinate at which "the escrow read nothing" stopped being a
+    /// fact and became the same `null` as "nobody recorded it". The signature narrows to
+    /// `Result<Self>` so that the caller **cannot** re-open the collapse by assembling an
+    /// `Option` of its own: a road that has no entries to hand this function is now a road that
+    /// has to name its own absence, and there are exactly two such roads (`gx-engine`'s
+    /// `rebuilt_attest`, on the two arms `req/498` measured).
+    ///
+    /// # Errors
+    /// [`Error::Canon`] if an entry has no canonical form, which is what a leaf hash is taken over.
+    pub fn from_reads(mut entries: Vec<ReadEntry>) -> Result<Self> {
+        entries.sort();
+        entries.dedup();
+        if entries.is_empty() {
+            return Ok(ReadSet::Nothing);
+        }
+        if entries.len() <= READ_SET_SPILL_THRESHOLD {
+            return Ok(ReadSet::PerRead(entries));
+        }
+        let leaves = read_set_leaves(&entries)?;
+        Ok(ReadSet::PerEffectRoot {
+            root: read_set_root(&leaves),
+            leaf_count: leaves.len() as u64,
+        })
+    }
+
+    /// Does this receipt, **alone**, say that `locator` was read?
+    ///
+    /// `req/350` §3's denominator made executable. `Some(true)`/`Some(false)` is a decision the
+    /// signed bytes carry; `None` is G4 saying honestly that it cannot answer without the entries,
+    /// which is the difference the granularity tag exists to publish.
+    ///
+    /// 🔴 **DR-46-34** — [`ReadSet::Nothing`] answers `Some(false)` about **every** locator, and
+    /// that is the whole value of the member: an escrow that read nothing decides the question for
+    /// the entire universe of objects, from the receipt alone, which is a *stronger* answer than
+    /// G3 gives. The other two absences answer `None` for G4's reason — they hold nothing to
+    /// decide with — and this is the line at which the old `Option<ReadSet>` was silently giving
+    /// `Nothing`'s strong answer to roads that had not earned it.
+    #[must_use]
+    pub fn names(&self, locator: &str) -> Option<bool> {
+        match self {
+            ReadSet::PerRead(entries) => Some(entries.iter().any(|e| e.locator == locator)),
+            ReadSet::PerEffectRoot { .. } => None,
+            ReadSet::Nothing => Some(false),
+            ReadSet::NoEscrowRecord | ReadSet::ReadsNotJournalled => None,
+        }
+    }
+}
+
+/// The leaf hashes of a read-set: `0x00 || canonical_dagcbor(entry)`, 42 §3.11's rule one tree down.
+///
+/// # Errors
+/// [`Error::Canon`] if an entry has no canonical form.
+pub fn read_set_leaves(entries: &[ReadEntry]) -> Result<Vec<Cid>> {
+    entries
+        .iter()
+        .map(|e| cid::mint_leaf(e).map_err(Error::from))
+        .collect()
+}
+
+/// RFC 6962's MTH over those leaves — 42 §3.11's `node_hash`, applied to a tree that is not the
+/// ledger's.
+///
+/// # Panics
+/// On an empty slice. A read-set with no reads is [`Option::None`] on the payload, not a root over
+/// nothing, and [`ReadSet::from_reads`] is the only constructor that reaches here.
+#[must_use]
+pub fn read_set_root(leaves: &[Cid]) -> Cid {
+    assert!(!leaves.is_empty(), "a root over no leaves is not a root");
+    if leaves.len() == 1 {
+        return leaves[0];
+    }
+    let k = split_point(leaves.len());
+    cid::mint_node(&read_set_root(&leaves[..k]), &read_set_root(&leaves[k..]))
+}
+
+/// RFC 6962 §2.1's `k`: the largest power of two strictly below `n`.
+fn split_point(n: usize) -> usize {
+    let mut k = 1;
+    while k * 2 < n {
+        k *= 2;
+    }
+    k
+}
+
+/// The sibling hashes from `index` to the root, leaf-first — **derived, never stored**.
+///
+/// See [`ReadSet::PerEffectRoot`] for the measurement that made storing one the losing placement.
+pub fn read_set_path(index: usize, leaves: &[Cid], out: &mut Vec<Cid>) {
+    if leaves.len() <= 1 {
+        return;
+    }
+    let k = split_point(leaves.len());
+    if index < k {
+        read_set_path(index, &leaves[..k], out);
+        out.push(read_set_root(&leaves[k..]));
+    } else {
+        read_set_path(index - k, &leaves[k..], out);
+        out.push(read_set_root(&leaves[..k]));
+    }
+}
+
+/// Fold a leaf and its path back to a root — RFC 6962 §2.1.1's walk, the same two counters
+/// `gx_log::proof::reconstruct_root` uses one tree up.
+///
+/// `None` when the path does not fit the tree the caller declares, which is the only way a verifier
+/// learns that it was handed a path from somewhere else.
+#[must_use]
+pub fn read_set_fold(index: u64, leaf: &Cid, siblings: &[Cid], leaf_count: u64) -> Option<Cid> {
+    if leaf_count == 0 || index >= leaf_count {
+        return None;
+    }
+    let mut node = index;
+    let mut last = leaf_count - 1;
+    let mut acc = *leaf;
+    for sibling in siblings {
+        if last == 0 {
+            return None;
+        }
+        if node % 2 == 1 || node == last {
+            acc = cid::mint_node(sibling, &acc);
+            while node != 0 && node.is_multiple_of(2) {
+                node /= 2;
+                last /= 2;
+            }
+        } else {
+            acc = cid::mint_node(&acc, sibling);
+        }
+        node /= 2;
+        last /= 2;
+    }
+    if last == 0 {
+        Some(acc)
+    } else {
+        None
+    }
+}
+
+/// The CBOR key whose value the ledger leaf is taken **without** (42 §3.11's circularity; see
+/// [`ReceiptPayload::ledger_digest`] for why this one member is cleared and no other).
+const INCLUSION_PROOF_KEY: &str = "inclusion_proof";
+
+/// CBOR `null` — 42 §2.1's `f6`, and what `serde` writes for a `None` **at a key**.
+///
+/// The distinction is the whole of this module's arithmetic: `None` is not "the key is missing", it
+/// is "the key is present and holds `f6`". A canonical map with a key holding `f6` and one without
+/// the key are different byte strings and therefore different digests.
+const CBOR_NULL: u8 = 0xf6;
+
+/// 🔴 **`req/38` §324 ruling 3 — the ledger leaf of a receipt, derived from the bytes that were
+/// signed.**
+///
+/// # The defect this closes, in the words of the three lanes that met it
+///
+/// `ReceiptPayload::ledger_digest` re-encodes a **struct**. For a value this build just built that
+/// is exact; for bytes that arrived from somewhere, it silently asks a different question — what
+/// would *this year's schema* have written — and `req/519` §7-5 measured what that costs:
+///
+/// > `ReceiptPayload::ledger_digest()` is `cid::compute(&staged)` — **it re-derives the leaf from a
+/// > struct whose canonical form moves with the schema**. Therefore every member ever added has
+/// > already moved every historical leaf.
+///
+/// (`req/519` §7-5 is written in Japanese; the block above is its content, and the report is the
+/// source a reader should go to for the wording. Rendered rather than quoted verbatim because
+/// `probes/doubt/tests/cjk_doubt.rs` counts CJK lines per directory and this file is not one of the
+/// places the census admits them — `req/38` §319's lesson, which cost a lane a merge turn.)
+///
+/// `req/38` §294 met it first and read it as a decode problem; §519 §7-5 measured that `Option` did
+/// not fix it and named the real cause one level down; §324 caught the third repeat — a 2026-08-22
+/// specimen, signature and anchor intact, verifying as `inclusion: refuted`. **`refuted` is the
+/// vocabulary's word for tampering**, and it was being said about a document nobody had touched.
+///
+/// # What it computes, and why the arithmetic is exactly this
+///
+/// 43 T-11 appends the leaf **before** the receipt is issued, so what the ledger witnessed is the
+/// canonical form of the payload as it stood with no inclusion proof in it. The engine builds that
+/// form by encoding the payload with `inclusion_proof: None` — and `serde` writes a `None` **at the
+/// key**, as `f6`. So the bytes the ledger committed to are the signed bytes with one value
+/// replaced by one byte:
+///
+/// ```text
+/// signed:  {... "inclusion_proof": {leaf_index, tree_size, audit_path} ...}
+/// leaf-of: {... "inclusion_proof": f6                                  ...}
+/// ```
+///
+/// **Replaced, not removed.** Removing the key would decrement the map header and produce bytes no
+/// build ever digested — a leaf that matches nothing in any ledger. The key stays, the map count
+/// stays, the key order stays; one value becomes `f6`. That is what makes this road answer the same
+/// number as `ReceiptPayload::ledger_digest` for a receipt this build issued **and** the number the
+/// 2026-08 builds wrote for the receipts they issued. It is one function, not a compatibility
+/// shim with a version switch, because there is only one rule and every generation obeyed it.
+///
+/// # What it does **not** do
+///
+/// It does not decode. Nothing here names a member other than the one key it clears, so a document
+/// carrying members this build has never heard of is digested exactly as its own build digested it.
+/// That is the property the previous three attempts lacked, and it is why this cannot rot the way
+/// they did: a member added to `ReceiptPayload` tomorrow does not appear in this function.
+///
+/// It also does not verify anything. The signature is the envelope's business and the inclusion
+/// proof is [`verify_offline`]'s; this answers one question, which is what number the leaf carries.
+///
+/// # Errors
+/// [`Error::Canon`] when the bytes are not canonical DAG-CBOR (they are audited to the whole of
+/// 42 §2.1 on the way past, so a spelling no encoder would have written cannot mint a leaf).
+pub fn ledger_digest_of_signed_payload(payload_bytes: &[u8]) -> Result<Cid> {
+    let Some(span) = cbor::value_span(payload_bytes, INCLUSION_PROOF_KEY)? else {
+        // No such key. Not a state any build in this lineage produces — `Option` members are
+        // written at their key — so the honest answer is the digest of the bytes as they stand
+        // rather than a guess about what a build that omitted it would have meant.
+        return Ok(cid::of_canonical_bytes(payload_bytes)?);
+    };
+    let mut staged = Vec::with_capacity(payload_bytes.len() - span.len() + 1);
+    staged.extend_from_slice(&payload_bytes[..span.start]);
+    staged.push(CBOR_NULL);
+    staged.extend_from_slice(&payload_bytes[span.end..]);
+    Ok(cid::of_canonical_bytes(&staged)?)
+}
+
+/// 🔴 **`req/493` §0 / AC-6** — whether the process that produced this receipt was held by the
+/// kernel, and which ruleset held it.
+///
+/// # A third fact, orthogonal to the two that were already here
+///
+/// `req/493` §0: the confinement context is carried "as a **third fact orthogonal** to the existing
+/// two values `enforced` / `record_only`" — it is not a fourth value of either. `enforced` says
+/// whether a `Deny` would have stopped this transformation; this says whether the process that
+/// carried it out could have written outside what it declared **even if nothing had checked**. A
+/// receipt can be `enforced=true` and unconfined (gx checked, the kernel did not), or
+/// `enforced=false` and confined (the posture was record-only, the kernel still held the process).
+/// Neither implies the other, which is what makes this a seat rather than a flag on an existing one.
+///
+/// # Two fields and two impossible pairs
+///
+/// `req/493` §1 AC-6 names exactly two: "the kernel-confined bit + the ruleset hash". Two fields
+/// spell four combinations and two of them are not states of the world:
+///
+/// * confined with no ruleset named — a claim that the kernel held something, with no answer to
+///   *what*. `gx_confine::ConfinePlan::ruleset_hash` exists precisely so that a reader can
+///   re-derive the answer from the pre-image; a `true` with no hash is the claim without the
+///   evidence.
+/// * unconfined with a ruleset named — a hash for a ruleset the kernel did not take. The plan may
+///   well have been derived (`gx confine --plan-only` derives one and enforces nothing); what a
+///   receipt may not do is name it as if it had held.
+///
+/// [`ReceiptPayload::check_schema`] refuses both, which is `req/493` §1 AC-4's rule applied one
+/// layer along: a gate that has never been fired is not a gate, so each of the two has a bed in
+/// `tests/confinement_attest.rs` that makes it false and is refused.
+///
+/// # `kernel_confined: false` is a **statement**, and that is why the seat on the payload is the
+/// `Option` and this type is not
+///
+/// The same shape DR-46-28 settled for `DeterminismBoundary`: a value that means "no" and a value
+/// that means "nobody wrote this" must not be one spelling. A process that was not launched under
+/// `gx confine` produces `kernel_confined: false` — a true sentence about the run — and every
+/// receipt this binary issues carries one. The `None` on [`ReceiptPayload::confinement`] means
+/// something else entirely and is documented there.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ConfinementContext {
+    /// Whether the kernel was actually holding the writing face when this receipt was produced.
+    ///
+    /// `gx_confine::Confinement::to_json`'s `kernel_confined` is the same bit and is derived the
+    /// same way (`fs.is_enforcing()`): "fully-enforced" or "partially-enforced" is the kernel
+    /// holding something back, and every other face status is not.
+    ///
+    /// 🔴 What it does **not** say, written here because the name invites the other reading: it is
+    /// the **write** face and no other. `req/497` §6 measured what this build's ruleset covers —
+    /// reads are unrestricted, execution is unrestricted, `rename` is outside Landlock ABI 1 — and
+    /// `gx_confine::FS_COVERS` is the sentence that says so on every run. A reader who takes this
+    /// bit for "the process could do nothing it did not declare" is reading more than it carries.
+    pub kernel_confined: bool,
+    /// [`gx_confine::ConfinePlan::ruleset_hash`]'s answer: the domain-separated digest of the
+    /// ruleset's pre-image, as text.
+    ///
+    /// A `String` rather than a [`Cid`] because it is not one: `gx-confine` mints it through
+    /// `gx_canon::cid` with the `Leaf` domain so that it cannot collide with a transformation id
+    /// even over identical bytes, and carrying it in the `Cid` type here would put it in the same
+    /// namespace as the ids this payload joins on. `None` exactly when `kernel_confined` is false.
+    pub ruleset_hash: Option<String>,
+}
+
+impl ConfinementContext {
+    /// The true sentence about a process nobody confined.
+    ///
+    /// Named rather than spelled at each of its callers because it is the **default answer** and a
+    /// default written by hand in a dozen places is a default that drifts. It is also the one
+    /// combination a reader has to be able to tell from `None`: this says "the kernel was not
+    /// holding this process", `None` says "the bytes predate the erratum that asks".
+    #[must_use]
+    pub fn unconfined() -> Self {
+        Self {
+            kernel_confined: false,
+            ruleset_hash: None,
+        }
+    }
+}
+
 /// What a receipt says, and the whole of what its signature covers (42 §3.10).
 ///
-/// # Eleven fields, and the count 42 §3.10 is read as having
+/// # Fourteen fields, and the count 42 §3.10 is read as having
 ///
-/// req/49 §2.1 and §3 M2-9 both call this table 「15 field」. It has **eleven** rows -- counted
+/// req/49 §2.1 and §3 M2-9 both call this table "15 fields". It had **eleven** rows -- counted
 /// mechanically by `tools/verify_m2h5.sh` off `req/spec/40-architecture/42-data-model.md`, not by
 /// eye. The miscount changes nothing E-M2-7 ruled (the flag really is absent from all eleven) and
 /// is raised in req/54 §4 as the same shape as M1's A-3.
 ///
-/// Eleven rows minus `issued_at` (E-M2-6) plus `fail_posture_engaged` (E-M2-7) is eleven fields
-/// here, and `tests/ac_018.rs` asserts the arithmetic against the spec file rather than against
-/// this sentence.
+/// 🔴 **DR-46-24(A) (`req/38` §236 ruling 2, `req/440` §0-3/§0-4)** — the table gains **two** rows
+/// and the struct two fields: `read_set` (what the escrow read, with its granularity tag inside it)
+/// and `fingerprint_scope` (P2, riding on the same erratum because `req/350` §7-4 measured it as
+/// the cheapest thing to close beside it). Thirteen rows minus `issued_at` (E-M2-6) plus
+/// `fail_posture_engaged` (E-M2-7) is thirteen fields here, and `tests/ac_018.rs` asserts the
+/// arithmetic against the spec file rather than against this sentence.
+///
+/// **The wire moved, and it had to.** A canonical DAG-CBOR map with two more keys is different
+/// bytes even when both values are absent — `None` is `0xf6` *at a key*, not nothing — so unlike
+/// E-M5-11 this erratum is a migration and not a retyping. `tests/receipt_verdict_wire.rs` carries
+/// the pre-DR-46-24 golden beside the new one rather than replacing it, so the change is recorded
+/// as a difference instead of being regenerated away.
+///
+/// 🔴 **DR-46-26 (`req/38`'s S1 ruling 5)** — the table gains a **third** row in a second window
+/// and the struct a fourteenth field: `reversibility`, C-25's three-valued answer. D24 closed the
+/// read-set half of `req/38` §198 ruling (b) and left the other half open by name; this closes it,
+/// and it is the same kind of change as the one above — a key added to a canonical map, so the
+/// wire moves again. The D24 form is followed exactly rather than invented: the pre-DR-46-26
+/// golden is **kept beside** the new one (`tests/inverse_status_wire.rs`), and the subtraction that
+/// turns one into the other — remove the single `reversibility` key, get the D24 bytes back — is
+/// asserted rather than described, so "one key was added and nothing else moved" is a measurement.
 ///
 /// # Field order
 ///
@@ -141,7 +682,7 @@ pub struct VerdictSummary {
 /// enforces (`gx-log/tests/map_key_order.rs` measured that the encoder sorts keys itself).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptPayload {
-    /// 42 §3.10: the signing key's id, 「`DsseSignature.keyid`と一致」. Checked by
+    /// 42 §3.10: the signing key's id, "matches `DsseSignature.keyid`". Checked by
     /// [`verify_offline`], which is the point of carrying it inside the signed bytes: a receipt
     /// states which key ought to have signed it, so a signature moved onto another key's receipt
     /// does not verify even if that key is trusted.
@@ -150,17 +691,18 @@ pub struct ReceiptPayload {
     ///
     /// `Option` since M5 hand 6. 42 §3.10 types this as a `VerdictSummary` and 43 T-4e reaches a
     /// state in which no verdict exists: the fail-open posture degrades a transformation to
-    /// record-only 「当該Transformationに限り」 **without calling the gate at all**, so there is
+    /// record-only "for that Transformation alone" **without calling the gate at all**, so there is
     /// nothing to summarise and no proof to digest. `req/38_ERRATA_2026-08-07.md` §41 rules it:
     ///
-    /// > **M5H4-3 採(a)**=**E-M5-11**: `ReceiptPayload.verdict` を **`Option`** にする(42 §3.10
-    /// > erratum)。T-4e は gate を呼ばず verdict が存在しない——**空 digest の鋳造禁(M4H4-2)を wire
-    /// > まで貫く**形で、journal 側 E-M5-7(`verdict_digest=Option`)と対称。
+    /// > **M5H4-3, adopted (a)** = **E-M5-11**: make `ReceiptPayload.verdict` an **`Option`** (a 42 §3.10
+    /// > erratum). T-4e calls no gate and no verdict exists -- carried through to the wire in the
+    /// > shape that keeps **the ban on minting an empty digest (M4H4-2)**, symmetric with the journal
+    /// > side's E-M5-7 (`verdict_digest=Option`).
     ///
     /// The three alternatives were each a way of writing down something untrue: minting an empty
     /// `AdmitProof` and digesting it (a proof for an admission no gate made — §32 M4H4-2 refused
     /// that twice), making `proof_digest` optional inside a present summary (a third state,
-    /// 「verdict は在るが proof が無い」), or refusing the commit (which is what hand 4 did, and
+    /// "a verdict exists but there is no proof"), or refusing the commit (which is what hand 4 did, and
     /// what left AC-037 unreachable).
     ///
     /// **The wire did not move**: serde writes `Some(x)` as `x`, so every receipt that has a
@@ -175,21 +717,220 @@ pub struct ReceiptPayload {
     /// `gx_engine::Error::Unrepresentable` — and the hand's report raises the question rather than
     /// answering it here.
     ///
-    /// 🔴 **Superseded by `req/38_ERRATA_2026-08-07.md` §43 (M5H6-8① 採(a)), implemented in the M5
+    /// 🔴 **Superseded by `req/38_ERRATA_2026-08-07.md` §43 (M5H6-8 ① adopted (a)), implemented in the M5
     /// fix hand.** The paragraph above is kept rather than rewritten (no-delete): it records what
     /// was true between hand 6 and this hand, and *why* the rule was not written then. The ruling,
     /// verbatim:
     ///
-    /// > **M5H6-8 ①採(a)・実装窓=fix批**: gx-witness `check_schema` に「`verdict=None` ⇒
-    /// > `fail_posture_engaged=true`」の対規則を足す(fail-closed の二重防衛・42 §3.10 erratum 相当)。
+    /// > **M5H6-8 ① adopted (a), implementation window = fix batch**: add the paired rule "`verdict=None` ⇒
+    /// > `fail_posture_engaged=true`" to gx-witness's `check_schema` (a fail-closed double defense,
+    /// > equivalent to a 42 §3.10 erratum).
     ///
     /// [`ReceiptPayload::check_schema`] now carries it. The producer's refusal stays where it is;
     /// the schema is the second defence, for payloads that reach this crate from a decoder rather
     /// than from gx-engine.
     pub verdict: Option<VerdictSummary>,
-    /// 42 §3.10: 「`false`はrecord-onlyモードでの非強制適用（DR-2）」. Not schema-checked; see this
+    /// 42 §3.10: "`false` is non-enforced application under record-only mode (DR-2)". Not schema-checked; see this
     /// module's header.
     pub enforced: bool,
+    /// 🔴 **`req/493` §0 / AC-6** — whether the kernel was holding the process that produced this,
+    /// and which ruleset it was holding. See [`ConfinementContext`] for the two fields and for why
+    /// this is orthogonal to the field above rather than a value of it.
+    ///
+    /// # What the `None` means, and why it is not a third value of the bit
+    ///
+    /// **"Written by a build older than this erratum."** Every receipt this binary issues carries a
+    /// `Some` — an unconfined run says `kernel_confined: false`, which is a sentence about the run —
+    /// so a `None` reaching a reader has come off bytes that had no such key. That is DR-46-34's
+    /// shape one field along, and `tests/confinement_attest.rs` asserts the unconditional `Some` on
+    /// the producing side so the two spellings cannot quietly become interchangeable.
+    ///
+    /// # `Option` **and** `#[serde(default)]`, and the reason is `req/38` §294 ruling 2
+    ///
+    /// DR-46-28 added `determinism_boundary` as **required with no default** and a receipt this
+    /// product issued in August 2026 stopped decoding — signature and anchor still valid, `decode`
+    /// alone dead — which §294 registered as a break of the third pillar ("verifiable for ever
+    /// without the issuer"). The remedy it named for that field is the shape this one is born in:
+    /// a decoder handed bytes with no `confinement` key reads `None` and goes on, so this erratum
+    /// adds a **fifth** row to 42 §3.10's table without adding a second document to that limit.
+    ///
+    /// 🔴 **Which of the two actually carries the compatibility was measured, not assumed, and it
+    /// is the `Option`.** The attribute was removed and
+    /// `tests/confinement_attest.rs::ac6_bytes_with_no_confinement_key_still_decode` **stayed
+    /// green** — `req/519` §7-4 already recorded the same thing from the other direction, which is
+    /// why `frozen_receipt_corpus.rs` refuses *both* spellings for the members that must stay
+    /// required. So the attribute is not load-bearing here; it is the declaration made explicit,
+    /// and it survives a codec that does not treat `Option` the way this one does. What holds it in
+    /// place is a source scan (`ac6_the_compatibility_default_is_declared_in_the_source`) rather
+    /// than the decode probe — stated here because a comment claiming the attribute is what keeps
+    /// August's receipts readable would be a claim this lane measured to be false.
+    ///
+    /// `docs/LIMITS.md`'s declared set — the members added required with no default — is therefore
+    /// **unmoved**, and `crates/gx-witness/tests/frozen_receipt_corpus.rs` is the machine that
+    /// refuses a lane which moves the page and the constant apart.
+    ///
+    /// # The rebuild roads reproduce this from Σ, and that is what put it in `Environment`
+    ///
+    /// 43 §7-3b compares a rebuilt payload's digest against the leaf the ledger already holds, so a
+    /// field the rebuild cannot reproduce would answer `payload_mismatch` — the word for tampering
+    /// — for every crash-window recovery of a confined commit. Unlike `determinism_boundary` this
+    /// value cannot be derived from `verdict`: it is a fact about the process, and the process that
+    /// repairs is not the process that committed. So it is **journalled**, in the record M5-25
+    /// already writes before the world moves (`ProvenanceDerived` →
+    /// [`crate::provenance::Environment::confinement`]), and both rebuild roads read it out of
+    /// `StateRow::provenance` exactly as `read_set` is read out of the escrow row.
+    #[serde(default)]
+    pub confinement: Option<ConfinementContext>,
+    /// 🔴 **DR-46-39** — which catalogue version governed this receipt, third-party-verifiable
+    /// (`req/777` §1, ruling `req/38` §5689: "(a)-family receipt-carry", not a self-hash slot).
+    ///
+    /// # Carry, not compute-here
+    ///
+    /// `gx-witness` does not depend on `gx-adapter-mcp` (`req/777` §2, checked against the
+    /// manifest rather than assumed) and this field does not change that: the digest of a
+    /// `Catalogue` value is minted by whichever crate holds both the catalogue and the
+    /// receipt-construction site, through `gx_canon::cid` (AC-014's only road to a digest), and
+    /// handed here as opaque text. `gx-witness` carries the field; it does not know what a
+    /// `Catalogue` is.
+    ///
+    /// # `String`, not `Cid`, and the reason is `ConfinementContext::ruleset_hash`'s own
+    ///
+    /// The identical shape already exists on this struct one field up: `ruleset_hash` is a
+    /// `String` "because it is not one... carrying it in the `Cid` type here would put it in the
+    /// same namespace as the ids this payload joins on" (`ConfinementContext`'s own doc comment).
+    /// `catalogue_hash` joins on nothing else in this payload either, so it follows the same rule.
+    ///
+    /// # `None` is not a third value of a bit
+    ///
+    /// `None` means "no catalogue was named as governing this receipt" — every receipt this build
+    /// issued before a caller starts minting one, and every receipt from a build that predates
+    /// this erratum entirely (`#[serde(default)]` below is what keeps those decoding — `req/294`
+    /// ruling 2's remedy, applied here as it was for `determinism_boundary` and `confinement`).
+    #[serde(default)]
+    pub catalogue_hash: Option<String>,
+    /// 🔴 **DR-46-24(A)** — what the escrow read, at a granularity the reader can tell apart.
+    ///
+    /// `None` on a `VerdictReceipt` always, and for the same reason `inverse_delta` is: the escrow
+    /// runs at 43 T-10b, during commit, so at verdict time there is nothing read to attest.
+    /// [`ReceiptPayload::check_schema`] holds that.
+    ///
+    /// # What this does **not** cover, said here because the field's name invites the other reading
+    ///
+    /// This is the set of objects **gx itself** read to build an inverse — one object, on the road
+    /// `req/350` §1 measured. It is **not** the agent's read traffic: `gx_mcp_wire`'s method table
+    /// classes `resources/read` and its siblings as `Passthrough` and keeps nothing, and `req/38`
+    /// §236 ruling 2 split that off as DR-46-25 with its cost unmeasured. So the cross-object
+    /// question — did B read what A wrote — is **not** decided by this field, and the claim that a
+    /// read-set attest makes selective undo well-defined does not follow from it. `docs/LIMITS.md`
+    /// says so in the same words.
+    pub read_set: Option<ReadSet>,
+    /// 🔴 **DR-46-26 / DR-46-13** — C-25's three-valued answer, in the **signed bytes**.
+    ///
+    /// # The defect this closes, in `req/38` §198 ruling (b)'s own words
+    ///
+    /// > **A-4 is judged half done**: `unknown` reaches the adapter's return value, the refusal
+    /// > sentence and the probe — **the receipt payload is still the same shape as `false`** →
+    /// > **DR-46-13 raised** (a seventh `InverseStatus` word, or a field added to 42 §3.10 — a
+    /// > change to a frozen face, Lean-side confirmation included).
+    ///
+    /// D24 seated the seventh word (`InverseStatus::Undetermined`) and DR-46-26 gives it a writer,
+    /// which closes the escrow row, the API and the CLI. It does **not** close this: a reader who
+    /// holds only the receipt still sees `inverse_delta: null` for both "no inverse exists" and
+    /// "nobody found out". The remedies differ — the first is a property of the change, the second
+    /// is a read that did not answer under a posture the deployment chose and can unchoose — so
+    /// the two facts are given two shapes here rather than one.
+    ///
+    /// # `None` on a `VerdictReceipt`, for `inverse_delta`'s and `read_set`'s reason
+    ///
+    /// The question is answered by the escrow, the escrow is 43 T-10b, and T-10b is inside commit:
+    /// at verdict time nothing has asked. [`ReceiptPayload::check_schema`] holds that, which makes
+    /// this the third field with the same kind-dependent rule and the same one-line justification.
+    ///
+    /// # `Option` on a `CommitReceipt` too, and what the option means there
+    ///
+    /// `None` is "this commit's receipt was written by a road that had no answer to carry" — a
+    /// rebuild for a transformation whose escrow row the journal no longer holds. It is not a
+    /// fourth value of C-25: `Some(Reversibility::Unknown)` is the "nobody found out" answer, and
+    /// the absence is the absence of an answer at all. `tests/inverse_status_wire.rs` pins the two
+    /// apart on the wire.
+    ///
+    /// 🔴 **The rebuild roads reproduce this rather than reading it back**, and that is not a
+    /// nicety: 43 §7-3b compares a rebuilt payload's digest against the leaf the ledger already
+    /// holds, so a road that could not reproduce one of fourteen fields would refuse every
+    /// crash-window recovery of a commit that had one. `gx-engine` derives the value from the
+    /// escrow row (journalled) and re-derives `read_set` from `InverseEscrowed.reads` (journalled
+    /// by the same erratum). `crates/gx-cli/tests/model_a_probes.rs` measured the first shape of
+    /// this — both seats taken from the filed receipt — answering `payload_mismatch`, because R13
+    /// closes a row from a filed receipt *before* the rebuild is attempted and the rebuild road is
+    /// therefore the road on which no filed receipt exists.
+    pub reversibility: Option<Reversibility>,
+    /// 🔴 **DR-46-28** — where the replay-deterministic part of this change ends and the
+    /// LLM-originated part begins, in the **signed bytes**.
+    ///
+    /// # What was missing, in `req/38` §255 ruling 4's own words
+    ///
+    /// > *This far is deterministic (replayable), from here on it is LLM-originated* -- **put it on
+    /// > the face of the receipt** (the sibling of the cannot-be-established contract). 42 as it
+    /// > stands has **zero** determinism-boundary fields, confirmed by grep.
+    ///
+    /// (The ruling is written in Japanese; the block above is its content, and `req/38` §255 is the
+    /// source a reader should go to for the wording.)
+    ///
+    /// The nearest thing that existed was `Transformation.actor` — `Actor::Agent { key, model }`
+    /// says an agent caused the change. It does not say **what the agent's contribution was**, and
+    /// that is the whole question: an agent that wrote an input which gx then gated is a different
+    /// object from an agent whose output was applied unexamined, and until this field a receipt
+    /// spelled the two the same way. The actor is also not on the receipt at all — a receipt
+    /// carries `transformation: TransformationId`, a join key, so a reader holding one receipt
+    /// could not reach the actor even to under-read it.
+    ///
+    /// # Not an `Option`, and the reason is one erratum old
+    ///
+    /// `unknown` is a **first-class value** here (`req/459` ruling 3), so an `Option` would rebuild
+    /// the defect DR-46-26 spent a lane closing: two shapes, `null` and `Unknown`, for one fact, and
+    /// a reader who cannot tell "nobody established it" from "the field was not written". One
+    /// shape, four values, and [`DeterminismBoundary::Unknown`] is what a road with no answer says.
+    ///
+    /// # The three rules [`ReceiptPayload::check_schema`] holds, and why each is not a convention
+    ///
+    /// `req/459` ruling 4 makes the acceptance test "each value of the taxonomy has a bed that
+    /// makes it false, and the bed is refused". Three of those beds are payload-local, so they are
+    /// refused here rather than described here:
+    ///
+    /// 1. **A receipt may not claim its verdict derivation was LLM-originated.** gx derives
+    ///    verdicts; `req/454`'s DR-46-27 machinery is what holds that derivation to "same input,
+    ///    same verdict". So [`DeterminismBoundary::LlmOriginated`] — which claims *both* stages —
+    ///    is a statement about a stage gx performed and did not perform that way. The value stays in
+    ///    the vocabulary for the **declaration** face, where a tool class gx never gates can carry
+    ///    it honestly.
+    /// 2. **No verdict, no determinism claim.** 43 T-4e reaches a commit with `verdict: None` by
+    ///    calling no gate at all. A payload that claims a replay-deterministic verdict derivation
+    ///    there is claiming a property of a derivation that did not happen — the same shape as
+    ///    M5H6-8①'s pairing rule two fields up, and refused for the same reason.
+    /// 3. **`Mixed` must actually mix.** `req/459` ruling 3 words `mixed` as *enumerated by stage*; a `Mixed`
+    ///    whose two stages are equal enumerates one class twice and is the collapsed value wearing
+    ///    a different name. [`DeterminismBoundary::of_stages`] never produces one, and a decoder
+    ///    that hands one in is refused.
+    ///
+    /// The fourth bed — `unknown` minted over stages that *were* established — is not payload-local
+    /// (the collapsed `Unknown` carries no stages to inspect) and is refused by the arithmetic
+    /// instead: `of_stages` cannot return `Unknown` unless both stages are `Unknown`.
+    ///
+    /// # 🔴 What this field is **not**, said here because the name invites the other reading
+    ///
+    /// It is not an input to anything. The boundary is written **after** the verdict exists and is
+    /// never read back into a decision — a field that attested determinism while participating in
+    /// the derivation it attests would be the self-reference `req/444` §1 warns about. That is not
+    /// a promise made in this comment: `tests/boundary_attest.rs` scans `gx-gate` for the name and
+    /// counts the gate's declared inputs, which is the same instrument `req/454` used one erratum
+    /// earlier for `decided_at`.
+    ///
+    /// And, `req/444` §1's counter-argument forward: **`deterministic_replay` means "replaying the same
+    /// input yields the same verdict" and nothing wider.** The engine has clocks, key generation
+    /// and filesystem order in it. None of them reach the answer; all of them are still there.
+    pub determinism_boundary: DeterminismBoundary,
+    /// Which of ASM-14's two shapes this payload claims to be; [`ReceiptPayload::check_schema`]
+    /// holds the kind-dependent field rules to it.
     pub receipt_kind: ReceiptKind,
     /// 42 §3.10: `Transformation.id`. Checked against [`ReceiptPayload::transformation`] by
     /// [`verify_offline`] -- see [`Checks::canonical_cid`] for what that check can and cannot say.
@@ -197,9 +938,52 @@ pub struct ReceiptPayload {
     /// 42 §3.10: the escrowed inverse delta's CID. `None` on a `VerdictReceipt` always, since
     /// escrow happens in 43 T-10b, during commit.
     pub inverse_delta: Option<Cid>,
+    /// The transformation the receipt witnesses (42 §3.10) -- the join key every other record
+    /// of the same act shares.
     pub transformation: TransformationId,
     /// 42 §3.10 / ASM-14: required on a `CommitReceipt`, absent on a `VerdictReceipt`.
     pub inclusion_proof: Option<InclusionProof>,
+    /// 🔴 **P2 / DR-46-24(A)** — what the two fingerprints below were taken **over** (42 §3.5's
+    /// `scope`).
+    ///
+    /// # The hole this closes, in the engine's own words
+    ///
+    /// `req/350` §3's predicate table has six rows and two of them were answered before this field.
+    /// P2 — *what did that precondition fingerprint cover* — was not, and the consequence is
+    /// written down at `crates/gx-engine/src/pipeline.rs:5347`, at the undo road's compare-and-set:
+    ///
+    /// > The comparison is on the **digest** alone rather than through `Fingerprint::cas_eq`, and
+    /// > that is forced rather than chosen: 42 §3.10 stores a `postcondition_fingerprint` as
+    /// > `FingerprintBytes` — 32 bytes with no substrate and no scope — so the two other components
+    /// > `cas_eq` insists on are simply not in the receipt.
+    ///
+    /// That is `req/337` §3's three conditions met by one field: the value is **observed** (every
+    /// `Fingerprint` carries it), **unattested** (`grep scope crates/gx-witness/src/receipt.rs`
+    /// answered zero before this hand), and it **changes a decision** — a CAS run through
+    /// `cas_eq` refuses a comparison across scopes, and a CAS run on digests alone cannot.
+    ///
+    /// # Why one field and not two, established rather than assumed
+    ///
+    /// `req/440` §0-4 makes one field the default and asks for the invariant to be checked before
+    /// relying on it: that `precondition_fingerprint` and `postcondition_fingerprint` are always
+    /// over the same scope. Three machines already hold it, and none of them was added here —
+    /// `tests/read_set_wire.rs` pins all three by name:
+    ///
+    /// 1. `gx_core::Fingerprint::cas_eq` returns `Err(FingerprintScopeMismatch)` rather than a
+    ///    boolean when two scopes differ, so no scope-crossing pair is ever *compared*, only
+    ///    refused.
+    /// 2. `pipeline.rs`'s T-10a runs `fp0.cas_eq(&fp1)` and turns that `Err` into
+    ///    `Aborted(InternalError)` (M5-24 adopted (a)), so a transformation whose scope moved does
+    ///    not reach the commit receipt at all.
+    /// 3. `gx_substrate_conformance::laws` compares `applied.postcondition()` against a fresh
+    ///    `precondition` through `cas_eq` too, so an adapter that moved the scope across its own
+    ///    `apply` fails 51 §7 rather than shipping.
+    ///
+    /// The type is a `String` and not an `Option`: `precondition_fingerprint` is not optional
+    /// either, and every `Fingerprint` has a scope. **`FingerprintBytes` is untouched** — it is
+    /// still the opaque 32 bytes E-M2-2 made it, because widening it would put a scope inside a
+    /// type whose whole contract is that it is carried and never interpreted.
+    pub fingerprint_scope: String,
     /// **E-M2-7**, added: 35 ASM-13 and 43 T-4e require it and 42 §3.10's table has no room.
     /// Deterministic, so it is inside the signed core.
     pub fail_posture_engaged: bool,
@@ -209,8 +993,8 @@ pub struct ReceiptPayload {
     pub postcondition_fingerprint: Option<FingerprintBytes>,
 }
 
-/// 42 §1.3: 「`ReceiptPayload` | 全フィールド | — | Receiptはmeta-witnessであり除外規則なし
-/// （`Receipt`自体は署名対象）」.
+/// 42 §1.3: "`ReceiptPayload` | all fields | — | Receipt is a meta-witness and has no exclusion rule
+/// (`Receipt` itself is what is signed)".
 ///
 /// Borrowed, as `Evidence`'s is, because the projection is the value. Note what the row's own
 /// parenthesis says and what §1.3-4 repeats: the *signature* is not in here. The identity of a
@@ -227,13 +1011,13 @@ impl IdentityView for ReceiptPayload {
 impl ReceiptPayload {
     /// The digest a ledger leaf carries for this receipt (42 §3.11's `receipt_digest`).
     ///
-    /// # 🔴 This is a derivation, and the reason is a circularity in the 正本
+    /// # 🔴 This is a derivation, and the reason is a circularity in the canonical source
     ///
-    /// 42 §3.11 defines the field as 「`Receipt`（DSSE envelope bytes全体）のBLAKE3digest」. For a
+    /// 42 §3.11 defines the field as "the BLAKE3 digest of `Receipt` (the whole of the DSSE envelope bytes)". For a
     /// `CommitReceipt` that value cannot exist. Three statements are each clear and are together
     /// unsatisfiable:
     ///
-    /// 1. 43 T-11 orders the commit as 「`ledger.append(...)` → `InclusionProof`；Receipt発行」 --
+    /// 1. 43 T-11 orders the commit as "`ledger.append(...)` → `InclusionProof`; Receipt issued" --
     ///    the append happens **before** the receipt is issued;
     /// 2. 42 §3.10 puts the resulting `inclusion_proof` **inside** `ReceiptPayload`, which is inside
     ///    the signed envelope;
@@ -246,12 +1030,12 @@ impl ReceiptPayload {
     /// # What is computed instead, and why these two exclusions
     ///
     /// The CID of this payload with `inclusion_proof` cleared -- 42 §1.3's own row for
-    /// `ReceiptPayload` (「全フィールド」) applied to the value as it stood before the ledger answered.
+    /// `ReceiptPayload` ("all fields") applied to the value as it stood before the ledger answered.
     /// Two things are therefore outside the ledger's commitment, and each has a precedent in a
     /// ruling already made:
     ///
     /// * **the signatures**, which 42 §1.3-4 already keeps out of a `ReceiptPayload`'s identity
-    ///   (「署名は除外…署名対象はpayload bytes」). A leaf that covered them could not be written
+    ///   ("signatures are excluded ... what is signed is the payload bytes"). A leaf that covered them could not be written
     ///   before the signing, which is what 43 T-11 requires.
     /// * **the inclusion proof**, which is the self-reference above. Excluding a field because
     ///   including it is impossible is E-M2-6's shape exactly, one layer along.
@@ -262,12 +1046,29 @@ impl ReceiptPayload {
     /// the same property `issued_at`'s exclusion buys, and which makes 43 ASM-43-1's idempotent
     /// re-append work across a retry rather than raising `Error::Conflict`.
     ///
-    /// **Not ruled.** req/54 §4 raises the circularity as the blocking defect it is; a ruling that
-    /// keeps 42 §3.11's literal wording has to change 42 §3.10 or 43 T-11, and neither is an
-    /// implementation's to touch.
+    /// **Not ruled** — was true through R41; superseded by the line below.
+    ///
+    /// 🔴 **Ruled (`req/38` §337, `req/565` §2) — option (a), erratum.** 42 §3.11's literal
+    /// wording is unchanged (42 §3.10 and 43 T-11 are untouched too), and the value this function
+    /// computes is recorded directly under 42 §3.11's table as a no-delete addendum
+    /// (`req/spec/40-architecture/42-data-model.md`, right after the `LedgerLeaf`/`Tile` rows).
+    /// `req/54` §4 H5-1 is closed by that addendum in the sense of "recorded", not in the sense
+    /// of "the self-reference is resolved" — 42 §3.10 and 43 T-11 still have to move for the
+    /// three-statement circularity itself to go away, and this erratum deliberately does not move
+    /// either.
     ///
     /// # Errors
     /// [`Error::Canon`] if the payload has no canonical form.
+    /// 🔴 **`req/38` §324 ruling 3 — this is the producer's road, and only the producer's.**
+    ///
+    /// A value this build constructed has one canonical form and this computes it. A value that
+    /// arrived as **bytes** does not: it decodes into this year's type, whose canonical form is not
+    /// the form those bytes were written in, and taking this road on one of those is the defect
+    /// §324 sent a lane back for. [`ledger_digest_of_signed_payload`] is the road for those, and
+    /// every consumer in this workspace takes it.
+    ///
+    /// The two agree, by construction, for every receipt this build issues —
+    /// `tests/leaf_from_signed_bytes.rs` asserts the agreement rather than assuming it.
     pub fn ledger_digest(&self) -> Result<Cid> {
         let staged = ReceiptPayload {
             inclusion_proof: None,
@@ -280,16 +1081,16 @@ impl ReceiptPayload {
     ///
     /// 42 §3.10 states them as prose about which fields are filled for which kind, and prose is
     /// what `req/38_ERRATA_2026-08-07.md` §11's H2-6 called the weak form. This is the schema
-    /// req/49 §4 predicted would 「schema 検査としてここで初めて実体を持つ」 -- the conditional-
+    /// req/49 §4 predicted would "first take real form here, as a schema check" -- the conditional-
     /// requirement shape gx already meets in a fabrication-status YAML gate, now in a type.
     ///
     /// # The one rule that is not ASM-14's, and why it is here (**M5H6-8①**)
     ///
     /// `verdict = None` ⇒ `fail_posture_engaged = true`. 42 §3.10 states no such pairing and
-    /// `req/38_ERRATA_2026-08-07.md` §43 rules it in anyway, as 「fail-closed の二重防衛・42 §3.10
-    /// erratum 相当」. It is kind-independent, so it is checked before the kind is looked at: a
+    /// `req/38_ERRATA_2026-08-07.md` §43 rules it in anyway, as "a fail-closed double defense, equivalent
+    /// to a 42 §3.10 erratum". It is kind-independent, so it is checked before the kind is looked at: a
     /// receipt of either kind that carries no verdict is claiming 43 T-4e's degraded admission, and
-    /// T-4e's own cell requires 「`fail_posture_engaged=true`を必ずreceiptに刻む」. The absence of
+    /// T-4e's own cell requires "always carve `fail_posture_engaged=true` into the receipt". The absence of
     /// both is not a milder receipt; it is a receipt that names no reason for having skipped the
     /// gate.
     ///
@@ -299,7 +1100,7 @@ impl ReceiptPayload {
     ///
     /// # Errors
     /// [`Error::Schema`], naming the field and the kind. AC-070 asks for exactly this on a
-    /// `CommitReceipt` with no inclusion proof: 「スキーマ不正または`Ok(false)`」.
+    /// `CommitReceipt` with no inclusion proof: "a schema violation or `Ok(false)`".
     pub fn check_schema(&self) -> Result<()> {
         // The verdict kind used to be checked here. It is checked by the decoder now (E-M3-2), so
         // a `VerdictSummary` that exists at all carries one of the three -- there is no state left
@@ -316,22 +1117,83 @@ impl ReceiptPayload {
             return Err(refuse(
                 "no verdict and no engaged fail posture",
                 "a pair: 43 T-4e is the only road to a receipt without a verdict and it \
-                 requires 「`fail_posture_engaged=true`を必ずreceiptに刻む」 (§43 M5H6-8①)",
+                 requires \"always carve `fail_posture_engaged=true` into the receipt\" (§43 M5H6-8①)",
             ));
+        }
+
+        // 🔴 **DR-46-28** — the three payload-local beds of `req/459` ruling 4, before the kind,
+        // because none of them depends on it. Each one is a way of writing down something the
+        // boundary cannot be true of; the fourth bed (`unknown` minted over stages that were
+        // established) is arithmetic and lives on `DeterminismBoundary::of_stages`.
+        //
+        // The order is load-bearing and is well-formedness first: a `Mixed` whose two stages are
+        // equal is not a claim that happens to be wrong, it is a value that does not parse as the
+        // thing its name says. Asking the two semantic questions of it first would answer about
+        // half of a degenerate value and name the wrong defect in the sentence.
+        //
+        // (1) `Mixed` must mix: `req/459` ruling 3 words it as an enumeration by stage.
+        if let DeterminismBoundary::Mixed {
+            input_generation,
+            verdict_derivation,
+        } = self.determinism_boundary
+        {
+            if input_generation == verdict_derivation {
+                let stage = input_generation.as_str();
+                return Err(Error::Schema {
+                    detail: format!(
+                        "the receipt's determinism_boundary is mixed({stage}/{stage}), which enumerates one class twice: `DeterminismBoundary::of_stages` answers {stage} for those two stages and never `Mixed` (`req/459` ruling 3)"
+                    ),
+                });
+            }
+        }
+        // (2) A receipt may not say gx's own derivation came from a model.
+        if self.determinism_boundary.verdict_derivation() == BoundaryStage::LlmOriginated {
+            return Err(Error::Schema {
+                detail: format!(
+                    "the receipt's determinism_boundary is {}, which says this verdict was derived from a model: gx derives verdicts, and DR-46-27's machinery holds that derivation to \"same input, same verdict\". The value belongs on the declaration face (`req/459` ruling 3), not on a receipt",
+                    self.determinism_boundary.as_str()
+                ),
+            });
+        }
+        // (3) No verdict, no determinism claim: 43 T-4e calls no gate at all.
+        if self.verdict.is_none()
+            && self.determinism_boundary.verdict_derivation() == BoundaryStage::DeterministicReplay
+        {
+            return Err(Error::Schema {
+                detail: format!(
+                    "the receipt's determinism_boundary is {} and it carries no verdict: 43 T-4e is the only road to a receipt without one and it calls no gate, so there is no derivation for the claim to be about (`req/459` ruling 4)",
+                    self.determinism_boundary.as_str()
+                ),
+            });
+        }
+
+        // 🔴 **`req/493` §0 / AC-6** — the two pairs [`ConfinementContext`] names as not being
+        // states of the world, before the kind, because neither depends on it: a verdict receipt
+        // and a commit receipt are produced by the same process and the kernel is holding it or is
+        // not. `req/493` §1 AC-4's rule is what makes them refusals rather than remarks — a gate
+        // that has never been fired is not a gate, and `tests/confinement_attest.rs` fires each.
+        if let Some(confinement) = &self.confinement {
+            if confinement.kernel_confined && confinement.ruleset_hash.is_none() {
+                return Err(Error::Schema {
+                    detail: "the receipt says the kernel confined the process that produced it and names no ruleset: `gx_confine::ConfinePlan::ruleset_hash` is what lets a reader re-derive what was enforced from the pre-image, and a claim carried without it is the claim without the evidence (`req/493` §1 AC-6)".to_string(),
+                });
+            }
+            if !confinement.kernel_confined && confinement.ruleset_hash.is_some() {
+                return Err(Error::Schema {
+                    detail: "the receipt names a confinement ruleset and says the kernel confined nothing: a plan can be derived without being applied (`gx confine --plan-only` does exactly that), and what a receipt may not do is name one as though it had held (`req/493` §1 AC-6)".to_string(),
+                });
+            }
         }
 
         match self.receipt_kind {
             ReceiptKind::VerdictReceipt => {
                 if self.inclusion_proof.is_some() {
-                    return Err(refuse(
-                        "an inclusion proof",
-                        "always absent: 「常に`None`」",
-                    ));
+                    return Err(refuse("an inclusion proof", "always absent: always `None`"));
                 }
                 if self.postcondition_fingerprint.is_some() {
                     return Err(refuse(
                         "a postcondition fingerprint",
-                        "always absent: 「`VerdictReceipt`では常にNone」",
+                        "always absent: always None on `VerdictReceipt`",
                     ));
                 }
                 if self.inverse_delta.is_some() {
@@ -340,12 +1202,32 @@ impl ReceiptPayload {
                         "always absent: escrow is 43 T-10b, during commit",
                     ));
                 }
+                // 🔴 **DR-46-24(A)** — `req/350` §7-3 asked for the kind-dependent rule by name.
+                // The read-set is what the escrow read, the escrow is T-10b, and T-10b is inside
+                // commit: a verdict receipt claiming one is claiming a read that had not happened
+                // when it was signed.
+                if self.read_set.is_some() {
+                    return Err(refuse(
+                        "a read-set",
+                        "always absent: the escrow that reads is 43 T-10b, during commit",
+                    ));
+                }
+                // 🔴 **DR-46-26** — the third field with this rule, and it is the same rule.
+                // C-25's answer is what the escrow found out; the escrow is T-10b; T-10b is inside
+                // commit. A verdict receipt carrying one would be reporting an answer to a question
+                // nothing had asked when it was signed.
+                if self.reversibility.is_some() {
+                    return Err(refuse(
+                        "an inverse-status",
+                        "always absent: C-25 is answered by the escrow at 43 T-10b, during commit",
+                    ));
+                }
             }
             ReceiptKind::CommitReceipt => {
                 if self.inclusion_proof.is_none() {
                     return Err(refuse(
                         "no inclusion proof",
-                        "required: 「`CommitReceipt`は必須（`Some`）」",
+                        "required: mandatory (`Some`) on `CommitReceipt`",
                     ));
                 }
             }
@@ -358,12 +1240,12 @@ impl ReceiptPayload {
 ///
 /// # Why this is not literally 42 §3.10's `Receipt = DsseEnvelope`
 ///
-/// It was, until E-M2-6 took `issued_at` out of the signed core and sent it 「unsigned envelope
-/// metadata へ」. A DSSE envelope has exactly three fields -- 42 §3.10's own table says so, and the
+/// It was, until E-M2-6 took `issued_at` out of the signed core and sent it "to unsigned envelope
+/// metadata". A DSSE envelope has exactly three fields -- 42 §3.10's own table says so, and the
 /// standard 42 §4 compares gx against says so -- and a fourth would make the wire form something no
 /// DSSE reader parses. So the timestamp rides *beside* the envelope: [`Receipt::envelope`] is
 /// exactly 42 §3.10's three fields and is what a DSSE verifier sees, and this struct is the pair.
-/// The wire shape of that pair is in no 正本 and is raised in req/54 §4.
+/// The wire shape of that pair is in no canonical source and is raised in req/54 §4.
 ///
 /// # The consequence worth stating
 ///
@@ -422,15 +1304,22 @@ impl Receipt {
         Ok(cbor::decode(&self.envelope.payload)?)
     }
 
-    /// `LedgerEntry.receipt_digest` (42 §3.11), as [`ReceiptPayload::ledger_digest`] derives it.
+    /// `LedgerEntry.receipt_digest` (42 §3.11), derived from **the bytes that were signed**.
     ///
-    /// Read that function before using this one: the value is **not** 42 §3.11's literal 「DSSE
-    /// envelope bytes全体」, and the reason is a circularity in the 正本 rather than a shortcut.
+    /// Read [`ledger_digest_of_signed_payload`] before using this one, twice over: the value is
+    /// **not** 42 §3.11's literal "the whole of the DSSE envelope bytes" (a circularity in the
+    /// canonical source, set out at [`ReceiptPayload::ledger_digest`]), and it is not reached by
+    /// decoding this receipt either.
+    ///
+    /// 🔴 **`req/38` §324 ruling 3** — this used to be `self.payload()?.ledger_digest()`, and that
+    /// is the line three lanes in a row were sent back over. A receipt is a thing that arrives; the
+    /// struct it decodes into is this build's, and re-encoding it asks what this build's schema
+    /// would have written rather than what was signed.
     ///
     /// # Errors
     /// [`Error::Canon`] if the payload is not canonical DAG-CBOR.
     pub fn ledger_digest(&self) -> Result<Cid> {
-        self.payload()?.ledger_digest()
+        ledger_digest_of_signed_payload(&self.envelope.payload)
     }
 
     /// The signature offered under `key_id`, if there is one.
@@ -449,24 +1338,26 @@ impl Receipt {
 /// that cannot be `false` is a reader's invitation to check the wrong thing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Checks {
-    /// AC-018's 「canonical CID整合検査」: `canonical_cid == transformation`.
+    /// AC-018's "canonical CID consistency check": `canonical_cid == transformation`.
     ///
     /// # What this check is worth, honestly
     ///
     /// Both fields are inside the signed payload, so a tamperer cannot move one without breaking
     /// the signature -- which means this catches a **producer's** bug and no attack. 42 §3.10 asks
-    /// for both fields all the same (`transformation` 「対象変換」, `canonical_cid` 「`Transformation.id`」),
+    /// for both fields all the same (`transformation` "the target transformation", `canonical_cid` "`Transformation.id`"),
     /// and an engine that filled them from two different places could disagree. Raised in req/54 §4:
     /// the AC names a check whose adversarial value is zero, and saying so is better than reporting
     /// it as though it were a signature.
     pub canonical_cid: bool,
+    /// What the inclusion-proof walk found (AC-070's "checks.inclusion"): checked against a
+    /// known checkpoint, or honestly reported as not checkable for this receipt kind.
     pub inclusion: InclusionCheck,
     /// What a consulted revocation list said about the key (**FR-M7-3**).
     ///
     /// [`RevocationCheck::NotConsulted`] unless the caller took [`verify_offline_consulting`], which
     /// is the road that has a list to consult. Present on every answer rather than only when a list
     /// was given: a field that appeared only when it was interesting is a field a reader misses on
-    /// exactly the runs where it matters (M6H8-11 採(a)).
+    /// exactly the runs where it matters (M6H8-11 adopted (a)).
     pub revocation: RevocationCheck,
     /// Which key the signature was checked against. Carried so a caller aggregating verifications
     /// does not have to remember which key it passed in.
@@ -478,7 +1369,12 @@ impl Checks {
     ///
     /// [`InclusionCheck::Unanchored`] is **not** a pass. A `CommitReceipt` verified without an
     /// anchor has had its signature checked and its ledger claim not checked at all, and reporting
-    /// that as `true` is the fail-open req/29 §4 forbids -- 「skip と pass を同じ見た目にしない」.
+    /// that as `true` is the fail-open req/29 §4 forbids -- "a skip and a pass must not look the same".
+    ///
+    /// 🔴 **H-09**: [`InclusionCheck::Unbridged`] is not a pass either, and for the same sentence.
+    /// An anchor of a different `tree_size` with nothing bridging it leaves the ledger claim
+    /// unchecked; that it is also not *refuted* changes what the operator should do about it, and
+    /// changes nothing about whether the receipt has been verified.
     #[must_use]
     pub fn verified(&self) -> bool {
         self.canonical_cid
@@ -494,36 +1390,55 @@ impl Checks {
 
 /// What happened to the ledger half of a verification.
 ///
-/// Four values where AC-018 writes `"skipped"` and AC-070 writes `true`, because those two are the
-/// two *good* outcomes and a boolean has no room for the two bad ones. The AC vocabulary is a JSON
+/// Five values where AC-018 writes `"skipped"` and AC-070 writes `true`, because those two are the
+/// two *good* outcomes and a boolean has no room for the three bad ones. The AC vocabulary is a JSON
 /// field of the M6 CLI (`gx receipt verify --offline`); this is the library form it will be
 /// rendered from, and the mapping is written in each variant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InclusionCheck {
     /// A `VerdictReceipt`: ASM-14 says there is nothing in the ledger yet. AC-018's `"skipped"`.
     NotApplicable,
-    /// A `CommitReceipt` whose proof reached the anchor's root. AC-070's `true`.
+    /// A `CommitReceipt` whose proof reached the anchor's root — directly when the anchor is the
+    /// tree the proof names, or through a consistency proof when it is a later one. AC-070's `true`.
     Verified,
     /// A `CommitReceipt` whose proof did not reach the anchor's root -- a forged proof, a proof
     /// against a different tree, or an anchor from a different log.
+    ///
+    /// 🔴 **H-09 narrowed this word.** Before the repair it also covered every receipt older than
+    /// the anchor, because an inclusion proof is relative to the `tree_size` it names and a later
+    /// head has a different root by construction. That is [`InclusionCheck::Unbridged`] now:
+    /// `Refuted` is reserved for evidence **against** the receipt, and growth is not evidence.
     Refuted,
     /// A `CommitReceipt` verified with no anchor to check against. Not a pass: see
     /// [`Checks::verified`].
     Unanchored,
+    /// 🔴 **H-09** — the anchor and the proof are about **different trees**, and nothing bridged
+    /// them.
+    ///
+    /// The anchor commits to a `tree_size` the receipt's `inclusion_proof` does not name, and either
+    /// no consistency proof was offered or the one offered was about some other pair of sizes. The
+    /// ledger claim is then neither confirmed nor contradicted: the verifier holds two true
+    /// statements about two trees and no link between them (RFC 6962 §2.1.2 is that link).
+    ///
+    /// **Not a pass** ([`Checks::verified`]) and **not a refutation**. Reporting it as `Refuted`
+    /// was the false negative `req/222` measured — three commits, and the two older receipts came
+    /// back as evidence of tampering — and reporting it as `Verified` would be the fail-open on the
+    /// other side. It is the third thing, and it has its own word for the reason req/29 §4 gives.
+    Unbridged,
 }
 
 /// What happened to the key half of a verification (**FR-M7-3**).
 ///
-/// Five values, for [`InclusionCheck`]'s reason: 「the key is fine」 has three different meanings
+/// Five values, for [`InclusionCheck`]'s reason: "the key is fine" has three different meanings
 /// here and folding them into a boolean would lose the one that matters most — that nothing was
 /// consulted.
 ///
 /// 🔴 **Why `NotConsulted` is a pass and `Unanchored` is not.** A `CommitReceipt` *claims* inclusion
 /// in its own signed payload, so verifying one without an anchor leaves a claim the receipt made
 /// unchecked (H5-9). A receipt makes no claim about revocation at all: the list is the **verifier's**
-/// own input, and 45's ASM-45-2 makes consulting it optional (「revocation list参照はverifier側任意と
-/// する」). So not consulting is a verifier declining an option, not a check that was skipped — and
-/// the word is on the wire either way, which is M6H8-11 採(a)'s rule applied to the second thing a
+/// own input, and 45's ASM-45-2 makes consulting it optional ("consulting the revocation list is
+/// optional, at the verifier's discretion"). So not consulting is a verifier declining an option, not a check that was skipped — and
+/// the word is on the wire either way, which is M6H8-11 adopted (a)'s rule applied to the second thing a
 /// verification can leave out.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RevocationCheck {
@@ -532,10 +1447,10 @@ pub enum RevocationCheck {
     /// A list was consulted and holds no revocation of this key.
     NotRevoked,
     /// A revocation exists and takes effect **after** the moment of this verification, so there is
-    /// nothing to apply yet. The other half of req/98 §3-2's 「失効時刻より後の verify」.
+    /// nothing to apply yet. The other half of req/98 §3-2's "a verify after the revocation time".
     NotYetInForce,
     /// A revocation is in force, the setting is [`Retroaction::FromRevocation`], and the receipt is
-    /// dated before it: 「発行時点の鍵状態」 (ASM-45-2's DEFAULT). Valid.
+    /// dated before it: "the key's state at the moment of issue" (ASM-45-2's DEFAULT). Valid.
     ValidAtIssue,
     /// The receipt is not valid: the key was already revoked when the receipt says it was issued, or
     /// the setting is [`Retroaction::All`].
@@ -554,7 +1469,8 @@ impl RevocationCheck {
 ///
 /// All three are the **verifier's**, which is the whole shape of ASM-45-2: nothing about revocation
 /// travels inside a receipt, and a receipt cannot state its own key's standing. `verified_at` is
-/// injected rather than read here for 41 §6's reason (「乱数・時刻はengine境界で注入」) and for a
+/// injected rather than read here for 41 §6's reason ("randomness and clock reads are injected at
+/// the engine boundary") and for a
 /// sharper one — a library that read a clock could not be tested about what it answers at a chosen
 /// moment, which is most of what there is to test.
 #[derive(Clone, Copy, Debug)]
@@ -569,20 +1485,21 @@ pub struct RevocationPolicy<'a> {
 
 /// 🔴 The invariant (**FR-M7-3**): was this key revoked at or before the moment the receipt claims?
 ///
-/// > 「鍵が receipt timestamp 以前に revoke されていないか」 (req/98 §3-2)
+/// > "was the key revoked at or before the receipt timestamp" (req/98 §3-2)
 ///
 /// Four inputs and no hidden fifth, so that every answer can be reproduced from the values printed
 /// beside it. The order of the arms is the order the questions have to be asked in:
 ///
 /// 1. **no entry** — nothing to apply;
 /// 2. **not yet in force** — the revocation is dated after this verification, and applying it early
-///    would answer 「invalid」 about a receipt that is valid at the time of asking;
+///    would answer "invalid" about a receipt that is valid at the time of asking;
 /// 3. **[`Retroaction::All`]** — every receipt of a revoked key is refused, and no clock is read;
-/// 4. **before the revocation** — ASM-45-2's DEFAULT keeps it valid (「発行時点の鍵状態」);
+/// 4. **before the revocation** — ASM-45-2's DEFAULT keeps it valid ("the key's state at the moment of issue");
 /// 5. **at or after** — the key was already revoked when this receipt says it was issued.
 ///
 /// Arm 4 believes `issued_at`, which **E-M2-6** keeps out of the signed core. That is the limit 45
-/// §3 grades as TH-5's residual (「TSA連携なしのv0.1では失効時刻の第三者証明が弱い」) and it is why
+/// §3 grades as TH-5's residual ("in v0.1, without TSA integration, third-party proof of the
+/// revocation time is weak") and it is why
 /// arm 3 exists: a compromise is answered with the setting that reads no clock at all.
 #[must_use]
 pub fn revocation_status(
@@ -615,7 +1532,7 @@ pub fn revocation_status(
 ///    encoding, and a verifier that parsed first would report some of those flips as malformed
 ///    values instead of as bad signatures.
 /// 2. **The payload decodes**, strictly (CM-6).
-/// 3. **The schema**, per ASM-14's kind (AC-070's 「スキーマ不正」).
+/// 3. **The schema**, per ASM-14's kind (AC-070's "schema violation").
 /// 4. **`key_id` agrees** with the signature that was checked. 42 §3.10 requires it and nothing
 ///    else would notice a receipt naming one key and signed by another that a caller happens to
 ///    trust.
@@ -623,7 +1540,7 @@ pub fn revocation_status(
 ///
 /// # `anchor`
 ///
-/// AC-070 says 「既知checkpoint照合」 -- the verifier has to already believe a checkpoint, from a
+/// AC-070 says "match against a known checkpoint" -- the verifier has to already believe a checkpoint, from a
 /// witness, a previous run, or an operator. Passing `None` is legitimate (a `VerdictReceipt` needs
 /// none) and is reported as [`InclusionCheck::Unanchored`] for a `CommitReceipt` rather than
 /// quietly passing. The checkpoint's own signature is **not** checked here: that is
@@ -640,13 +1557,13 @@ pub fn verify_offline(
     key: &VerifyingKeyRef<'_>,
     anchor: Option<&Checkpoint>,
 ) -> Result<Checks> {
-    checks_of(receipt, key, anchor, None)
+    checks_of(receipt, key, anchor.map(Anchorage::at).as_ref(), None)
 }
 
 /// The same verification, **consulting a revocation list** (**FR-M7-3**).
 ///
 /// A second entry point rather than a fifth argument on the first, because ASM-45-2 makes consulting
-/// optional (「revocation list参照はverifier側任意とする」) and every caller written before this hand
+/// optional ("consulting the revocation list is optional, at the verifier's discretion") and every caller written before this hand
 /// consults nothing: a signature change would have turned that legitimate posture into a compile
 /// error and then into a hurried `None` at each call site. The two functions differ in exactly one
 /// input and answer the same type, with [`Checks::revocation`] saying which road was taken.
@@ -661,13 +1578,81 @@ pub fn verify_offline_consulting(
     anchor: Option<&Checkpoint>,
     revocation: &RevocationPolicy<'_>,
 ) -> Result<Checks> {
-    checks_of(receipt, key, anchor, Some(revocation))
+    checks_of(
+        receipt,
+        key,
+        anchor.map(Anchorage::at).as_ref(),
+        Some(revocation),
+    )
+}
+
+/// 🔴 **H-09** — an anchor, and (when the log has moved on) what ties the receipt's tree to it.
+///
+/// # Why the bridge is a second field and not a second checkpoint
+///
+/// An `inclusion_proof` is relative to exactly one `tree_size` (`gx_log::proof::prove_inclusion_at`),
+/// so the head a verifier believes today is, for every receipt but the newest, a root the proof
+/// cannot reach. `req/222` measured what that cost: a project with three commits answered
+/// `inclusion: "refuted"` for the two older receipts — a **false negative**, and the worst-shaped
+/// one, because "refuted" is the word for tampering.
+///
+/// RFC 6962 §2.1.2 is the standard answer and it is already implemented
+/// (`gx_log::proof::verify_consistency`, `gx log consistency`). What was missing is the *carriage*:
+/// a place for the caller to put the proof that the tree the receipt names grew into the tree the
+/// anchor names. This is that place.
+///
+/// # The chain has no unchecked link
+///
+/// 1. `root_at_proof_size` is **computed** from the receipt's own leaf and audit path
+///    (`gx_log::proof::root_of_inclusion`) — nobody hands it in, so nobody can forge it;
+/// 2. the consistency proof carries that root to `checkpoint.root_hash`;
+/// 3. `checkpoint.root_hash` is what the verifier already believed (and, with
+///    `--checkpoint-key`, what somebody signed).
+///
+/// A bridge about other sizes than `(proof.tree_size, checkpoint.tree_size)` is not weaker
+/// evidence, it is evidence about something else, and it is answered as
+/// [`InclusionCheck::Unbridged`] rather than folded in.
+#[derive(Clone, Copy, Debug)]
+pub struct Anchorage<'a> {
+    /// The head the verifier believes (AC-070's "known checkpoint").
+    pub checkpoint: &'a Checkpoint,
+    /// RFC 6962 §2.1.2, from the receipt's `tree_size` to the checkpoint's. `None` is honest and
+    /// common: a third party holding one file pair has no way to make one.
+    pub bridge: Option<&'a gx_log::proof::ConsistencyProof>,
+}
+
+impl<'a> Anchorage<'a> {
+    /// An anchor with nothing bridging it — what [`verify_offline`] has always passed.
+    #[must_use]
+    pub fn at(checkpoint: &'a Checkpoint) -> Self {
+        Self {
+            checkpoint,
+            bridge: None,
+        }
+    }
+}
+
+/// The same verification, told **how the log grew** since the receipt was issued (**H-09**).
+///
+/// The one entry point that can answer `Verified` for a receipt older than the anchor. The other
+/// two are this one with `bridge: None`, which is why they still report [`InclusionCheck::Unbridged`]
+/// in that case: an answer is not improved by a caller who has no evidence.
+///
+/// # Errors
+/// Everything [`verify_offline`] refuses.
+pub fn verify_offline_against(
+    receipt: &Receipt,
+    key: &VerifyingKeyRef<'_>,
+    anchorage: Option<&Anchorage<'_>>,
+    revocation: Option<&RevocationPolicy<'_>>,
+) -> Result<Checks> {
+    checks_of(receipt, key, anchorage, revocation)
 }
 
 fn checks_of(
     receipt: &Receipt,
     key: &VerifyingKeyRef<'_>,
-    anchor: Option<&Checkpoint>,
+    anchor: Option<&Anchorage<'_>>,
     revocation: Option<&RevocationPolicy<'_>>,
 ) -> Result<Checks> {
     receipt.envelope.verify(key)?;
@@ -678,7 +1663,7 @@ fn checks_of(
         return Err(Error::Schema {
             detail: format!(
                 "the receipt names key {:?} and was verified against {:?} (42 §3.10: \
-                 「`DsseSignature.keyid`と一致」)",
+                 matches `DsseSignature.keyid`)",
                 payload.key_id, key.key_id
             ),
         });
@@ -687,12 +1672,8 @@ fn checks_of(
     let canonical_cid = payload.canonical_cid == payload.transformation.0;
     let inclusion = match (payload.receipt_kind, &payload.inclusion_proof, anchor) {
         (ReceiptKind::VerdictReceipt, _, _) => InclusionCheck::NotApplicable,
-        (ReceiptKind::CommitReceipt, Some(proof), Some(head)) => {
-            if verify_inclusion_from(&payload, proof, head)? {
-                InclusionCheck::Verified
-            } else {
-                InclusionCheck::Refuted
-            }
+        (ReceiptKind::CommitReceipt, Some(proof), Some(anchorage)) => {
+            verify_inclusion_from(&payload, &receipt.envelope.payload, proof, anchorage)?
         }
         (ReceiptKind::CommitReceipt, _, None) => InclusionCheck::Unanchored,
         // Unreachable: `check_schema` refused a CommitReceipt with no proof two statements ago.
@@ -736,21 +1717,81 @@ fn checks_of(
 /// The third of those is where 42 §3.11's own wording had to be derived from rather than
 /// transcribed; [`ReceiptPayload::ledger_digest`] is the whole argument and req/54 §4 the ticket.
 ///
-/// The arithmetic is gx-log's (`verify_inclusion_of`) and is not repeated here. That is why this
-/// crate names gx-log at all -- see the dependency note in the crate root.
+/// The arithmetic is gx-log's (`verify_inclusion_of`, `root_of_inclusion`, `verify_consistency`)
+/// and is not repeated here. That is why this crate names gx-log at all -- see the dependency note
+/// in the crate root.
+///
+/// # 🔴 Three sizes, and what each one means (**H-09**, RFC 6962 §2.1.2)
+///
+/// Call `m` the `tree_size` the receipt's proof names and `n` the anchor's.
+///
+/// * **`m == n`** -- the original question, unchanged: does the path reach this root? Yes is
+///   [`InclusionCheck::Verified`], no is [`InclusionCheck::Refuted`], and no still means what it
+///   always meant, because the two statements are about the same tree.
+/// * **`m < n`** -- the log grew after the receipt was issued, which is the ordinary case for every
+///   receipt but the newest. The roots differ *by construction*, so asking the `m == n` question
+///   here answers "refuted" about a receipt nothing is wrong with. With a consistency proof the
+///   chain closes: reconstruct the root at `m` from the receipt itself, carry it to `n`, compare
+///   with the anchor. Without one there is no link and the answer is
+///   [`InclusionCheck::Unbridged`].
+/// * **`m > n`** -- the anchor is *older* than the commit. A tree of `n` leaves cannot contain a
+///   leaf appended at `m`, and its silence is not a statement about the receipt.
+///   [`InclusionCheck::Unbridged`] again: the honest answer is "this head is too old to say", and
+///   the operator's move is to fetch a later one.
+///
+/// The bridge is refused before it is used unless it is about exactly `(m, n)`. A proof between two
+/// other sizes is not partial evidence; used anyway it would let a holder of any two consistent
+/// sizes launder a receipt from a third tree.
 fn verify_inclusion_from(
     payload: &ReceiptPayload,
+    signed_bytes: &[u8],
     proof: &InclusionProof,
-    anchor: &Checkpoint,
-) -> Result<bool> {
+    anchorage: &Anchorage<'_>,
+) -> Result<InclusionCheck> {
+    let anchor = anchorage.checkpoint;
     let leaf = LedgerLeaf {
         index: proof.leaf_index,
-        receipt_digest: payload.ledger_digest()?,
+        // 🔴 **`req/38` §324 ruling 3** — from the bytes, not from the struct they decoded into.
+        //
+        // This is the line the ruling is about. A verifier is by definition holding a document
+        // somebody else wrote, possibly under a schema this build has never seen; re-encoding the
+        // decoded value asks what *this* build would have written and answers `Refuted` — the word
+        // for tampering — about an untouched receipt whenever a member has been added since.
+        receipt_digest: ledger_digest_of_signed_payload(signed_bytes)?,
         transformation: payload.transformation,
     };
-    Ok(gx_log::proof::verify_inclusion_of(
-        proof,
-        &anchor.root_hash,
-        &leaf,
-    )?)
+    if anchor.tree_size == proof.tree_size {
+        return Ok(
+            if gx_log::proof::verify_inclusion_of(proof, &anchor.root_hash, &leaf)? {
+                InclusionCheck::Verified
+            } else {
+                InclusionCheck::Refuted
+            },
+        );
+    }
+    if anchor.tree_size < proof.tree_size {
+        return Ok(InclusionCheck::Unbridged);
+    }
+    // The root the receipt *itself* computes to. `None` is a proof that does not fit the tree it
+    // declares -- a statement about no tree at all, and the one case here that is a refutation
+    // rather than a gap.
+    let Some(root_at_proof_size) = gx_log::proof::root_of_inclusion(proof, &leaf)? else {
+        return Ok(InclusionCheck::Refuted);
+    };
+    let Some(bridge) = anchorage.bridge else {
+        return Ok(InclusionCheck::Unbridged);
+    };
+    if bridge.old_size != proof.tree_size || bridge.new_size != anchor.tree_size {
+        return Ok(InclusionCheck::Unbridged);
+    }
+    Ok(
+        if gx_log::proof::verify_consistency(bridge, &root_at_proof_size, &anchor.root_hash)? {
+            InclusionCheck::Verified
+        } else {
+            // Both sizes are the ones asked about and the walk did not land: the receipt's tree is
+            // not a prefix of the anchor's, or the bridge is forged. Either way this is evidence
+            // against, which is what the word is for.
+            InclusionCheck::Refuted
+        },
+    )
 }

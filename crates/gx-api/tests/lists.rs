@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **M6-05** — the three lists, the fourth extension, and the one coordinate they share with
 //! `GET /stream`.
 //!
-//! 44 §2.7 reserves the regulation and specifies no list endpoints; §47 M6-05 採(a) adds them as 44
-//! extensions and fixes the ordering: 「**cursor=journal 順**(M6-13 と共有・表順=CID 順は時間について
-//! 任意)」. The sharpest probe in this file is [`the_list_cursor_is_the_stream_cursor`], because that
+//! 44 §2.7 reserves the regulation and specifies no list endpoints; §47 M6-05, adopted (a), adds them as 44
+//! extensions and fixes the ordering: "**cursor = journal order** (shared with M6-13; table order = CID order is arbitrary
+//! with respect to time)" (sem: SEM-gx-api-309). The sharpest probe in this file is [`the_list_cursor_is_the_stream_cursor`], because that
 //! sentence is a claim about **two features being one thing** and is otherwise only a comment.
 
 mod support;
@@ -44,9 +46,9 @@ async fn commit_many(server: &Server, n: usize) -> Vec<String> {
 
 /// 🔴 `GET /transformations` lists every row in **journal order**, which is not the table's order.
 ///
-/// req/88 M6-05 is the reason this is a probe rather than a detail: 「engine の表は
-/// `BTreeMap<TransformationId, _>`=**TID 順(=CID 順=実質ランダム)であって時間順ではない**」. A list
-/// that came out of the table would be sorted by content address, so 「the newest change」 would be
+/// req/88 M6-05 is the reason this is a probe rather than a detail: "the engine's table,
+/// `BTreeMap<TransformationId, _>`, is **TID order (= CID order = effectively random), not chronological order**" (sem: SEM-gx-api-310). A list
+/// that came out of the table would be sorted by content address, so "the newest change" would be
 /// wherever its digest happened to fall. Three commits, in a known order, are enough to tell the two
 /// apart — and the probe says so by asserting the order **is** the order they were made in.
 #[tokio::test(flavor = "multi_thread")]
@@ -65,7 +67,7 @@ async fn transformations_are_listed_in_the_order_they_happened() {
     assert_eq!(page.status, 200, "{:?}", page.json);
     let listed: Vec<String> = page.json["items"]
         .as_array()
-        .expect("44 §2.7: 「`{ items: [...], next_cursor: … }`」")
+        .expect("44 §2.7: \"`{ items: [...], next_cursor: … }`\" (sem: SEM-gx-api-311)")
         .iter()
         .map(|row| {
             row["transformation"]
@@ -83,7 +85,13 @@ async fn transformations_are_listed_in_the_order_they_happened() {
         by_cid, ids,
         "this fixture cannot tell the two orders apart — the ids happen to sort into the order they \
          were made in, so the assertion above would pass for a table-ordered list too. Change the \
-         goals until they differ (a probe that cannot fail is not a probe)"
+         goals until they differ (a probe that cannot fail is not a probe). 🔴 The goals are not \
+         the only input: 42 §3.3 puts the **locator** in the `IntentId` and the `IntentId` in the \
+         `TransformationId`, and the locator here is an absolute path under `CARGO_TARGET_TMPDIR` \
+         — so the five ids, and therefore their sort order, depend on where this repository is \
+         checked out and on `CARGO_TARGET_DIR`. Measured (`req/221`): the same commit passes under \
+         one target directory and lands in CID order under another. If this fires after a move \
+         rather than after a change, that is why"
     );
     assert_eq!(page.json["next_cursor"], serde_json::Value::Null);
 }
@@ -205,7 +213,7 @@ async fn candidates_lists_the_unfinished_and_transformations_lists_everything() 
 /// 🔴 `GET /escalations` is the only way to find a ticket, so it has to find one.
 ///
 /// 44 §1.2's `gx escalation approve <TICKET_ID>` and `POST /candidates/{id}/escalation` both consume
-/// a ticket and 43 T-4c's 「人間へ通知」 has no implementation in v0.1. The empty answer is asserted
+/// a ticket and 43 T-4c's "notify a human" (sem: SEM-gx-api-312) has no implementation in v0.1. The empty answer is asserted
 /// too: a list that reported an escalation for a transformation nobody escalated would be worse than
 /// no list at all.
 #[tokio::test(flavor = "multi_thread")]
@@ -227,7 +235,7 @@ async fn escalations_is_empty_until_something_escalates() {
 ///
 /// A clamp would answer a request for a thousand rows with two hundred and say nothing, so a client
 /// paging by a thousand would see a fifth of the ledger and believe it had seen all of it. That is
-/// the 「skip と pass を同じ顔にするな」 shape (req/29 §4) in a pagination parameter.
+/// the "don't give skip and pass the same face" (sem: SEM-gx-api-313) shape (req/29 §4) in a pagination parameter.
 #[tokio::test(flavor = "multi_thread")]
 async fn the_limit_is_44s_and_a_limit_outside_it_is_refused() {
     let server = Server::new("m6h6_list_limit", "before\n");
@@ -237,8 +245,11 @@ async fn the_limit_is_44s_and_a_limit_outside_it_is_refused() {
     let defaulted = client.send("GET", "/v1/transformations", None).await;
     assert_eq!(defaulted.status, 200);
     println!("DEFAULT_LIMIT={DEFAULT_LIMIT} MAX_LIMIT={MAX_LIMIT}");
-    assert_eq!(DEFAULT_LIMIT, 50, "44 §2.7: 「既定50」");
-    assert_eq!(MAX_LIMIT, 200, "44 §2.7: 「最大200」");
+    assert_eq!(
+        DEFAULT_LIMIT, 50,
+        "44 §2.7: \"default 50\" (sem: SEM-gx-api-314)"
+    );
+    assert_eq!(MAX_LIMIT, 200, "44 §2.7: \"maximum 200\"");
 
     for bad in ["0", "201", "9999"] {
         let refused = client
@@ -271,12 +282,22 @@ async fn ledger_consistency_answers_over_http_as_it_does_on_the_command_line() {
         .await;
     println!("CONSISTENCY_1_2={}", proof.json);
     assert_eq!(proof.status, 200, "{:?}", proof.json);
-    assert_eq!(proof.json["from"], serde_json::json!(1));
-    assert_eq!(proof.json["to"], serde_json::json!(2));
+    // DR-44-1 = option (a) bare (`req/38` §119 ruling 2, landed in v0.4-l `req/189`): the answer
+    // **is** the `ConsistencyProof` (42 §3.11 `{old_size, new_size, path}`) — the CLI twin's
+    // stdout, the SDK's return type and `GET /ledger/proof`'s bare `InclusionProof` all agree now.
+    // The pre-ruling wrapper `{from, to, proof}` (asserted here until v0.4-l) is gone; `from`/`to`
+    // were `old_size`/`new_size` said twice.
+    assert_eq!(proof.json["old_size"], serde_json::json!(1));
+    assert_eq!(proof.json["new_size"], serde_json::json!(2));
     assert!(
-        proof.json["proof"].is_object() || proof.json["proof"].is_array(),
-        "the proof is the value gx-log produced: {}",
-        proof.json["proof"]
+        proof.json["path"].is_array(),
+        "the proof is the value gx-log produced, bare: {}",
+        proof.json
+    );
+    assert!(
+        proof.json.get("proof").is_none() && proof.json.get("from").is_none(),
+        "DR-44-1 (a): no wrapper around the proof any more: {}",
+        proof.json
     );
 
     let backwards = client
@@ -301,7 +322,7 @@ fn the_extensions_are_declared_and_are_all_reads() {
     for endpoint in EXTENSION_ENDPOINTS {
         assert!(
             endpoint.starts_with("GET /"),
-            "44 §2.6 permits 「後方互換な追加」 and a list that changed state would not be one: \
+            "44 §2.6 permits \"backward-compatible addition\" (sem: SEM-gx-api-315) and a list that changed state would not be one: \
              {endpoint}"
         );
     }

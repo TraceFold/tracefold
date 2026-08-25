@@ -1,4 +1,6 @@
-//! 🔴 **M6-11 採(b)** — 44 §2.4's `Idempotency-Key`, and the sentence it is **not** about.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-11, adopted (b)** (sem: SEM-gx-api-298) — 44 §2.4's `Idempotency-Key`, and the sentence it is **not** about.
 //!
 //! The four claims 44 §2.4 makes, plus one it does not and M6-11 requires:
 //!
@@ -45,8 +47,8 @@ async fn committed(name: &str) -> (Server, String) {
 
 /// 🔴 The same key twice returns the same bytes, and the ledger grew **once**.
 ///
-/// The second half is the one that matters. 44 §2.4's purpose is 「ネットワーク断による『apply成功・
-/// 応答喪失』時の二重適用を防ぐ」, and what a client needs after losing a response is *the same
+/// The second half is the one that matters. 44 §2.4's purpose is "preventing double application when a network
+/// break causes apply-succeeded-response-lost" (sem: SEM-gx-api-299), and what a client needs after losing a response is *the same
 /// receipt* — a second `Receipt` describing the same commit differently would be two documents about
 /// one event, which is what a ledger exists to prevent.
 #[tokio::test]
@@ -72,7 +74,7 @@ async fn the_same_key_twice_returns_the_same_response() {
     assert_eq!(second.status.as_u16(), 200);
     assert_eq!(
         second.json, first.json,
-        "44 §2.4: 「同一キーでの再送に対して**副作用を再実行せず**同一レスポンスを返す」"
+        "44 §2.4: \"on a resend with the same key, **does not re-run the side effect** and returns the identical response\" (sem: SEM-gx-api-300)"
     );
 
     let proof = client
@@ -88,7 +90,7 @@ async fn the_same_key_twice_returns_the_same_response() {
 
 /// 🔴 The one line M6-11 requires, **measured**: the cache is not what prevents a double apply.
 ///
-/// > engine の commit は既に冪等なので、cache が守るのは**応答の同一性**であって副作用ではない
+/// > the engine's commit is already idempotent, so what the cache protects is **response identity**, not the side effect (sem: SEM-gx-api-301)
 ///
 /// The same commit is retried with **no key at all**, so nothing is cached and nothing is replayed —
 /// and the ledger still has one leaf and the file is still written once. If this test failed, the
@@ -143,7 +145,7 @@ async fn without_any_key_a_retried_commit_is_still_applied_once() {
 /// 🔴 The same key with a **different body** is `409 IDEMPOTENCY_CONFLICT` (44 §2.4).
 ///
 /// Measured on `undo`, because it is the endpoint 44 gives a body — `{actor}` — and therefore the
-/// only one of the two where 「同一キーで異なるリクエスト本文」 is expressible at all. That asymmetry
+/// only one of the two where "a different request body with the same key" (sem: SEM-gx-api-302) is expressible at all. That asymmetry
 /// is worth noticing: `commit` takes no body, so its conflict case can only be reached by using one
 /// key for two **transformations**, which the `(transformation_id, key)` pair already separates.
 #[tokio::test]
@@ -199,8 +201,8 @@ async fn one_key_and_two_bodies_is_a_conflict() {
 
 /// 🔴 **Why §47 took (b) over (a)** — the record is on disk and a new store reads it.
 ///
-/// > 44 の存在理由が「ネットワーク断による『apply成功・応答喪失』時の二重適用を防ぐ」であり、
-/// > **その断は process 再起動を伴いうる**
+/// > 44's reason for existing is "preventing double application when a network break causes
+/// > apply-succeeded-response-lost", and **that break can involve a process restart** (sem: SEM-gx-api-303)
 ///
 /// A memory cache is empty exactly when the failure it exists for has happened. A **second store
 /// object over the same directory** is the closest a single-process test can stand to a restart, and
@@ -238,12 +240,12 @@ async fn the_record_outlives_the_store_that_wrote_it() {
     // of the paragraph above: losing it costs a duplicated *response*, never a duplicated *effect*.
     assert!(
         fresh.dir().starts_with(&index),
-        "44 §2.4's cache lives under `.gx/index/` (M6-11 採(b)): {}",
+        "44 §2.4's cache lives under `.gx/index/` (M6-11, adopted (b); sem: SEM-gx-api-304): {}",
         fresh.dir().display()
     );
 }
 
-/// A record older than 44 §2.4's 「既定24時間」 is a miss, and an expired read deletes nothing.
+/// A record older than 44 §2.4's "default 24 hours" (sem: SEM-gx-api-305) is a miss, and an expired read deletes nothing.
 #[test]
 fn an_expired_record_is_a_miss_and_is_not_swept_on_read() {
     let dir = support::scratch("idem_ttl").join("index");
@@ -274,11 +276,14 @@ fn an_expired_record_is_a_miss_and_is_not_swept_on_read() {
         fresh.is_some(),
         "exactly at the boundary is still inside it"
     );
-    assert!(expired.is_none(), "44 §2.4: 「一定期間（既定24時間）」");
+    assert!(
+        expired.is_none(),
+        "44 §2.4: \"a fixed period (default 24 hours)\" (sem: SEM-gx-api-306)"
+    );
     assert!(
         store.path_of(&tid).exists(),
         "an expired read must not delete: a read that mutates a directory is a read that cannot be \
-         retried, and 「一定期間」 is about what may be **answered** from the cache"
+         retried, and \"a fixed period\" (sem: SEM-gx-api-307) is about what may be **answered** from the cache"
     );
 }
 
@@ -306,7 +311,7 @@ fn the_conflict_is_about_the_request_and_not_the_response() {
     assert_eq!(different.code, "IDEMPOTENCY_CONFLICT");
     assert!(
         different.detail.contains("alice") && different.detail.contains("bob"),
-        "🔴 both requests are named. A conflict that says only 「they differ」 leaves an operator \
+        "🔴 both requests are named. A conflict that says only \"they differ\" (sem: SEM-gx-api-308) leaves an operator \
          holding two clients and no way to tell which one was first: {}",
         different.detail
     );

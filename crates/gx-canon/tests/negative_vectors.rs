@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! T-30 / T-21 — the decode side refuses every vector that the spec says is not canonical.
 //!
 //! The vectors live as raw JSON in `tests/vectors/negative/`, one file per vector, readable
-//! without running anything (T-31: 「生成 script に依存せず読める」). Their provenance is the
-//! table `req/33_NEGVECTOR_TABLE_A_2026-08-07.md` ruled on 2026-08-07: A-1〜A-8 authored from the
-//! IPLD DAG-CBOR Strictness section, A-9 taken as data from `ipld/codec-fixtures`. P-1〜P-3 are
+//! without running anything (T-31: "readable without depending on a generation script") (sem: SEM-gx-canon-103). Their provenance is the
+//! table `req/33_NEGVECTOR_TABLE_A_2026-08-07.md` ruled on 2026-08-07: A-1 through A-8 authored from the
+//! IPLD DAG-CBOR Strictness section, A-9 taken as data from `ipld/codec-fixtures`. P-1 through P-3 are (sem: SEM-gx-canon-104)
 //! outside that table and are marked as such in their files -- T-30 asks for at least one
 //! violating input per rule of 42 §2.1, and rules 3, 4 and 5 have no row in req/33 because
 //! req/33 was drawn from IPLD's MUST tokens and those three are places where gx is *stricter*
@@ -19,15 +21,17 @@
 //! Whether the underlying codec would also have refused is recorded and printed rather than
 //! asserted, because it is a fact about `serde_ipld_dagcbor` and not a requirement on gx.
 //!
-//! Each vector carries a positive control (req/29 §2: 「正例の対照を必ず対で持つ」). Without one,
+//! Each vector carries a positive control (req/29 §2: "always carry a positive-example control as a pair") (sem: SEM-gx-canon-105). Without one,
 //! a scanner that refused everything would pass this file.
 //!
-//! # The six S-AI vectors, and why 「refused」 was not enough (**H6-4**)
+//! # The six S-AI vectors, and why "refused" was not enough (**H6-4**)
 //!
-//! `req/38_ERRATA_2026-08-07.md` §16 逐語: 「🔴**H6-4（採用・fix 批へ載荷）**: additional-info 境界の
-//! 判別 vector（24/25/26/27・28-30・31）を負例表へ追加する。mutation survivor 22 件は「負例 suite が
-//! strict scanner の境界を区別していない」という検査の穴の具体形であり、数学的厳密の第一原則から放置
-//! 不可」.
+//! `req/38_ERRATA_2026-08-07.md` §16 verbatim: "🔴**H6-4 (adopted, loaded onto the fix batch)**:
+//! add to the negative-vector table the vectors that discriminate the additional-info boundary
+//! (24/25/26/27, 28-30, 31). The 22 mutation survivors are a concrete instance of the hole in
+//! coverage that "the negative-vector suite does not distinguish the strict scanner's
+//! boundaries" describes, and the first principle of mathematical rigor forbids leaving it
+//! unaddressed." (sem: SEM-gx-canon-106)
 //!
 //! The hole had two shapes and the six vectors close both.
 //!
@@ -36,26 +40,26 @@
 //!   values 1 and 1, which are nowhere near any of them. Swapping a `>` for a `>=` left every vector
 //!   in the table passing. `S-AI24`..`S-AI27` each sit on one side of one comparison and each carry a
 //!   control on the other side, so a change in either direction moves a vector across it.
-//! * **「it was refused」 did not say *why*.** `simple_or_float` answers major type 7 with five arms,
+//! * **"it was refused" did not say *why*.** `simple_or_float` answers major type 7 with five arms,
 //!   four of which are refusals; deleting any one of them lets its inputs fall to the fifth, which
-//!   also refuses. A suite that only asks `is_err()` cannot see the difference between 「the float
-//!   rule caught it」 and 「the catch-all caught it」. So a vector may declare `expected_error`, and
+//!   also refuses. A suite that only asks `is_err()` cannot see the difference between "the float
+//!   rule caught it" and "the catch-all caught it" (sem: SEM-gx-canon-107). So a vector may declare `expected_error`, and
 //!   `negative_the_declared_error_is_the_one_the_scanner_returns` asserts the variant rather than the
 //!   refusal. The twelve older vectors do not declare one and are unchanged; the field is optional
 //!   and its absence is not a failure (extending it to them is raised in req/57 §4).
 //!
 //! # M3 hand 4: the payload, and the two vectors that reach it (**F-3**, **A-8**, **A-9**)
 //!
-//! Until this hand the sentence above read 「the survivors that live in the error *payload*
+//! Until this hand the sentence above read "the survivors that live in the error *payload*
 //! arithmetic -- `missing: end - self.b.len()`, `extra: bytes.len() - scan.i` -- are still open,
-//! because no assertion here reads those numbers」. req/38 §17 shelved that as F-3 and §18 shelved
-//! A-8 and A-9 beside it, all three into M3's error-vocabulary window, 「error の値をどこまで検査
-//! するか」 being one design decision rather than three.
+//! because no assertion here reads those numbers". req/38 §17 shelved that as F-3 and §18 shelved
+//! A-8 and A-9 beside it, all three into M3's error-vocabulary window, "how far to check the
+//! value of an error" (sem: SEM-gx-canon-108) being one design decision rather than three.
 //!
 //! The decision taken is to **widen `expected_error` rather than build a second suite**: a vector
 //! may now also declare `expected_error_payload`, a table of the numeric fields the refusal must
-//! carry. The reason is that those numbers are facts about the byte string -- 「eight bytes are
-//! missing at offset one」 -- and a separate suite would have to restate the byte string to assert
+//! carry. The reason is that those numbers are facts about the byte string -- "eight bytes are
+//! missing at offset one" (sem: SEM-gx-canon-109) -- and a separate suite would have to restate the byte string to assert
 //! them, which is two places to keep one input.
 //!
 //! It is a **subset** check: a vector declares the fields it means, and a field it does not name is
@@ -74,15 +78,15 @@
 //!   reading the *key*, so this is the one vector that separates `map`'s key-side `depth + 1` from
 //!   its value-side one; with the addition gone the key is read and the answer becomes `Truncated`.
 //! * **P-1** and **A-7** gain `expected_error: FloatNotAllowed`, which is A-8's other half
-//!   (req/38 §18: 「旧 vector の宣言拡張(P-1/A-7)」). Neither kills a survivor of its own -- A-6
+//!   (req/38 §18: "extending the declaration of existing vectors (P-1/A-7)") (sem: SEM-gx-canon-110). Neither kills a survivor of its own -- A-6
 //!   already declares that arm -- and that is reported rather than implied: what they add is that a
-//!   vector stating 「NaN is refused」 says *as what*, so a future arm that swallowed them would be
+//!   vector stating "NaN is refused" says *as what* (sem: SEM-gx-canon-111), so a future arm that swallowed them would be
 //!   visible here.
 //!
 //! # Hand 7: the three declarations F-1 and F-2 add (`req/38_ERRATA_2026-08-07.md` §17)
 //!
-//! * **F-1** 逐語: 「旧 12 vector のうち P-3 と A-6/P-1 に `expected_error` を 2 行宣言する（機構は既設・
-//!   arm 削除の survivor 2 件が落ちる）」. `P-3` declares `IndefiniteLength` and `A-6` declares
+//! * **F-1** verbatim: "declare `expected_error` on two lines, among the old 12 vectors: on P-3
+//!   and on A-6/P-1 (the mechanism already exists; deleting the arm drops 2 survivors)" (sem: SEM-gx-canon-112). `P-3` declares `IndefiniteLength` and `A-6` declares
 //!   `FloatNotAllowed`. Both are arms that a catch-all sits behind: deleting `head`'s `31 =>` arm
 //!   leaves `P-3` refused as `ReservedAdditionalInfo`, and deleting `simple_or_float`'s `25..=27 =>`
 //!   arm leaves `A-6` refused as `SimpleValueNotAllowed`. Two files gained one line each; no bytes,
@@ -92,15 +96,15 @@
 //!   `normative_basis: "IPLD-MUST"`, which was the **mirror reading** of L66 rather than a verbatim
 //!   one -- req/67 §2.6 measured that the IPLD spec names no MUST about truncation at all, and that
 //!   L66 is a sentence about *extraneous* bytes. The sentence about *missing* ones is RFC 8949 §3's:
-//!   「If the encoded sequence of bytes ends before the end of a data item, that item is not
-//!   well-formed」 (L487), with 「A decoder MUST NOT return a decoded data item when it encounters
-//!   input that is not a well-formed encoded CBOR data item」 (L445-446) supplying the strength. So
+//!   "If the encoded sequence of bytes ends before the end of a data item, that item is not
+//!   well-formed" (L487), with "A decoder MUST NOT return a decoded data item when it encounters
+//!   input that is not a well-formed encoded CBOR data item" (L445-446) (sem: SEM-gx-canon-113) supplying the strength. So
 //!   the vocabulary below gains a fourth value, `RFC8949-MUST`, and `TR-1` is the one vector that
 //!   carries it. The three req/33 ruled remain exactly as they were: the addition names a second
 //!   normative document, not a fourth degree of strictness.
-//! * **F-2** 逐語: 「64 段超の入れ子 vector 1 本を負例表へ追加（深さ制限 survivor 5 件が落ちる）。
-//!   `normative_basis` は **gx-policy**（41 §6 panic=bug 系譜・42 §2.1 の条項でない事を vector 注記に
-//!   明記）」. `D-65` is that vector, and it is the first one here whose input is **canonical IPLD
+//! * **F-2** verbatim: "add one nesting vector exceeding 64 levels to the negative-vector table
+//!   (dropping 5 depth-ceiling survivors). `normative_basis` is **gx-policy** (41 §6's panic=bug
+//!   lineage; the vector's note states plainly that this is not a clause of 42 §2.1)" (sem: SEM-gx-canon-114). `D-65` is that vector, and it is the first one here whose input is **canonical IPLD
 //!   DAG-CBOR**: nothing in 42 §2.1 refuses it, and gx does, because a recursive scanner walking a
 //!   stranger's bytes needs a ceiling. Its control sits at exactly 64 levels and must be accepted --
 //!   without it the suite could not tell `depth > MAX_DEPTH` from `depth >= MAX_DEPTH`, since both
@@ -115,7 +119,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use support::unhex;
 
-/// req/33 ruled 8+1; P-1〜P-3 were hand 3's addition for T-30's per-rule coverage; S-AI24..S-AI31 are
+/// req/33 ruled 8+1; P-1 through P-3 (sem: SEM-gx-canon-115) were hand 3's addition for T-30's per-rule coverage; S-AI24..S-AI31 are
 /// the fix hand's six for H6-4's additional-info boundaries; `D-65` is hand 7's one for F-2; `D-65K`
 /// and `TR-1` are M3 hand 4's for A-9 and F-3. A literal count, so adding a vector without
 /// accounting for it here fails.
@@ -306,7 +310,7 @@ fn negative_every_vector_is_rejected_by_the_gx_scanner_alone() {
 
 /// Which layer catches what. Printed, not asserted: it describes the dependency, and asserting
 /// it would turn a `serde_ipld_dagcbor` release into a gx test failure. The numbers are what the
-/// step-3 report quotes for 「reject 層の内訳」.
+/// step-3 report quotes for "the breakdown of the reject layer" (sem: SEM-gx-canon-116).
 #[test]
 fn negative_reject_layer_breakdown() {
     let vectors = load();
@@ -515,8 +519,8 @@ fn negative_the_declared_payload_is_the_one_the_scanner_reports() {
     println!("NEGATIVE_VECTORS_WITH_A_DECLARED_PAYLOAD={checked} of {EXPECTED_VECTOR_COUNT}");
 }
 
-/// 42 §2.1-2 as written says the sort key is 「キーのUTF-8バイト列」; IPLD's spec.md L58 says the
-/// comparison includes 「their major type 3 and length」, which puts a short key before a long one
+/// 42 §2.1-2 as written says the sort key is "the key's UTF-8 byte sequence" (sem: SEM-gx-canon-117); IPLD's spec.md L58 says the
+/// comparison includes "their major type 3 and length", which puts a short key before a long one
 /// regardless of content. The two readings disagree -- under the first, `{"aa":2,"b":1}` is
 /// canonical; under the second, `{"b":1,"aa":2}` is. `serde_ipld_dagcbor`, which 42 §2.1-6 names
 /// as authoritative for the implementation, writes the second. This test pins the behaviour the

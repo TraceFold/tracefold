@@ -1,14 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-011 — the CID of a value is the same wherever it is computed.
 //!
-//! 34 AC-011 verbatim: 「(a) プロセスAとして`gx_canon::cid::compute(&x)`をライブラリ関数として直接
-//! 呼び出しCIDを取得、(b) 完全に独立した子プロセスB（別バイナリ・キャッシュ非共有・別ワーキング
-//! ディレクトリ）で同一関数を同一入力に対し呼び出しCIDを取得。Then: `Cid_A == Cid_B`（BLAKE3
-//! 32byte値がbit-equal）」, and 42 §1.1 for what the digest is: BLAKE3-256 over the canonical
+//! 34 AC-011 verbatim: "(a) as process A, call `gx_canon::cid::compute(&x)` directly as a
+//! library function and obtain the CID; (b) in a completely independent child process B (a
+//! separate binary, no shared cache, a separate working directory), call the same function on
+//! the same input and obtain the CID. Then: `Cid_A == Cid_B` (the BLAKE3 32-byte values are
+//! bit-equal)" (sem: SEM-gx-canon-028), and 42 §1.1 for what the digest is: BLAKE3-256 over the canonical
 //! DAG-CBOR form of the value.
 //!
 //! # The two architectures
 //!
-//! The criterion also asks for 「x86_64/aarch64双方のCIマトリクス」. There is no aarch64 execution
+//! The criterion also asks for "a CI matrix covering both x86_64/aarch64" (sem: SEM-gx-canon-029). There is no aarch64 execution
 //! environment in this estate (req/10 §6 B-5), so A-5 conditions that half of the clause and this
 //! file reports what it actually ran on. The report is computed from `std::env::consts::ARCH`
 //! rather than written down, so it stays true if the same test is one day run on an arm runner:
@@ -69,7 +72,7 @@ fn ac_011_the_hashed_bytes_are_the_canonical_form_of_the_projection() {
 /// Independence is arranged three ways, one per clause of the criterion: a different binary
 /// (`gx_cid_probe`, a separate compilation unit with its own `main`), a different working
 /// directory (a fresh directory under the system temp), and no inherited environment at all
-/// (`env_clear`, which is the strongest available reading of 「キャッシュ非共有」 -- there is no
+/// (`env_clear`, which is the strongest available reading of "no shared cache" (sem: SEM-gx-canon-030) -- there is no
 /// cache in `compute` to share, so what is removed is every variable that could make one process
 /// behave differently from the other).
 ///
@@ -143,7 +146,7 @@ fn ac_011_two_independent_processes_agree_on_the_cid() {
         .filter(|a| *a != parent_arch && *a != child_arch)
         .collect();
 
-    // Machine output, not prose. req/31 §9's DoD for this step asks for 「aarch64=未実測」 to come
+    // Machine output, not prose. req/31 §9's DoD for this step asks for "aarch64=not measured" (sem: SEM-gx-canon-031) to come
     // out of the machine, and the honest way to produce it is to name the architecture that ran.
     println!("CID_A={parent_text}");
     println!("CID_B={child_text}");

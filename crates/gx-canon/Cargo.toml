@@ -5,8 +5,10 @@ name = "gx-canon"
 description = "Canonical DAG-CBOR form, CID, and the JCS compatibility layer (41 §2 / 42)."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-canon-001)
 license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # P5 (req/134 §1 item 6): `dist generate` reads this
 
 # Every version below is the max_stable_version read off the crates.io API on 2026-08-07,
 # and every license was checked at three points -- the published Cargo.toml (crates.io
@@ -41,7 +43,7 @@ serde_json_canonicalizer = "0.3"      # RFC 8785 JCS compatibility layer (T-25)
 # 38_ERRATA §1 A-6 is the approval.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"                      # Intent.goal and the JCS input (42 §3.3)
-thiserror = "2"                       # 41 §6, "エラーは thiserror で型化"
+thiserror = "2"                       # 41 §6, "errors are typed with thiserror" (sem: SEM-gx-canon-002)
 
 # Off by default, and that is the point: it is what keeps the probe binary out of anything a
 # published crate hands a user (see the [[bin]] block). Nothing in src/ reads it.
@@ -55,12 +57,12 @@ proptest = "1.11"                     # the eight properties of T-28 (51 §3)
 # CARGO_BIN_EXE_gx_cid_probe; `cargo build`, `cargo install` and a consumer's build do not.
 gx-canon = { path = ".", features = ["probe-bin"] }
 
-# AC-011 requires the second CID to come from 「別バイナリ」, so the second binary is part of the
+# AC-011 requires the second CID to come from "a separate binary" (sem: SEM-gx-canon-003), so the second binary is part of the
 # acceptance criterion. The path keeps it out of src/, which 41 §2 fixes at four modules; cargo
 # builds it ahead of the integration tests and hands them its location in CARGO_BIN_EXE_gx_cid_probe.
 #
 # `required-features` is the publish exclusion the erratum asks for (`req/38_ERRATA_2026-08-07.md`
-# §5, 「probe bin の身分」; raised as req/42 §4-H). Cargo has no per-target `publish` key, and
+# §5, "the probe bin's status" (sem: SEM-gx-canon-004); raised as req/42 §4-H). Cargo has no per-target `publish` key, and
 # `exclude`-ing the file would make `cargo package` fail verification on a target whose source is
 # missing -- so the exclusion is expressed as a feature that is off unless a test build turns it
 # on. `cargo install gx-canon` installs no binary; `cargo test` still runs AC-011 unconditionally.
@@ -68,6 +70,12 @@ gx-canon = { path = ".", features = ["probe-bin"] }
 name = "gx_cid_probe"
 path = "tests/bin/cid_probe.rs"
 required-features = ["probe-bin"]
+
+# 🔴 P5 (req/134 §1 item 6, `gx-mcp-wire/Cargo.toml`'s identical note): `gx_cid_probe` is a
+# `probe-bin`-gated test fixture, not shipped product. Opted out of `dist generate`'s default
+# (every `[[bin]]` in the workspace) the same way.
+[package.metadata.dist]
+dist = false
 
 # Two of the eight A-6 items are cargo subcommands, not manifest entries, so they are
 # installed by CI rather than declared here: cargo-nextest (51 §2, the workspace test

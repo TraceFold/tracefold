@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-026 (FR-026) — every registered invariant is called, exactly once, by one `verify`.
 //!
-//! AC-026 逐語: 「Given: モック`InvariantCheck`実装3件をregistryへ登録。When: `Gate::verify(input)`を
-//! 呼ぶ。Then: 3件すべての`check`が正確に1回ずつ呼ばれたことがモックの呼び出しカウンタで確認できる。」
-//! 判定方法: 「unit（mock検証）」.
+//! AC-026 verbatim: "Given: register 3 mock `InvariantCheck` implementations to the registry. When:
+//! `Gate::verify(input)` is called. Then: it can be confirmed via the mocks' call counters that all
+//! 3 `check`s were called exactly once each." Judgment method: "unit (mock verification)". (sem: SEM-gx-gate-197)
 //!
-//! 「正確に1回ずつ」 has two failure modes and the counter sees both: zero (a registry that was
+//! "exactly once each" has two failure modes and the counter sees both: zero (a registry that was (sem: SEM-gx-gate-198)
 //! never consulted, or one whose loop skipped an entry) and two (a check asked once per system, or
 //! once per arm of a fold). The criterion is stated on a single `verify`, so each test below counts
 //! after exactly one call unless it says otherwise.
@@ -180,13 +182,17 @@ fn ac_026_three_registered_invariants_are_each_called_exactly_once() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+            // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+            // varying this field alone moves no verdict) about the field and not about this fixture.
+            decided_at: Timestamp(0),
         })
         .expect("a permissive set and three holding invariants reach a verdict");
 
     assert_eq!(
         counts(&counters),
         vec![1, 1, 1],
-        "AC-026: 「3件すべての`check`が正確に1回ずつ呼ばれた」"
+        "AC-026: \"all 3 `check`s were called exactly once each\"" // (sem: SEM-gx-gate-199)
     );
     assert_eq!(verdict.kind(), VerdictKind::Admit);
 
@@ -211,8 +217,8 @@ fn ac_026_three_registered_invariants_are_each_called_exactly_once() {
 
 /// The count does not depend on what the policy said (FR-026 is unconditional).
 ///
-/// FR-026 逐語: 「`check(pre, planned) -> Result<InvariantResult>` を**全登録invariant**に対し実行
-/// しなければならない」. A registry that stopped once a policy had already refused would still pass
+/// FR-026 verbatim: "`check(pre, planned) -> Result<InvariantResult>` **must be run against every
+/// registered invariant**" (sem: SEM-gx-gate-200). A registry that stopped once a policy had already refused would still pass
 /// AC-026's own Given -- the criterion admits any input -- and would make an `AdmitProof`'s record
 /// depend on which of the two systems was consulted first. So the refusing case is measured too.
 #[test]
@@ -230,6 +236,7 @@ fn ac_026_the_count_is_the_same_when_the_policy_refuses() {
             planned: &planned,
             evidence: &[],
             invert_available: false,
+            decided_at: Timestamp(0),
         })
         .expect("a refusal is a verdict, not an error");
 
@@ -256,6 +263,7 @@ fn ac_026_a_second_verify_asks_every_invariant_again() {
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        decided_at: Timestamp(0),
     };
 
     gate.verify(input()).expect("first");
@@ -280,7 +288,7 @@ fn the_registry_reports_its_three_invariants_in_registration_order() {
     assert_eq!(registry.ids(), vec!["aaa-first", "bbb-second", "ccc-third"]);
 }
 
-/// A gate that was given no invariants records none, and that is not the same as 「all held」.
+/// A gate that was given no invariants records none, and that is not the same as "all held". (sem: SEM-gx-gate-201)
 #[test]
 fn a_gate_with_an_empty_registry_records_no_invariant_results() {
     let gate = gate(PERMIT_EVERYTHING, InvariantRegistry::new());
@@ -296,6 +304,7 @@ fn a_gate_with_an_empty_registry_records_no_invariant_results() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect("evaluable");
 

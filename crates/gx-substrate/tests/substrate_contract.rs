@@ -1,11 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **H-2** / **E-M4-12** — the locator-normalisation contract, measured where a later hand has to
-//! meet it.
+//! meet it. (sem: SEM-gx-substrate-121, SEM-gx-substrate-122, SEM-gx-substrate-123,
+//! SEM-gx-substrate-124, SEM-gx-substrate-125)
 //!
-//! `req/38_ERRATA_2026-08-07.md` §25 逐語: 「🔴**H-2(採用=案 c 両方)**: ①M4 adapter 契約の必須 ticket
-//! 「locator は正規化済みで gate に渡す」を予約」. §28 M4-12 then fixed what the contract says:
-//! 「locator 正規化は **字句(lexical)のみ**を契約に——dot-segment 畳込み・重複区切り除去・末尾区切り規約。
-//! I/O 0=plan 純関数性と CAS を汚さない。**symlink/realpath 解決は v0.2+ 起票とし、TH-2 残存(symlink 経路
-//! は字句では閉じない)を doc と受領書側 disclosure に明示**」.
+//! `req/38_ERRATA_2026-08-07.md` §25, verbatim: "🔴**H-2 (adopted = both option c)**: ① reserves the
+//! mandatory ticket of the M4 adapter contract, 'the locator is passed to the gate already
+//! normalised'". §28 M4-12 then fixed what the contract says: "put locator normalisation in the
+//! contract as **lexical only** -- dot-segment folding, duplicate-separator removal, the
+//! trailing-separator convention. Zero I/O = does not taint `plan`'s purity or the CAS. **File
+//! symlink/realpath resolution as a v0.2+ ticket, and make the TH-2 residue (the symlink road is not
+//! closed lexically) explicit in both the doc and the receipt-side disclosure**".
 //!
 //! # Why a documentation obligation gets a test
 //!
@@ -17,7 +22,8 @@
 //! This is that shape one crate over.
 //!
 //! What it buys is not literary. Hand 4 writes the fs normalisation and hand 2 writes the trait
-//! doc that points at it; both are graded against the clauses below, so 「後続手が従う事」 is a
+//! doc that points at it; both are graded against the clauses below, so "that a later hand
+//! complies" is a
 //! failing test rather than a reviewer's memory.
 //!
 //! # What it deliberately does not check
@@ -62,13 +68,13 @@ fn crate_doc(source: &str) -> String {
 /// three operations it consists of, what it is not (symlink resolution), and the residual threat
 /// that not-being leaves behind.
 const NORMATIVE_CLAUSES: [&str; 8] = [
-    "locator は正規化済みで gate に渡す",
-    "字句(lexical)のみ",
-    "dot-segment 畳込み",
-    "重複区切り除去",
-    "末尾区切り規約",
-    "symlink/realpath 解決は v0.2+",
-    "TH-2 残存",
+    "the locator is passed to the gate already normalised",
+    "Lexical only",
+    "Dot-segment folding",
+    "Duplicate-separator removal",
+    "Trailing-separator convention",
+    "Symlink/realpath resolution is v0.2+",
+    "TH-2 residue",
     "E-M4-12",
 ];
 
@@ -107,10 +113,11 @@ fn the_contract_has_a_section_of_its_own() {
 
 /// The contract says lexical, and this hand ships no code that could make it false.
 ///
-/// 「I/O 0=plan 純関数性と CAS を汚さない」 is the reason M4-12 (a) was taken over (b), and the
+/// "zero I/O = does not taint `plan`'s purity or the CAS" is the reason M4-12 (a) was taken over
+/// (b), and the
 /// reason is measurable while the crate is still a skeleton: no path resolution, no file read, no
 /// clock. Asserting the absence now is what makes hand 4 add each of those deliberately, if it adds
-/// them at all -- the same shape as `AC-053`'s 「無い事」 checks (req/69 §8.2).
+/// them at all -- the same shape as `AC-053`'s "the absence" checks (req/69 §8.2).
 #[test]
 fn the_crate_reads_no_path_no_file_and_no_clock() {
     let dir = repo_root().join("crates/gx-substrate/src");

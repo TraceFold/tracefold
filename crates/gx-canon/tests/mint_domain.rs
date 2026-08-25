@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The domain-separated mint API (**E-M2-12**, `req/38_ERRATA_2026-08-07.md` §8).
 //!
 //! No acceptance criterion is claimed here. AC-021..AC-024 are gx-log's and this file is the
@@ -9,7 +11,7 @@
 //! ```
 //!
 //! and until this hand there was no way to produce either without reaching for the digest
-//! directly. 41 §6 forbids that — 「全 canonical encode は gx-canon 経由のみ」 — and AC-014 checks
+//! directly. 41 §6 forbids that — "every canonical encode goes through gx-canon only" (sem: SEM-gx-canon-100) — and AC-014 checks
 //! it mechanically, so a gx-log that hashed its own leaves would either violate the rule or make
 //! the check that guards it stop meaning anything. E-M2-12 rules the other way round: gx-canon
 //! gains the mint, gx-log calls it.
@@ -26,8 +28,8 @@
 //! # What this API is not
 //!
 //! It is not a second road to an *identity*. [`gx_canon::cid::compute`] takes an `IdentityView`
-//! and answers 「what is this value」 (42 §1.1, §1.3); the mint takes bytes and a domain tag and
-//! answers 「what is this position in a Merkle tree」 (42 §3.11). The two never produce the same
+//! and answers "what is this value" (sem: SEM-gx-canon-101) (42 §1.1, §1.3); the mint takes bytes and a domain tag and
+//! answers "what is this position in a Merkle tree" (42 §3.11). The two never produce the same
 //! digest for the same input — the domain byte is exactly what stops them — and
 //! `ac_014.rs` pins the set of functions that may take a digest at all so that a third road has to
 //! be declared before it can exist.
@@ -70,7 +72,7 @@ fn blake3_of(domain: u8, parts: &[&[u8]]) -> Cid {
 // The two domain bytes
 // ---------------------------------------------------------------------------
 
-/// 42 §3.11 逐語: 「プレフィクスバイト（`0x00`=leaf, `0x01`=internal node）」.
+/// 42 §3.11 verbatim: "the prefix byte (`0x00`=leaf, `0x01`=internal node)" (sem: SEM-gx-canon-102).
 ///
 /// A constant rather than a literal at each call site, because the whole purpose of the two bytes
 /// is that leaf hashing and node hashing can never be made to agree by accident (RFC 6962 §2.1,

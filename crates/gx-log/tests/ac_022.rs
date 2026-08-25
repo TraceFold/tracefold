@@ -1,11 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-022 (FR-022) — inclusion proofs, and what happens to a tampered one.
 //!
-//! AC-022 逐語: 「Given: 100件commit済みのgx-log。When: seq=42のentryについてinclusion proofを生成し
-//! `verify_inclusion(proof, root, entry)`を呼ぶ。Then: `Ok(true)`。entryを改ざんした場合は
-//! `Ok(false)`または`Err`。」 判定方法欄: 「property（ランダムseq×複数root状態）」.
+//! AC-022 verbatim: "Given: a gx-log with 100 entries already committed. When: an inclusion proof
+//! is generated for the entry at seq=42 and `verify_inclusion(proof, root, entry)` is called.
+//! Then: `Ok(true)`. If the entry was tampered with: `Ok(false)` or `Err`." Judgement-method column:
+//! "property (random seq x several root states)". (sem: SEM-gx-log-110)
 //!
 //! The literal case (100 entries, seq 42) is the first test; the rest is the property the AC's
-//! own 判定方法 column asks for, plus the negatives that make a positive worth anything. A verifier
+//! own judgement-method column asks for, plus the negatives that make a positive worth anything. A verifier (sem: SEM-gx-log-111)
 //! that returns `Ok(true)` for everything passes the literal case.
 //!
 //! # What is being verified
@@ -56,7 +59,7 @@ fn ac_022_seq_42_of_a_hundred_entries_verifies() {
     assert_eq!(verify_inclusion(&proof, &root, &entry), Ok(true));
 }
 
-/// A tampered entry does not verify. 「entryを改ざんした場合は `Ok(false)` または `Err`」.
+/// A tampered entry does not verify. "if the entry was tampered with: `Ok(false)` or `Err`" (sem: SEM-gx-log-112).
 ///
 /// Each field of the leaf is edited in turn, because a verifier that recomputed only part of the
 /// leaf would still reject the others.
@@ -174,7 +177,7 @@ fn ac_022_the_single_leaf_tree_verifies_with_an_empty_path() {
 }
 
 // ---------------------------------------------------------------------------
-// The property AC-022's 判定方法 column asks for: random seq x several tree sizes
+// The property AC-022's judgement-method column asks for: random seq x several tree sizes (sem: SEM-gx-log-113)
 // ---------------------------------------------------------------------------
 
 proptest! {

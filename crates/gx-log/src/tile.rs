@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The append-only tree: leaves, entries, tiles, and the hash arithmetic over them.
 //!
 //! Spec: 42 §3.11 for every field table and for the two hash rules, 32 FR-021/FR-024 for what the
 //! crate owes, 34 AC-021/AC-024 for how that is judged, RFC 6962 §2.1 for the tree definition
-//! 42 §3.11 says it reuses (「Certificate Transparency（RFC 6962）由来の設計をそのまま再利用する」).
+//! 42 §3.11 says it reuses ("reuses the design from Certificate Transparency (RFC 6962) as-is") (sem: SEM-gx-log-076).
 //!
 //! # Written here, not imported
 //!
-//! **M2H1-6 → 手 2 裁定** (`req/38_ERRATA_2026-08-07.md` §9): the merkle tree is gx's own. Three
+//! **M2H1-6 → hand 2 ruling** (`req/38_ERRATA_2026-08-07.md` §9): the merkle tree is gx's own. Three (sem: SEM-gx-log-077)
 //! reasons are recorded there — gx hashes with BLAKE3 (35 DR-3) while `rs_merkle` pulls a second
 //! SHA-256 implementation into a workspace that needs none (req/50 §6 measured the duplicated
 //! `sha2` subtree), 42 §3.11's domain separation is no library's default, and the licence claim
@@ -30,8 +32,8 @@
 //!
 //! The split is what makes the tree append-only in shape as well as in API: a left subtree is
 //! always complete, so appending never rewrites a hash that was already published — which is what
-//! lets [`TileLog::tile`] hand out immutable, cacheable blocks (42 §3.11: 「CDNキャッシュ可能な
-//! 固定サイズ塊」).
+//! lets [`TileLog::tile`] hand out immutable, cacheable blocks (42 §3.11: "a fixed-size chunk
+//! that a CDN can cache" (sem: SEM-gx-log-078)).
 
 use gx_canon::cid;
 use gx_core::{Cid, Timestamp, TransformationId};
@@ -39,9 +41,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result};
 
-/// Leaves per full tile (42 §3.11: `width` は 1..=256、「既定tile幅256」).
+/// Leaves per full tile (42 §3.11: `width` is 1..=256, "the default tile width is 256") (sem: SEM-gx-log-079).
 ///
-/// The upstream vocabulary calls the same number a 「tile height」 of 8, meaning 2^8 leaves; AC-024
+/// The upstream vocabulary calls the same number a "tile height" (sem: SEM-gx-log-080) of 8, meaning 2^8 leaves; AC-024
 /// compares both readings against a reference vector.
 pub const TILE_WIDTH: u16 = 256;
 
@@ -50,23 +52,23 @@ pub const TILE_WIDTH: u16 = 256;
 /// # Why this one compile-time assertion and not a dozen
 ///
 /// M2 hand 6 went looking for length and layout invariants worth asserting at compile time
-/// (req/49 §5, 批9) and found that almost all of them are already refused by the type checker: a
+/// (req/49 §5, batch 9) and found that almost all of them are already refused by the type checker: a (sem: SEM-gx-log-081)
 /// `Cid` is `[u8; 32]` by construction, a key seed is `[u8; SECRET_KEY_LENGTH]` taken from
 /// ed25519-dalek's own constant, both alphabets are `&[u8; N]`, and `Tile::width` is a `u16` so
 /// `u16::try_from(hashes.len())` in [`TileLog::tile`] cannot exceed it. A `const _: () =
 /// assert!(...)` over any of those would restate what already fails to compile.
 ///
-/// This one is different because the constraint is a **range stated in prose in the 正本** and no
+/// This one is different because the constraint is a **range stated in prose in the canonical doc** (sem: SEM-gx-log-082) and no
 /// type expresses it. `TILE_WIDTH` is a `u16`, so `512` compiles, resolves, and passes every test
 /// in this crate -- the tile arithmetic is width-agnostic -- while silently leaving 42 §3.11's
-/// 「1..=256」 and putting AC-024's comparison against the upstream vector out of reach. So it
+/// "1..=256" (sem: SEM-gx-log-083) and putting AC-024's comparison against the upstream vector out of reach. So it
 /// stops being a build.
 const _: () = assert!(
     TILE_WIDTH >= 1 && TILE_WIDTH <= 256,
-    "42 §3.11: `width` は 1..=256"
+    "42 §3.11: `width` is 1..=256" // (sem: SEM-gx-log-084)
 );
 
-/// What a leaf hash is taken over (42 §3.11: 「`LedgerEntry`のIdentityView相当」).
+/// What a leaf hash is taken over (42 §3.11: "the equivalent of `LedgerEntry`'s IdentityView") (sem: SEM-gx-log-085).
 ///
 /// # Field order
 ///
@@ -78,8 +80,8 @@ const _: () = assert!(
 ///
 /// # This convention is a readability rule, not a checked one
 ///
-/// Hand 2 recorded a safety net for it (req/51 §3.6: 「順序を違えても `encode` が
-/// `NotCanonicalizable` で落ちる」). Hand 3 measured it and there is none: `serde_ipld_dagcbor`
+/// Hand 2 recorded a safety net for it (req/51 §3.6: "even with the wrong order, `encode`
+/// fails with `NotCanonicalizable`" (sem: SEM-gx-log-086)). Hand 3 measured it and there is none: `serde_ipld_dagcbor`
 /// sorts a struct's keys itself, so a misordered declaration produces the same canonical bytes and
 /// fails nothing. `tests/map_key_order.rs` holds the measurement and req/52 §4 H3-1 the ticket.
 /// Writing the fields in encoded order is still worth doing — it makes the canonical form the
@@ -117,7 +119,7 @@ impl LedgerEntry {
     ///
     /// A method rather than a field, for the reason `IdentityView` is a projection in gx-canon: a
     /// stored copy could disagree with the entry it came from, and then two answers would exist to
-    /// 「what is this leaf」.
+    /// "what is this leaf" (sem: SEM-gx-log-087).
     #[must_use]
     pub fn leaf(&self) -> LedgerLeaf {
         LedgerLeaf {
@@ -144,9 +146,10 @@ pub struct Tile {
     ///
     /// # gx's `level` is a tree **height**, and the upstream's is not (**E-M2-27**)
     ///
-    /// `req/38_ERRATA_2026-08-07.md` §15 逐語: 「(b)gx の `subtree_span(level)=2^level` の「level」は
-    /// **木の高さ**であり、一次の tile level（1 level=高さ 8 段=256 倍）と 8 倍 scale で別物——
-    /// **doc 化+field 名 `height` への rename を検討**（wire 不変なら rename 採用）」.
+    /// `req/38_ERRATA_2026-08-07.md` §15 verbatim: "(b) gx's `subtree_span(level)=2^level` 'level' is
+    /// **the tree's height**, and it is a different thing at an 8x scale from a primary tile level (1
+    /// level = 8 steps of height = 256x) -- **document it, and consider renaming the field to `height`**
+    /// (adopt the rename if the wire stays unchanged)" (sem: SEM-gx-log-088).
     ///
     /// One gx level is one doubling: level `N` holds the roots of complete `2^N`-leaf subtrees. One
     /// C2SP `tlog-tiles` level is **eight** doublings, because a tile there is 256 wide and each
@@ -156,9 +159,9 @@ pub struct Tile {
     ///
     /// **The field is not renamed.** 42 §3.11's table names it `level`, and the name is on the wire:
     /// it is a map key in the canonical DAG-CBOR of a `Tile`, so `height` would be a different byte
-    /// string for the same value. The ruling adopts the rename only 「wire 不変なら」, and here it is
+    /// string for the same value. The ruling adopts the rename only "if the wire stays unchanged" (sem: SEM-gx-log-089), and here it is
     /// not -- `tests/tile_wire.rs` holds the golden that says so, and the rename is taken where the
-    /// wire genuinely does not see it: the private [`subtree_span`], whose argument is a height and
+    /// wire genuinely does not see it: the private `subtree_span`, whose argument is a height and
     /// is now spelled one.
     pub level: u8,
     /// 1..=[`TILE_WIDTH`].
@@ -167,8 +170,8 @@ pub struct Tile {
 
 /// `leaf_hash = BLAKE3(0x00 || canonical_dagcbor(LedgerLeaf))` (42 §3.11).
 ///
-/// Delegates to gx-canon's mint (**E-M2-12**), which is what keeps 41 §6's 「全 canonical encode は
-/// gx-canon 経由のみ」 true of this crate: gx-log names neither a codec nor a hash.
+/// Delegates to gx-canon's mint (**E-M2-12**), which is what keeps 41 §6's "all canonical encoding
+/// goes through gx-canon alone" (sem: SEM-gx-log-090) true of this crate: gx-log names neither a codec nor a hash.
 ///
 /// # Errors
 /// [`Error::Canon`] if the leaf has no canonical form. It always does today — three ids and an
@@ -197,8 +200,8 @@ pub fn node_hash(left: &Cid, right: &Cid) -> Cid {
 /// split is deliberate — a tree with a key index would carry state no proof consumes — and it is
 /// raised as H3-2 in req/52 §4 because it is bypassable rather than enforced.
 ///
-/// 🔴 **H3-2 の裁定** (`req/38_ERRATA_2026-08-07.md` §12): 「TileLog を production の公開書込 road
-/// にしない」. [`crate::store::LedgerStore`] is the only write road a deployment may expose — this
+/// 🔴 **H3-2's ruling** (`req/38_ERRATA_2026-08-07.md` §12): "do not make `TileLog` a production
+/// public-write road" (sem: SEM-gx-log-091). [`crate::store::LedgerStore`] is the only write road a deployment may expose — this
 /// type is the tree a proof is computed over, and reaching it directly bypasses ASM-43-1's
 /// exactly-once (INV-S3). M6, which decides what the CLI and the HTTP surface publish, is where the
 /// rule has to hold; it is written here because this is the type it is about.
@@ -209,7 +212,7 @@ pub fn node_hash(left: &Cid, right: &Cid) -> Cid {
 /// proof O(n) encodes instead of O(n) hashes. The vector is derived state, written only by
 /// [`TileLog::append`], and `entries[i].leaf_cid == leaves[i]` holds by construction.
 ///
-/// # 🔴 **FR-M7-2 案 A** — the completed tiles are kept too, and that is what makes a proof cheap
+/// # 🔴 **FR-M7-2 option A** — the completed tiles are kept too, and that is what makes a proof cheap (sem: SEM-gx-log-092)
 ///
 /// `req/97` §3.1 measured `prove_inclusion` and found it **linear in `n`**: 1,000 → 64,000 leaves
 /// cost 68× for 64× the leaves, while the proof itself grew from 10 hashes to 16. The cost was never
@@ -217,12 +220,12 @@ pub fn node_hash(left: &Cid, right: &Cid) -> Cid {
 /// so one proof hashed the whole tree and `n` commits each producing one was O(n²). At n ≈ 22.8k that
 /// one function was 3.4 ms of a 3.770 ms commit stage (§54 M6H7-3, confirmed numerically in §55).
 ///
-/// `req/38` §56 追加裁定 a adopted **案 A** as an M7 implementation requirement: cache the root of
+/// `req/38` §56 additional ruling a adopted **option A** as an M7 implementation requirement: cache the root of (sem: SEM-gx-log-093)
 /// every **completed** tile. 42 §3.11's tile layout already says a completed tile is final (a left
 /// subtree is always complete, so appending never rewrites a published hash), which is exactly the
 /// property that makes the cache safe to keep and impossible to invalidate.
 ///
-/// * `tile_roots[t]` is `MTH(leaves[256t .. 256t+256])`, pushed by [`TileLog::commit`] the moment
+/// * `tile_roots[t]` is `MTH(leaves[256t .. 256t+256])`, pushed by `TileLog::commit` (private) the moment
 ///   the 256th leaf of that tile arrives — 255 node hashes per 256 appends, i.e. **~1 hash per
 ///   append amortised**, against a proof that used to hash the whole tree.
 /// * The partial tail is **not** cached, because it is not final.
@@ -230,7 +233,7 @@ pub fn node_hash(left: &Cid, right: &Cid) -> Cid {
 ///   replay computes the same vector from the same appends.
 ///
 /// 🔴 **The cache is authoritative, not a shortcut.** [`TileLog::root`], [`TileLog::root_at`] and the
-/// audit path all go through [`TileLog::mth_range`], which reads `tile_roots` for any aligned power-
+/// audit path all go through `TileLog::mth_range` (private), which reads `tile_roots` for any aligned power-
 /// of-two block of whole tiles. There is no second road that recomputes the same answer: an
 /// implementation that stopped maintaining the cache would produce a **wrong root**, not a slow one,
 /// and `the_cached_fold_is_the_recursive_fold` is red on the first size past 256. A cache with a
@@ -243,7 +246,7 @@ pub fn node_hash(left: &Cid, right: &Cid) -> Cid {
 pub struct TileLog {
     entries: Vec<LedgerEntry>,
     leaves: Vec<Cid>,
-    /// `MTH` of each **completed** 256-leaf block, in index order (**FR-M7-2 案 A**).
+    /// `MTH` of each **completed** 256-leaf block, in index order (**FR-M7-2 option A**). (sem: SEM-gx-log-094)
     tile_roots: Vec<Cid>,
 }
 
@@ -332,7 +335,7 @@ impl TileLog {
         );
         self.leaves.push(entry.leaf_cid);
         self.entries.push(entry);
-        // **FR-M7-2 案 A**: the tile this leaf completed, folded once and kept. 255 node hashes per
+        // **FR-M7-2 option A**: the tile this leaf completed, folded once and kept. 255 node hashes per (sem: SEM-gx-log-095)
         // 256 appends, and never again — 42 §3.11's completed tile is final.
         let width = usize::from(TILE_WIDTH);
         if self.leaves.len().is_multiple_of(width) {
@@ -342,7 +345,7 @@ impl TileLog {
         }
     }
 
-    /// The roots of the completed tiles, in index order (**FR-M7-2 案 A**).
+    /// The roots of the completed tiles, in index order (**FR-M7-2 option A**). (sem: SEM-gx-log-096)
     ///
     /// Derived state, exposed so that its maintenance can be **measured** rather than trusted:
     /// `tests/incremental_inclusion.rs` compares this vector with a fold computed from the leaves
@@ -405,14 +408,14 @@ impl TileLog {
     }
 
     /// `MTH(leaves[start..end])`, reading the tile cache wherever the range is a whole number of
-    /// **aligned** tiles (**FR-M7-2 案 A**).
+    /// **aligned** tiles (**FR-M7-2 option A**). (sem: SEM-gx-log-097)
     ///
     /// # The two conditions, and the derivation that says they are enough
     ///
     /// `MTH` splits at `k`, the largest power of two **strictly** below the length. For a range of
     /// `256·m` leaves that `k` is `256 · split_point(m)`: multiplying by 256 shifts the binary
     /// expansion by eight places and moves neither the position of the highest set bit nor the
-    /// strictness of 「below」. So a range that starts on a tile boundary and holds `m` whole tiles
+    /// strictness of "below" (sem: SEM-gx-log-098). So a range that starts on a tile boundary and holds `m` whole tiles
     /// splits into two ranges that each start on a tile boundary and each hold a whole number of
     /// tiles — for **every** `m`, not only for powers of two — down to `m = 1`, where the range is
     /// one tile and the recursion's leaf **is** the cached root.
@@ -494,8 +497,8 @@ impl TileLog {
     ///
     /// `None` when the tile holds nothing yet: past the end of the level, or at a level no
     /// complete subtree has reached. An absent tile and an empty one are different answers, and
-    /// conflating them would make 「the log has no 16-leaf subtree yet」 look like 「here is an
-    /// empty block」.
+    /// conflating them would make "the log has no 16-leaf subtree yet" look like "here is an
+    /// empty block" (sem: SEM-gx-log-099).
     ///
     /// `level` is gx's, which is a tree height: one level is one doubling, not the eight a C2SP
     /// `tlog-tiles` level covers ([`Tile::level`], E-M2-27).
@@ -534,7 +537,7 @@ impl TileLog {
 ///
 /// The rename stops at this function's argument. `Tile.level` is 42 §3.11's field name and travels
 /// on the wire as a map key, so renaming *it* would change the canonical bytes -- which the ruling's
-/// 「wire 不変なら rename 採用」 forbids, and `tests/tile_wire.rs` measures.
+/// "adopt the rename if the wire stays unchanged" (sem: SEM-gx-log-100) forbids, and `tests/tile_wire.rs` measures.
 fn subtree_span(height: u8) -> Option<usize> {
     if u32::from(height) >= usize::BITS {
         return None;
@@ -580,7 +583,7 @@ pub(crate) fn split_point(n: usize) -> usize {
 /// sibling through the tile cache. This function stays, compiled **for tests only**, because a
 /// re-implementation needs an oracle and the oracle that matters is the code that was believed
 /// before — `the_cached_audit_path_is_the_recursive_path` compares the two at every index of every
-/// size it runs. It is not deleted and it is not shipped: 「消さない」 and 「二つの道を出荷しない」 are
+/// size it runs. It is not deleted and it is not shipped: "do not delete" and "do not ship two roads" (sem: SEM-gx-log-101) are
 /// both satisfied by `#[cfg(test)]`.
 #[cfg(test)]
 pub(crate) fn audit_path(index: usize, leaves: &[Cid], out: &mut Vec<Cid>) {
@@ -741,7 +744,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // 🔴 FR-M7-2 案 A — the cache against the recursion it replaced
+    // 🔴 FR-M7-2 option A — the cache against the recursion it replaced (sem: SEM-gx-log-102)
     // -----------------------------------------------------------------------
 
     /// A log of `n` leaves whose hashes are distinguishable without being a hash of anything.

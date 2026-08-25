@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! H2-5 — an audit path has one lawful length, and it is checked before anything is hashed.
 //!
-//! req/38 §11 逐語: 「(leaf_index, tree_size) から path 長は数学的に一意——hash 計算の**前に**長さ
-//! 照合し、不一致は即 reject。全 hash 後拒否は計算資源の無駄+挙動が入力長に依存する形」.
+//! req/38 §11 verbatim: "the path length follows mathematically from (leaf_index, tree_size) --
+//! check the length **before** hashing, and reject immediately on a mismatch. Refusing only after
+//! every hash wastes compute and makes behaviour depend on the input's length." (sem: SEM-gx-log-147)
 //!
 //! # What is being fixed
 //!
@@ -13,7 +16,7 @@
 //!
 //! # Why the ordering is asserted from the source
 //!
-//! 「hash 計算の前に」 is not observable in the return value: both orders answer `Ok(false)`. A
+//! "before computing any hash" (sem: SEM-gx-log-148) is not observable in the return value: both orders answer `Ok(false)`. A
 //! timing assertion would be flaky, and a hash counter would be a second implementation of the
 //! thing being measured. So the behaviour is tested for its answers and the *ordering* is read off
 //! `proof.rs` -- the same split `ac_069.rs` makes for the fsync barrier, and for the same reason.

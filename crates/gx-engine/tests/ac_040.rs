@@ -1,26 +1,34 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-040 / AC-044** — undo is a new gated transformation, and the original is not rewritten.
 //!
-//! 34 AC-040 逐語 (「undo=新規gated変換横断の目玉」):
+//! 34 AC-040, verbatim ("the centerpiece of undo=a new gated transformation", sem:
+//! SEM-gx-engine-502):
 //!
-//! > Given: 既存Committed Transformation T_o（対象ファイルを"before"→"after"、inverse escrow済み）。
-//! > When: `gx undo <T_o.id>`を実行。Then: ①新規Candidate T_uが`submit→verify→canonicalize→commit`
-//! > の通常経路を独立に経る（T_uに対応するinvariant/policyを故意にDenyへ設定した別ケースでは、T_uが
-//! > `Committed`へ到達せず`Denied`のままとなり、undoもgatingを免除されないことを確認する）。②T_uが
-//! > `Committed`に到達すると`T_o.status`が`Superseded`へ遷移し`superseded_by=T_u.id`が記録される。
-//! > ③T_oのcanonical record・receipt・ledger entryはcommit前後でハッシュ比較してbit-equalのまま不変。
+//! > Given: an existing Committed Transformation T_o (target file "before"->"after", inverse
+//! > escrowed). When: `gx undo <T_o.id>` is run. Then: (1) a new Candidate T_u independently walks
+//! > the normal `submit->verify->canonicalize->commit` road (in a separate case where the
+//! > invariant/policy corresponding to T_u is deliberately set to Deny, confirm T_u does not reach
+//! > `Committed` and stays `Denied` -- undo is not exempted from gating either). (2) when T_u reaches
+//! > `Committed`, `T_o.status` transitions to `Superseded` and `superseded_by=T_u.id` is recorded. (sem: SEM-gx-engine-502)
+//! > (3) `T_o`'s canonical record, receipt, and ledger entry stay bit-equal, unchanged, comparing
+//! > hashes before and after the commit. (sem: SEM-gx-engine-502)
 //!
-//! 34 AC-044 asks ③ again as a property of its own (INV-S2), and `tests/ac_044.rs` is where it is
+//! 34 AC-044 asks (3) again as a property of its own (INV-S2), and `tests/ac_044.rs` is where it is
 //! generated rather than exercised once.
 //!
 //! # 🔴 43 §5 is the sentence this whole suite is about
 //!
-//! > `Committed`から`Candidate`や`Admitted`へ戻る遷移は**存在しない**…T_uは自身の
-//! > `Draft→Candidate→Verifying→...→Committed`を独立に経る（undoであっても検証を免除されない —
-//! > fail-closed・P-4は適用され続ける）
+//! > There is **no** transition back from `Committed` to `Candidate` or `Admitted` ... T_u
+//! > independently walks its own `Draft->Candidate->Verifying->...->Committed` (undo is not
+//! > exempted from verification either -- fail-closed, P-4 keeps applying) (sem:
+//! > SEM-gx-engine-503)
 //!
-//! req/78 §3.2 Λ6 is the same statement as mathematics: 「undo は圏の逆元でも groupoid の逆射でも
-//! なく、`Σ` の上での「相殺の証拠を 2 つ並べる」操作である」. What the engine produces is **two
-//! terminal states**, not one reversal, and every assertion below is about that shape.
+//! req/78 §3.2 Λ6 is the same statement as mathematics: "undo is neither a category's inverse
+//! element nor a groupoid's inverse morphism; it is the operation of placing two pieces of
+//! 'cancellation evidence' side by side over `Σ`" (sem: SEM-gx-engine-503). What the engine
+//! produces is **two terminal states**, not one reversal, and every assertion below is about that
+//! shape.
 //!
 //! # Why the denial is an invariant and not a Cedar rule
 //!
@@ -44,7 +52,8 @@ const UNDO_AT: Timestamp = Timestamp(1_754_000_120_000_000_000);
 
 /// The canonical digest of a transformation, through gx-canon and nothing else (41 §6).
 ///
-/// The same function `plan` mints the `TransformationId` with, so 「bit-equal」 in AC-040 ③ is
+/// The same function `plan` mints the `TransformationId` with, so "bit-equal" (sem:
+/// SEM-gx-engine-504) in AC-040 (3) is
 /// compared over the bytes 42 §2.1 defines rather than over a `PartialEq` this suite chose.
 fn digest(t: &gx_core::Transformation) -> gx_core::Cid {
     cid::compute(t).expect("a transformation has a canonical form")
@@ -87,10 +96,13 @@ fn ac_040_an_undo_is_a_new_gated_transformation_that_supersedes_the_original() {
     let escrow_before = engine.inverse_status(&t_o);
 
     // --- T_u: the undo ----------------------------------------------------------------------
-    let (undo_intent, t_u) = engine.undo(&t_o, 61, UNDO_AT).expect("T-12's first half");
+    let (undo_intent, t_u) = engine
+        .undo(&t_o, &engine.attested_postcondition(&t_o), 61, UNDO_AT)
+        .expect("T-12's first half");
     assert_ne!(
         t_u, t_o,
-        "43 §5: 「新規`submit(intent)`から始まる通常のTransformation」"
+        "43 §5: \"a normal Transformation starting from a new `submit(intent)`\" (sem: \
+         SEM-gx-engine-505)"
     );
 
     // ① the normal road, one call at a time, with nothing skipped.
@@ -123,7 +135,8 @@ fn ac_040_an_undo_is_a_new_gated_transformation_that_supersedes_the_original() {
     assert_eq!(
         engine.verdict(&t_u),
         Some(VerdictKind::Admit),
-        "「undoであっても検証を免除されない」 -- a verdict exists because a gate was asked"
+        "\"undo is not exempted from verification either\" (sem: SEM-gx-engine-506) -- a verdict \
+         exists because a gate was asked"
     );
     assert_eq!(
         engine.verdict_receipts(&t_u).len(),
@@ -133,30 +146,30 @@ fn ac_040_an_undo_is_a_new_gated_transformation_that_supersedes_the_original() {
     assert_eq!(
         engine.transformation(&t_u).expect("the row").parents,
         vec![t_o],
-        "43 T-12's guard: 「`T_u.parents`が`T_o.id`を含み」"
+        "43 T-12's guard: \"`T_u.parents` contains `T_o.id`\" (sem: SEM-gx-engine-507)"
     );
     assert_eq!(
         engine.transformation(&t_u).expect("the row").subject,
         engine.transformation(&t_o).expect("the row").subject,
-        "「`T_u`の`Subject`が`T_o`と一致」"
+        "\"`T_u`'s `Subject` matches `T_o`\" (sem: SEM-gx-engine-508)"
     );
 
     // ② the edge.
     assert_eq!(
         engine.state(&t_o),
         Some(Lifecycle::Superseded),
-        "43 T-12: 「`T_o.status`が`Superseded`へ遷移」"
+        "43 T-12: \"`T_o.status` transitions to `Superseded`\" (sem: SEM-gx-engine-509)"
     );
     assert_eq!(
         engine.superseded_by(&t_o),
         Some(t_u),
-        "「`superseded_by=T_u.id`が記録される」"
+        "\"`superseded_by=T_u.id` is recorded\" (sem: SEM-gx-engine-510)"
     );
     assert_eq!(escrow_before, Some(InverseStatus::Available));
     assert_eq!(
         engine.inverse_status(&t_o),
         Some(InverseStatus::Consumed { by: t_u }),
-        "M5-16 採(a): the status moves with the edge"
+        "M5-16, adopted (a): the status moves with the edge (sem: SEM-gx-engine-511)"
     );
     assert_eq!(engine.supersede_count(), 1);
 
@@ -164,7 +177,8 @@ fn ac_040_an_undo_is_a_new_gated_transformation_that_supersedes_the_original() {
     assert_eq!(
         digest(engine.transformation(&t_o).expect("still there")),
         record_before,
-        "43 §5-4: 「`T_o`のcanonical record・receipt・ledger entryは一切書き換えられない」"
+        "43 §5-4: \"none of `T_o`'s canonical record, receipt, or ledger entry is ever rewritten\" \
+         (sem: SEM-gx-engine-512)"
     );
     assert_eq!(engine.receipt(&t_o), Some(&receipt_before));
     assert_eq!(
@@ -190,11 +204,13 @@ fn ac_040_an_undo_is_a_new_gated_transformation_that_supersedes_the_original() {
 
 /// 🔴 AC-040 ①'s second case: an undo the gate denies does **not** supersede anything.
 ///
-/// > T_uに対応するinvariant/policyを故意にDenyへ設定した別ケースでは、T_uが`Committed`へ到達せず
-/// > `Denied`のままとなり、undoもgatingを免除されないことを確認する
+/// > In a separate case where the invariant/policy corresponding to T_u is deliberately set to
+/// > Deny, confirm T_u does not reach `Committed` and stays `Denied` -- undo is not exempted from
+/// > gating either (sem: SEM-gx-engine-513)
 ///
-/// The invariant refuses the payload the escrowed inverse carries (「before」) and admits the one the
-/// original carries (「after」), so one engine, one policy set, two outcomes — which is what makes
+/// The invariant refuses the payload the escrowed inverse carries ("before") and admits the one the
+/// original carries ("after") (sem: SEM-gx-engine-513), so one engine, one policy set, two
+/// outcomes — which is what makes
 /// this a measurement of the *gating* rather than of two differently-configured runs.
 #[test]
 fn ac_040_an_undo_the_gate_denies_leaves_the_original_committed() {
@@ -218,7 +234,7 @@ fn ac_040_an_undo_the_gate_denies_leaves_the_original_committed() {
     let receipt_before = engine.receipt(&t_o).expect("one").clone();
 
     let (_, t_u) = engine
-        .undo(&t_o, 63, UNDO_AT)
+        .undo(&t_o, &engine.attested_postcondition(&t_o), 63, UNDO_AT)
         .expect("the candidate is built");
     let verdict_state = engine
         .verify(&t_u, UNDO_AT, &signing_key(), None)
@@ -241,7 +257,11 @@ fn ac_040_an_undo_the_gate_denies_leaves_the_original_committed() {
         String::from_utf8_lossy(&world.lock().expect("the world is not poisoned"))
     );
 
-    assert_eq!(verdict_state, Lifecycle::Denied, "「`Denied`のままとなり」");
+    assert_eq!(
+        verdict_state,
+        Lifecycle::Denied,
+        "\"stays `Denied`\" (sem: SEM-gx-engine-514)"
+    );
     assert_eq!(canonicalize.err().as_deref(), Some("InvalidState"));
     assert_eq!(commit.err().as_deref(), Some("InvalidState"));
     assert_eq!(
@@ -270,7 +290,8 @@ fn ac_040_an_undo_the_gate_denies_leaves_the_original_committed() {
 ///
 /// A transformation that has not committed has no escrowed inverse to consume (43 T-10b runs inside
 /// the critical section); one that has already been superseded has had it consumed (42 §3.12's
-/// `Consumed`, which is what makes 「一度だけ」 a fact); and an unknown id names nothing. Each is a
+/// `Consumed`, which is what makes "only once" (sem: SEM-gx-engine-515) a fact); and an unknown
+/// id names nothing. Each is a
 /// different sentence and each gets its own refusal.
 #[test]
 fn ac_040_undo_refuses_what_it_cannot_undo() {
@@ -289,11 +310,13 @@ fn ac_040_undo_refuses_what_it_cannot_undo() {
     let t_o = engine.plan(&i, AT).expect("plan");
 
     let uncommitted = engine
-        .undo(&t_o, 65, UNDO_AT)
+        .undo(&t_o, &engine.attested_postcondition(&t_o), 65, UNDO_AT)
         .expect_err("a `Candidate` has escrowed nothing");
+    let absent = gx_core::TransformationId(gx_core::Cid([3u8; 32]));
     let unknown = engine
         .undo(
-            &gx_core::TransformationId(gx_core::Cid([3u8; 32])),
+            &absent,
+            &engine.attested_postcondition(&absent),
             66,
             UNDO_AT,
         )
@@ -302,14 +325,16 @@ fn ac_040_undo_refuses_what_it_cannot_undo() {
     engine.verify(&t_o, AT, &signing_key(), None).expect("T-4a");
     engine.canonicalize(&t_o, AT, None).expect("T-8");
     engine.commit(&t_o, AT, &signing_key()).expect("T-11");
-    let (_, t_u) = engine.undo(&t_o, 67, UNDO_AT).expect("the first undo");
+    let (_, t_u) = engine
+        .undo(&t_o, &engine.attested_postcondition(&t_o), 67, UNDO_AT)
+        .expect("the first undo");
     engine
         .verify(&t_u, UNDO_AT, &signing_key(), None)
         .expect("T-4a");
     engine.canonicalize(&t_u, UNDO_AT, None).expect("T-8");
     engine.commit(&t_u, UNDO_AT, &signing_key()).expect("T-11");
     let twice = engine
-        .undo(&t_o, 68, UNDO_AT)
+        .undo(&t_o, &engine.attested_postcondition(&t_o), 68, UNDO_AT)
         .expect_err("its inverse has been consumed");
 
     println!(

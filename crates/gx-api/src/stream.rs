@@ -1,14 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 `GET /stream` (44 §2.2) — **M6-12**'s map, **M6-13**'s cursor, and the five records that stay in.
 //!
 //! # The map, and why it is a table rather than a `match` somebody reads
 //!
 //! 44 §2.2 lists **ten** events, 33 NFR-018 requires the same ten, and the engine's journal holds
-//! **thirteen** record kinds (`gx_engine::store::JOURNAL_RECORD_KINDS`). §47 M6-12 採(a) asks for one
+//! **fifteen** record kinds (`gx_engine::store::JOURNAL_RECORD_KINDS`). §47 M6-12, adopted (a) (sem: SEM-gx-api-262), asks for one
 //! place where the two vocabularies meet:
 //!
-//! > **写像表を 1 箇所に置き、写らない 4 record は「journal 内部・stream に出さない」を機械検査**
-//! > (42 §3.13 逐語「Journalはengine内部の進行中パイプライン記録…**外部公開しない**」が根拠)。表は
-//! > M5H2-7 の分母の形=「journal 語彙が増えたのに stream 側が黙って落とす」を RED にする
+//! > **put the mapping table in one place, and machine-check that the 4 unmapped records are "internal to the journal, not emitted to the stream"**
+//! > (grounded in 42 §3.13, verbatim: "the journal is the engine's internal in-progress pipeline record … **not published externally**"). The table
+//! > takes M5H2-7's denominator shape = turns "the journal vocabulary grew and the stream side silently drops it" RED (sem: SEM-gx-api-263)
 //!
 //! [`EVENT_MAP`] is that place. Every one of the thirteen has a row, each row is either an event
 //! vocabulary or a reason for staying inside, and [`MAP_COVERS_THE_JOURNAL`] is a **compile-time**
@@ -18,8 +20,8 @@
 //!
 //! # 🔴 The count is **five**, not four, and two of the four named were the wrong two
 //!
-//! req/88 §4 M6-12 named the unmapped records 「`Planned`・`ProvenanceDerived`・`InverseEscrowed`・
-//! `ApplyStarted`」 and the hand-6 brief hedged it (「実物は 42 §3.13 と突合して確定」). Read against
+//! req/88 §4 M6-12 named the unmapped records "`Planned`, `ProvenanceDerived`, `InverseEscrowed`,
+//! `ApplyStarted`" (sem: SEM-gx-api-264) and the hand-6 brief hedged it ("the actual set is settled by cross-checking 42 §3.13"). Read against
 //! 42 §3.13 and 43 §3 the answer is **`DraftCreated`, `CommittingStarted`, `ProvenanceDerived`,
 //! `InverseEscrowed`, `ApplyStarted`** — five — and `Planned` is the producer of
 //! `candidate.created`. Four independent reasons, each of which alone settles it:
@@ -28,30 +30,30 @@
 //!    `{event, at, transformation: "gx1:...", data}` and `DraftCreated` has **no
 //!    `TransformationId`** — E-M5-3 keyed it on the `IntentId` because none exists yet, and
 //!    `EngineJournalRecord::transformation()` answers `None` for that variant alone.
-//! 2. **43 §1's own definition.** `Candidate` is the state reached at **T-2** (「snapshot+planが完了
-//!    し…`TransformationId`が確定した状態」). A `candidate.created` at T-1 would announce a candidate
+//! 2. **43 §1's own definition.** `Candidate` is the state reached at **T-2** ("the state where snapshot+plan have completed
+//!    … the `TransformationId` is settled"; sem: SEM-gx-api-265). A `candidate.created` at T-1 would announce a candidate
 //!    that does not exist yet.
-//! 3. **44 §0 forbids the Draft on this surface.** 「HTTP `POST /candidates`は submit+plan を一括
-//!    atomically実行するためDraft単独状態を公開せず」.
+//! 3. **44 §0 forbids the Draft on this surface.** "HTTP `POST /candidates` runs submit+plan atomically
+//!    as one, so it does not expose the Draft-alone state" (sem: SEM-gx-api-266).
 //! 4. **The data fields fit.** `candidate.created`'s data is `{intent_digest, substrate, locator}`,
 //!    and `Planned` is the only record carrying both the intent id and the **locator** — a field it
 //!    gained under **E-M5-13** in hand 1, for resume. `DraftCreated` has no locator.
 //!
-//! Raised as **M6H6-1** under 規律49's lane-side reconciliation. The five are then exactly 42
+//! Raised as **M6H6-1** under discipline 49's lane-side reconciliation (sem: SEM-gx-api-267). The five are then exactly 42
 //! §3.13's sentence: `CommittingStarted`, `ProvenanceDerived`, `InverseEscrowed` and `ApplyStarted`
 //! are the inside of 43 T-9's critical section, and a client watching a commit sees T-9 open
 //! (`canonicalized`) and close (`committed` or `aborted`) rather than the four steps between.
 //!
 //! # 🔴 L343 is read through req/38 §45, not through 44's letter (**E-M5-8**)
 //!
-//! 44 §2.2's `canonicalized` row says the `enforced` field is false 「T-8rのrecord-only経路のみ」.
-//! §45 M5H8-1 rules that stale — 「`enforced` は**遷移でなく Transformation に従う**(FailOpen 降格中は
-//! Admitted→Canonicalized の道でも `Some(false)`)」 — and the engine already writes it that way
+//! 44 §2.2's `canonicalized` row says the `enforced` field is false "only via T-8r's record-only road" (sem: SEM-gx-api-268).
+//! §45 M5H8-1 rules that stale — "`enforced` **follows the Transformation, not the transition**(while degrading FailOpen,
+//! even the Admitted→Canonicalized road gets `Some(false)`)" (sem: SEM-gx-api-269) — and the engine already writes it that way
 //! (`Engine::canonicalize`'s note on T-4e). So this module reads `Engine::enforced`, the
 //! transformation's own answer, and never the transition it arrived by. Following 44's letter would
 //! make a **fail-open degradation invisible in the audit stream**, which is INV-S5 inverted.
 //!
-//! # 🔴 The cursor (**M6-13 採(a)**), and why it is the list endpoints' cursor too
+//! # 🔴 The cursor (**M6-13, adopted (a)**; sem: SEM-gx-api-270), and why it is the list endpoints' cursor too
 //!
 //! 44 §2.2 offers `?since=<ledger_index|RFC3339>` or a `Last-Event-ID` header, and req/88 M6-13
 //! showed that neither of the two `?since=` forms can name a `Denied`/`Aborted` event: INV-S4 keeps
@@ -71,7 +73,7 @@
 //! green — the shape 44 §2.5's guard avoided by living on the router rather than in thirteen
 //! handlers. The journal's length is the one fact that cannot be forgotten: it grows because a
 //! transition happened, whoever drove it. The cost is a lock acquisition per subscriber per tick
-//! ([`TICK`]), which the single lock of M6-06 採(a) already serialises everything behind.
+//! ([`TICK`]), which the single lock of M6-06, adopted (a) (sem: SEM-gx-api-271), already serialises everything behind.
 
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -129,17 +131,17 @@ impl MapRow {
     }
 }
 
-/// 🔴 The map: thirteen journal kinds onto ten events, with the five that stay in.
+/// 🔴 The map: fifteen journal kinds onto ten events, with the seven that stay in.
 ///
 /// The order is `JOURNAL_RECORD_KINDS`' order, which [`MAP_COVERS_THE_JOURNAL`] asserts at compile
 /// time. `tests/stream.rs` asserts the other direction — that every one of [`EVENTS`] is produced by
 /// some row — so a vocabulary that grew on either side is a failure and not a silence.
-pub const EVENT_MAP: [MapRow; 13] = [
+pub const EVENT_MAP: [MapRow; 15] = [
     MapRow {
         record: "DraftCreated",
         events: &[],
         note: "T-1. No `TransformationId` exists yet (E-M5-3), so 44 §2.2's envelope has no id to \
-               carry; 44 §0 also keeps the Draft off this surface (「Draft単独状態を公開せず」).",
+               carry; 44 §0 also keeps the Draft off this surface (\"it does not expose the Draft-alone state\"; sem: SEM-gx-api-272).",
     },
     MapRow {
         record: "Planned",
@@ -151,7 +153,7 @@ pub const EVENT_MAP: [MapRow; 13] = [
         record: "VerifyStarted",
         events: &["verify.started"],
         note: "T-3, and the one event whose data 44 §2.2 leaves empty: what a subscriber learns is \
-               that evidence collection began, and 43 T-3's side effect is 「evidence collector起動」 \
+               that evidence collection began, and 43 T-3's side effect is \"launching the evidence collector\" (sem: SEM-gx-api-273) \
                — nothing a client could be given.",
     },
     MapRow {
@@ -164,7 +166,7 @@ pub const EVENT_MAP: [MapRow; 13] = [
     MapRow {
         record: "HumanDecision",
         events: &["human.decision", "receipt.issued"],
-        note: "T-5 / T-5b. 43's side effect is 「人間裁定receipt（署名済み）をprovenance鎖に追記」, so \
+        note: "T-5 / T-5b. 43's side effect is \"appending a signed human-ruling receipt to the provenance chain\" (sem: SEM-gx-api-274), so \
                the ruling is a second `VerdictReceipt` producer — a third for `receipt.issued`, \
                where req/88 M6-12 counted two.",
     },
@@ -177,14 +179,14 @@ pub const EVENT_MAP: [MapRow; 13] = [
     MapRow {
         record: "CommittingStarted",
         events: &[],
-        note: "T-9 opens 43 §1's critical section. 42 §3.13: the journal is 「engine内部の進行中\
-               パイプライン記録…外部公開しない」, and 44 gives the section two edges (`canonicalized`, \
+        note: "T-9 opens 43 §1's critical section. 42 §3.13: the journal is \"the engine's internal in-progress\
+               pipeline record … not published externally\" (sem: SEM-gx-api-275), and 44 gives the section two edges (`canonicalized`, \
                then `committed` or `aborted`) rather than its inside.",
     },
     MapRow {
         record: "ProvenanceDerived",
         events: &[],
-        note: "M5-25 採(a). Inside T-9's section; the value it carries reaches the outside through \
+        note: "M5-25, adopted (a) (sem: SEM-gx-api-276). Inside T-9's section; the value it carries reaches the outside through \
                the receipt, which `receipt.issued` names.",
     },
     MapRow {
@@ -199,6 +201,20 @@ pub const EVENT_MAP: [MapRow; 13] = [
                because nothing outside may assume the world has not moved.",
     },
     MapRow {
+        record: "ApplyObserved",
+        events: &[],
+        note: "Two-phase escrow (req/38 §98 ruling 1; sem: SEM-gx-api-277). Inside T-9's section: the applied call's \
+               observed answer, journalled for the escrow completion alone — an engine-internal \
+               record like the two beside it.",
+    },
+    MapRow {
+        record: "InverseCompleted",
+        events: &[],
+        note: "Two-phase escrow's outcome, inside T-9's section. What reaches the outside is the \
+               receipt's `inverse_delta` (the completed CID, or None as the fold's fingerprint), \
+               which `receipt.issued` already carries.",
+    },
+    MapRow {
         record: "Committed",
         events: &["committed", "receipt.issued"],
         note: "T-11. `receipt.issued` carries ASM-14's `CommitReceipt`.",
@@ -206,7 +222,7 @@ pub const EVENT_MAP: [MapRow; 13] = [
     MapRow {
         record: "Aborted",
         events: &["aborted"],
-        note: "T-4d/T-6/T-7/T-10a/T-10c. NFR-018: 「`AbortReason`の6variant全てを区別可能な形で刻む」.",
+        note: "T-4d/T-6/T-7/T-10a/T-10c. NFR-018: \"record all 6 variants of `AbortReason` in a distinguishable form\" (sem: SEM-gx-api-278).",
     },
     MapRow {
         record: "Superseded",
@@ -233,12 +249,12 @@ const fn str_eq(a: &str, b: &str) -> bool {
     true
 }
 
-/// 🔴 The compile-time half of M6-12: thirteen rows, the thirteen kinds, in order.
+/// 🔴 The compile-time half of M6-12: fifteen rows, the fifteen kinds, in order.
 ///
 /// `gx_engine::store::JOURNAL_RECORD_KINDS` is the engine's own declaration and gx-engine's
 /// `journal_vocabulary.rs` already ties it to the variants. Tying **this** table to that array means
 /// a fourteenth record cannot be added without a hand deciding, in this file, whether it is published
-/// — which is the whole of 「journal 語彙が増えたのに stream 側が黙って落とす」を RED にする, one step
+/// — which is the whole of "the journal vocabulary grew and the stream side silently drops it" turning RED (sem: SEM-gx-api-279), one step
 /// earlier than red: the crate does not build.
 pub const MAP_COVERS_THE_JOURNAL: () = {
     assert!(EVENT_MAP.len() == gx_engine::store::JOURNAL_RECORD_KINDS.len());
@@ -252,7 +268,7 @@ pub const MAP_COVERS_THE_JOURNAL: () = {
     }
 };
 
-/// How many journal kinds never reach the wire. Five — see the module header.
+/// How many journal kinds never reach the wire. Seven since v0.3-a — see the module header.
 pub const UNPUBLISHED: usize = {
     let mut count = 0;
     let mut i = 0;
@@ -272,12 +288,12 @@ pub fn row_for(record: &str) -> Option<&'static MapRow> {
 }
 
 // ---------------------------------------------------------------------------
-// The cursor (M6-13 採(a))
+// The cursor (M6-13, adopted (a); sem: SEM-gx-api-280)
 // ---------------------------------------------------------------------------
 
 /// 🔴 A position in the journal, plus which event of that record — see the module header.
 ///
-/// `PartialOrd` is the whole contract: resume means 「everything strictly after this」, and the
+/// `PartialOrd` is the whole contract: resume means "everything strictly after this" (sem: SEM-gx-api-281), and the
 /// derived lexicographic order over `(record, ordinal)` is exactly that.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Cursor {
@@ -287,13 +303,13 @@ pub struct Cursor {
     pub ordinal: usize,
 }
 
-/// 🔴 The wrapping that makes the cursor opaque (**M6H8-12 採(a)**, req/38 §55).
+/// 🔴 The wrapping that makes the cursor opaque (**M6H8-12, adopted (a)**, req/38 §55; sem: SEM-gx-api-282).
 ///
 /// # What was wrong with `12.2`
 ///
 /// The first spelling was `format!("{}.{}", record, ordinal)`, and `record` is an index into
-/// `EngineJournal::records()` — 42 §3.13 says the journal is 「engine内部の進行中パイプライン記録…
-/// **外部公開しない**」, and 44 §2.7 calls the cursor 「opaque」. Three things leaked and the second is
+/// `EngineJournal::records()` — 42 §3.13 says the journal is "the engine's internal in-progress pipeline record …
+/// **not published externally**" (sem: SEM-gx-api-283), and 44 §2.7 calls the cursor "opaque". Three things leaked and the second is
 /// the one that decided this: the journal's **length** (the newest cursor is a lower bound), the
 /// existence and **count of the five record kinds that publish no event** (`DraftCreated`,
 /// `CommittingStarted`, `ProvenanceDerived`, `InverseEscrowed`, `ApplyStarted` consume indices, so a
@@ -333,9 +349,9 @@ const _: () = assert!(MIX.wrapping_mul(UNMIX) == 1);
 const CURSOR_TEXT_LEN: usize = 32;
 
 impl Cursor {
-    /// 44 §2.7's 「`cursor=<opaque string>`」 — opaque to a client, ordered here.
+    /// 44 §2.7's "`cursor=<opaque string>`" (sem: SEM-gx-api-284) — opaque to a client, ordered here.
     ///
-    /// See [`MIX`] for what 「opaque」 buys and what it does not.
+    /// See `MIX` (private) for what "opaque" (sem: SEM-gx-api-285) buys and what it does not.
     #[must_use]
     pub fn to_text(self) -> String {
         let packed = ((self.record as u128) << 64) | self.ordinal as u128;
@@ -387,8 +403,8 @@ pub struct Event {
 impl Event {
     /// 44 §2.2's envelope, plus the cursor this line is at.
     ///
-    /// 🔴 The fifth field is an **addition**, and 44 §2.6 permits it (「後方互換な追加（新規optional
-    /// フィールド…）は`/v1`内で許容する」). It has to be there: 44 asks for resume by `Last-Event-ID`
+    /// 🔴 The fifth field is an **addition**, and 44 §2.6 permits it ("a backward-compatible addition (a new optional
+    /// field …) is allowed within `/v1`"; sem: SEM-gx-api-286). It has to be there: 44 asks for resume by `Last-Event-ID`
     /// and NDJSON, unlike SSE, has no frame in which an id could travel — so without a field the
     /// header names a value no client was ever given. Raised as **M6H6-2**.
     #[must_use]
@@ -432,7 +448,7 @@ fn receipt_data(receipt: &gx_witness::Receipt, kind: &str) -> Option<serde_json:
 /// table has no row, the other that the projection has no decision.
 ///
 /// The engine is read for what the record does not carry (a ticket's reasons, the enforced flag,
-/// a receipt). That is 則 1 in its ordinary working shape: every value below is an accessor's answer,
+/// a receipt). That is Rule 1 in its ordinary working shape (sem: SEM-gx-api-287): every value below is an accessor's answer,
 /// and nothing here computes a `Cid`, builds a `Verdict` or writes a `Lifecycle`.
 pub fn events_for<E: EvidenceSource>(
     record: &EngineJournalRecord,
@@ -452,7 +468,9 @@ pub fn events_for<E: EvidenceSource>(
         | EngineJournalRecord::CommittingStarted { .. }
         | EngineJournalRecord::ProvenanceDerived { .. }
         | EngineJournalRecord::InverseEscrowed { .. }
-        | EngineJournalRecord::ApplyStarted { .. } => Vec::new(),
+        | EngineJournalRecord::ApplyStarted { .. }
+        | EngineJournalRecord::ApplyObserved { .. }
+        | EngineJournalRecord::InverseCompleted { .. } => Vec::new(),
 
         EngineJournalRecord::Planned {
             transformation,
@@ -491,13 +509,29 @@ pub fn events_for<E: EvidenceSource>(
                     "proof_digest": verdict_digest.map(|d| d.to_text()),
                 }),
             )];
-            if let Some(ticket) = engine.ticket(transformation) {
+            // 🔴 **H-04** (`req/182` §1-1, `req/189`): `escalated` is decided by the **record**
+            // — `kind == Escalate` — and not by whether the live row still holds a ticket. Until
+            // v0.4-l this read `engine.ticket()`, so a replay after a ruling (or after a restart,
+            // when the table is empty) produced no `escalated` line for a record that had one the
+            // first time: the same cursor named a different ordinal on the second read. The
+            // ticket's contents come from `Engine::ticket_as_raised` (the live ticket while the
+            // row waits, the M6H3-10 rebuild from Σ once it has moved on) — the engine constructs
+            // it, this layer reads it (rule 1). `null` fields only if the rebuild itself refuses,
+            // which is `InconsistentTicket` territory and is reported as such rather than hidden.
+            if *kind == gx_core::VerdictKind::Escalate {
+                let (ticket_id, reasons) = match engine.ticket_as_raised(transformation) {
+                    Ok(Some(ticket)) => (
+                        serde_json::Value::String(ticket.id.0.to_text()),
+                        serde_json::to_value(&ticket.reasons).unwrap_or(serde_json::Value::Null),
+                    ),
+                    Ok(None) | Err(_) => (serde_json::Value::Null, serde_json::Value::Null),
+                };
                 events.push(one(
                     "escalated",
                     *transformation,
                     serde_json::json!({
-                        "ticket_id": ticket.id.0.to_text(),
-                        "reasons": ticket.reasons,
+                        "ticket_id": ticket_id,
+                        "reasons": reasons,
                     }),
                 ));
             }
@@ -523,11 +557,21 @@ pub fn events_for<E: EvidenceSource>(
                 "human.decision",
                 *transformation,
                 serde_json::json!({
-                    // 44 §2.2's data names the ticket. A ruling resolves the escalation, so the
+                    // 44 §2.2's data names the ticket. ~~A ruling resolves the escalation, so the
                     // ticket is gone from the row by the time this is read back from Σ — the id is
                     // taken from the live row where it is still there, and `null` where it is not,
-                    // rather than invented.
-                    "ticket_id": engine.ticket(transformation).map(|t| t.id.0.to_text()),
+                    // rather than invented.~~
+                    // 🔴 L-02 (`req/182` §1-3, `req/189`): the struck sentence described a world
+                    // that did not exist — until v0.4-l nothing removed the ticket after a ruling
+                    // (H-04), so this read the *stale* live ticket. Now the ticket **is** gone
+                    // from the row (H-04 repaired), and the id is the one T-4c raised, rebuilt by
+                    // the engine from Σ (`Engine::ticket_as_raised`) — the same id on the first
+                    // read and on every replay, restart included.
+                    "ticket_id": engine
+                        .ticket_as_raised(transformation)
+                        .ok()
+                        .flatten()
+                        .map(|t| t.id.0.to_text()),
                     "decision": kind,
                     "reason": reason,
                 }),
@@ -579,14 +623,28 @@ pub fn events_for<E: EvidenceSource>(
             events
         }
 
+        // 🔴 **R29 / `req/361` L-03** — the record holds `rollback` and this arm used to drop it
+        // with `..`. The twenty-eighth audit filed the omission as a **denominator** problem rather
+        // than a wire one: R28's hand-off named `GET /transformations/{id}` and the list as the two
+        // faces that could not answer "is my object back where it was", and a ruling taken on two
+        // faces leaves the third behind. This is the cheapest of the three — the value is already
+        // in this function's hand, no accessor and no second read.
+        //
+        // `null` where the record carries no roll-back (an abort that never entered T-10c's guard),
+        // which is the same honesty `crate::problem::RollbackFacts` keeps on the refusal face: a
+        // member carrying `null` is a fact a reader can branch on, where absence is not.
         EngineJournalRecord::Aborted {
             transformation,
             reason,
+            rollback,
             ..
         } => vec![one(
             "aborted",
             *transformation,
-            serde_json::json!({ "reason": reason }),
+            serde_json::json!({
+                "reason": reason,
+                "rollback": rollback.as_ref().map(|r| r.kind()),
+            }),
         )],
 
         EngineJournalRecord::Superseded {
@@ -636,11 +694,11 @@ pub fn events_after(
 /// `GET /stream`'s query.
 #[derive(Debug, Default, Deserialize)]
 pub struct StreamQuery {
-    /// 44 §2.2: 「`?since=<ledger_index|RFC3339>`」.
+    /// 44 §2.2: "`?since=<ledger_index|RFC3339>`" (sem: SEM-gx-api-288).
     pub since: Option<String>,
 }
 
-/// 🔴 Resolve 44 §2.2's resume request into a [`Cursor`] — the M6-13 採(a) reading.
+/// 🔴 Resolve 44 §2.2's resume request into a [`Cursor`] — the M6-13, adopted (a), reading (sem: SEM-gx-api-289).
 ///
 /// Three entrances, one coordinate:
 ///
@@ -713,7 +771,7 @@ pub fn resume_from(
 }
 
 impl Cursor {
-    /// The cursor immediately before this one, for a resolution that means 「from here, inclusive」.
+    /// The cursor immediately before this one, for a resolution that means "from here, inclusive" (sem: SEM-gx-api-290).
     #[must_use]
     const fn pred(self) -> Self {
         if self.record == 0 {
@@ -758,11 +816,11 @@ impl futures_core::Stream for Lines {
 ///
 /// 1. the client went away (`send` fails, because the receiver was dropped);
 /// 2. **the server is shutting down** — a subscription is an in-flight request that never finishes,
-///    so a graceful shutdown that waited for it would never complete. See [`crate::serve`]: closing
+///    so a graceful shutdown that waited for it would never complete. See [`mod@crate::serve`]: closing
 ///    the streams is the first of the three stages, not an optimisation of it;
 /// 3. never otherwise. There is no built-in idle timeout: 44 gives none, and a stream that closed
-///    itself after a quiet minute would make an operator's 「nothing is happening」 indistinguishable
-///    from 「the audit stream stopped」.
+///    itself after a quiet minute would make an operator's "nothing is happening" indistinguishable
+///    from "the audit stream stopped" (sem: SEM-gx-api-291).
 ///
 /// # Errors
 /// [`ApiError`] `VALIDATION_ERROR` for a `Last-Event-ID` or `?since=` that names nothing.

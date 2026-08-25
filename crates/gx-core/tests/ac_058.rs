@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-058 (FR-053) — the two measure traits carry exactly the signatures of 41 §3.
 //!
-//! AC-058 逐語: 「Given: `ObjectMeasure`/`MorphismMeasure`実装。When: 41 §3のシグネチャ
-//! （`measure(&ObjectSnapshot) -> f64` / `measure(&Transformation) -> f64`）と照合する型検査
-//! コードをコンパイルする。Then: 両trait実装ともコンパイル成功する。」
+//! AC-058, verbatim (quoted in SEM-gx-core-123): "Given: `ObjectMeasure`/`MorphismMeasure`
+//! implementations. When: type-checking code that matches them against 41 §3's signatures
+//! (`measure(&ObjectSnapshot) -> f64` / `measure(&Transformation) -> f64`) is compiled. Then: both
+//! trait implementations compile."
 //!
-//! 41 §3 逐語:
+//! 41 §3, verbatim (sem: SEM-gx-core-124):
 //! `pub trait ObjectMeasure   { fn measure(&self, x: &ObjectSnapshot) -> f64; }`
 //! `pub trait MorphismMeasure { fn measure(&self, f: &Transformation) -> f64; }`
 //!

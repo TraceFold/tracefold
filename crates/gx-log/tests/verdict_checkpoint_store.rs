@@ -1,15 +1,17 @@
-//! 🔴 **FR-M04** — the file the aggregate verdict checkpoints are appended to (M7 hand 6, 案 A).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **FR-M04** — the file the aggregate verdict checkpoints are appended to (M7 hand 6, option A). (sem: SEM-gx-log-173)
 //!
 //! # Why a second file and not the ledger's own
 //!
-//! FR-M04 asks for 「件数集計値のcommitmentを**ledgerへ追記**」, and the design material's 案 A
+//! FR-M04 asks for "append the count-tally's **commitment** to the ledger" (sem: SEM-gx-log-174), and the design material's option A
 //! (`FRM04_DESIGN_MATERIAL_2026-08-11.md` §3) leaves the writer's shape open with two candidates:
 //! a separate index, or a second kind of record inside the ledger's own physical log. The second
 //! is not available: `store.rs`'s frame is `length:u32be || canonical_dagcbor(LedgerEntry)` and
 //! replay decodes **every** record as a `LedgerEntry`, so a second record type in that file is a
-//! file the current reader refuses at the first one it meets. Making the reader tolerant is 案 B
+//! file the current reader refuses at the first one it meets. Making the reader tolerant is option B (sem: SEM-gx-log-175)
 //! by another road — `LedgerEntry` becomes a sum type and `LedgerStore::append` changes shape —
-//! and `req/98` §3-3 已 chose 案 A precisely to keep adapter work and canonical-structure work in
+//! and `req/98` §3-3 already chose option A precisely to keep adapter work and canonical-structure work in (sem: SEM-gx-log-176)
 //! different milestones.
 //!
 //! So the artefact is its own append-only file, beside the ledger, with the **same** framing and
@@ -18,7 +20,7 @@
 //!
 //! # RED-first
 //!
-//! Committed before `VerdictCheckpointStore` exists (compile-stage RED, 規律47).
+//! Committed before `VerdictCheckpointStore` exists (compile-stage RED, discipline 47). (sem: SEM-gx-log-177)
 
 mod support;
 
@@ -84,9 +86,9 @@ fn what_is_appended_is_what_replays() {
 
 /// A half-written record at the tail is removed and **reported**, never repaired.
 ///
-/// The same rule `LedgerStore` holds (its `Recovery` doc: 「Reported rather than logged」). A store
-/// that silently truncated would make 「the chain ends here」 indistinguishable from 「the last write
-/// was cut in half」, and the whole of AC-VC-5 is about telling those two apart.
+/// The same rule `LedgerStore` holds (its `Recovery` doc: "Reported rather than logged"). A store
+/// that silently truncated would make "the chain ends here" indistinguishable from "the last write
+/// was cut in half" (sem: SEM-gx-log-178), and the whole of AC-VC-5 is about telling those two apart.
 #[test]
 fn a_torn_tail_is_removed_and_reported() {
     let dir = scratch("verdict_store_torn");

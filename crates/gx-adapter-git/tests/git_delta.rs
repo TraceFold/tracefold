@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The grammar, the locator and the scope bound: the three things a payload has to survive.
 //!
 //! Spec: 42 §2.1 (canonical DAG-CBOR), 42 §3.4 (the payload is opaque above the adapter), 42 §2.3
-//! (the `≈` this crate's root declares), and **req/98** §3-4 予約 6 for the last section — 「git/mcp の
-//! locator が `ScopeTooLong` を**構成時に**拒否する経路を通る」.
+//! (the `≈` this crate's root declares), and **req/98** §3-4's reserved item 6 for the last section -- "git/mcp's
+//! locator route refuses `ScopeTooLong` **at construction time**". (sem: SEM-gx-adapter-git-121)
 
 mod support;
 
@@ -17,7 +19,7 @@ use support::{intent_for, GitFixture, BRANCH, GOAL};
 // The grammar
 // ---------------------------------------------------------------------------
 
-/// **M4-07 採(c)**: concatenation of sequences is associative, which is what makes the monoid free.
+/// **M4-07, adopted (c)**: concatenation of sequences is associative, which is what makes the monoid free. (sem: SEM-gx-adapter-git-122)
 ///
 /// On the *sequences* and not on the bytes: **N-14** requires canonical DAG-CBOR and a CBOR array
 /// carries its length in its head, so two payloads do not concatenate as bytes. `decode`, concatenate,
@@ -65,8 +67,8 @@ fn concatenation_of_sequences_is_associative() {
 
 /// The three refusals of [`GitDelta::decode`], each with its own word.
 ///
-/// 「未対応」 (`Unimplemented`, which the shared harness reads as 「無い」) and 「this is not a payload I
-/// wrote」 (`PayloadUnreadable`) are different facts, and req/29 §4 forbids one word for both.
+/// "unimplemented" (`Unimplemented`, which the shared harness reads as "none") and "this is not a payload I
+/// wrote" (`PayloadUnreadable`) are different facts, and req/29 §4 forbids one word for both. (sem: SEM-gx-adapter-git-123)
 #[test]
 fn decode_refuses_three_different_things_in_three_different_words() {
     let op = GitOp::write("/r#refs/heads/a:x".to_string(), b"a".to_vec());
@@ -91,7 +93,7 @@ fn decode_refuses_three_different_things_in_three_different_words() {
 /// A `reset` with content and a `content` with a target are payloads this grammar did not write.
 ///
 /// The discriminant is a **field** rather than an inference precisely so that these two are
-/// detectable: a grammar that read 「no target」 as 「a content operation」 would let a hand-made payload
+/// detectable: a grammar that read "no target" as "a content operation" would let a hand-made payload (sem: SEM-gx-adapter-git-124)
 /// turn a branch move into a file change, or the reverse.
 #[test]
 fn an_operation_whose_kind_and_fields_disagree_is_unreadable() {
@@ -152,7 +154,7 @@ fn forged_op(kind: &str, content: Option<&[u8]>, locator: &str, target: Option<S
     .expect("a map of four keys has a canonical form")
 }
 
-/// **M4H5-4 採(b)**: the forward bound is declared **once**, and the declaration is the one that runs.
+/// **M4H5-4, adopted (b)**: the forward bound is declared **once**, and the declaration is the one that runs. (sem: SEM-gx-adapter-git-125)
 #[test]
 fn the_forward_ceiling_is_declared_in_one_place_and_is_enforced_in_plan() {
     let source = std::fs::read_to_string(
@@ -193,7 +195,7 @@ fn the_forward_ceiling_is_declared_in_one_place_and_is_enforced_in_plan() {
 ///
 /// The crate root argues it: an fs inverse carries the whole old file (42 §5, M4-21) and a git inverse
 /// carries an object id, so no input could reach a bound. A constant declared here would be a refusal
-/// nobody asked for (52 契約 2), and — worse — one a reader would believe was reachable. This probe is
+/// nobody asked for (52 contract 2), and -- worse -- one a reader would believe was reachable. This probe is (sem: SEM-gx-adapter-git-126)
 /// what makes the day somebody adds one a red test rather than a silent widening of the vocabulary.
 #[test]
 fn this_adapter_declares_no_escrow_ceiling() {
@@ -266,7 +268,7 @@ fn the_normalisation_folds_no_case_and_no_unicode() {
     );
 }
 
-/// What is not a position, and the word for it (**M4H5-5 採(b)**).
+/// What is not a position, and the word for it (**M4H5-5, adopted (b)**). (sem: SEM-gx-adapter-git-127)
 #[test]
 fn a_spelling_that_is_not_a_position_is_refused_as_one() {
     let adapter = gx_adapter_git::GitAdapter::new();
@@ -288,14 +290,14 @@ fn a_spelling_that_is_not_a_position_is_refused_as_one() {
 }
 
 // ---------------------------------------------------------------------------
-// The scope bound (req/98 §3-4 予約 6)
+// The scope bound (req/98 §3-4's reserved item 6) (sem: SEM-gx-adapter-git-128)
 // ---------------------------------------------------------------------------
 
-/// 🔴 **予約 6**: the git locator reaches `ScopeTooLong` through the **same one road** the fs adapter
+/// 🔴 **Reserved item 6**: the git locator reaches `ScopeTooLong` through the **same one road** the fs adapter (sem: SEM-gx-adapter-git-129)
 /// takes, and the refusal is at construction.
 ///
-/// [`gx_core::Fingerprint::new`] is where the bound lives (**M4H1-2**: 「gx-core にも scope 文字列の上限
-/// +超過時 digest 化」), and [`elide_scope`] is the adapter-side fold that keeps a long scope's
+/// [`gx_core::Fingerprint::new`] is where the bound lives (**M4H1-2**: "gx-core also has a ceiling on the scope string
+/// and turns it into a digest past it"), and [`elide_scope`] is the adapter-side fold that keeps a long scope's (sem: SEM-gx-adapter-git-130)
 /// identity. Two halves are measured: a scope over the bound is refused **by the type** when it is not
 /// elided, and the elision produces something the type accepts and that two reads agree on.
 #[test]
@@ -334,14 +336,14 @@ fn an_over_long_scope_is_refused_at_construction_and_elides_to_one_line() {
 /// `postcondition` (L2), and **never one with the other**. A `precondition` that named a different
 /// scope than the `apply` beside it was therefore invisible — while being exactly the defect that
 /// makes 42 §3.5's CAS unusable, since [`gx_core::Fingerprint::cas_eq`] refuses outright across two
-/// scopes (**E-M4-15**) and an engine would read that refusal as 「その比較は意味を持たない」 about an
+/// scopes (**E-M4-15**) and an engine would read that refusal as "that comparison carries no meaning" about an (sem: SEM-gx-adapter-git-131)
 /// object comparing with itself.
 ///
 /// So the two are compared here, in both directions: the fingerprint `apply` observed is comparable
 /// with a fresh `precondition` (one scope) and says the state did **not** move between them, and the
 /// fingerprint taken **before** the apply is comparable and says it did. A mutation of either scope
 /// makes the first assertion an `Err` rather than a `false`, which is the shape that distinguishes
-/// 「different state」 from 「different question」.
+/// "different state" from "different question". (sem: SEM-gx-adapter-git-132)
 #[test]
 fn the_postcondition_and_the_precondition_name_one_scope() {
     let fixture = GitFixture::new();
@@ -382,7 +384,7 @@ fn the_postcondition_and_the_precondition_name_one_scope() {
     assert_eq!(
         before.cas_eq(applied.postcondition()),
         Ok(false),
-        "the branch moved, and the answer to 「did it move」 is `Ok(false)` rather than a refusal"
+        "the branch moved, and the answer to 'did it move' is `Ok(false)` rather than a refusal (sem: SEM-gx-adapter-git-133)"
     );
 }
 

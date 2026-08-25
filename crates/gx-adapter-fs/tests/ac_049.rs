@@ -1,37 +1,39 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-049 (FR-044) — the round trip, in three kinds, on a tmpfs.
 //!
-//! AC-049 逐語: 「Given: fs-adapterでファイル作成/変更/削除の3種delta。When: 各々について`apply(delta)`→
-//! 得られた逆deltaで`apply(inverse)`を実行。Then: 対象ファイル内容が操作前のバイト列とbit-equalに戻る
-//! （3ケース）。」判定方法: 「integration（tmpfs上）」, M4.
+//! AC-049, verbatim: "Given: fs-adapter with a delta from one of the 3 kinds -- create/change/delete a file. When: for
+//! each, run `apply(delta)` -> take the resulting inverse delta and run `apply(inverse)`. Then: the target
+//! file's content returns bit-equal to the byte sequence before the operation (3 cases)." Judgment method: "integration (on tmpfs)", M4. (sem: SEM-gx-adapter-fs-113)
 //!
-//! # 🔴 The order is T-10b's, and the逐語 is the one that was corrected
+//! # 🔴 The order is T-10b's, and the verbatim text is the one that was corrected (sem: SEM-gx-adapter-fs-114)
 //!
-//! The criterion reads `apply` → 「得られた逆delta」 → `apply`, with the inverse obtained after the
-//! change. **E-M4-30** (req/38 §31 M4H3-1 採(a)) is the erratum:
+//! The criterion reads `apply` -> "the resulting inverse delta" -> `apply`, with the inverse obtained after the
+//! change. **E-M4-30** (req/38 §31 M4H3-1, adopted (a)) is the erratum: (sem: SEM-gx-adapter-fs-115)
 //!
-//! > 「51 §7 契約 4 の cell と AC-049 の逐語順を erratum——**escrow(invert)は apply の前**(43 T-10b が
-//! > state machine の正本)。根拠は物理: 上書き/削除の逆は旧内容本体を運ぶ(42 §5 の escrow 必須理由)ので、
-//! > **invert は pre が観測可能な時点でしか構成できない**——T-10b 順が唯一 constructible であり、逐語順を
-//! > 満たせるのは自前履歴を持つ adapter だけ(要求はどこにも無い)」
+//! > "the erratum over the cell of 51 §7 contract 4 and AC-049's verbatim order -- **escrow (invert) comes before apply**
+//! > (43 T-10b is state machine's canonical source). The reason is physical: the inverse of an overwrite/deletion carries the old content's body (42 §5's reason the escrow is required), so
+//! > **invert can only be constructed at the point where pre is observable** -- T-10b's order is the only constructible one, and
+//! > only an adapter that keeps its own history could satisfy the verbatim order (the requirement exists nowhere)" (sem: SEM-gx-adapter-fs-116)
 //!
 //! This adapter keeps no history, so the inverse is built while the old bytes are still on the
 //! filesystem. Every case below prints `ORDER=T-10b`.
 //!
 //! # The Given is written down, because **E-M4-3** made that a condition
 //!
-//! 「往復 property の Given に状態を書く事を DoD 条件化」. The quantifier of the round trip is 「`invert`
-//! に渡した `pre` の 1 点」 and not every state: req/69 §3.2 shows in three lines that reading the round
-//! trip and 41 §4's 「適用は冪等」 as laws over a whole state map forces every delta to be the identity.
+//! "the Given of the round-trip property carrying state is made a DoD condition". The quantifier of the round trip is "the one `pre`
+//! passed to `invert`" and not every state: req/69 §3.2 shows in three lines that reading the round
+//! trip and 41 §4's "apply is idempotent" as laws over a whole state map forces every delta to be the identity. (sem: SEM-gx-adapter-fs-117)
 //! So each case names the bytes it starts from, in the assertion message and in a printed line, and
 //! the property at the end generates **contents** rather than moving the state during a trip.
 //!
 //! # What tmpfs makes this evidence about
 //!
 //! The primaries were fetched in full by this hand (`Desktop/GitRepo/REFERENCES.md`, 2026-08-09).
-//! POSIX's normative sentence for `rename` is about **concurrent observation** -- 「a directory entry
+//! POSIX's normative sentence for `rename` is about **concurrent observation** -- "a directory entry
 //! named new shall remain visible to other threads throughout the renaming operation and refer either
-//! to the file referred to by new or old before the operation began」 -- and its RATIONALE is where the
-//! word 「atomic」 appears. On a tmpfs `fsync` is effectively free, so **this suite is evidence about
+//! to the file referred to by new or old before the operation began" -- and its RATIONALE is where the
+//! word "atomic" appears. On a tmpfs `fsync` is effectively free, so **this suite is evidence about (sem: SEM-gx-adapter-fs-118)
 //! atomicity and not about crash durability**, and the crate root says so in the same words rather
 //! than leaving a reader to assume it.
 
@@ -58,13 +60,14 @@ fn round_trip(
     let inverse = adapter
         .invert(delta, pre)
         .expect("invert answers")
+        .into_inverse()
         .expect("the escrow ceiling is not reached by these cases");
     adapter.apply(delta).expect("the forward delta applies");
     adapter.apply(&inverse).expect("the inverse applies");
     content_at(locator)
 }
 
-/// 変更 — the file exists, the delta replaces it, and the old bytes come back.
+/// Change -- the file exists, the delta replaces it, and the old bytes come back. (sem: SEM-gx-adapter-fs-119)
 #[test]
 fn a_change_comes_back_to_the_bytes_it_started_from() {
     let sandbox = Sandbox::new();
@@ -91,9 +94,9 @@ fn a_change_comes_back_to_the_bytes_it_started_from() {
     );
 }
 
-/// 作成 — the position holds nothing, the delta creates a file, and the position holds nothing again.
+/// Creation -- the position holds nothing, the delta creates a file, and the position holds nothing again.
 ///
-/// The Given is 「there is no file here」, which this adapter cannot express as a snapshot: `snapshot`
+/// The Given is "there is no file here", which this adapter cannot express as a snapshot: `snapshot` (sem: SEM-gx-adapter-fs-120)
 /// reads, and a position with nothing at it answers [`gx_substrate::Error::Unreadable`]. So the `pre`
 /// is built by the test (`support::absent_snapshot`) and the seam is raised in `req/74` §2 -- an
 /// engine planning a creation would hit the same wall in M5.
@@ -112,6 +115,7 @@ fn a_creation_comes_back_to_a_position_that_holds_nothing() {
     let inverse = adapter
         .invert(&delta, &pre)
         .expect("invert answers for a position that holds nothing")
+        .into_inverse()
         .expect("the inverse of a creation is a removal, which fits any ceiling");
 
     adapter.apply(&delta).expect("the creation applies");
@@ -129,7 +133,7 @@ fn a_creation_comes_back_to_a_position_that_holds_nothing() {
     );
 }
 
-/// 削除 — the file exists, the delta removes it, and the old bytes come back.
+/// Deletion -- the file exists, the delta removes it, and the old bytes come back. (sem: SEM-gx-adapter-fs-121)
 #[test]
 fn a_removal_comes_back_to_the_bytes_it_started_from() {
     let sandbox = Sandbox::new();
@@ -148,6 +152,7 @@ fn a_removal_comes_back_to_the_bytes_it_started_from() {
     let inverse = adapter
         .invert(&delta, &pre)
         .expect("invert answers")
+        .into_inverse()
         .expect("six bytes fit under the escrow ceiling");
 
     adapter.apply(&delta).expect("the removal applies");
@@ -166,7 +171,7 @@ fn a_removal_comes_back_to_the_bytes_it_started_from() {
     );
 }
 
-/// **L5's two routes agree** (**M4H3-3 採(a)**), measured where both of them exist.
+/// **L5's two routes agree** (**M4H3-3, adopted (a)**), measured where both of them exist. (sem: SEM-gx-adapter-fs-122)
 ///
 /// One route derives the target from the intent's goal without touching the filesystem; the other is
 /// what `apply` observed after its `rename`. The harness runs the same comparison as a law (L5) with
@@ -203,13 +208,13 @@ fn the_promised_target_and_the_observed_digest_are_reached_by_different_roads() 
     assert_eq!(
         applied.resulting_digest(),
         &promised,
-        "the plan promised one digest and the apply observed another (L5, M4-06 採(b))"
+        "the plan promised one digest and the apply observed another (L5, M4-06, adopted (b)) (sem: SEM-gx-adapter-fs-123)"
     );
 }
 
 /// The observation is taken from the substrate rather than from the buffer that was written.
 ///
-/// req/69 §3.1: 「post は返り値でなく観測値である」. The difference is not visible in a passing run --
+/// req/69 §3.1: "post is an observation, not a return value". The difference is not visible in a passing run -- (sem: SEM-gx-adapter-fs-124)
 /// both roads give one digest when the write landed -- so it is stated as a property of the source
 /// and measured by `tools/verify_m4h5.sh` mutation (d), which makes `apply` digest its own input
 /// instead of reading back and shows which probes notice.
@@ -228,7 +233,7 @@ fn the_postcondition_names_the_same_scope_the_precondition_did() {
         applied.postcondition().scope(),
         before.scope(),
         "a CAS check compares two fingerprints of one scope, so an apply that renamed the scope \
-         would make every comparison answer 「その比較は意味を持たない」 (E-M4-15)"
+         would make every comparison answer 'that comparison carries no meaning' (E-M4-15) (sem: SEM-gx-adapter-fs-125)"
     );
     assert_eq!(
         applied.applied_at(),

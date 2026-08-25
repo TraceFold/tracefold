@@ -1,21 +1,26 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-037** — `mode=RecordOnly ∧ verdict=Deny ∧ status=Committed ⇒ receipt.enforced=false`.
 //!
-//! 34 AC-037 逐語 (「record-only enforced=false横断の目玉」):
+//! 34 AC-037, verbatim ("the centerpiece of record-only enforced=false", sem: SEM-gx-engine-461):
 //!
-//! > Given: `EnforcementMode::RecordOnly`が有効な対象substrate。When: Cedar/invariant評価がDenyを
-//! > 返すTransformationをsubmit→verify→canonicalize(T-8r)→commitまで通す。Then: Tが`Committed`へ
-//! > 到達し、発行Receiptの`enforced`フィールドが必ず`false`。プロパティ
-//! > `mode=RecordOnly ∧ verdict=Deny ∧ status=Committed ⇒ receipt.enforced=false`を全生成ケースで
-//! > 検証（NFR-006と同一命題）。 | property（proptest, 全mode×全verdict組合せ）
+//! > Given: a target substrate with `EnforcementMode::RecordOnly` in effect. When: a Transformation
+//! > for which Cedar/invariant evaluation returns Deny is carried through
+//! > submit->verify->canonicalize(T-8r)->commit. Then: T reaches `Committed`, and the issued
+//! > Receipt's `enforced` field is always `false`. Verify the property
+//! > `mode=RecordOnly ∧ verdict=Deny ∧ status=Committed ⇒ receipt.enforced=false` over every
+//! > generated case (the same proposition as NFR-006). | property (proptest, every mode × every
+//! > verdict combination) (sem: SEM-gx-engine-461)
 //!
 //! # 🔴 Why this criterion could not be written until **E-M5-11**
 //!
-//! 「全mode×全verdict組合せ」 has **eight** cells, and one of them is 43 T-4e's degraded admission:
-//! a transformation that reaches `Committed` with `enforced=false` and **no verdict at all**,
-//! because the gate was never asked. Until §41 made `ReceiptPayload.verdict` an `Option`, hand 4's
-//! `commit` refused that cell with `Error::Unrepresentable` — so a property over 「every generated
-//! case」 either skipped a row or failed. §41 says so in as many words: 「実装窓=**手 6**(AC-037 が
-//! この経路を正面から踏む)」. [`the_grid`] walks all eight.
+//! "every mode × every verdict combination" has **eight** cells, and one of them is 43 T-4e's
+//! degraded admission: a transformation that reaches `Committed` with `enforced=false` and **no
+//! verdict at all**, because the gate was never asked. Until §41 made `ReceiptPayload.verdict` an
+//! `Option`, hand 4's `commit` refused that cell with `Error::Unrepresentable` — so a property over
+//! "every generated case" either skipped a row or failed. §41 says so in as many words: "the
+//! implementation window is **hand 6** (AC-037 is where this road is walked head-on)" (sem:
+//! SEM-gx-engine-462). [`the_grid`] walks all eight.
 //!
 //! # Two instruments, because the criterion has two halves
 //!
@@ -26,8 +31,9 @@
 //!   randomly chosen cells, seeds and locators. What it adds is that the implication does not
 //!   depend on the fixtures the grid happens to use.
 //!
-//! **M5-15 採(b)** is why the second one is plain `proptest` and not `proptest-state-machine`:
-//! 「素の proptest で `Vec<Event>` 生成の自前 model(**external 238 不変**)」.
+//! **M5-15, adopted (b)** is why the second one is plain `proptest` and not
+//! `proptest-state-machine`: "a hand-rolled model for `Vec<Event>` generation using plain proptest
+//! (**external 238 unchanged**)" (sem: SEM-gx-engine-463).
 
 mod support;
 
@@ -42,11 +48,12 @@ use support::{
 
 const AT: Timestamp = Timestamp(1_754_000_000_000_000_000);
 
-/// The four roads to a verdict-stage outcome, which is what 「全verdict」 enumerates.
+/// The four roads to a verdict-stage outcome, which is what "every verdict" enumerates (sem:
+/// SEM-gx-engine-464).
 ///
-/// Three are 43 T-4a/T-4b/T-4c and the fourth is T-4e — 43 §4 calls it 「record-onlyモード相当へ
-/// 降格」, so it belongs on the verdict axis of a criterion about `enforced` even though no gate
-/// answered.
+/// Three are 43 T-4a/T-4b/T-4c and the fourth is T-4e — 43 §4 calls it "downgrade to
+/// record-only-equivalent mode" (sem: SEM-gx-engine-464), so it belongs on the verdict axis of a
+/// criterion about `enforced` even though no gate answered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Driver {
     /// T-4a: the policy set permits.
@@ -111,7 +118,8 @@ fn run(name: &str, mode: EnforcementMode, driver: Driver, seed: u64) -> Outcome 
     let mut state = engine
         .verify(&id, AT, &signing_key(), None)
         .expect("T-3..T-4e");
-    // 43 §1: `Denied` is terminal 「ただしrecord-onlyモード時のみ」, and `Escalated` waits for a
+    // 43 §1: `Denied` is terminal "but only in record-only mode" (sem: SEM-gx-engine-465), and
+    // `Escalated` waits for a
     // person. Both refusals are states rather than errors, so the pipeline simply stops.
     if engine.canonicalize(&id, AT, None).is_ok() {
         state = engine
@@ -187,7 +195,8 @@ fn ac_037_the_whole_grid_of_modes_and_verdicts() {
                         "no commit, no CommitReceipt"
                     );
                 }
-                // 🔴 T-8r: the目玉. Denied, carried through, and the receipt says it was not enforced.
+                // 🔴 T-8r: the centerpiece (sem: SEM-gx-engine-466). Denied, carried through, and
+                // the receipt says it was not enforced.
                 (EnforcementMode::RecordOnly, Driver::Deny) => {
                     committed_denials += 1;
                     assert_eq!(out.state, Lifecycle::Committed);
@@ -200,7 +209,8 @@ fn ac_037_the_whole_grid_of_modes_and_verdicts() {
                     assert_eq!(out.leaves, 1);
                     assert_eq!(
                         out.applies, 1,
-                        "「適用は通ったが、ポリシー上は拒否されていた」"
+                        "\"the apply went through, but it was refused at the policy level\" (sem: \
+                         SEM-gx-engine-467)"
                     );
                 }
                 // T-4c: a person has not answered, so nothing proceeds in either mode (INV-S6).
@@ -234,7 +244,8 @@ fn ac_037_the_whole_grid_of_modes_and_verdicts() {
     assert_eq!(cells, 8, "2 modes × 4 verdict drivers");
     assert_eq!(
         committed_denials, 1,
-        "exactly one cell is 「Deny が Committed に到達した」, and it is RecordOnly's"
+        "exactly one cell is \"Deny reached Committed\" (sem: SEM-gx-engine-468), and it is \
+         RecordOnly's"
     );
 }
 
@@ -242,11 +253,13 @@ fn ac_037_the_whole_grid_of_modes_and_verdicts() {
 // The property
 // ---------------------------------------------------------------------------
 
-/// 🔴 The proptest 34 names, over randomly chosen cells (**M5-15 採(b)**: plain `proptest`).
+/// 🔴 The proptest 34 names, over randomly chosen cells (**M5-15, adopted (b)**: plain `proptest`;
+/// sem: SEM-gx-engine-469).
 ///
 /// The grid above says the implication holds for the eight fixtures this suite wrote. This says it
 /// holds for cells chosen by the generator, with seeds and locators the fixtures did not pick —
-/// which is the difference between 「these eight pass」 and 「the implication is true」.
+/// which is the difference between "these eight pass" and "the implication is true" (sem:
+/// SEM-gx-engine-470).
 #[test]
 fn ac_037_the_property_holds_for_every_generated_case() {
     let mut runner = proptest::test_runner::TestRunner::new(ProptestConfig {

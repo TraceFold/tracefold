@@ -1,0 +1,117 @@
+{
+  "gx": "attach",
+  "project": "/home/testuser2/.sg/p1b_mint/proj",
+  "gx_dir": "/home/testuser2/.sg/p1b_mint/proj/.gx",
+  "gx_dir_under_working_directory": true,
+  "working_directory": "/home/testuser2/.sg/p1b_mint",
+  "placement": [
+    {
+      "rel": "ledger",
+      "shape": "directory",
+      "nature": "source",
+      "losing_it": "nothing regenerates what this holds; losing it loses data",
+      "placement": "created"
+    },
+    {
+      "rel": "checkpoints",
+      "shape": "directory",
+      "nature": "countersigned",
+      "losing_it": "re-derivable, but only by the holder of the ledger signing key",
+      "placement": "created"
+    },
+    {
+      "rel": "evidence",
+      "shape": "directory",
+      "nature": "source",
+      "losing_it": "nothing regenerates what this holds; losing it loses data",
+      "placement": "created"
+    },
+    {
+      "rel": "index",
+      "shape": "directory",
+      "nature": "derived",
+      "losing_it": "rebuilding it is always correct, so losing it costs time and not data",
+      "placement": "created"
+    },
+    {
+      "rel": "drafts",
+      "shape": "directory",
+      "nature": "source",
+      "losing_it": "nothing regenerates what this holds; losing it loses data",
+      "placement": "created"
+    },
+    {
+      "rel": "receipts",
+      "shape": "directory",
+      "nature": "source",
+      "losing_it": "nothing regenerates what this holds; losing it loses data",
+      "placement": "created"
+    },
+    {
+      "rel": "config.toml",
+      "shape": "file",
+      "nature": "meta",
+      "losing_it": "settings and the declaration; losing it is a reconfiguration",
+      "placement": "created"
+    },
+    {
+      "rel": "VERSION",
+      "shape": "file",
+      "nature": "meta",
+      "losing_it": "settings and the declaration; losing it is a reconfiguration",
+      "placement": "created"
+    },
+    {
+      "rel": "LOCK",
+      "shape": "file",
+      "nature": "transient",
+      "losing_it": "the state of a running process, carrying no project data of its own",
+      "placement": "not-placed",
+      "why": "the state of a running process. Creating it would make a file that looks like an exclusion and holds none — the exclusion is an open descriptor's"
+    },
+    {
+      "rel": "repair",
+      "shape": "directory",
+      "nature": "source",
+      "losing_it": "nothing regenerates what this holds; losing it loses data",
+      "placement": "created"
+    },
+    {
+      "rel": "ledger/*.torn.*",
+      "shape": "name-rule",
+      "nature": "source",
+      "losing_it": "nothing regenerates what this holds; losing it loses data",
+      "placement": "not-placed",
+      "why": "a rule for naming a copy of a torn tail, not a path: nothing creates one and nothing removes one"
+    }
+  ],
+  "counts": {
+    "total": 11,
+    "created": 9,
+    "already_present": 0,
+    "not_placed": 2
+  },
+  "created_entries": [
+    ".gx",
+    ".gx/.gitignore",
+    ".gx/VERSION",
+    ".gx/checkpoints",
+    ".gx/config.toml",
+    ".gx/drafts",
+    ".gx/evidence",
+    ".gx/index",
+    ".gx/ledger",
+    ".gx/ledger/journal",
+    ".gx/receipts",
+    ".gx/repair"
+  ],
+  "project_root_entries_added": [
+    ".gx"
+  ],
+  "network": "none",
+  "not_carried_by_this_face": [
+    "which effects reach the membrane: this operation points no route at gx. `gx wrap --adopt-config` is the road that does, and it is a separate invocation",
+    "what this project can and cannot observe about a change: nothing here states it, so nothing here should be read as stating it",
+    "how to leave: this operation has no inverse yet. `.gx/` is not removed by any verb of this binary, so what it holds survives whatever happens next"
+  ]
+}

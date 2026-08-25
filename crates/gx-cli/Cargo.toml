@@ -1,9 +1,9 @@
-# 41 §2's twelfth crate and 44 §1's surface: 「gx submit|plan|verify|commit|undo|cancel|escalation|
-# receipt|replay|log|key|policy|serve（44準拠）」.
+# 41 §2's twelfth crate and 44 §1's surface: "gx submit|plan|verify|commit|undo|cancel|escalation|
+# receipt|replay|log|key|policy|serve (per 44)" (sem: SEM-gx-cli-381).
 #
-# 🔴 **M6 hand 1 implements none of the thirteen** (req/88 §6.2 手 1: 「subcommand は 1 本も実装しな
-# い」). What this hand builds is the ground the subcommands stand on: the `.gx/` directory of
-# req/56, the draft holding area M6-01 採(a) put there, the `.gx/index/` cache of M6-02 採(b), and
+# 🔴 **M6 hand 1 implements none of the thirteen** (req/88 §6.2 hand 1: "not a single subcommand
+# is implemented" (sem: SEM-gx-cli-382)). What this hand builds is the ground the subcommands stand on: the `.gx/` directory of
+# req/56, the draft holding area M6-01 adopted (a) put there, the `.gx/index/` cache of M6-02 adopted (b), and
 # the argument parser's error contract. A crate that existed and did nothing would be a crate a
 # reader has to rule out (gx-engine's manifest says the same thing about `pipeline.rs` in M5 hand 1).
 [package]
@@ -11,32 +11,34 @@ name = "gx-cli"
 description = "The `gx` command line: `.gx/` layout, draft store, id-resolution cache (44 §1, req/56)."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+rust-version.workspace = true         # blocker item 1, adopted (req/38 §47; sem: SEM-gx-cli-383): declared once, in the workspace
 license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # P5 (req/134 §1 item 6): `dist generate` reads this
 
 # 🔴 The binary is named **`gx`** and not `gx-cli`. 44 spells every command `gx <verb>`, and
-# NFR-019 asks for 「単一静的バイナリ」; a binary whose name did not match the documentation would be
+# NFR-019 asks for "a single static binary" (sem: SEM-gx-cli-384); a binary whose name did not match the documentation would be
 # a rename waiting to happen at the worst moment (the release hand).
 [[bin]]
 name = "gx"
 path = "src/main.rs"
 
-# 🔴 **則 1** (req/88 §3 Λ1) is a claim about *this table* before it is a claim about the source.
+# 🔴 **Rule 1** (req/88 §3 Λ1; sem: SEM-gx-cli-385) is a claim about *this table* before it is a claim about the source.
 # `gx-canon` is absent and may not be added: 41 §6 gives the canonical encode one door
-# (「全canonical encodeはgx-canon経由のみ（迂回禁止）」), and a CLI that could mint a `Cid` could name
+# ("every canonical encode goes through gx-canon only, bypass forbidden"; sem: SEM-gx-cli-386), and a CLI that could mint a `Cid` could name
 # a transformation the engine never saw. `gx-gate` and `gx-engine` are absent for a different and
-# weaker reason — **the M5H1-1 rule, ruled 採(a) in req/38 §38**: 「出荷依存は**呼び出しが在る手で
-# declare**」. This hand has no call into either. Hands 3 and 4 add them.
+# weaker reason — **the M5H1-1 rule, ruled adopted (a) in req/38 §38**: "a shipping dependency
+# is declared by the hand where the call exists" (sem: SEM-gx-cli-387). This hand has no call into either. Hands 3 and 4 add them.
 #
 # `gx-core` is here because the two things this hand stores are keyed on gx-core ids (`IntentId`,
 # `TransformationId`) and because `Cid::from_text` — the `gx1:` parser 44 §0's id-resolution needs —
-# **lives in gx-core, not in gx-canon**. That is what makes 則 1 (i) satisfiable at all rather than a
+# **lives in gx-core, not in gx-canon**. That is what makes Rule 1 (i) satisfiable at all rather than a (sem: SEM-gx-cli-388)
 # rule the CLI has to break to do its job: parsing a name is not minting one.
 #
-# 🔴 **N-13 does not extend to this crate, and req/88 §1 says so in as many words**: 「`gx-cli` は fs
-# adapter を出荷依存する——CLI は『どの substrate か』を `--substrate` で受けて registry に register
-# する層であり、adapter を知らなければ何もできない。N-13 が守るのは engine の中立性であって、CLI の
-# 中立性ではない」. No adapter is declared **yet** — the same 「declare where it is called」 rule — and
+# 🔴 **N-13 does not extend to this crate, and req/88 §1 says so in as many words**: "`gx-cli`
+# ships an fs adapter as a dependency -- the CLI is the layer that takes 'which substrate' via
+# `--substrate` and registers it into the registry; without knowing the adapter it can do nothing.
+# What N-13 protects is the engine's neutrality, not the CLI's neutrality" (sem: SEM-gx-cli-389). No adapter is declared **yet** — the same "declare where it is called" rule — and
 # when hand 3 adds `gx-adapter-fs` here it is not a breach of anything.
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
@@ -44,53 +46,54 @@ path = "src/main.rs"
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }  # ids, `Cid::from_text`, `Intent`, `b64`
 
-# 🔴 M6 hand 2, under the same rule hand 1 applied to `gx-gate`/`gx-engine` (req/38 §38 採(a):
-# 「出荷依存は**呼び出しが在る手で declare**」). All three are **path** dependencies, so the external
+# 🔴 M6 hand 2, under the same rule hand 1 applied to `gx-gate`/`gx-engine` (req/38 §38 adopted (a):
+# "a shipping dependency is declared by the hand where the call exists"; sem: SEM-gx-cli-390). All three are **path** dependencies, so the external
 # package count does not move: req/89 §2.3's 277 stands, and the read side costs zero new packages.
 #
-# `gx-witness` — `Receipt`, `verify_offline`, `KeyPair`, and `dsse::sign_checkpoint` (M6-24 採(b)'s
+# `gx-witness` — `Receipt`, `verify_offline`, `KeyPair`, and `dsse::sign_checkpoint` (M6-24 adopted (b)'s (sem: SEM-gx-cli-391)
 #   producer, whose caller count outside gx-witness was **0** before this hand).
 # `gx-log`     — `LedgerStore`, `prove_inclusion`, `prove_consistency`, `unsigned_checkpoint`.
 # `gx-engine`  — `EngineJournal` and `reconstruct`, which is the whole of replay after E-M5-2
-#   (「replay は Σ のみを再構成する read-only 操作」). 🔴 Note what is **not** used: no `Engine` is
+#   ("replay is a read-only operation that reconstructs only Σ"; sem: SEM-gx-cli-392). 🔴 Note what is **not** used: no `Engine` is
 #   opened by any verb in this hand. Opening one would take a `Gate` and an `EvidenceSource` — a
-#   judging apparatus, for four commands that read — and 則 1 is easier to keep when the surface
+#   judging apparatus, for four commands that read — and Rule 1 is easier to keep when the surface (sem: SEM-gx-cli-393)
 #   that could break it is not in scope.
 #
-# 🔴 `gx-canon` is still absent and still may not be added (41 §6, 則 1 (i)). It arrives here
+# 🔴 `gx-canon` is still absent and still may not be added (41 §6, Rule 1 (i); sem: SEM-gx-cli-394). It arrives here
 # transitively through all three, which is exactly the point: this crate consumes values the canon
 # layer produced and computes none.
 gx-witness = { path = "../gx-witness", version = "0.1.0" }
 gx-log = { path = "../gx-log", version = "0.1.0" }
 gx-engine = { path = "../gx-engine", version = "0.1.0" }
 
-# 🔴 M6 hand 3, under the same rule (「出荷依存は**呼び出しが在る手で declare**」). Both are **path**
+# 🔴 M6 hand 3, under the same rule ("a shipping dependency is declared by the hand where the call exists"; sem: SEM-gx-cli-395). Both are **path**
 # dependencies and both were already in this binary's transitive graph through `gx-engine`, so the
 # external package count is **unchanged**: req/89 §2.3's 277 still stands and this hand adds zero
 # registry packages.
 #
 # `gx-gate`        — `Gate::with_policies` and `packs::fs_pack`. The CLI **chooses the policy set**
 #   the engine judges with and does not judge: 41 §4 keeps the one decision in `Gate::verify` and
-#   則 1 (ii) is the mechanical check that this crate never constructs a `Verdict`. FR-028's
-#   「pack の file が build に埋め込まれる経路が 1 本」 is why the bytes come from gx-gate's
+#   Rule 1 (ii) is the mechanical check that this crate never constructs a `Verdict`. FR-028's
+#   "there is exactly one road by which a pack's file gets embedded into the build" (sem: SEM-gx-cli-396) is why the bytes come from gx-gate's
 #   `include_str!` rather than from a file this binary opens.
 # `gx-adapter-fs`  — `FsAdapter`, registered into the engine's registry at
-#   `session::Session::open`. 🔴 req/88 §1 already ruled this is not an N-13 breach: 「N-13 が守るのは
-#   engine の中立性であって、CLI の中立性ではない」. `gx-engine`'s own manifest still declares no
+#   `session::Session::open`. 🔴 req/88 §1 already ruled this is not an N-13 breach: "what N-13
+#   protects is the engine's neutrality, not the CLI's neutrality" (sem: SEM-gx-cli-397). `gx-engine`'s own manifest still declares no
 #   adapter, and `ENGINE_SHIPPED_ADAPTERS=0` is unmoved.
 gx-gate = { path = "../gx-gate", version = "0.1.0" }
 gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
 
-# 🔴 **M7 hand 4** — the 既定 registry half of `req/38` §60's **R-9 対裁定**: 「既定 policy set と既定
-# registry は**対**で決まる(pack を足しても adapter が register されなければ NotFound)」. Until this
-# hand `gx submit --substrate git` parsed, wrote a draft and then failed at `plan` with 「no adapter
-# for this substrate」 — 44 §1.2 documents the flag, and M4H5-5's rule (an argument that changes
+# 🔴 **M7 hand 4** — the default registry half of `req/38` §60's **R-9 paired ruling**: "the
+# default policy set and the default registry are decided **as a pair** (adding a pack without
+# registering an adapter still gives NotFound)" (sem: SEM-gx-cli-398). Until this
+# hand `gx submit --substrate git` parsed, wrote a draft and then failed at `plan` with "no adapter
+# for this substrate" — 44 §1.2 documents the flag, and M4H5-5's rule (an argument that changes
 # nothing must not look like one that worked) has a twin: a flag the documentation offers must not be
 # one no invocation can satisfy. `gx-substrate` comes with it because
 # `session::register_default_adapters` names the trait in its own body.
 #
-# 🔴 **M6-27's five points, measured before this line was written** (req/38 §47 採(a): 「依存 5 点実測を
-# 宣言より先に」), by `tools/m7h4_dep_probe.sh` on the baseline commit 8990a44:
+# 🔴 **M6-27's five points, measured before this line was written** (req/38 §47 adopted (a): "measure
+# the five dependency points before declaring"; sem: SEM-gx-cli-399), by `tools/m7h4_dep_probe.sh` on the baseline commit 8990a44:
 #
 #   1. **package count**: `cargo tree -e normal -p gx-cli` **167 → 245 (+78)**. This is by far the
 #      largest edge this binary has taken and the number is not softened: `gix` and its 56 `gix-*`
@@ -100,9 +103,9 @@ gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
 #      have been gating them for four hands.
 #   2. **licences**: unchanged allow list. The one non-`MIT OR Apache-2.0` branch is `zlib-rs`
 #      (Zlib), which req/38 §58 **R-12** already put in `deny.toml` with its reason and referred to
-#      the Owner 卓 as a 35 DR-5 addition; that entry's 「暫定」 身分 is unchanged by this line and is
+#      the Owner's table as a 35 DR-5 addition; that entry's "provisional" status is unchanged by this line and is (sem: SEM-gx-cli-400)
 #      **not** re-decided here.
-#   3. **MSRV**: `gix` declares 1.85, under this workspace's 1.89 (卓-1). No subtree raises it.
+#   3. **MSRV**: `gix` declares 1.85, under this workspace's 1.89 (blocker item 1; sem: SEM-gx-cli-401). No subtree raises it.
 #   4. **duplicate roots**: none added — the closure is the one `gx-adapter-git` already resolves.
 #   5. 🔴 **the offline verifier's surface**, which is the point that needed a judgement rather than a
 #      number: the closure now holds `gix-transport`, `gix-protocol` and `gix-packetline`.
@@ -115,8 +118,85 @@ gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
 gx-adapter-git = { path = "../gx-adapter-git", version = "0.1.0" }
 gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
 
-# 🔴 Declared **after** M6-27's five-point measurement and not before (req/38 §47 M6-27 採(a):
-# 「依存 5 点実測を宣言より先に」). The numbers are in req/89 §2; the short form is that `clap` 4.6.6
+# 🔴 **P3** (`req/38` §71, `req/119` §2.5) — the third adapter and the wire that made registering it
+# true rather than decorative.
+#
+# The pair is the point. `gx-adapter-mcp` is the boundary, the grammar and the gate; `gx-mcp-wire` is
+# the JSON-RPC framing and the proxy's two halves. Declaring the adapter without the wire is what
+# `session::MCP_IS_NOT_REGISTERED` refused — "registering it behind a transport that refused
+# everything would buy nothing" (sem: SEM-gx-cli-402) — and declaring the wire is what makes `policies/mcp/` reachable from
+# this binary for the first time. The edge is Rule 2's own shape one layer out: `gx wrap` is the single
+# road from an agent's `tools/call` to `Engine::commit`, and this manifest is where that road becomes
+# a fact about the shipping graph rather than a diagram.
+#
+# Neither crate adds an external package: `gx-mcp-wire` declares `serde`/`serde_json`, which this
+# binary already carries, and refuses a linked MCP client library for AC-051's reason.
+gx-adapter-mcp = { path = "../gx-adapter-mcp", version = "0.1.0" }
+gx-mcp-wire = { path = "../gx-mcp-wire", version = "0.1.0" }
+
+# 🔴 **S③** (`req/493` §4 item 2) — `gx confine`'s derivation and its Landlock arm.
+#
+# The verb is here and the mechanism is not, for `gx-confine`'s own manifest reason: the applying
+# half is `cfg(target_os = "linux")` and the deriving half is not, and a `cfg` fork in the middle of
+# this crate's argument parser is the shape `req/493` §2's "part-applied is not applied" is about.
+# What this manifest gains is one module (`src/confine.rs`) that reads a plan and `exec`s.
+#
+# 🔴 It brings `gx-canon` into this binary's **transitive** graph, and that is not the thing this
+# manifest's Rule 1 note forbids. The prohibition is on *this crate's source* naming `gx_canon::`
+# — `crates/gx-canon/tests/authority_boundary.rs` counts the lines and requires zero — and
+# `src/confine.rs` names it nowhere. A dependency that mints ids on its own behalf is not a road
+# from this binary to a mint.
+#
+# External packages: **+3** (`landlock`, `enumflags2`, `enumflags2_derive`), all
+# `MIT OR Apache-2.0`. req/89 §2.3's 277 does move, and this is the line that says so rather than
+# a comment elsewhere claiming it did not.
+gx-confine = { path = "../gx-confine", version = "0.1.0" }
+
+# 🔴 **v0.2.7 Lane A** (`req/137` §A1 item 1, `req/38` §81 ruling 1; sem: SEM-gx-cli-403) — the fourth adapter, closing the
+# gap `req/136` §4-1 named gotcha75: `gx-adapter-postgres` had been a workspace member since P1
+# (`req/115` §A) but was never wired to an `Engine` anywhere in this repository, so `gx plan` on
+# `--substrate custom:postgres` always answered `no adapter named Custom("postgres")`. The adapter
+# is a stateless `Copy` struct and its DSN is resolved lazily per method call
+# (`gx_adapter_postgres::db::connect`, an environment variable), so registering it is free and a
+# missing DSN is a named `Error::Unreadable` at use time rather than a fail-open — no feature gate,
+# unlike `gx-adapter-mcp`'s transport (which genuinely cannot be built without a deployment-supplied
+# `ToolTransport`).
+#
+# 🔴 **Five-point measurement, taken before this line** (req/38 §47 M6-27 adopted (a): "measure
+# the five dependency points before declaring"; sem: SEM-gx-cli-404), on baseline commit `36405d3`:
+#
+#   1. **package count**: `cargo tree -e normal -p gx-cli` **261 → 286 (+25)**. `Cargo.lock`
+#      itself does **not** move (414 packages, before and after): `gx-adapter-postgres` has been a
+#      workspace member since P1, so every package this edge gains — `postgres`, `sqlparser`,
+#      `tokio-postgres`, `postgres-protocol`, `postgres-types`, `phf`/`phf_shared` 0.13.1,
+#      `rand`/`rand_core` 0.10.1, `stringprep`, `md-5`, `hmac`, `base64`, `const-oid`,
+#      `fallible-iterator`, `whoami`, `recursive`(-proc-macro-impl), `siphasher`,
+#      `unicode-bidi`/`unicode-properties`, `async-trait`, `futures-sink`, `tokio-util` — was
+#      already resolved in the workspace graph; this edge only changes which member *reaches* them.
+#   2. **licences**: unchanged allow list. `sqlparser` (Apache-2.0) and `postgres` (MIT OR
+#      Apache-2.0) were first-hand checked at P1 (`Desktop/GitRepo/REFERENCES.md` 2026-08-13 entry,
+#      `crates/gx-adapter-postgres/Cargo.toml`'s own comment) — no new fetch, so no new REFERENCES.md
+#      entry (gitrepo HARD is about the fetch, not the re-wiring).
+#   3. **MSRV**: unchanged — the subtree already built as a workspace member under this workspace's
+#      1.89 (blocker item 1; sem: SEM-gx-cli-405).
+#   4. **duplicate roots**: none *new*. `gx-cli`'s own closure and `gx-adapter-postgres`'s agree on
+#      `tokio 1.53.1` (the one runtime `gx-api`'s axum stack already put in this binary's closure —
+#      `crates/gx-cli/tests/ac_057.rs`). The three duplicates `cargo deny check bans` reports
+#      (`wasi` ×2, `phf_shared`, `rand_core`) are `deny.toml`'s existing P2.1-lane entries
+#      (2026-08-14), already skip-listed for exactly this subtree since `gx-adapter-postgres` joined
+#      the workspace at P1 — this edge adds no new duplicate.
+#   5. **the offline verifier's surface** (`ac_057.rs::the_network_stack_reaches_the_verifier_
+#      through_exactly_one_declared_edge`): unaffected. That probe scans each workspace member's own
+#      `Cargo.toml` text for seven literal names (`axum`/`tokio`/`hyper`/`tower`/`reqwest`/`ureq`/
+#      `curl`); `gx-adapter-postgres/Cargo.toml` declares none of them (its `tokio` arrives only
+#      transitively, through `postgres`), so `declarers` stays exactly `["gx-api"]`.
+#
+# `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
+# requirement (M2 hand 6, req/55 §4 H6-1) — the same line every other adapter's Cargo.toml carries.
+gx-adapter-postgres = { path = "../gx-adapter-postgres", version = "0.1.0" }
+
+# 🔴 Declared **after** M6-27's five-point measurement and not before (req/38 §47 M6-27 adopted (a):
+# "measure the five dependency points before declaring"; sem: SEM-gx-cli-406). The numbers are in req/89 §2; the short form is that `clap` 4.6.6
 # is already resolved in this workspace through criterion's dev graph, so what it adds to
 # `cargo tree -e normal` is **10 packages**, all `MIT OR Apache-2.0` or narrower, none requiring a
 # rustc newer than 1.85, and `cargo deny check licenses` passes on the existing allow list without a
@@ -124,37 +204,39 @@ gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
 clap = { version = "4", features = ["derive"] }
 
 # 🔴 **M6 hand 6** — `gx serve` calls into it, so it moves from `[dev-dependencies]` to here under the
-# rule this manifest has now applied five times (req/38 §38 採(a): 「出荷依存は**呼び出しが在る手で
-# declare**」). 47 §1(a) fixes the direction — 「単一静的バイナリ(`gx-cli` が `gx serve` で `gx-api`
-# 機能を内包)」 — and cargo would refuse the other way round.
+# rule this manifest has now applied five times (req/38 §38 adopted (a): "a shipping dependency
+# is declared by the hand where the call exists"; sem: SEM-gx-cli-407). 47 §1(a) fixes the direction — "single static binary
+# (`gx-cli` embeds `gx-api`'s functionality via `gx serve`)" — and cargo would refuse the other way round.
 #
-# 🔴 **`tokio` is deliberately absent from this table.** The hand-6 brief: 「gx-cli に tokio は
-# declare しない(serve は gx-api 側)」. `gx_api::serve` is a **blocking** function that builds its own
+# 🔴 **`tokio` is deliberately absent from this table.** The hand-6 brief: "gx-cli does not declare
+# tokio (serve is on gx-api's side)" (sem: SEM-gx-cli-408). `gx_api::serve` is a **blocking** function that builds its own
 # runtime, so this binary stays synchronous and `main` keeps returning an `ExitCode`. What does change
 # is the **closure**: axum, tokio, hyper and tower are now reachable from `gx` through this one edge,
 # and `tests/ac_057.rs` asserts they arrive through this edge and no other — a networking crate
 # declared anywhere else in this workspace's shipping graph is a red probe, which is what keeps
-# 「the verifier links no network stack」 a measurement rather than a memory.
+# "the verifier links no network stack" (sem: SEM-gx-cli-409) a measurement rather than a memory.
 gx-api = { path = "../gx-api", version = "0.1.0" }
 
-# The output format 44 §1.3 fixes (「単一オブジェクトを返すコマンドはstdoutに**改行終端の単一JSON**」)
+# The output format 44 §1.3 fixes ("a command that returns a single object puts a single
+# newline-terminated JSON on stdout"; sem: SEM-gx-cli-410)
 # and the format the draft store and the index are written in. **Already a shipping dependency of
 # five crates in this workspace**, so the package count does not move.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-thiserror = "2"                       # 41 §6, "エラーは thiserror で型化"
+thiserror = "2"                       # 41 §6, "errors are typed with thiserror" (sem: SEM-gx-cli-411)
 
 # 🔴 **M6 hand 5** — the test client 51 §7 names, and the crate it drives.
 #
-# > axum test client（`tower::ServiceExt`相当）でCLIと同一パイプラインを叩き、レスポンスを比較する
+# > hit the same pipeline as the CLI with an axum test client (equivalent to
+# > `tower::ServiceExt`) and compare the response (sem: SEM-gx-cli-412)
 #
 # `crates/gx-cli/tests/ac_055.rs` needs **both** surfaces, and only one of the two crates can name the
-# other: 47 §1(a) makes the v0.1 artefact 「単一静的バイナリ(`gx-cli` が `gx serve` で `gx-api` 機能を
-# 内包)」, so gx-cli is the crate that will depend on gx-api and gx-api may never depend back (cargo
+# other: 47 §1(a) makes the v0.1 artefact "single static binary (`gx-cli` embeds `gx-api`'s
+# functionality via `gx serve`)" (sem: SEM-gx-cli-413), so gx-cli is the crate that will depend on gx-api and gx-api may never depend back (cargo
 # refuses the cycle). AC-055 therefore lives here.
 #
-# **A dev-dependency, not a shipping one**, under the same 「declare where it is called」 rule this
-# manifest has applied four times (req/38 §38 採(a)): no verb in this binary calls into gx-api today.
+# **A dev-dependency, not a shipping one**, under the same "declare where it is called" rule this (sem: SEM-gx-cli-414)
+# manifest has applied four times (req/38 §38 adopted (a)): no verb in this binary calls into gx-api today.
 # **Hand 6 promotes it**, when `gx serve` calls `gx_api::router`.
 #
 # All four are **already resolved**: `gx-api`/`gx-adapter-fs` are path dependencies, and `tokio

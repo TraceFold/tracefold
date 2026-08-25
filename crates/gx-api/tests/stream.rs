@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 `GET /stream` — **AC-056**, M6-12's map and the five records that never reach a client.
 //!
-//! AC-056 逐語 (34): 「購読中に別 client が commit → `event: "committed"` が 1 行配信」. Two of the
+//! AC-056, verbatim (34; sem: SEM-gx-api-395): "while subscribed, another client commits → `event: "committed"` is delivered as one line". Two of the
 //! probes here measure it: [`ac_056_a_subscriber_sees_a_commit_another_client_made`] over the router,
 //! and `crates/gx-cli/tests/ac_056.rs` over a real socket with `gx serve`. Two, because they answer
 //! different questions — this one asks whether the projection and the reader task are right, and that
@@ -8,8 +10,8 @@
 //!
 //! # 🔴 The retry rule this file runs under
 //!
-//! req/88 §8.2: 「**stream の test は timing 依存が本質**(51 §13-4)。リトライ許容回数を CI 設定で明示
-//! し、それでも落ちるなら flaky でなく実バグ」. The rule, stated once and applied everywhere below:
+//! req/88 §8.2: "**a stream test is essentially timing-dependent** (51 §13-4). State the allowed retry count
+//! explicitly in the CI config, and if it still fails, that's a real bug, not flakiness" (sem: SEM-gx-api-396). The rule, stated once and applied everywhere below:
 //!
 //! * a subscriber polls the journal every `stream::TICK` (20ms), so a line cannot arrive sooner;
 //! * every wait here is a **`tokio::time::timeout` of [`WAIT`]** (2s = 100 ticks) around a single
@@ -19,8 +21,8 @@
 //!   file re-runs a step. A hundred ticks of headroom on a 20ms period is three orders of magnitude
 //!   more than the operation needs, so an expiry is a real defect and is reported as one.
 //!
-//! Chosen this way because a suite that retries turns 「the stream stopped delivering」 into 「the
-//! suite took two attempts」, which is the shape that makes a broken audit stream ship.
+//! Chosen this way because a suite that retries turns "the stream stopped delivering" into "the
+//! suite took two attempts" (sem: SEM-gx-api-397), which is the shape that makes a broken audit stream ship.
 
 mod support;
 
@@ -92,7 +94,7 @@ async fn ac_056_a_subscriber_sees_a_commit_another_client_made() {
     let server = Server::new("m6h6_ac056", "before\n");
     let subscriber = server.client();
 
-    // Subscribe from the end: `?since=` with an instant in the future means 「what happens next」.
+    // Subscribe from the end: `?since=` with an instant in the future means "what happens next" (sem: SEM-gx-api-398).
     let response = subscriber
         .open("/v1/stream?since=2099-01-01T00:00:00Z", &[])
         .await;
@@ -103,11 +105,11 @@ async fn ac_056_a_subscriber_sees_a_commit_another_client_made() {
             .get("content-type")
             .and_then(|v| v.to_str().ok()),
         Some("application/x-ndjson"),
-        "44 §2.2: 「`Content-Type: application/x-ndjson`」"
+        "44 §2.2: \"`Content-Type: application/x-ndjson`\" (sem: SEM-gx-api-399)"
     );
     let mut body = response.into_body();
 
-    // A **second** client, as AC-056 asks (「別 client が commit」).
+    // A **second** client, as AC-056 asks ("another client commits"; sem: SEM-gx-api-400).
     let id = commit_one(&server, "after\n").await;
 
     // Everything the commit produced, until `committed` — the criterion names that event.
@@ -143,13 +145,13 @@ async fn ac_056_a_subscriber_sees_a_commit_another_client_made() {
     }
     assert!(
         committed["at"].as_str().unwrap_or_default().ends_with('Z'),
-        "44 §0: 「日時はRFC 3339」"
+        "44 §0: \"date-times are RFC 3339\" (sem: SEM-gx-api-401)"
     );
 }
 
 /// A subscriber that joins late gets what it missed, then keeps following.
 ///
-/// The journal is the backlog, so 「everything from the beginning」 is the default subscription. This
+/// The journal is the backlog, so "everything from the beginning" (sem: SEM-gx-api-402) is the default subscription. This
 /// is also the probe that shows the ordering is the journal's rather than the table's (`BTreeMap` by
 /// `TransformationId` = CID order = arbitrary in time, req/88 M6-05).
 #[tokio::test(flavor = "multi_thread")]
@@ -175,7 +177,7 @@ async fn a_late_subscriber_receives_the_backlog_and_then_follows() {
             ordinal: 0
         }
         .to_text()),
-        "🔴 the cursor sits at the **journal record index** (M6-13 採(a)) and the candidate is the \
+        "🔴 the cursor sits at the **journal record index** (M6-13, adopted (a); sem: SEM-gx-api-403) and the candidate is the \
          second record — `DraftCreated` is index 0 and publishes nothing. Since M6H8-12 the wire \
          form is the opaque wrapping of that coordinate rather than the coordinate itself, so the \
          expectation is written as the wrapping of 1.0 and not as a literal: a test that spelled the \
@@ -213,7 +215,7 @@ async fn resume_from_a_cursor_delivers_only_what_followed_it() {
     );
     assert_eq!(
         after, third,
-        "44 §2.2: 「`Last-Event-ID` ヘッダで途切れた位置から再送可能」 — the line after the cursor, \
+        "44 §2.2: \"the `Last-Event-ID` header lets a resend start from where it broke off\" (sem: SEM-gx-api-404) — the line after the cursor, \
          and the same line the first subscription saw there"
     );
 }
@@ -309,7 +311,7 @@ fn the_map_covers_both_vocabularies_and_five_records_stay_inside() {
         UNPUBLISHED
     );
 
-    assert_eq!(EVENT_MAP.len(), 13);
+    assert_eq!(EVENT_MAP.len(), 15);
     assert_eq!(EVENTS.len(), 10);
     assert_eq!(
         internal,
@@ -319,14 +321,16 @@ fn the_map_covers_both_vocabularies_and_five_records_stay_inside() {
             "ProvenanceDerived",
             "InverseEscrowed",
             "ApplyStarted",
+            "ApplyObserved",
+            "InverseCompleted",
         ],
-        "🔴 **M6H6-1** — req/88 §4 M6-12 named 「`Planned`・`ProvenanceDerived`・`InverseEscrowed`・\
-         `ApplyStarted`」 and the brief hedged it (「実物は 42 §3.13 と突合して確定」). `Planned` is \
+        "🔴 **M6H6-1** — req/88 §4 M6-12 named \"`Planned`, `ProvenanceDerived`, `InverseEscrowed`,\
+         `ApplyStarted`\" (sem: SEM-gx-api-405) and the brief hedged it (\"the actual set is settled by cross-checking 42 §3.13\"). `Planned` is \
          `candidate.created`'s producer (43 §1's `Candidate` begins at T-2, and it is the only record \
          carrying the locator E-M5-13 added); `DraftCreated` cannot fill 44 §2.2's envelope at all \
          (no `TransformationId`, E-M5-3) and `CommittingStarted` is the inside of T-9's section"
     );
-    assert_eq!(UNPUBLISHED, 5);
+    assert_eq!(UNPUBLISHED, 7);
 
     // Every event 44 §2.2 lists has at least one producer.
     for event in EVENTS {
@@ -356,8 +360,8 @@ fn the_map_covers_both_vocabularies_and_five_records_stay_inside() {
 ///
 /// The table above says they should not; this drives a transformation from `POST /candidates` to
 /// `Committed`, collects every line the stream produced, and checks that the count of published
-/// events equals the count 33 NFR-018 asks for — 「イベント種別ごとに対応する状態遷移の発生回数と
-/// 出力行数が一致することを確認する」 — with the journal itself as the denominator.
+/// events equals the count 33 NFR-018 asks for — "confirm that, for each event kind, the number of times
+/// the corresponding state transition occurred equals the number of output lines" (sem: SEM-gx-api-406) — with the journal itself as the denominator.
 #[tokio::test(flavor = "multi_thread")]
 async fn no_line_ever_carries_a_record_the_map_keeps_inside() {
     let server = Server::new("m6h6_unpublished", "before\n");
@@ -394,8 +398,8 @@ async fn no_line_ever_carries_a_record_the_map_keeps_inside() {
     println!("PIPELINE_JOURNAL={journal_kinds:?}");
     println!("PIPELINE_EVENTS={events:?}");
 
-    // 🔴 **NFR-018's equality**: 「イベント種別ごとに対応する状態遷移の発生回数と出力行数が一致する
-    // ことを確認する」. The denominator of an event is the number of records that produce it, which is
+    // 🔴 **NFR-018's equality**: "confirm that, for each event kind, the number of times the corresponding
+    // state transition occurred equals the number of output lines" (sem: SEM-gx-api-407). The denominator of an event is the number of records that produce it, which is
     // a **sum** for the one event with three producers — and that number is the second thing req/88
     // M6-12 got wrong: it counted two producers for `receipt.issued` (T-4's verdict receipt and
     // T-11's commit receipt) where 43 T-5's ruling issues a third.
@@ -439,17 +443,17 @@ async fn no_line_ever_carries_a_record_the_map_keeps_inside() {
         );
         assert!(
             !events.iter().any(|e| e.eq_ignore_ascii_case(internal)),
-            "42 §3.13: 「Journalはengine内部の…外部公開しない」 — `{internal}` reached a client"
+            "42 §3.13: \"the journal is the engine's internal … not published externally\" (sem: SEM-gx-api-408) — `{internal}` reached a client"
         );
     }
 }
 
 /// A cursor round-trips through its text form, and orders the way resume needs.
 ///
-/// 🔴 **M6H8-12 採(a)** (req/38 §55) made the text form opaque, so this probe now measures three
+/// 🔴 **M6H8-12, adopted (a)** (req/38 §55; sem: SEM-gx-api-409) made the text form opaque, so this probe now measures three
 /// things rather than two: the round trip, the ordering, and the **absence of the coordinate** from
 /// the wire. Until this batch `to_text()` was `"12.2"` — the journal record index in the clear,
-/// against 44 §2.7's 「opaque」 and 42 §3.13's 「外部公開しない」.
+/// against 44 §2.7's "opaque" and 42 §3.13's "not published externally" (sem: SEM-gx-api-410).
 #[test]
 fn the_cursor_is_opaque_ordered_and_refuses_what_it_did_not_issue() {
     let cursor = Cursor {

@@ -1,20 +1,22 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **AC-073 (FR-059, DR-11, 43 T-7)** — `gx cancel` through the binary, with **E-M6-1**'s from-set.
 //!
-//! 34 AC-073 逐語:
+//! 34 AC-073 verbatim (sem: SEM-gx-cli-2286):
 //!
-//! > Given: `Committing`到達前の任意状態（Draft/Candidate/Verifying/Admitted/Canonicalized/Escalated）
-//! > のTransformation T。When: `gx cancel <T.id>`…を実行する。Then: Tは`Aborted(OwnerCancelled)`へ
-//! > 遷移する。When: 既に`Committing`以降（Committed含む）のTに対し同コマンドを実行する。Then: 無効
-//! > 操作として拒否され既存状態を変更しない。
+//! > Given: a Transformation T in any state before reaching `Committing` (Draft/Candidate/Verifying/Admitted/Canonicalized/Escalated).
+//! > When: `gx cancel <T.id>`… is run. Then: T transitions to `Aborted(OwnerCancelled)`.
+//! > When: the same command is run against a T already at `Committing` or later (including Committed). Then: it is refused as an
+//! > invalid operation and the existing state does not change. (sem: SEM-gx-cli-2287)
 //!
 //! # 🔴 The Given's first word is gone — **E-M6-1**
 //!
-//! req/38 §47 M6-03 採(c) removed `Draft` from 44 L101's from-set and said the same of this criterion:
-//! 「AC-073 の Given も同読み替え(E-M5-14 が 43 でやった形)」. §45 M5H8-2 採(b) — 「M6 の
-//! id-resolution が担う」 — was **withdrawn** in the same ruling, with the frame correction recorded:
-//! id-resolution solves 「how do I point at it」 and a draft's problem is that there is **no seat**.
+//! req/38 §47 M6-03 adopted (c) (sem: SEM-gx-cli-2288) removed `Draft` from 44 L101's from-set and said the same of this criterion:
+//! "AC-073's Given gets the same reading (the shape E-M5-14 did in 43)" (sem: SEM-gx-cli-2289). §45 M5H8-2 adopted (b) — "M6's
+//! id-resolution carries it" (sem: SEM-gx-cli-2290) — was **withdrawn** in the same ruling, with the frame correction recorded:
+//! id-resolution solves "how do I point at it" (sem: SEM-gx-cli-2291) and a draft's problem is that there is **no seat**.
 //! 43 T-1 leaves a draft without a `TransformationId`, 43 T-7's `Aborted` is keyed on one, and M5-17
-//! 採(b) keeps the draft phase in the journal alone.
+//! adopted (b) keeps the draft phase in the journal alone (sem: SEM-gx-cli-2292).
 //!
 //! So the last case below is not the criterion failing: it is the criterion as the erratum reads it.
 //! `crates/gx-engine/tests/ac_073.rs` has measured the shape from the engine's side since M5
@@ -42,10 +44,10 @@ fn ac_073_a_candidate_cancels() {
     );
     assert_eq!(
         cancelled.code, 0,
-        "44 §1.2 `gx cancel`: 「0=成功」. stderr: {}",
+        "44 §1.2 `gx cancel`: \"0=success\" (sem: SEM-gx-cli-2293). stderr: {}",
         cancelled.stderr
     );
-    // 44 §1.2: 「stdout: `{ "transformation": <id>, "state": "Aborted", "reason": "OwnerCancelled" }`」.
+    // 44 §1.2: "stdout: `{ "transformation": <id>, "state": "Aborted", "reason": "OwnerCancelled" }`" (sem: SEM-gx-cli-2307).
     assert_eq!(cancelled.json()["transformation"], tid);
     assert_eq!(cancelled.json()["state"], "Aborted");
     assert_eq!(cancelled.json()["reason"], "OwnerCancelled");
@@ -55,7 +57,7 @@ fn ac_073_a_candidate_cancels() {
         "43 T-7 fires before the critical section, so nothing was escrowed and nothing applied"
     );
 
-    // 43 T-7's idempotency column: 「二重キャンセルは無効操作として無視（既にAborted）」.
+    // 43 T-7's idempotency column: "a double cancel is ignored as an invalid operation (already Aborted)" (sem: SEM-gx-cli-2294).
     let again = run(fixture.gx().args(["cancel", &tid]));
     println!(
         "AC073_TWICE exit={} state={:?}",
@@ -64,7 +66,7 @@ fn ac_073_a_candidate_cancels() {
     );
     assert_eq!(
         again.code, 0,
-        "a second cancel is 「無視」 and not an error: {}",
+        "a second cancel is \"ignored\" and not an error (sem: SEM-gx-cli-2295): {}",
         again.stderr
     );
     assert_eq!(again.json()["state"], "Aborted");
@@ -113,40 +115,40 @@ fn ac_073_a_committed_transformation_is_refused() {
         fixture.target_contents(),
         cancelled.stderr.trim()
     );
-    // 🔴 **E-M6-13** (req/38 §51 M6H4-1 採(a)), implemented in M6 hand 5. Hand 4 asserted **1**
-    // here and recorded the disagreement in prose: 「a state machine refusal wearing 44 §1.4's
-    // 「エラー」…kept at 1 because that is what §1.2 writes」. §51 ruled the repair and named the
-    // hand — 「実装は手5 以降の最初に踏む手」 — so the number moved, and what the move buys is what
-    // the ruling is about: 1 says 「you asked wrongly, try again differently」 and 2 says 「the
-    // machine refused, and it will refuse the same way for ever」.
+    // 🔴 **E-M6-13** (req/38 §51 M6H4-1 adopted (a)), implemented in M6 hand 5. Hand 4 asserted **1**
+    // here and recorded the disagreement in prose: "a state machine refusal wearing 44 §1.4's
+    // "error"…kept at 1 because that is what §1.2 writes". §51 ruled the repair and named the
+    // hand — "the implementation is the first hand from hand 5 onward to take this step" — so the number moved, and what the move buys is what
+    // the ruling is about: 1 says "you asked wrongly, try again differently" and 2 says "the
+    // machine refused, and it will refuse the same way for ever". (sem: SEM-gx-cli-2296)
     assert_eq!(
         cancelled.code, 2,
-        "E-M6-13: 44 §1.4's 2 is 「拒否（denied）」 and 43 T-7's guard is 「`Committing`到達前」, so a \
+        "E-M6-13: 44 §1.4's 2 is \"refused (denied)\" and 43 T-7's guard is \"before reaching `Committing`\" (sem: SEM-gx-cli-2297), so a \
          cancel of a committed row is 43 §3 saying no. stdout: {}",
         cancelled.stdout
     );
     assert!(
         cancelled.stdout.contains("43 T-7"),
         "🔴 and the refusal is **T-7's**, not a resume's. A `gx cancel` on a committed row would \
-         otherwise be answered 「43 §3 has no `plan` from a Committed row」 — true, and an answer to \
+         otherwise be answered \"43 §3 has no `plan` from a Committed row\" (sem: SEM-gx-cli-2298) — true, and an answer to \
          a question nobody asked. 🔴 It is now on **stdout** rather than stderr: E-M6-13 makes this \
-         an `Outcome` (「the command ran and answered no」) rather than an `Err` (「the command could \
-         not run」), and 44 §1.3 gives the first a JSON object: {}",
+         an `Outcome` (\"the command ran and answered no\") rather than an `Err` (\"the command could \
+         not run\") (sem: SEM-gx-cli-2299), and 44 §1.3 gives the first a JSON object: {}",
         cancelled.stdout
     );
     assert_eq!(
         fixture.target_contents(),
         "after\n",
-        "34 AC-073: 「既存状態を変更しない」"
+        "34 AC-073: \"the existing state does not change\" (sem: SEM-gx-cli-2300)"
     );
 }
 
 /// 🔴 **E-M6-1** — a `Draft` is refused **by name**, and the refusal says what discarding one is.
 ///
-/// The from-set no longer contains `Draft` (req/38 §47 M6-03 採(c)), and the reason an operator gets
-/// has to be the real one rather than 「未検出」: the id they typed is a perfectly good `IntentId`
+/// The from-set no longer contains `Draft` (req/38 §47 M6-03 adopted (c); sem: SEM-gx-cli-2301), and the reason an operator gets
+/// has to be the real one rather than "not-found" (sem: SEM-gx-cli-2302): the id they typed is a perfectly good `IntentId`
 /// that this project is holding a draft under. Telling them it is unknown would be
-/// 「読めない」/「無い」 conflated one layer up (E-M4-35).
+/// "unreadable"/"absent" (sem: SEM-gx-cli-2303) conflated one layer up (E-M4-35).
 #[test]
 fn e_m6_1_a_draft_is_refused_by_name_and_not_reported_missing() {
     let fixture = pipeline("m6h4_ac073_draft", "before\n");
@@ -165,7 +167,7 @@ fn e_m6_1_a_draft_is_refused_by_name_and_not_reported_missing() {
     );
     assert_eq!(
         cancelled.code, 1,
-        "a draft is 「入力不正」 and not 「未検出」: the name resolves, the operation does not exist"
+        "a draft is \"invalid input\" and not \"not-found\" (sem: SEM-gx-cli-2304): the name resolves, the operation does not exist"
     );
     assert!(
         cancelled.stderr.contains("E-M6-1"),
@@ -179,7 +181,7 @@ fn e_m6_1_a_draft_is_refused_by_name_and_not_reported_missing() {
     );
 }
 
-/// An id that parses and names nothing is 44 §1.2's 「6=未検出」.
+/// An id that parses and names nothing is 44 §1.2's "6=not-found" (sem: SEM-gx-cli-2305).
 #[test]
 fn cancelling_an_unknown_transformation_is_six() {
     let fixture = pipeline("m6h4_ac073_absent", "before\n");
@@ -188,7 +190,7 @@ fn cancelling_an_unknown_transformation_is_six() {
     assert_eq!(cancelled.code, 6, "stderr: {}", cancelled.stderr);
 }
 
-/// 🔴 `--actor-key` is refused: 43 T-7's owner guard has no enforcement point in v0.1 (M5H6-4 採(a)).
+/// 🔴 `--actor-key` is refused: 43 T-7's owner guard has no enforcement point in v0.1 (M5H6-4 adopted (a); sem: SEM-gx-cli-2306).
 #[test]
 fn the_cancel_flag_with_nowhere_to_go_is_refused() {
     let fixture = pipeline("m6h4_ac073_actor_key", "before\n");

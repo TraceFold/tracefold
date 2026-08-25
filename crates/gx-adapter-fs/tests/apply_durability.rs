@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! What `apply` does around the `rename`, what it leaves behind, and what this hand may claim.
 //!
 //! # The three steps, and where they come from
@@ -6,22 +8,22 @@
 //! (`Desktop/GitRepo/REFERENCES.md`, 2026-08-09; hand 4's entry for the same three was a WebSearch
 //! snippet, which is enough to write a doc paragraph and not enough to write a `sync_all`):
 //!
-//! * **LWN 457667** gives the sequence, verbatim: 「The following steps are required to perform this
+//! * **LWN 457667** gives the sequence, verbatim: "The following steps are required to perform this
 //!   type of update: create a new temp file (on the same file system!) / write data to the temp file
 //!   / fsync() the temp file / rename the temp file to the appropriate name / fsync() the containing
-//!   directory」. `SURVIVORS.md` §A-2 calls it 「3 手」, which are the last three of those five.
-//! * **POSIX `rename`** gives the atomicity, and gives it in one direction: 「a directory entry named
+//!   directory". `SURVIVORS.md` §A-2 calls it "3 moves", which are the last three of those five.
+//! * **POSIX `rename`** gives the atomicity, and gives it in one direction: "a directory entry named
 //!   new shall remain visible to other threads throughout the renaming operation and refer either to
-//!   the file referred to by new or old before the operation began」, with 「the action of the function
-//!   be atomic」 in the RATIONALE. The subject of the sentence is **other threads**.
-//! * **`std::fs::rename`** documents 「replacing the original file if `to` already exists」 and never
+//!   the file referred to by new or old before the operation began", with "the action of the function
+//!   be atomic" in the RATIONALE. The subject of the sentence is **other threads**.
+//! * **`std::fs::rename`** documents "replacing the original file if `to` already exists" and never (sem: SEM-gx-adapter-fs-175)
 //!   uses the word atomic, because the guarantee belongs to the filesystem underneath.
 //!
 //! # 🔴 One correction this hand owes its own sources
 //!
 //! `SURVIVORS.md` §A-2 and `req/73` both write that **skipping the parent-directory fsync loses the
 //! rename**. That sentence is **not in LWN 457667**: the article gives the ordered list and says
-//! nothing about omitting a step (the words 「directory entry」 do not occur in its body at all). The
+//! nothing about omitting a step (the words "directory entry" do not occur in its body at all). The (sem: SEM-gx-adapter-fs-176)
 //! failure modes are a **derivation** -- a directory entry is data like any other, so a rename that
 //! reached no stable storage is a rename that a crash can lose -- and this file says derivation where
 //! the earlier text said source. Marking it is the whole of the fix; the three steps stay.
@@ -61,8 +63,8 @@ fn apply_source() -> String {
 /// 🔴 The function bound was earned rather than chosen. Scanning the whole module, this probe
 /// **survived** `tools/verify_m4h5.sh` mutation (a) -- which deletes the directory `fsync` from the
 /// write path -- because `remove_whole_file` sits below `write_whole_file` and its own directory
-/// `fsync` answered the search. That is §30 M4H2-6's rule (「どこかに書いてある」は「その場所に書いて
-/// ある」ではない) in its fourth costume, and the fifth entry in the台帳 §31 M4H3-5 opened: an
+/// `fsync` answered the search. That is §30 M4H2-6's rule ("somewhere in the file" is not "written
+/// at that spot") in its fourth costume, and the fifth entry the ledger §31 M4H3-5 opened: an (sem: SEM-gx-adapter-fs-177)
 /// instrument that finds the right token in the wrong scope reports on a claim nobody made.
 #[test]
 fn the_write_syncs_the_temporary_file_then_renames_then_syncs_the_directory() {
@@ -85,7 +87,7 @@ fn the_write_syncs_the_temporary_file_then_renames_then_syncs_the_directory() {
         .expect("the temporary file is fsynced (LWN step 3)");
     let rename = code
         .find("fs::rename(")
-        .expect("the change lands by rename (M4-13 採(a))");
+        .expect("the change lands by rename (M4-13, adopted (a))"); // (sem: SEM-gx-adapter-fs-178)
     let dir_sync = code[rename..]
         .find("sync_all()")
         .map(|at| at + rename)
@@ -198,10 +200,10 @@ fn the_second_removal_of_one_delta_is_not_a_failure() {
     assert_eq!(content_at(&locator), None);
 }
 
-/// A sequence longer than v0.1 accepts is refused, and refused as 「未実装」 rather than as damage.
+/// A sequence longer than v0.1 accepts is refused, and refused as "unimplemented" rather than as damage.
 ///
-/// M4-13 採(a): 「**v0.1 の `apply` は len==1 の列のみ受理**・len>1 は Err(未対応の明示・黙って非原子実行
-/// しない=fail-closed)」. The decoder is where the bound lives (hand 4) and this is the statement that
+/// M4-13, adopted (a): "**v0.1's `apply` accepts only a sequence of `len==1`**; `len>1` is Err (unimplemented,
+/// stated explicitly -- it does not run non-atomically in silence, i.e. fail-closed)". The decoder is where the bound lives (hand 4) and this is the statement that (sem: SEM-gx-adapter-fs-179)
 /// `apply` goes through it -- a second write path that skipped the decoder would make two files move
 /// under one `rename`, which is 45 §3's TH-3 condition exactly.
 #[test]
@@ -261,10 +263,10 @@ fn a_delta_from_another_substrate_never_reaches_the_filesystem() {
 
 /// **M4H4-10**: the crate root's reachability paragraph is written for an adapter that **writes**.
 ///
-/// §32 記録+trigger 条項: 「**手5 が `apply` を書く時に crate root の disclosure を「読める→書ける」へ
-/// 書き直す事を手5 DoD に追加**」. A disclosure that still described a reader would understate v0.1 by
+/// §32 record+trigger clause: "**hand 5, when writing `apply`, must add to hand 5's DoD the requirement to rewrite the crate root's
+/// disclosure from 'readable' to 'readable, writable'**". A disclosure that still described a reader would understate v0.1 by
 /// exactly the thing this hand added, and 45 §4 forbids the direction. Measured in the section rather
-/// than in the file (§30 M4H2-6: 「どこかに書いてある」は「その場所に書いてある」ではない).
+/// than in the file (§30 M4H2-6: "somewhere in the file" is not "written at that spot"). (sem: SEM-gx-adapter-fs-180)
 #[test]
 fn the_reachability_disclosure_describes_writing_and_not_only_reading() {
     let source = crate_root_source();
@@ -277,7 +279,7 @@ fn the_reachability_disclosure_describes_writing_and_not_only_reading() {
         .next()
         .expect("the section ends");
 
-    // 🔴 The tokens are phrases and not words, for the reason mutation (i) exposed: with 「write」 in
+    // 🔴 The tokens are phrases and not words, for the reason mutation (i) exposed: with "write" in (sem: SEM-gx-adapter-fs-181)
     // the list, the probe **survived** a rewrite of the sentence that says what `apply` does, because
     // the word was still in the clause above it. A one-word token in a paragraph of prose is
     // satisfied by any sentence at all -- §30 M4H2-6 again, and the reason each entry below is a

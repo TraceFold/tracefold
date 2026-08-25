@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Σ's components that **no transition in this hand can write** — reconstructed from journals
 //! written by hand, and honest about what that costs.
 //!
@@ -10,7 +12,8 @@
 //! journal an execution wrote, so what is measured here is the *reconstruction* and not the
 //! agreement between two independent paths. The alternative was to leave Σ's escrow and ledger
 //! components with no probe at all until hand 4, which would mean shipping a reconstruction whose
-//! two most consequential components had never been run — and 「skip と pass を同じ顔にしない」
+//! two most consequential components had never been run -- and "do not let skip and pass wear the
+//! same face" (sem: SEM-gx-engine-854)
 //! (req/29 §4) cuts the other way here: an untested component that *looks* tested because AC-039 is
 //! green is the failure to avoid. The report says which half is which.
 
@@ -59,6 +62,7 @@ fn a_committed_run() -> Vec<EngineJournalRecord> {
             delta_cid: cid(10),
             fp0: support::fp(1),
             parents: Vec::new(),
+            input_generation: gx_core::BoundaryStage::Unknown,
             at: AT,
         },
         EngineJournalRecord::VerifyStarted {
@@ -85,6 +89,11 @@ fn a_committed_run() -> Vec<EngineJournalRecord> {
         EngineJournalRecord::InverseEscrowed {
             transformation: t,
             inverse_cid: Some(cid(13)),
+            pending: false,
+            reads: Vec::new(),
+            undetermined: false,
+            // 🔴 **DR-46-34** — the adapter answered, so the list above is a reading.
+            reads_attested: true,
             at: AT,
         },
         EngineJournalRecord::ApplyStarted {
@@ -125,8 +134,8 @@ fn a_committed_run_reconstructs_into_all_four_components() {
     assert_eq!(row.verdict, Some(VerdictKind::Admit));
     assert!(row.enforced);
 
-    // 🔴 E-M5-1: the record that separates 「the world did not move」 from 「the world moved and
-    // nothing recorded it」 has to survive the round trip, or hand 5's recovery reads a journal that
+    // 🔴 E-M5-1: the record that separates "the world did not move" from "the world moved and
+    // nothing recorded it" (sem: SEM-gx-engine-855) has to survive the round trip, or hand 5's recovery reads a journal that
     // has forgotten the one fact it was added for.
     assert_eq!(row.apply_started, Some(cid(10)));
 
@@ -139,7 +148,7 @@ fn a_committed_run_reconstructs_into_all_four_components() {
 
 /// 🔴 T-12, read back: the original is `Superseded` **and** its escrowed inverse is `Consumed`.
 ///
-/// **M5-09 採(a)** and **M5-16 採(a)** put both writes at T-12 「1 箇所」. Firing that transition is
+/// **M5-09 adopted (a)** and **M5-16 adopted (a)** put both writes at T-12, "one site" (sem: SEM-gx-engine-856). Firing that transition is
 /// hand 6's; this is the reconstruction, and it fails if either half is dropped — a `Superseded`
 /// state with an inverse still `Available` would offer an undo that has already been used.
 #[test]
@@ -166,11 +175,12 @@ fn a_supersede_consumes_the_escrowed_inverse() {
     assert_eq!(
         sigma.escrow()[0].status,
         InverseStatus::Consumed { by: undoer },
-        "M5-16 採(a): `Consumed{{by}}` is written at T-12, in the same place as the supersedes edge"
+        "M5-16 adopted (a): `Consumed{{by}}` is written at T-12, in the same place as the supersedes edge (sem: SEM-gx-engine-857)"
     );
 }
 
-/// A **trimmed** journal names no state it cannot support (42 §5: 「commit確定後トリム可」).
+/// A **trimmed** journal names no state it cannot support (42 §5: "trimmable once the commit is
+/// finalized", sem: SEM-gx-engine-858).
 ///
 /// A surviving prefix that begins in the middle is a legitimate journal, not a damaged one. The row
 /// it produces says what the records say and no more: an `Aborted` with no `Planned` before it has
@@ -214,7 +224,7 @@ fn a_trimmed_journal_names_no_state_it_cannot_support() {
     );
     assert_eq!(
         mid_commit.state, None,
-        "43 §1 has no value meaning 「unknown」 to borrow, and borrowing one would be a guess"
+        "43 §1 has no value meaning \"unknown\" to borrow, and borrowing one would be a guess (sem: SEM-gx-engine-859)"
     );
     assert_eq!(mid_commit.apply_started, Some(cid(20)));
 }
@@ -294,7 +304,7 @@ fn a_torn_tail_is_not_in_sigma() {
 
 /// 🔴 **E-M5-6 across a restart**: the index comes from the journal, the body from the blob store.
 ///
-/// This is the whole shape M5-05 採(a) buys. Neither half is an escrow on its own — the journal
+/// This is the whole shape M5-05 adopted (a) (sem: SEM-gx-engine-860) buys. Neither half is an escrow on its own — the journal
 /// knows *which* inverse belongs to *which* transformation and nothing about the delta; the store
 /// knows the delta and nothing about who it undoes — and `BlobStore::escrowed` is the one place they
 /// are put back together, through `EscrowedInverse::restore`, which refuses a row whose status and
@@ -313,6 +323,11 @@ fn an_escrowed_inverse_is_rebuilt_from_the_index_and_the_store() {
         .append(EngineJournalRecord::InverseEscrowed {
             transformation: tid(1),
             inverse_cid: Some(inverse_cid),
+            pending: false,
+            reads: Vec::new(),
+            undetermined: false,
+            // 🔴 **DR-46-34** — the adapter answered, so the list above is a reading.
+            reads_attested: true,
             at: AT,
         })
         .expect("append");
@@ -335,7 +350,7 @@ fn an_escrowed_inverse_is_rebuilt_from_the_index_and_the_store() {
     assert_eq!(escrowed.status(), &InverseStatus::Available);
     assert_eq!(
         row.retained_until, None,
-        "42 §3.13's `InverseEscrowed` has no seat for a deadline; DR-9's OSS default is 無期限"
+        "42 §3.13's `InverseEscrowed` has no seat for a deadline; DR-9's OSS default is unbounded (sem: SEM-gx-engine-861)"
     );
 
     // The other direction, from a store that lost the body: the index alone is not an escrow, and

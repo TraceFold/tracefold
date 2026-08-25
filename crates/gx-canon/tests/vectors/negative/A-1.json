@@ -1,17 +1,17 @@
 {
   "id": "A-1",
   "kind": "codec-deviation",
-  "statement": "tag 42 以外の CBOR tag を含む byte 列は decode されない",
+  "statement": "A byte string containing a CBOR tag other than tag 42 is not decoded",
   "vector": "c06178",
   "expected": "REJECT",
   "normative_basis": "IPLD-MUST",
   "tier": "Tier1",
-  "deviation": "tag 0(RFC 8949 既定 tag)でテキスト文字列 \"x\" を包んだ。DAG-CBOR が許す tag は 42 のみで、gx はその 42 すら許さない(42 §2.1-5)。",
+  "deviation": "Wrapped the text string \"x\" in tag 0 (RFC 8949's default tag). The only tag DAG-CBOR allows is 42, and gx does not even allow that 42 (42 §2.1-5).",
   "spec_anchor": "ipld/ipld@a65340b specs/codecs/dag-cbor/spec.md L52 / 42 §2.1-5 / req/33 §2 A-1",
   "origin": "gx self-authored from spec (req/33_NEGVECTOR_TABLE_A_2026-08-07.md §2)",
   "control": {
     "vector": "6178",
     "expected": "ACCEPT",
-    "note": "同じ論理値 \"x\" を tag 無しの最短形で書いた物"
+    "note": "The same logical value \"x\" written in its shortest tag-free form"
   }
 }

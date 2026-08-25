@@ -33,6 +33,44 @@ One file does not match that grep — it names its citations as `req/29`, `req/0
 
 Two other files reference a `probes/` path (`crates/gx-substrate-conformance/tests/print_consumers.rs`, `crates/gx-gate/tests/pack_embedding.rs`) but degrade gracefully when it is absent (`fs::read_dir` behind an `Ok(..) else { continue }`, scanning only `crates/` when `probes/` is not there); they are real, passing tests in this repository and are not excluded.
 
+## 2026-08-25 update: the list above is now machine-derived, and three files were added
+
+The 17 files above were a hand-maintained list, and hand-maintained lists decay silently: this
+repository's sync tooling (`tools/pub_sync_dryrun.sh`, in the development tree this repository is
+cut from) now derives the exclusion set by grep at every sync -- any tracked file under a
+`tests/`/`test/` directory whose *non-comment* lines name a `req/spec/...` path (matching
+`include_str!`, `fs::read_to_string`, `read_repo`, `readFileSync`, or `readRepoFile` literals; a
+comment-only citation, like the two files noted above, does not count) -- unioned with the 17-file
+hand list as a floor that is never shrunk. The derivation caught one file the hand list had missed
+and this document had never named, plus two equivalent cases in the TypeScript SDK the Rust-only
+hand list could not have named:
+
+- `crates/gx-log/tests/nfr_027.rs` -- reads `req/spec/30-requirements/33-non-functional.md` and
+  `35-open-questions.md` at runtime. It post-dates the original 17-file list and was never added to
+  it by hand; the derivation now finds it every run.
+- `sdk/typescript/test/audit_m9_p4_independent_parity.test.mjs` -- an independent re-parse of
+  `req/spec/40-architecture/44-api-spec.md` (the M9 audit lane's cross-check of AC-P4-1, deliberately
+  not reusing the SDK's own parser -- see the file's own header comment for why).
+- `sdk/typescript/test/endpoint_parity.test.mjs` -- does not name `req/spec` in its own text; it
+  imports and calls `specifiedEndpointsFromSpec()` from `sdk/typescript/testlib/support.mjs`, which
+  performs the read. This is a transitive case a plain text grep on the test file's own content
+  cannot see (the earlier two SDK findings, from the ruling this section follows through on, named
+  the direct case but not this one hop further out).
+
+`sdk/typescript/testlib/support.mjs` itself **ships** (it is not excluded): six other shipped tests
+(`gx_code_census.test.mjs`, `quickstart.test.mjs`, `gui_probe_runs.test.mjs`,
+`gui_probe_import_boundary.test.mjs`, `inverse_status_vocabulary_parity.test.mjs`,
+`server_health_vocabulary_parity.test.mjs`) import other functions from the same file
+(`repoRoot`/`sdkRoot`/`readRepoFile`) against paths this repository does contain, and excluding the
+whole file would break all six. `specifiedEndpointsFromSpec()` is dead code in this repository after
+the two files above are withheld: nothing shipped calls it, so it never runs and never fails; it
+would throw a clean "file not found" if anything ever did.
+
+`crates/gx-canon/tests/ac_014.rs` (the probes/doubt case, above) is not caught by this grep -- it
+references `probes` as a bare directory name, not a `req/spec` path -- so it stays excluded only
+because it is still on the hand-list floor. The total is now **20 files** (19 grep-derived + 1
+hand-list-only).
+
 ## This repository's floor
 
 2026-08-13 measured, `cargo test --workspace` on this staging tree (WSL, `rustc`/`cargo` 1.97.1): **1,160 passed / 216 suites, 0 failed.** ("Suites" here counts every `cargo test` harness invocation: one `unittests` run per crate that has one, one run per file under `tests/`, and one `Doc-tests` run per crate.) This is the number for this public repository as it stands today, not the development tree's 1,370/247.

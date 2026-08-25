@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `invert`: the branch goes back where it was, built while it is still there.
 //!
 //! Spec: 41 §4 for the method and DR-1(a), 42 §5 for why an escrow carries a body, 34 AC-048 and
@@ -8,31 +10,31 @@
 //!
 //! # 🔴 Why the inverse is a reset and not a revert
 //!
-//! **AC-050** 逐語: 「`apply`→`invert`→`apply(inverse)`。Then: repoの**HEADおよびtree hash**が操作前と
-//! bit-equalに戻る（2ケース）」. A revert commit restores the *tree* and moves HEAD **forward**, so it
+//! **AC-050**, verbatim: "`apply`->`invert`->`apply(inverse)`. Then: the repo's **HEAD and tree hash** return
+//! bit-equal to before the operation (2 cases)". A revert commit restores the *tree* and moves HEAD **forward**, so it (sem: SEM-gx-adapter-git-046)
 //! satisfies half of that sentence and fails the other half. Only putting the reference back where it
 //! was returns both, so that is what an inverse of this adapter is: a `reset` operation naming the tip
 //! the branch had at the escrow point.
 //!
 //! What this does **not** do is unmake the commit. The objects stay in the database and become
-//! unreachable; `git reflog` shows both moves. So an undo here means 「the branch is where it was」 and
-//! not 「the change never existed」, and the crate root says so where a reader of the disclosure will
+//! unreachable; `git reflog` shows both moves. So an undo here means "the branch is where it was" and
+//! not "the change never existed", and the crate root says so where a reader of the disclosure will (sem: SEM-gx-adapter-git-047)
 //! find it.
 //!
 //! # Why this module reads the repository, and why the order is not negotiable
 //!
-//! **E-M4-30** (req/38 §31 M4H3-1 採(a)) 逐語: 「escrow(invert)は apply の前(43 T-10b が state machine の
-//! 正本)…**invert は pre が観測可能な時点でしか構成できない**」. This adapter keeps no history: the tip a
-//! reset has to name is 「where the branch is now」, and after `apply` it is somewhere else. So [`invert`]
+//! **E-M4-30** (req/38 §31 M4H3-1, adopted (a)), verbatim: "escrow (invert) comes before apply (43 T-10b is state machine's
+//! canonical source)... **invert can only be constructed at the point where pre is observable**". This adapter keeps no history: the tip a
+//! reset has to name is "where the branch is now", and after `apply` it is somewhere else. So `invert` (private) (sem: SEM-gx-adapter-git-048)
 //! reads the reference, and 43 T-10b requires the caller to have called it first.
 //!
 //! 🔴 What git changes about 42 §5's reasoning is worth stating, because it is the one place this
 //! adapter is **structurally** better off than the filesystem one. 42 §5 requires the escrowed inverse
-//! to carry the body — 「digest-onlyでは実際のundoが物理的に不可能なため」 — and `gx-adapter-fs` therefore
+//! to carry the body -- "because a digest-only inverse makes an actual undo physically impossible" -- and `gx-adapter-fs` therefore (sem: SEM-gx-adapter-git-049)
 //! carries the whole old file and declares a ceiling on it (**M4-21**). A git object database is
 //! content-addressed and keeps what it was given, so **the body is already escrowed**: the inverse
 //! carries an object id and the undo is a pointer move. The ceiling that fires for the fs adapter has
-//! no input here that could reach it, and 52 契約 2 forbids inventing a refusal nobody asked for, so
+//! no input here that could reach it, and 52 contract 2 forbids inventing a refusal nobody asked for, so (sem: SEM-gx-adapter-git-050)
 //! this adapter declares no escrow ceiling — and the `Ok(None)` of 51 §7 contract 5 has a different
 //! instance instead.
 
@@ -47,10 +49,10 @@ use crate::repo;
 ///
 /// # The one reason for `Ok(None)` in this adapter
 ///
-/// 41 §4 separates 「the question itself cannot be answered」 (`Err`) from 「the answer is no inverse」
+/// 41 §4 separates "the question itself cannot be answered" (`Err`) from "the answer is no inverse"
 /// (`Ok(None)`), and **E-M3-4** makes the second an escalation to a human rather than a refusal to
-/// act. **E-M4-32** fixes which facts may take it: 「**`Ok(None)` は「同一 object の正当な構成不能」
-/// (上限超過・旧内容破棄済み)に限定**」. For git, in v0.1, that leaves exactly one:
+/// act. **E-M4-32** fixes which facts may take it: "**`Ok(None)` is limited to 'a legitimate construction of the
+/// same object is not possible' (over the ceiling, or the old content already discarded)**". For git, in v0.1, that leaves exactly one: (sem: SEM-gx-adapter-git-051)
 ///
 /// * **An unborn branch.** A branch with no commits on it — the state `git init` leaves — is a branch
 ///   a change *creates*. Its inverse would have to **delete** the reference, and v0.1's grammar spells
@@ -58,7 +60,7 @@ use crate::repo;
 ///   `Ok(None)`, E-M3-4 escalates, and a person is asked before a branch disappears — which is the
 ///   right person to ask.
 ///
-/// It is 「正当な構成不能」 in E-M4-32's sense and not a defect: the object exists, the question is
+/// It is "a legitimate construction not possible" in E-M4-32's sense and not a defect: the object exists, the question is (sem: SEM-gx-adapter-git-052)
 /// well-formed, and the honest answer is that this version cannot construct the inverse.
 ///
 /// # Errors

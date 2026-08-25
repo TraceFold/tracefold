@@ -1,39 +1,49 @@
-//! 🔴 **R-9 の対裁定** — what a `gx` that was told nothing starts from (**M7 hand 4**).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **R-9's paired ruling** (sem: SEM-gx-cli-1984) — what a `gx` that was told nothing starts from (**M7 hand 4**).
 //!
-//! `req/38` §60: 「**R-9 採=手 4 の対裁定**。既定 policy set と既定 registry は**対**で決まる(pack を
-//! 足しても adapter が register されなければ NotFound)」. req/101 §9-1 measured the state that ruling
-//! is about and named the third change点 as the one nobody had decided:
+//! `req/38` §60: "**R-9 adopted = hand 4's paired ruling**. The default policy set and the default
+//! registry are decided as a **pair** (even if a pack is added, if the adapter isn't registered, it's NotFound)" (sem: SEM-gx-cli-1985). req/101 §9-1 measured the state that ruling
+//! is about and named the third change point (sem: SEM-gx-cli-1986) as the one nobody had decided:
 //!
-//! > **同時に adapter の register も決めねばならない**——policy set だけ広げても、adapter が居なければ
-//! > `Error::NotFound`(「substrate に adapter が register されていない」)で止まる。∴ 裁定は 1 つでなく
-//! > **対**である: 「既定の policy set」と「既定の registry」。
+//! > **the adapter's registration must be decided at the same time** — widening only the policy set still
+//! > stops at `Error::NotFound` ("no adapter is registered for the substrate") if the adapter isn't there. ∴ the ruling is not one but
+//! > a **pair**: "the default policy set" and "the default registry" (sem: SEM-gx-cli-1987).
 //!
 //! So this file measures both halves and the seam between them. The policy half is
 //! [`gx_cli::session::default_policies`]; the registry half is
 //! [`gx_cli::session::register_default_adapters`]; and the seam is that a substrate with a pack and
 //! no adapter is indistinguishable, from a `gx` invocation, from a substrate with neither.
 //!
-//! # The half this hand did **not** make true, and why it is a probe rather than a paragraph
+//! # The half hand 4 did **not** make true, and the hand that did (**P3**)
 //!
-//! 44 §1.2's `--substrate` takes `fs|git|mcp`, and after this hand a `gx` binary registers **two** of
-//! the three. `gx-adapter-mcp` cannot be constructed without a `ToolTransport`, which is the
-//! deployment's code by a ruling this project has already made twice (the crate's own manifest: 「a
-//! linked MCP client library would be a **second road** to the substrate」, and req/101 §9 R-2 files
-//! the missing wire as **deliberate**). Registering it behind a transport that refuses everything
-//! would buy nothing — the refusal would land in `snapshot`, before a gate, so the mcp pack would
-//! still be unreachable — and would cost a made-up `adapter_version` in a signed provenance record.
+//! 44 §1.2's `--substrate` takes `fs|git|mcp`, and after hand 4 a `gx` binary registered **two** of
+//! the three. `gx-adapter-mcp` cannot be constructed without a `ToolTransport`, which was the
+//! deployment's code by a ruling this project had made twice (the crate's own manifest: "a linked
+//! MCP client library would be a **second road** to the substrate" (sem: SEM-gx-cli-1988), and req/101 §9 R-2 files the
+//! missing wire as **deliberate**). Registering it behind a transport that refused everything would
+//! have bought nothing — the refusal would land in `snapshot`, before a gate, so the mcp pack would
+//! still be unreachable — and would have cost a made-up `adapter_version` in a signed provenance
+//! record.
 //!
-//! So the answer is 「not yet」, and D-7's rule is that a deferral carries a firing condition.
-//! [`gx_cli::session::MCP_IS_NOT_REGISTERED`] is that condition in a place a probe reads, and
-//! [`the_deferral_of_the_mcp_adapter_names_its_firing_condition`] is what stops it from decaying
-//! into a memory.
+//! So the answer was "not yet" (sem: SEM-gx-cli-1989), and D-7's rule is that a deferral carries a firing condition.
+//! [`gx_cli::session::MCP_IS_NOT_REGISTERED`] is that condition in a place a probe reads.
+//!
+//! 🔴 **The condition fired on 2026-08-13** (`req/38` §71 P3 ruling ①; sem: SEM-gx-cli-1990, `req/119` §2.5): `gx-mcp-wire`
+//! ships the JSON-RPC framing, so a `gx` binary registers **three** and `policies/mcp/` is reachable
+//! from it. The probes below moved with the binary rather than being loosened, and the two that
+//! record the transition are [`the_deferral_of_the_mcp_adapter_has_fired_and_both_halves_say_so`]
+//! and [`an_mcp_intent_reaches_the_mcp_adapter_and_is_refused_for_want_of_a_server`]. What
+//! registration does not buy is a **server**, which is what an invocation names — and that
+//! distinction is the one the second probe measures, because "no adapter" and "no server" (sem: SEM-gx-cli-1991) are two
+//! sentences an operator acts on differently.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use gx_cli::session::{
     default_policies, open_engine, register_default_adapters, DEFAULT_SUBSTRATES,
-    MCP_IS_NOT_REGISTERED,
+    MCP_IS_NOT_REGISTERED, MCP_REGISTRATION_FIRED,
 };
 use gx_core::{Actor, ChangeContext, GoalBytes, Intent, SubstrateKind, Timestamp};
 use gx_engine::InjectedEvidence;
@@ -182,7 +192,7 @@ fn the_default_policy_set_is_every_shipped_pack() {
     assert_eq!(
         set.policy_ids(),
         declared,
-        "a `gx` told no `--policy` decides with every shipped pack (req/38 §60's R-9 対裁定)"
+        "a `gx` told no `--policy` decides with every shipped pack (req/38 §60's R-9 paired ruling; sem: SEM-gx-cli-1992)"
     );
 }
 
@@ -207,8 +217,8 @@ fn the_default_registry_is_the_declared_set() {
 
 /// 🔴 A `--substrate git` intent reaches the **git adapter**, and fails as that adapter fails.
 ///
-/// The discrimination this probe exists for: before this hand the answer was `NotFound` (「substrate
-/// に adapter が register されていない」), and 44 §1.2 documented a flag that could therefore never
+/// The discrimination this probe exists for: before this hand the answer was `NotFound` ("no adapter
+/// is registered for the substrate" (sem: SEM-gx-cli-1993)), and 44 §1.2 documented a flag that could therefore never
 /// work. M4H5-5's rule — an argument that changes nothing must not look like one that worked — has a
 /// twin here: a flag the documentation offers must not be one no invocation can satisfy.
 ///
@@ -240,13 +250,31 @@ fn a_git_intent_reaches_the_git_adapter_rather_than_an_empty_registry() {
     }
 }
 
-/// 🔴 And an `--substrate mcp` intent does **not** — for the reason the constant gives.
+/// 🔴 And since **P3** an `--substrate mcp` intent reaches the **mcp adapter** — refused for want of
+/// a *server*, which is a different sentence from "no adapter" (sem: SEM-gx-cli-1994).
 ///
-/// The pair to the probe above. This one is the half hand 4 left open, measured rather than
-/// described: the pack ships, the policy set holds it, and no invocation of this binary can reach
-/// it, because the wire is the deployment's.
+/// # What this probe used to measure, and why it moved
+///
+/// Hand 4 left this half open and measured the absence: `NotFound { what: "adapter" }`, "the pack (sem: SEM-gx-cli-1995)
+/// ships, the policy set holds it, and no invocation of this binary can reach it, because the wire
+/// is the deployment's" (sem: SEM-gx-cli-1996). `req/38` §71's P3 ruling ① (sem: SEM-gx-cli-1996) shipped the wire (`gx-mcp-wire`), which is the
+/// firing condition `MCP_IS_NOT_REGISTERED` names, so the adapter registers and the refusal moved
+/// one layer in.
+///
+/// **The discrimination is the point of the move.** Three sentences an operator could hear, and they
+/// are three different facts:
+///
+/// | | |
+/// |---|---|
+/// | `NotFound { what: "adapter" }` | this build has no MCP support at all — true until P3, false now |
+/// | `Adapter { action: "snapshot" }` + "connected to no MCP server" (sem: SEM-gx-cli-1997) | the support is here and this invocation named no server |
+/// | a snapshot that succeeds | a server is wired, and the pack is reachable |
+///
+/// The middle one is what an invocation with no `--mcp-server` must produce, and it must say which
+/// flag supplies the missing half — otherwise "registered" (sem: SEM-gx-cli-1998) becomes a claim an operator cannot act
+/// on. `crates/gx-cli/tests/mcp_registration.rs` measures the third row, which needs a transport.
 #[test]
-fn an_mcp_intent_is_refused_by_the_registry_and_not_by_a_pretend_adapter() {
+fn an_mcp_intent_reaches_the_mcp_adapter_and_is_refused_for_want_of_a_server() {
     let mut engine = engine_in("defaults_mcp");
     let intent = intent(
         SubstrateKind::Mcp,
@@ -258,14 +286,30 @@ fn an_mcp_intent_is_refused_by_the_registry_and_not_by_a_pretend_adapter() {
     let planned = engine.plan(&intent, Timestamp(1_754_000_000_000_000_001));
     println!("CLI_MCP_PLAN answer={planned:?}");
     match planned {
-        Err(gx_engine::Error::NotFound { what, .. }) => assert_eq!(
-            what, "adapter",
-            "the refusal names the registry, so an operator is told the truth: this build has no \
-             MCP wire"
+        Err(gx_engine::Error::Adapter { action, detail }) => {
+            assert_eq!(
+                action, "snapshot",
+                "the mcp adapter is registered, so the refusal is its own — it tried to read the \
+                 resource and had no server to read it from"
+            );
+            for clause in ["connected to no MCP server", "gx wrap", "--mcp-server"] {
+                assert!(
+                    detail.contains(clause),
+                    "the refusal must name {clause:?}: \"registered\" (sem: SEM-gx-cli-1999) is only useful to an operator \
+                     who is told what the other half is. Got: {detail}"
+                );
+            }
+        }
+        Err(gx_engine::Error::NotFound {
+            what: "adapter", ..
+        }) => panic!(
+            "the mcp adapter is not in the registry. That was true until P3, and the firing \
+             condition `MCP_IS_NOT_REGISTERED` names (a wire ships) has been met — see \
+             `session::MCP_REGISTRATION_FIRED`"
         ),
         other => panic!(
-            "an mcp intent has no adapter in this binary, and the refusal must say so rather than \
-             coming from a transport that pretends: {other:?}"
+            "an mcp intent with no server named must be refused by the adapter, naming the flag \
+             that supplies the server: {other:?}"
         ),
     }
 }
@@ -315,41 +359,65 @@ fn an_engine_this_binary_opened_decides_a_git_change_with_the_git_pack() {
     );
 }
 
-/// The deferral carries a firing condition, and the condition is not 「a later hand」 (**D-7**).
+/// 🔴 The deferral carried a firing condition, the condition **fired**, and both halves say so.
 ///
 /// The shape `crates/gx-cli/src/consumers.rs` uses for M6-21 and M6-22: the decision lives where a
-/// reader of the code lands, and a probe keeps it from becoming a sentence nobody re-reads.
+/// reader of the code lands, and a probe keeps it from becoming a sentence nobody re-reads. What
+/// this hand adds is the other end of the same discipline — a deferral that fired and left its
+/// firing condition sitting there unmarked is worse than one that never fired, because a reader
+/// arrives at a paragraph describing a state the binary has left.
+///
+/// So both constants are read here. [`MCP_IS_NOT_REGISTERED`] stays word for word (no-delete: the
+/// argument that produced the deferral is the record of why it was right at the time), and
+/// [`MCP_REGISTRATION_FIRED`] is the answer to it — including the half registration does **not**
+/// buy, which is a server.
 #[test]
-fn the_deferral_of_the_mcp_adapter_names_its_firing_condition() {
+fn the_deferral_of_the_mcp_adapter_has_fired_and_both_halves_say_so() {
     println!(
-        "MCP_IS_NOT_REGISTERED={} chars",
-        MCP_IS_NOT_REGISTERED.len()
+        "MCP_IS_NOT_REGISTERED={} chars MCP_REGISTRATION_FIRED={} chars",
+        MCP_IS_NOT_REGISTERED.len(),
+        MCP_REGISTRATION_FIRED.len()
     );
     for clause in ["ToolTransport", "R-2", "44 §1.2", "firing condition"] {
         assert!(
             MCP_IS_NOT_REGISTERED.contains(clause),
-            "the deferral must state {clause:?}: a deferral without a condition is the 「a hand will \
-             do it later」 M5H4-8 refused to accept"
+            "the deferral must state {clause:?}: a deferral without a condition is the \"a hand will \
+             do it later\" (sem: SEM-gx-cli-2000) M5H4-8 refused to accept"
+        );
+    }
+    for clause in [
+        "gx-mcp-wire",
+        "gx wrap",
+        "--mcp-server",
+        "UnconfiguredTransport",
+        "D-1",
+    ] {
+        assert!(
+            MCP_REGISTRATION_FIRED.contains(clause),
+            "the firing record must state {clause:?}: what shipped, how an invocation names a \
+             server, what stands in when none is named, and that AC-051's first premise is \
+             untouched"
         );
     }
     assert!(
-        !DEFAULT_SUBSTRATES.contains(&"mcp"),
-        "and it must be a deferral rather than a claim: if mcp registers, this constant is stale"
+        DEFAULT_SUBSTRATES.contains(&"mcp"),
+        "the condition fired (req/38 §71 P3 ruling ①; sem: SEM-gx-cli-2001), so the registry holds three substrates. If \
+         this is false again, the wire was withdrawn and `MCP_REGISTRATION_FIRED` is the stale one"
     );
 }
 
 /// 🔴 **Every pack this build ships that no invocation of this binary can reach** — as a *derived
-/// difference* rather than as a name (**M7 fix批 ②, 起票 A-2**: `req/38` §64, `req/105` §5-2).
+/// difference* rather than as a name (**M7 fix batch ②, filed A-2**; sem: SEM-gx-cli-2002: `req/38` §64, `req/105` §5-2).
 ///
 /// # What was already true, and why it was not enough
 ///
-/// The probe above pins `mcp` **by name**, and today that is correct: one pack ships that nothing
-/// registers, and `MCP_IS_NOT_REGISTERED` carries its firing condition. req/105 §5-2 measured what
-/// that costs and named the file it costs it in:
+/// The probe above pinned `mcp` **by name**, and until P3 that was correct: one pack shipped that
+/// nothing registered, and `MCP_IS_NOT_REGISTERED` carried its firing condition. req/105 §5-2
+/// measured what that costs and named the file it costs it in:
 ///
-/// > **問題は 4 本目である**: register されない substrate 向けの pack が将来 1 本出荷された日、それを
-/// > 名指す probe は誰も書いていないので、**「出荷されているが 1 度も評価されない pack」が黙って 2 本に
-/// > なる**。
+/// > **the problem is the 4th one**: the day a pack ships for a substrate with no registered
+/// > adapter, since nobody has written a probe that names it, **"a pack that ships but is never
+/// > evaluated" silently becomes two** (sem: SEM-gx-cli-2003).
 ///
 /// A pack in `SHIPPED_PACKS` whose substrate has no adapter is loaded into every default policy set
 /// ([`the_default_policy_set_is_every_shipped_pack`]) and then decides nothing, ever, because
@@ -369,7 +437,7 @@ fn the_deferral_of_the_mcp_adapter_names_its_firing_condition() {
 ///
 /// # Both readings of the difference, because they are different claims
 ///
-/// req/38 §60's 対裁定 is about the **pair** 「既定 policy set と既定 registry」, and the registry has
+/// req/38 §60's paired ruling (sem: SEM-gx-cli-2004) is about the **pair** "the default policy set and the default registry" (sem: SEM-gx-cli-2004), and the registry has
 /// a declaration ([`DEFAULT_SUBSTRATES`]) and an actual ([`register_default_adapters`]'s derived
 /// return). Reachability is a fact about the actual; the declaration is what a reader of the source
 /// believes. They agree today — [`the_default_registry_is_the_declared_set`] is the assertion that
@@ -402,21 +470,25 @@ fn the_shipped_packs_no_default_binary_can_reach_are_a_derived_difference() {
         unreachable.len()
     );
 
+    // 🔴 **Empty since P3**, and the assertion moved with the binary rather than being loosened.
+    // Until `gx-mcp-wire` shipped this set held `mcp` and the message said that an empty set meant
+    // "an adapter started registering without this file being told" (sem: SEM-gx-cli-2005). That is exactly what happened,
+    // deliberately (req/38 §71 P3 ruling ①; sem: SEM-gx-cli-2006), so the expected value is now the empty set and the guard
+    // the probe exists for — a **fourth** pack for a substrate nothing registers — is unchanged: any
+    // member here is a pack that ships, joins every default policy set, and is never evaluated.
     assert_eq!(
         unreachable,
-        BTreeSet::from(["mcp".to_string()]),
-        "the packs this build ships and cannot reach are {unreachable:?}. One is expected and it is \
-         `mcp`, for the reason `MCP_IS_NOT_REGISTERED` gives. A **second** entry here is a pack \
-         that ships, joins every default policy set, and is never evaluated by anything — decide \
-         whether its adapter registers or whether the pack ships, and if the answer is 「not yet」 \
-         then it needs a firing condition of its own (D-7). An **empty** set here means an adapter \
-         started registering without this file being told, and `MCP_IS_NOT_REGISTERED` is now a \
-         paragraph describing a state the binary left"
+        BTreeSet::new(),
+        "the packs this build ships and cannot reach are {unreachable:?}, and since P3 that set is \
+         empty: fs, git and mcp all register. A member here is a pack that ships, joins every \
+         default policy set, and is never evaluated by anything — decide whether its adapter \
+         registers or whether the pack ships, and if the answer is \"not yet\" (sem: SEM-gx-cli-2007) then it needs a \
+         firing condition of its own (D-7), the way `MCP_IS_NOT_REGISTERED` had one"
     );
     assert_eq!(
         unreachable, unreachable_by_declaration,
         "the difference taken against what registers and the difference taken against \
          DEFAULT_SUBSTRATES disagree, so the constant and the code have parted and the sentence \
-         「出荷したのに 1 度も評価されない pack」 no longer has one meaning"
+         \"a pack that ships but is never evaluated even once\" (sem: SEM-gx-cli-2008) no longer has one meaning"
     );
 }

@@ -1,28 +1,32 @@
-//! `.gx/drafts/` — **M6-01 採(a)**: where the intent body lives between `gx submit` and `gx plan`.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! `.gx/drafts/` — **M6-01 adopted (a)**: where the intent body lives between `gx submit` and `gx plan`. (sem: SEM-gx-cli-018)
 //!
 //! # The hole this closes
 //!
-//! req/88 §4 M6-01 is the reqdef's own 「本批の最重要所見」 and a declared hand-1 blocker:
+//! req/88 §4 M6-01 is the reqdef's own "the batch's most important finding" (sem: SEM-gx-cli-019) and a declared hand-1 blocker:
 //!
-//! > `gx plan <ID>` が要求する intent 本体の保管先が、正本にも実装にも `.gx/` 定義にも無い。
-//! > `Engine::plan` は `&Intent` を取り、journal の `DraftCreated` は `{intent_id, rng_seed, at}` しか
-//! > 持たない。**単発 process の CLI では `gx submit` と `gx plan` が別 process** なので、intent body
-//! > は process をまたげない。
+//! > there is nowhere the intent body that `gx plan <ID>` requires is stored -- not in the
+//! > canon, not in the implementation, not in the `.gx/` definition. `Engine::plan` takes
+//! > `&Intent`, and the journal's `DraftCreated` holds only `{intent_id, rng_seed, at}`.
+//! > **Because a single-shot-process CLI runs `gx submit` and `gx plan` as separate processes**,
+//! > the intent body cannot cross a process boundary. (sem: SEM-gx-cli-020)
 //!
-//! The engine's own documentation had written the assumption down: 「44 §1.2's `gx plan <ID>`
-//! resolves an id to a session **the CLI is holding**」 — and a single-shot process holds nothing.
+//! The engine's own documentation had written the assumption down: "44 §1.2's `gx plan <ID>`
+//! resolves an id to a session **the CLI is holding**" (sem: SEM-gx-cli-021) — and a single-shot process holds nothing.
 //! req/38 §47 adopted (a): the body is the CLI's, in `.gx/drafts/`, and the engine is not touched.
 //!
 //! # 🔴 Why the file is JSON and not the `.cbor` the ticket wrote
 //!
 //! M6-01(a)'s text says `.gx/drafts/<IntentId>.cbor`. This implements `<IntentId>.json`, and the
-//! reason is **則 1**:
+//! reason is **Rule 1** (sem: SEM-gx-cli-022):
 //!
-//! * a canonical CBOR encode outside gx-canon is exactly what 41 §6 forbids (「全canonical encodeは
-//!   gx-canon経由のみ（迂回禁止）」), and 則 1 (i) turns that into a mechanical check on this crate;
+//! * a canonical CBOR encode outside gx-canon is exactly what 41 §6 forbids ("every canonical
+//!   encode goes through gx-canon only, bypass forbidden" (sem: SEM-gx-cli-023)), and Rule 1 (i) turns that into a mechanical check on this crate;
 //! * a *non*-canonical CBOR encode would need a second CBOR crate in the graph, i.e. a second
 //!   spelling of a format this project has exactly one spelling of;
-//! * 44 §1.3 makes JSON the CLI's format anyway (「CLI/HTTPともJSONを一次フォーマットとする」).
+//! * 44 §1.3 makes JSON the CLI's format anyway ("both CLI and HTTP take JSON as the primary
+//!   format" (sem: SEM-gx-cli-024)).
 //!
 //! Nothing depends on the draft file's bytes: the `IntentId` is minted by `Engine::submit` from the
 //! canonical form of the `Intent`, not from this file, and this file is keyed **by** that id. So the
@@ -135,7 +139,7 @@ impl DraftStore {
 
     /// File a draft under the id the **engine** minted.
     ///
-    /// The id is an argument rather than something computed here, and that is 則 1 (i) in the
+    /// The id is an argument rather than something computed here, and that is Rule 1 (i) in the (sem: SEM-gx-cli-025)
     /// signature: this crate may not compute a `Cid`, so the only way it can name a draft is with a
     /// name `Engine::submit` handed it.
     ///
@@ -152,9 +156,9 @@ impl DraftStore {
 
     /// Read one back, if it is there.
     ///
-    /// `Ok(None)` for 「no such draft」 and `Err` for 「there is a file and it is not a draft」. The
-    /// two are different answers and E-M4-35 is the rule that keeps them apart: 「読めない」を「無い」
-    /// と読まない.
+    /// `Ok(None)` for "no such draft" and `Err` for "there is a file and it is not a draft". The
+    /// two are different answers and E-M4-35 is the rule that keeps them apart: do not read
+    /// "cannot be read" as "does not exist" (sem: SEM-gx-cli-026).
     ///
     /// # Errors
     /// [`Error::Io`] if the file exists and cannot be read. [`Error::Malformed`] if it is not a

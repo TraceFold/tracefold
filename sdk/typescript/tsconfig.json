@@ -1,0 +1,35 @@
+{
+  // module/moduleResolution=node16: pairs with package.json's "type": "commonjs" (emits CJS) and is
+  // what makes explicit `.js` specifiers on relative imports (`./client.js` from `client.ts`)
+  // resolve to their `.ts` siblings -- the shape `./wasm-gen/wasm_verify.js` needs to pick up the
+  // `wasm-bindgen`-generated `.d.ts` beside the plain-JS glue (req/132 §5 item 1's spike output).
+  // "node" (classic) resolution was rejected by TypeScript 7 itself (TS5108: removed).
+  //
+  // lib=DOM: the one way to type `fetch`/`Response`/`URLSearchParams` without adding `@types/node`
+  // as a dependency (ruling 2, req/132 §6: "dev dependencies are typescript only, as the rule";
+  // sem: SEM-sdk-typescript-032). Node 18+ implements the
+  // same WHATWG interfaces DOM's ambient types describe; this SDK never touches a browser-only
+  // global (`window`, `document`, ...), so the extra ambient surface costs nothing at runtime.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "lib": ["ES2022", "DOM"],
+    "declaration": true,
+    "sourceMap": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
+    "resolveJsonModule": false,
+    "noEmitOnError": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "test"]
+}

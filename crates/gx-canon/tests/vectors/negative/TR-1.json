@@ -1,19 +1,19 @@
 {
   "id": "TR-1",
   "kind": "codec-deviation",
-  "statement": "宣言した長さの byte を持たない text string は decode されず、足りない byte 数が報告される",
+  "statement": "A text string that does not hold the bytes for its declared length is not decoded, and the number of missing bytes is reported",
   "vector": "6a6161",
   "expected": "REJECT",
   "expected_error": "Truncated",
   "expected_error_payload": { "at": 1, "wanted": 10, "missing": 8 },
   "normative_basis": "RFC8949-MUST",
   "tier": "Tier1",
-  "deviation": "major type 3・ai 10(長さ 10 の text string)を宣言し、続く byte を 2 つしか置かなかった。**normative_basis 変更(2026-08-09・req/38 §26 I-5)**: 当初は `IPLD-MUST` と宣言していたが、これは A-8(余剰 byte)の L66 を鏡像に読んだ物であって逐語ではない——IPLD spec 全文に truncation の MUST は無く、L66 は**余剰**を名指す文である(req/67 §2.6 の実測)。不足を名指す MUST 級の一文は RFC 8949 §3 に在る: 「If the encoded sequence of bytes ends before the end of a data item, that item is not well-formed.」(L487)+「A decoder **MUST NOT** return a decoded data item when it encounters input that is not a well-formed encoded CBOR data item」(L445-446)。∴ 本 vector の根拠は `RFC8949-MUST` が正で、旧読み(IPLD L66 の対偶)は誤りではないが逐語でないため記録として本行に残す。**この 1 本の存在理由は `missing` の値**である: 現行の 19 本は `Truncated` に到達せず、到達する物が在っても値を読む assert が無かった(req/58 §4 F-3 の survivor 2 件=`take` の `missing: end - self.b.len()` の算術)。宣言値は `end(11) - len(3) = 8` で、`+` へ変えると 14、`/` へ変えると 3 になり、どちらも 8 と異なる——長さと残量の差が小さい vector(例 `6261`)では整数除算がたまたま真値と一致するため、判別できる幅を選んである。",
+  "deviation": "Declared major type 3, ai 10 (a length-10 text string), and placed only 2 following bytes. **`normative_basis` changed (2026-08-09, req/38 §26 I-5)**: originally declared `IPLD-MUST`, but this was a mirror reading of A-8's (excess bytes) L66, not a verbatim one -- there is no truncation MUST anywhere in the IPLD spec text, and L66 is a sentence naming **excess** (measured at req/67 §2.6). A MUST-grade sentence naming a shortfall exists in RFC 8949 §3: \"If the encoded sequence of bytes ends before the end of a data item, that item is not well-formed.\" (L487) + \"A decoder **MUST NOT** return a decoded data item when it encounters input that is not a well-formed encoded CBOR data item\" (L445-446). \u2234 this vector's basis is correctly `RFC8949-MUST`; the old reading (the contrapositive of IPLD L66) was not wrong but was not verbatim, and is kept here on record. **The reason this one vector exists is the value of `missing`**: the 19 existing vectors do not reach `Truncated`, and even where one did, there was no assert reading the value (`req/58` §4 F-3's 2 survivors = the arithmetic of `take`'s `missing: end - self.b.len()`). The declared value is `end(11) - len(3) = 8`; changing `-` to `+` gives 14, and to `/` gives 3, both different from 8 -- a vector where the gap between length and remainder is small (e.g. `6261`) would let integer division coincide with the true value by chance, so a discriminating gap was chosen.",
   "spec_anchor": "RFC 8949 §3 L445-446 / L487(well-formedness) / 42 §2.1 / req/38 §17 F-3 / §26 I-5",
-  "origin": "gx self-authored for M3 hand 4 (req/38 §17 F-3 の窓)",
+  "origin": "gx self-authored for M3 hand 4 (req/38 §17 F-3's window)",
   "control": {
     "vector": "626161",
     "expected": "ACCEPT",
-    "note": "宣言どおりの長さを持つ text string `\"aa\"`。負例との差は宣言長だけで、byte 数は同じ 3 である"
+    "note": "A text string `\"aa\"` holding exactly its declared length. The only difference from the negative vector is the declared length; the byte count is the same, 3"
   }
 }

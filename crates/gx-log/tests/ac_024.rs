@@ -1,14 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-024 (FR-024) — the tile layout against a Rekor v2 reference vector, difference included.
 //!
-//! AC-024 逐語: 「Given: gx-logが生成した1 tile。When: Rekor v2 tile仕様の主要フィールド
-//! （tile height, hash algorithm, leaf encoding）とのテストベクタ比較を実行。Then: 対応フィールドが
-//! 一致する。」 FR-024 itself is a SHOULD.
+//! AC-024 verbatim: "Given: one tile gx-log produced. When: a test-vector comparison is run
+//! against the Rekor v2 tile spec's main fields (tile height, hash algorithm, leaf encoding).
+//! Then: the corresponding fields agree." FR-024 itself is a SHOULD. (sem: SEM-gx-log-118)
 //!
 //! # The erratum this file implements
 //!
-//! **E-M2-9** (`req/38_ERRATA_2026-08-07.md` §8): 「gx=BLAKE3 と Rekor v2=SHA-256 で『hash
-//! algorithm 一致』は原理不能。erratum=構造 field（tile height/leaf encoding）は一致 assert・hash
-//! algorithm は『宣言どおりの差異』を機械 assert（一致の偽装より差異の明示）」.
+//! **E-M2-9** (`req/38_ERRATA_2026-08-07.md` §8): "with gx=BLAKE3 and Rekor v2=SHA-256, 'hash
+//! algorithm agreement' is impossible in principle. erratum = assert agreement on the structural
+//! fields (tile height/leaf encoding) and mechanically assert the hash algorithm as 'a declared
+//! difference' -- stating the difference beats faking agreement" (sem: SEM-gx-log-119).
 //!
 //! So this file asserts two different things, and keeps them apart:
 //!
@@ -17,13 +20,15 @@
 //! * the **hash algorithm** differs, and the difference is asserted as such. A file that quietly
 //!   dropped the comparison would read the same as one where the algorithms happened to agree.
 //!
-//! # What 「leaf encoding」 does and does not mean here (**E-M2-27**)
+//! # What "leaf encoding" (sem: SEM-gx-log-120) does and does not mean here (**E-M2-27**)
 //!
-//! `req/38_ERRATA_2026-08-07.md` §15 逐語: 「(a)「leaf encoding」assert の実体は domain byte 検査で
-//! あり、一次の「leaf encoding」（big-endian uint16 length-prefix の entry bundle・gx 未実装）と別物
-//! ——**assert 名を実体に合わせて訂正**（N-1 病=名前が嘘）+entry bundle 型は gx の主張範囲外と明記」.
+//! `req/38_ERRATA_2026-08-07.md` §15 verbatim: "(a) the substance of the 'leaf encoding' assert is
+//! a domain-byte check, and that is a different thing from the upstream's 'leaf encoding' (a
+//! big-endian uint16 length-prefixed entry bundle -- gx does not implement it) -- **correct the
+//! assert's name to match its substance** (the N-1 disease: a name that lies) + state plainly that
+//! the entry-bundle type is outside gx's claim" (sem: SEM-gx-log-121).
 //!
-//! The upstream's 「leaf encoding」 is a *record format*: how one entry's bytes are laid out inside a
+//! The upstream's "leaf encoding" (sem: SEM-gx-log-122) is a *record format*: how one entry's bytes are laid out inside a
 //! tile's data file, length-prefixed with a big-endian `uint16`. **gx does not implement it and does
 //! not claim it.** A gx leaf is `BLAKE3(0x00 || canonical_dagcbor(LedgerLeaf))` and the tile holds
 //! digests, so there is no entry bundle in this workspace for a comparison to be made against.
@@ -39,9 +44,9 @@
 //! # Where the reference vector comes from, and what that is worth
 //!
 //! 🔴 The reference below is **restated from gx's own canon**, not fetched from the upstream
-//! document. 42 §3.11 states the design it follows (「tile設計はRekor v2（Trillian非依存・
-//! tile-backed、research/02 §3）に倣う」, `width: u16` 1..=256 「既定tile幅256」, `level: u8`
-//! 「0=leaf層」, and RFC 6962 §2.1's `0x00`/`0x01` domain separation 「をそのまま再利用する」),
+//! document. 42 §3.11 states the design it follows ("the tile design follows Rekor v2 (Trillian-
+//! independent, tile-backed, research/02 §3)", `width: u16` 1..=256 "the default tile width is 256",
+//! `level: u8` "0=the leaf layer", and RFC 6962 §2.1's `0x00`/`0x01` domain separation "reused as-is") (sem: SEM-gx-log-123),
 //! research/02 §3 records Rekor v2 as tile-backed and SHA-256, and 35 DR-3 fixes gx on BLAKE3.
 //! No C2SP `tlog-tiles` or Rekor v2 specification text was fetched or read while writing this
 //! file, so what it compares is gx's implementation against gx's reading of the upstream design --
@@ -57,18 +62,18 @@ use gx_log::tile::{TileLog, TILE_WIDTH};
 ///
 /// See the module docs for the provenance of every value here.
 struct ReferenceVector {
-    /// 「tile height」 in the upstream's vocabulary: the log2 of the number of leaves a full tile
-    /// covers. 42 §3.11's 「既定tile幅256」 is 2^8.
+    /// "tile height" (sem: SEM-gx-log-124) in the upstream's vocabulary: the log2 of the number of leaves a full tile
+    /// covers. 42 §3.11's "the default tile width is 256" is 2^8.
     tile_height_log2: u32,
     /// The same number as a count, which is what 42 §3.11's `Tile.width` holds.
     tile_width: u16,
     /// RFC 6962 §2.1 domain separation, which 42 §3.11 reuses verbatim.
     ///
-    /// **Not** the upstream's 「leaf encoding」, which is the length-prefixed entry bundle gx does not
+    /// **Not** the upstream's "leaf encoding" (sem: SEM-gx-log-125), which is the length-prefixed entry bundle gx does not
     /// implement (E-M2-27; see the module docs).
     leaf_domain_byte: u8,
     node_domain_byte: u8,
-    /// Level 0 is the leaf layer (42 §3.11: `level: u8` 「0=leaf層, N=内部層」).
+    /// Level 0 is the leaf layer (42 §3.11: `level: u8` "0=the leaf layer, N=an internal layer") (sem: SEM-gx-log-126).
     ///
     /// gx counts one level per doubling; the upstream counts one level per **eight** doublings. The
     /// two agree at 0 and nowhere else -- see `tile.rs`'s note on `Tile.level` (E-M2-27).
@@ -112,7 +117,7 @@ fn log_of(n: u64) -> TileLog {
 // The structural fields: these must agree
 // ---------------------------------------------------------------------------
 
-/// 「tile height」 and the width it implies.
+/// "tile height" (sem: SEM-gx-log-127) and the width it implies.
 #[test]
 fn ac_024_tile_height_matches_the_reference() {
     assert_eq!(TILE_WIDTH, REKOR_V2.tile_width);
@@ -126,7 +131,7 @@ fn ac_024_tile_height_matches_the_reference() {
 
 /// A full tile is exactly `tile_width` hashes; a partial tile is shorter and says so.
 ///
-/// 42 §3.11 admits partial tiles (「1..=256（既定tile幅256、部分tileも許容）」), which is what makes
+/// 42 §3.11 admits partial tiles ("1..=256 (the default tile width is 256, a partial tile is also allowed)") (sem: SEM-gx-log-128), which is what makes
 /// a log readable before it reaches a tile boundary.
 #[test]
 fn ac_024_a_generated_tile_has_the_reference_shape() {
@@ -172,7 +177,7 @@ fn ac_024_level_zero_is_the_leaf_layer() {
 ///
 /// The ragged tail is deliberately absent: a partial subtree has no level-N hash yet, because
 /// appending to it would change one. That is what makes a tile immutable once written, which is
-/// what makes it cacheable -- 42 §3.11's 「CDNキャッシュ可能な固定サイズ塊」.
+/// what makes it cacheable -- 42 §3.11's "a fixed-size chunk that a CDN can cache" (sem: SEM-gx-log-129).
 #[test]
 fn ac_024_an_internal_level_holds_only_complete_subtrees() {
     let log = log_of(10);
@@ -193,13 +198,13 @@ fn ac_024_an_internal_level_holds_only_complete_subtrees() {
 }
 
 /// The two domain bytes are RFC 6962's, inherited unchanged (**E-M2-27**: this is what the
-/// 「leaf encoding」 line of AC-024 is actually able to compare).
+/// "leaf encoding" (sem: SEM-gx-log-130) line of AC-024 is actually able to compare).
 ///
 /// The constants come from gx-canon, which is where the hash is actually taken; that a leaf hash
 /// really is `BLAKE3(0x00 || …)` and a node hash `BLAKE3(0x01 || …)` is checked there, in
 /// `tests/mint_domain.rs`, because AC-014 keeps the digest out of every crate but that one.
 ///
-/// The upstream's own 「leaf encoding」 -- the big-endian `uint16` length-prefixed entry bundle -- is
+/// The upstream's own "leaf encoding" (sem: SEM-gx-log-131) -- the big-endian `uint16` length-prefixed entry bundle -- is
 /// **outside gx's claim** and is printed as such. gx stores digests in tiles and has no entry bundle
 /// at all, so there is nothing here to agree or disagree with it.
 #[test]
@@ -228,7 +233,7 @@ fn ac_024_the_digest_length_matches() {
 
 /// The hash algorithm differs, and the difference is the assertion.
 ///
-/// AC-024 asks for 「対応フィールドが一致する」 over a list that includes 「hash algorithm」. gx is
+/// AC-024 asks for "the corresponding fields agree" (sem: SEM-gx-log-132) over a list that includes "hash algorithm". gx is
 /// BLAKE3 (35 DR-3 DEFAULT) and Rekor v2 is SHA-256; no implementation makes those equal, and an
 /// implementation that reported them as equal would be lying about the one property a verifier of
 /// somebody else's log would need first. E-M2-9 rules the comparison inverted here: the mismatch
@@ -255,7 +260,7 @@ fn ac_024_the_hash_algorithm_is_a_declared_difference() {
 /// The consequence, stated so nobody reads the structural agreement as interoperability.
 ///
 /// A Rekor v2 client handed a gx tile would parse its shape and compute a different root. FR-024
-/// is a SHOULD about tile *形式*; it is not a claim that the two logs verify each other, and 45
+/// is a SHOULD about tile *format* (sem: SEM-gx-log-133); it is not a claim that the two logs verify each other, and 45
 /// §4.1's overclaim rule applies to this file as much as to a README.
 #[test]
 fn ac_024_structural_correspondence_is_not_interoperability() {

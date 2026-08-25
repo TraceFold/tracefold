@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-028 (FR-028) — the shipped fs pack, and the cases a deployment can check it against.
 //!
-//! AC-028 逐語: 「Given: fs substrate向け出荷policy pack(`policies/fs/`)。When: packのconformance
-//! テストを実行。Then: packが最低1 Admitケース・1 Denyケースを持ち両方pass。git/MCP向けpackはadapter
-//! 実装に合わせM7で提供され、対応するconformanceテストはAC-074(M7)で検証する。」判定方法:
-//! 「integration」.
+//! AC-028 verbatim: "Given: the shipped fs-substrate policy pack (`policies/fs/`). When: the pack's
+//! conformance test is run. Then: the pack has at least 1 Admit case and 1 Deny case and both pass.
+//! The git/MCP packs are provided in M7 to match the adapter implementation, and the corresponding
+//! conformance test is verified in AC-074 (M7)." Judgment method: "integration". (sem: SEM-gx-gate-202)
 //!
 //! # What a conformance case is here
 //!
@@ -24,7 +26,7 @@
 //! # What the cases are expected to say, and what they never assert
 //!
 //! Expectations name the arm and the policy id that answered. They never assert that Cedar decided
-//! correctly — req/60 §7.2: 「Cedar の決定を gx の test が再実装しない」 — so what is measured is that
+//! correctly -- req/60 §7.2: "a gx test does not re-implement Cedar's decision" (sem: SEM-gx-gate-203) -- so what is measured is that
 //! this pack, through this mapping, reaches this arm with this policy recorded as the one that
 //! answered.
 
@@ -81,7 +83,7 @@ fn cases() -> Vec<Case> {
             order: 0,
             expect: Expect::DenyBy("fs-deny-etc"),
             why:
-                "AC-028's Deny case, and AC-025's first half. 「forbid overrides permit」, so the \
+                "AC-028's Deny case, and AC-025's first half. \"forbid overrides permit\" (sem: SEM-gx-gate-204), so the \
                   base permit does not need an exception carved into it",
         },
         Case {
@@ -128,7 +130,7 @@ fn cid(seed: u64) -> Cid {
 }
 
 /// A change at the given order. At order 2 the subject is another transformation and the context is
-/// `Policy` (41 §3, P-3): 「policy自体の変更」.
+/// `Policy` (41 §3, P-3): "a change to the policy itself". (sem: SEM-gx-gate-205)
 fn change(order: u8) -> Transformation {
     let subject = if order == 0 {
         Subject::Object(ObjectId(cid(2)))
@@ -196,6 +198,10 @@ fn ac_028_every_conformance_case_holds() {
                 planned: &planned,
                 evidence: &[],
                 invert_available: true,
+                // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+                // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+                // varying this field alone moves no verdict) about the field and not about this fixture.
+                decided_at: Timestamp(0),
             })
             .unwrap_or_else(|e| panic!("{}: the pack must be evaluable: {e}", case.name));
 
@@ -255,7 +261,7 @@ fn ac_028_every_conformance_case_holds() {
     }
 }
 
-/// AC-028's own arithmetic: 「最低1 Admitケース・1 Denyケース」, counted from the table.
+/// AC-028's own arithmetic: "at least 1 Admit case and 1 Deny case", counted from the table. (sem: SEM-gx-gate-206)
 ///
 /// The criterion is a statement about the *pack's* conformance suite, so it is asserted about the
 /// suite rather than satisfied by it accidentally. A table that lost its Admit case would otherwise
@@ -275,8 +281,8 @@ fn ac_028_the_table_holds_at_least_one_admit_case_and_one_deny_case() {
         "ac_028: {admits} Admit case(s), {denies} Deny case(s), {} rows",
         cases.len()
     );
-    assert!(admits >= 1, "AC-028: 「最低1 Admitケース」");
-    assert!(denies >= 1, "AC-028: 「1 Denyケース」");
+    assert!(admits >= 1, "AC-028: \"at least 1 Admit case\""); // (sem: SEM-gx-gate-207)
+    assert!(denies >= 1, "AC-028: \"1 Deny case\"");
 }
 
 /// The cases ran against the artifact that ships, not against a set assembled here.
@@ -307,7 +313,7 @@ fn the_conformance_runs_against_the_pack_the_build_embeds() {
 /// The pack cannot see the change it is judging (P-6 / M3-10), measured rather than described.
 ///
 /// Two requests differing only in the payload get the same verdict. That is the wall behind which
-/// 45 TH-1's 「行数保存」 invariant and FR-028's 「既製invariant集」 sit until an adapter hands the gate
+/// 45 TH-1's "row-count preserved" invariant and FR-028's "ready-made invariant set" sit until an adapter hands the gate (sem: SEM-gx-gate-208)
 /// structured facts (M4), and it is the reason the effective range in `packs.rs` says locator /
 /// actor / context / order and stops there.
 #[test]
@@ -326,6 +332,7 @@ fn the_pack_cannot_see_the_change_it_is_judging() {
             planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect("evaluable")
         .kind()

@@ -1,0 +1,10 @@
+{
+  "origin": "glovrex-ledger/v1",
+  "tree_size": 1,
+  "root_hash": "gx1:ta7g7vrbmnxwrtcj6anyurmbgepqdqs7mzspb552d3yk7chmqrfa",
+  "timestamp": 1787382413423795967,
+  "signature": {
+    "keyid": "ed25519-703643751f18a688",
+    "sig": "r/Pq11n8/QluxUxn+M2wi/VtS4nEF2fINT9BTwWW4iqsscszFEOIUsjyKw/FUC7wbaiRY9rig+Ol/l9kL1jaAg=="
+  }
+}

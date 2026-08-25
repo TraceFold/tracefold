@@ -1,7 +1,7 @@
 {
   "id": "FA-8",
   "kind": "false-admit",
-  "statement": "evidence が付いていても、拒否される変換が admit されてはならない",
+  "statement": "a transformation that is refused must not be admitted even when evidence is attached (sem: SEM-gx-gate-345)",
   "expected": "MUST_DENY",
   "expected_reason": {
     "source": "Policy",
@@ -15,8 +15,8 @@
     "invert_available": true,
     "evidence": 2
   },
-  "why": "ASM-60-1 は evidence を `context.evidence_count` / `evidence_kinds` として policy に見せる。∴ 「evidence が在れば通す」型の節が pack に混ざる、または mapping が evidence を permit 側の条件に流す形になると、forbid が在るのに admit される。11 §4 の 3 項目め(evidence 要件)は**通す理由**ではなく**足す条件**である、という向きを固定する 1 本。",
-  "spec_anchor": "11 §4 / req/38 §19 M3-07 / ASM-60-1(req/62 §2 の写像表)",
+  "why": "ASM-60-1 shows evidence to a policy as `context.evidence_count` / `evidence_kinds`. ∴ if a clause of the shape 'let it through when evidence exists' gets mixed into the pack, or the mapping routes evidence into a permit-side condition, a transformation is admitted even though a forbid exists. One vector that pins the direction: 11 §4's third item (the evidence requirement) is **an added condition**, not **a reason to let through**. (sem: SEM-gx-gate-346)",
+  "spec_anchor": "11 §4 / req/38 §19 M3-07 / ASM-60-1 (req/62 §2's mapping table) (sem: SEM-gx-gate-347)",
   "origin": "gx self-authored for M3 hand 6",
   "control": {
     "request": {
@@ -27,6 +27,6 @@
       "evidence": 2
     },
     "expected": "MUST_ADMIT",
-    "note": "同じ evidence を許可域の locator に付けた形。evidence の有無ではなく locator が答えを決めている事の対照で、evidence を要求する節が pack に入った日にはこちらが赤くなる(=出荷 pack の変化が見える)"
+    "note": "the same evidence attached to a locator in the permitted range. The control that the answer is decided by the locator, not by whether evidence is present; the day a clause requiring evidence enters the pack, this one goes red (making the shipped pack's change visible) (sem: SEM-gx-gate-348)"
   }
 }

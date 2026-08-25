@@ -1,8 +1,11 @@
-//! 🔴 **E-M2-23 / M6H5-2 (b)** — `ERROR_KINDS` is the variants of `Error`, and stays so.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **E-M2-23 / M6H5-2 (b)** — `ERROR_KINDS` is the variants of `Error`, and stays so. (sem:
+//! SEM-gx-witness-150, SEM-gx-witness-151, SEM-gx-witness-152)
 //!
 //! # What was missing, and what it was worth
 //!
-//! M6 hand 5 added [`gx_witness::ERROR_KINDS`] and `Error::kind` (§52 M6H5-2 採(a), paying E-M2-23's
+//! M6 hand 5 added [`gx_witness::ERROR_KINDS`] and `Error::kind` (§52 M6H5-2 adopted (a), paying E-M2-23's
 //! bill). What it did not add is the probe that keeps the two in step, and §52 sent that half to
 //! hand 8 as its DoD. Hand 8 measured it: renaming one entry of this array to a word `kind()` never
 //! returns (`"Schema"` → `"Schem"`) left **every suite in the workspace green** (req/96 §7.3, and
@@ -11,14 +14,14 @@
 //!
 //! Two of the three places are already held by the compiler: `Error::kind`'s `match` has no `_` arm,
 //! so a **new** variant does not compile, and `[&str; 8]` is a declared length, so a **deleted**
-//! entry does not compile (M6H7-10: 「長さを宣言した配列は assertion より 1 段早い gate」). What
+//! entry does not compile (M6H7-10: "an array with a declared length is a gate one step earlier than an assertion"). What
 //! compiles cleanly is a **misspelt** entry, and that is what this file is for.
 //!
 //! # Why a misspelling does not stay inside this crate
 //!
 //! `crates/gx-api/src/gx_code.rs` reads four crates' `ERROR_KINDS` as the **denominator** per
 //! `Origin`, and a probe there checks that the 33 `REFUSALS` rows cover it. A ghost entry is covered
-//! by that check like any other — so 44 §2.3's claim 「every refusal has a code」 would be proved
+//! by that check like any other — so 44 §2.3's claim "every refusal has a code" would be proved
 //! **about a refusal that does not exist**, while the real `"Schema"` fell through to `INTERNAL`.
 //! Neither side goes red. That is the whole reason this costs a file.
 //!

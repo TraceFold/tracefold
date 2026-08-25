@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-027 (FR-027) — the meet of the two systems, over all four quadrants, and the third arm
 //! **E-M3-4** adds to it.
 //!
-//! AC-027 逐語: 「Given: Cedar評価とinvariant評価の全4組合せ（Admit×Admit, Admit×Deny, Deny×Admit,
-//! Deny×Deny）。When: `Gate::verify`を呼ぶ。Then: いずれか一方でもDenyを含めば全体Verdictは必ず
-//! `Deny(Vec<Reason>)`。両方Admitの場合のみ`Admit`。」判定方法: 「property（4象限網羅）」, M3.
+//! AC-027 verbatim: "Given: all 4 combinations of the Cedar evaluation and the invariant evaluation
+//! (Admit×Admit, Admit×Deny, Deny×Admit, Deny×Deny). When: `Gate::verify` is called. Then: if either
+//! side includes even one Deny, the overall Verdict must be `Deny(Vec<Reason>)`. `Admit` only when
+//! both are Admit." Judgment method: "property (exhaustive over the 4 quadrants)", M3. (sem: SEM-gx-gate-373)
 //!
 //! # Why the file is called this
 //!
@@ -11,9 +14,10 @@
 //! `A(f) ∧ A(g) → A(g∘f)`, which is a different statement about a different composition. req/38
 //! §19's M3-22 separates them:
 //!
-//! > 「M3-22(採用=51 側 erratum): AC-027 は `verdict_meet`(2 系統の meet・Deny 優越)suite に紐付け・
-//! > `admissible_composition` は AC 無し(T1 のみ)。「合成」の 2 義(変換の合成=T1/系統の meet=AC-027)
-//! > を GLOSSARY で分離」 → **E-M3-10**
+//! > "M3-22 (adopted = an erratum on 51's side): AC-027 is tied to the `verdict_meet` suite (the
+//! > meet of two systems, Deny precedence); `admissible_composition` carries no AC (T1 only). The
+//! > two senses of 'composition' (composing a transformation = T1 / the meet of the two systems =
+//! > AC-027) are separated in the GLOSSARY" -> **E-M3-10** (sem: SEM-gx-gate-374)
 //!
 //! So this is the suite that ruling names. T1 is not measured here and is not a property of this
 //! crate at all (**E-M3-5**, and `lib.rs`'s module header says so at length).
@@ -22,8 +26,8 @@
 //!
 //! The quadrant table is AC-027's, and the third arm is AC-048's gate half, promoted into M3:
 //!
-//! > 「M3-04(採用=案 a): AC-048 の gate 側半分を M3 要件へ引き上げ——**`invert_available=false →
-//! > Escalate`** を M3 の最小生成規則にする」 → **E-M3-4**
+//! > "M3-04 (adopted = option a): raise AC-048's gate-side half to an M3 requirement -- make
+//! > **`invert_available=false -> Escalate`** the minimal generation rule for M3" -> **E-M3-4** (sem: SEM-gx-gate-375)
 //!
 //! The two interact on exactly one input -- both systems admit and no inverse exists -- where
 //! AC-027's second sentence would say `Admit` and E-M3-4 says `Escalate`. The tests below hold
@@ -146,12 +150,16 @@ fn quadrant(policy_admits: bool, invariant_holds: bool, invert_available: bool) 
             planned: &planned,
             evidence: &[],
             invert_available,
+            // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+            // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+            // varying this field alone moves no verdict) about the field and not about this fixture.
+            decided_at: Timestamp(0),
         })
         .expect("every input here is evaluable; ⊥ is E-M3-3's and not a quadrant")
 }
 
 // ---------------------------------------------------------------------------
-// The four quadrants, one test each (34: 「全4組合せ」)
+// The four quadrants, one test each (34: "all 4 combinations") (sem: SEM-gx-gate-376)
 // ---------------------------------------------------------------------------
 
 /// Admit × Admit → `Admit`, and the proof records both systems.
@@ -330,6 +338,7 @@ fn e_m3_12_registration_order_does_not_reach_the_deny() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect("evaluable")
     };
@@ -416,12 +425,12 @@ fn ac_027_a_refused_change_is_denied_even_when_it_cannot_be_undone() {
 }
 
 // ---------------------------------------------------------------------------
-// The property (34: 「property（4象限網羅）」)
+// The property (34: "property (exhaustive over the 4 quadrants)") (sem: SEM-gx-gate-377)
 // ---------------------------------------------------------------------------
 
 proptest! {
-    /// AC-027 as it is written, over the whole product: 「いずれか一方でもDenyを含めば全体Verdictは
-    /// 必ず`Deny(Vec<Reason>)`。両方Admitの場合のみ`Admit`」.
+    /// AC-027 as it is written, over the whole product: "if either side includes even one Deny, the
+    /// overall Verdict must be `Deny(Vec<Reason>)`. `Admit` only when both are Admit". (sem: SEM-gx-gate-378)
     ///
     /// `invert_available` is held at `true` so that the statement being measured is AC-027's own;
     /// the other value is the subject of the escalation tests above and of the second property

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Objects: the content-addressed snapshot and the two enumerations that describe it.
 //!
 //! Spec: 41 §3 for `ObjectSnapshot`, 42 §0 for this module's contents
@@ -18,9 +20,14 @@ pub struct ObjectId(pub Cid);
 /// keeping it a `String` is what stops this enum from becoming a registry the core has to hold.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SubstrateKind {
+    /// The filesystem adapter's namespace: a locator is a path (42 §3.1).
     Fs,
+    /// The git adapter's namespace: a locator is a ref or an object name.
     Git,
+    /// The MCP adapter's namespace: a locator names a tool-reachable resource.
     Mcp,
+    /// An adapter shipped outside this workspace. The string is its self-chosen name; the core
+    /// compares it and never interprets it.
     Custom(String),
 }
 
@@ -29,9 +36,15 @@ pub enum SubstrateKind {
 /// and encoded, never interpreted. Interpretation is the adapter's job (42 §3.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ReprKind {
+    /// An opaque byte sequence -- the representation that assumes nothing.
     Bytes,
+    /// A JSON document (42 §3.1). A hint for adapters and tools; the core does not parse it.
     Json,
+    /// A tree of named children, e.g. a directory or a git tree.
     Tree,
+    /// Content the adapter reaches through a reference rather than as bytes in hand. 42 §3.1
+    /// enumerates the name and leaves its interpretation to the adapter (P-10), same as the
+    /// other three.
     External,
 }
 
@@ -91,21 +104,27 @@ impl ObjectSnapshot {
         &self.locator
     }
 
+    /// The content digest -- ASM-9's whole claim about what is at the locator, since the bytes
+    /// themselves are never stored.
     #[must_use]
     pub fn digest(&self) -> &Cid {
         &self.digest
     }
 
+    /// Which substrate the locator is read against (42 §3.1).
     #[must_use]
     pub fn substrate(&self) -> &SubstrateKind {
         &self.substrate
     }
 
+    /// How the content happens to be represented. Carried, never interpreted here (P-10).
     #[must_use]
     pub fn representation(&self) -> &ReprKind {
         &self.representation
     }
 
+    /// The snapshot's identity: the CID of its `IdentityView`, which excludes this field itself
+    /// (42 §1.3).
     #[must_use]
     pub fn id(&self) -> &ObjectId {
         &self.id

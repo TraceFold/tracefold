@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 51 §7's harness, pointed at the **third** real adapter — and at the obligation §58 added.
 //!
-//! 51 §7 逐語: 「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する（cedar-
-//! conformance/cedar-specの手法と同型）」. This file is that call, and the whole of what an adapter's
+//! 51 §7, verbatim: "each adapter crate inherits the contract tests merely by calling this harness from `#[test]` (the same shape as cedar- (sem: SEM-gx-adapter-mcp-307)
+//! conformance/cedar-spec's method)". This file is that call, and the whole of what an adapter's (sem: SEM-gx-adapter-mcp-308)
 //! author writes is `support::McpFixture`.
 //!
 //! # 🔴 What the third adapter tests that the second could not
 //!
 //! M7 hand 1 measured that the harness did not move for `gx-adapter-git` (req/99 §2-2), which is the
-//! first evidence that 51 §7's 「adapter非依存」 is a property rather than a hope. What one more adapter
+//! first evidence that 51 §7's "adapter-independent" is a property rather than a hope. What one more adapter (sem: SEM-gx-adapter-mcp-309)
 //! adds is a **different kind** of subject:
 //!
 //! * git's substrate is readable and its footprint is derivable; **this one's footprint is not**. The
@@ -15,15 +17,15 @@
 //!   table), and no obligation in the harness noticed -- because none of them asks an adapter to make
 //!   them the same, and none should.
 //! * git's idempotence is a comparison; **this one's is a record**. 51 §7 contract 7 and L2 hold
-//!   without knowing which, which is what 「adapter非依存」 has to mean if it means anything.
+//!   without knowing which, which is what "adapter-independent" has to mean if it means anything. (sem: SEM-gx-adapter-mcp-310)
 //! * git's `Ok(None)` is an edge case (an unborn branch); **this one's is the ordinary case** (most
 //!   tools have no inverse). Contract 5 is the same obligation over a subject that is common rather
 //!   than rare.
 //!
 //! # 🔴 K2, and why this hand is where it is re-checked
 //!
-//! `req/38` §58 R-4: 「共有 harness に precondition↔postcondition 突合 obligation を足し、監査手が
-//! fs/git/mcp 3 adapter で再検」. The obligation is in `gx-substrate-conformance/src/laws.rs` and its
+//! `req/38` §58 R-4: "add a precondition<->postcondition reconciliation obligation to the shared harness, and re-verify it by the audit hand (sem: SEM-gx-adapter-mcp-311)
+//! across the fs/git/mcp 3 adapters". The obligation is in `gx-substrate-conformance/src/laws.rs` and its (sem: SEM-gx-adapter-mcp-312)
 //! argument is there; what this file does is **run** it against a third adapter whose two fingerprints
 //! come from two different code paths, so that a green K2 here is a measurement and not an inheritance.
 //!
@@ -39,7 +41,7 @@ mod support;
 use gx_substrate_conformance::{run_all, run_contracts, run_laws, Fixture, Origin, Outcome};
 use support::McpFixture;
 
-/// All seven of 51 §7's contracts hold, and none of them is 「無い」.
+/// All seven of 51 §7's contracts hold, and none of them is "none". (sem: SEM-gx-adapter-mcp-313)
 #[test]
 fn the_mcp_adapter_meets_every_one_of_the_seven_contracts() {
     let fixture = McpFixture::new();
@@ -67,7 +69,7 @@ fn the_mcp_adapter_meets_every_one_of_the_seven_contracts() {
     assert!(report.is_conformant(), "nothing contradicted 51 §7");
     assert!(
         report.is_complete(),
-        "every contract was run, which is the half of 51 §7's completion condition the word 「無い」 \
+        "every contract was run, which is the half of 51 §7's completion condition the word \"none\" (sem: SEM-gx-adapter-mcp-314) \
          holds open"
     );
 }
@@ -123,7 +125,7 @@ fn one_run_reports_sixteen_obligations_and_meets_the_completion_condition() {
          assertion twice — once in `gx-adapter-git` and once here"
     );
     println!(
-        "MCP_CONFORMANCE conformant={} complete={} meets_51_7={} passed={} 無い={} restorable_tools={}",
+        "MCP_CONFORMANCE conformant={} complete={} meets_51_7={} passed={} not_supplied={} restorable_tools={} (sem: SEM-gx-adapter-mcp-315)",
         report.is_conformant(),
         report.is_complete(),
         report.meets_51_7(),
@@ -136,9 +138,9 @@ fn one_run_reports_sixteen_obligations_and_meets_the_completion_condition() {
 /// 🔴 The fixture is not vacuous: the catalogue declares something, and the server was reached.
 ///
 /// A run against an **empty** catalogue would answer `Ok(None)` for every `invert`, which makes
-/// contract 4 and L3 「無い」 rather than failed — and `is_complete` would be false, so the assertions
+/// contract 4 and L3 "none" rather than failed -- and `is_complete` would be false, so the assertions (sem: SEM-gx-adapter-mcp-316)
 /// above would catch it. This probe closes the other direction: a fixture whose server was never
-/// touched at all would also satisfy 「no failures」, and 「conformant」 about a run in which nothing
+/// touched at all would also satisfy "no failures", and "conformant" about a run in which nothing (sem: SEM-gx-adapter-mcp-317)
 /// happened is §30's disease.
 #[test]
 fn the_run_reached_the_server_and_the_catalogue_was_not_empty() {
@@ -176,8 +178,8 @@ fn the_run_reached_the_server_and_the_catalogue_was_not_empty() {
 /// removes `apply`'s question to the [`gx_adapter_mcp::CallLog`] and **the sixteen obligations stayed
 /// green** — because this fixture's write tool is idempotent *in effect*, so a second call leaves the
 /// resource where the first did and contract 7's digest comparison sees nothing. That is the whole
-/// reason `log.rs` exists: on an effect substrate, 「the state did not move」 and 「no second effect
-/// happened」 are different facts, and only the second one is 43 T-10c's.
+/// reason `log.rs` exists: on an effect substrate, "the state did not move" and "no second effect (sem: SEM-gx-adapter-mcp-318)
+/// happened" are different facts, and only the second one is 43 T-10c's. (sem: SEM-gx-adapter-mcp-319)
 ///
 /// So the measurement is the **counter**. Two applications of one delta, one call.
 #[test]
@@ -202,7 +204,7 @@ fn the_retry_of_one_delta_sends_one_call() {
     assert_eq!(after_one, 1, "the first apply made {after_one} calls");
     assert_eq!(
         after_two, 1,
-        "the retry sent a second effect. 43 T-10c's recovery is 「run the same delta again」, and on a \
+        "the retry sent a second effect. 43 T-10c's recovery is \"run the same delta again\", and on a (sem: SEM-gx-adapter-mcp-320) \
          substrate whose deltas declare no state the only way that is safe is the record"
     );
     assert_eq!(fixture.log().len(), 1, "one delta, one record");
@@ -279,8 +281,8 @@ fn the_fixture_implementation_is_measured_beside_the_first_two_adapters() {
 /// req/99 §2-2 measured it for git's words. A third adapter is a third chance for the harness to have
 /// grown a branch to make a subject pass, and the words this one would have grown are not git's.
 ///
-/// The scan is over **code lines**: a harness's documentation names adapters by design (「`gx-adapter-fs`
-/// (hand 4) is the first real one」), and 「discusses」 and 「depends on」 are different facts.
+/// The scan is over **code lines**: a harness's documentation names adapters by design ("`gx-adapter-fs` (sem: SEM-gx-adapter-mcp-321)
+/// (hand 4) is the first real one"), and "discusses" and "depends on" are different facts. (sem: SEM-gx-adapter-mcp-322)
 #[test]
 fn the_shared_harness_names_no_adapter_of_this_kind_either() {
     let harness = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -300,8 +302,8 @@ fn the_shared_harness_names_no_adapter_of_this_kind_either() {
             .collect::<Vec<_>>()
             .join("\n");
         // 🔴 The list is this adapter's **vocabulary**, not its English. `resource` and `server` are
-        // in the harness's code already — inside L6's message about 「two applications of one change to
-        // one resource」, which is DPO's word and predates this crate by three milestones. A scan that
+        // in the harness's code already -- inside L6's message about "two applications of one change to (sem: SEM-gx-adapter-mcp-323)
+        // one resource", which is DPO's word and predates this crate by three milestones. A scan that (sem: SEM-gx-adapter-mcp-324)
         // banned them would be measuring the language rather than the dependency, and would have to be
         // weakened the first time it fired, which is how a gate becomes decorative.
         for word in [
@@ -317,7 +319,7 @@ fn the_shared_harness_names_no_adapter_of_this_kind_either() {
             assert!(
                 !code.contains(word),
                 "gx-substrate-conformance/src/{name} names {word:?} in code: 51 §7 asks for an \
-                 「adapter非依存の共有テストハーネス」 and a harness that knows its third subject is not one"
+                 \"an adapter-independent shared test harness\" and a harness that knows its third subject is not one (sem: SEM-gx-adapter-mcp-325)"
             );
         }
     }

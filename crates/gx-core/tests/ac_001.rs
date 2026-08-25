@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-001 (FR-001) — `ObjectSnapshot` and representation independence.
 //!
-//! AC-001 逐語 (`req/spec/30-requirements/34-acceptance.md`): 「Given: `representation`が
-//! `Bytes`と`Json`の2種の`ObjectSnapshot`を構築するコード。When: 両方に対し同一のcore API
-//! 関数（例: 汎用アクセサ）を適用する。Then: 関数シグネチャが`representation`種別によらず
-//! 同一（コンパイルが両方のケースで成功し、型注釈の変更が不要）であることが確認できる。」
+//! AC-001, verbatim (`req/spec/30-requirements/34-acceptance.md`; quoted in SEM-gx-core-103):
+//! "Given: code that builds two `ObjectSnapshot`s whose `representation` is `Bytes` and `Json`.
+//! When: the same core API function (e.g. a generic accessor) is applied to both. Then: it can be
+//! confirmed that the function signature is identical regardless of the `representation` kind
+//! (compilation succeeds in both cases and no type annotation has to change)."
 //!
 //! Field list from 41 §3 / 42 §3.1: `id`, `substrate`, `locator`, `digest`, `representation`.
 //! P-10 is the point being tested: the core is not allowed to branch on representation, so a

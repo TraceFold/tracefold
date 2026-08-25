@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Canonical form and content addressing.
 //!
 //! Spec: `req/spec/40-architecture/41-architecture.md` §2 for the module list and the

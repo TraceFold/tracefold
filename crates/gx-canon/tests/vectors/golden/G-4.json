@@ -1,7 +1,7 @@
 {
   "id": "G-4",
   "kind": "golden",
-  "statement": "SubstrateKind::Custom は 1 key の map として載り、unit variant の文字列形と混ざらない",
+  "statement": "SubstrateKind::Custom is carried as a 1-key map, and is not confused with the unit variant's string form (sem: SEM-gx-canon-142)",
   "type": "DeltaRef",
   "value": {
     "substrate": {
@@ -12,6 +12,6 @@
   "hex": "a2636369645820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff69737562737472617465a166437573746f6d6178",
   "expected": "ACCEPT",
   "spec_anchor": "42 §3.4 / 42 §2.1-2",
-  "origin": "gx self-authored; hex は RFC 8949 §3 の major-type/additional-info 表と 42 §2.1 の 6 規則から手で組み立てた(encoder 出力からの複写ではない)",
-  "note": "serde の externally tagged 表現。unit variant(Fs/Git/Mcp)は素の文字列、newtype variant は {name: value}。"
+  "origin": "gx self-authored; the hex was hand-assembled from RFC 8949 §3's major-type/additional-info table and 42 §2.1's six rules (not copied from encoder output) (sem: SEM-gx-canon-143)",
+  "note": "serde's externally-tagged representation. Unit variants (Fs/Git/Mcp) are bare strings; newtype variants are {name: value}. (sem: SEM-gx-canon-144)"
 }

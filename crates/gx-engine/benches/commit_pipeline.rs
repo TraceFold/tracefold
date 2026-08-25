@@ -1,14 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-065 (NFR-002) — how long one whole commit takes, measured and **recorded**.
 //!
-//! 34 AC-065 逐語: 「Given: fs-adapter経由・tmpfs上のcommit pipeline（submit→Committed, 43のT-1〜T-11
-//! 全通過）。When: `gx-engine`統合ベンチを実行する。Then: end-to-end overhead p99 ≤ 250ms。」
-//! 33 NFR-002 names the transition列 exactly: 「T-1→T-2→T-3→T-4a→T-8→T-9→T-10b→T-11」.
+//! 34 AC-065, verbatim: "Given: via the fs adapter, a commit pipeline on tmpfs (submit→Committed,
+//! all of 43's T-1 through T-11 walked). When: the `gx-engine` integration bench is run. Then:
+//! end-to-end overhead p99 ≤ 250ms." (quoted in SEM-gx-engine-022)
+//! 33 NFR-002 names the transition sequence exactly: "T-1→T-2→T-3→T-4a→T-8→T-9→T-10b→T-11"
+//! (quoted in SEM-gx-engine-022).
 //!
 //! # What the gate of this AC is, and what it is not
 //!
-//! **M3-15** (req/38 §19), which §37 extends to this hand's three benches: 「AC-064 は「p99 を
-//! median+回数+分母つきで測って記録した」を gate とし、閾値比較は記録のみ(設計予算)。「50ms を
-//! 満たした」と主張しない。bench-check の fail 化は Owner 閾値確定後」. The 250 ms here is 33's
+//! **M3-15** (req/38 §19), which §37 extends to this hand's three benches: "AC-064 gates on
+//! 'measured and recorded p99, with median + count + denominator', and the threshold comparison is
+//! record-only (a design budget). It does not claim '50ms was met'. Making the bench-check fail
+//! waits on the Owner fixing the threshold" (quoted in SEM-gx-engine-023). The 250 ms here is 33's
 //! provisional ASM value in the same sense, so **nothing in this file compares a measurement against
 //! it** and nothing in `tools/ci.sh` fails on it.
 //!
@@ -24,13 +29,14 @@
 //!
 //! # 🔴 The fs adapter is here, and N-13 is intact
 //!
-//! req/78 N-13 forbids gx-engine from **shipping** an adapter — 「ここを破ると『どの substrate でも
-//! 同じ engine』が実装で嘘になる」 — and `probes/doubt/tests/workspace_doubt.rs` checks the
-//! `[dependencies]` section for exactly that. AC-065's Given is 「fs-adapter経由」, so this bench needs
+//! req/78 N-13 forbids gx-engine from **shipping** an adapter — breaking this turns "the same
+//! engine no matter the substrate" into a lie in the implementation (quoted in SEM-gx-engine-024) —
+//! and `probes/doubt/tests/workspace_doubt.rs` checks the
+//! `[dependencies]` section for exactly that. AC-065's Given is "via the fs adapter", so this bench needs
 //! a real one, and it is a **dev-dependency**: `cargo tree -p gx-engine -e normal` still shows zero
 //! adapters, `ENGINE_SHIPPED_ADAPTERS=0` still holds, and no published artefact contains a line of
 //! `gx-adapter-fs`. What did change is hand 1's stricter reading of its own instrument
-//! (`ENGINE_ADAPTER_DECLARATIONS=0`, 「not even a dev-dependency」), which this hand moves to 1 and
+//! (`ENGINE_ADAPTER_DECLARATIONS=0`, "not even a dev-dependency", quoted in SEM-gx-engine-025), which this hand moves to 1 and
 //! reports rather than quietly re-scopes — see req/85 §5.2.
 //!
 //! Every byte is written to a **tmpfs**, proved from `/proc/self/mountinfo` (`support::tmpfs_root`),
@@ -72,16 +78,16 @@ fn engine(sandbox: &Sandbox) -> Engine<InjectedEvidence> {
     )
     .expect("a fresh journal opens on the tmpfs");
     // **M5H4-4**: the registrant declares the adapter's build, because 41 §4's seven methods cannot
-    // and N-07 forbids an eighth. A bench that passed 「unknown」 would put a made-up value into the
+    // and N-07 forbids an eighth. A bench that passed "unknown" (quoted in SEM-gx-engine-026) would put a made-up value into the
     // provenance record every commit below writes.
     engine.register_adapter(Arc::new(FsAdapter::new()), "gx-adapter-fs 0.1.0");
     engine
 }
 
-/// The whole of 33 NFR-002's transition列, once, with the end state checked.
+/// The whole of 33 NFR-002's transition sequence (sem: SEM-gx-engine-027), once, with the end state checked.
 ///
 /// Checked rather than assumed: a benchmark that measured a pipeline aborting at T-10a would be fast
-/// and wrong, and 「it returned」 does not say which arm it returned from.
+/// and wrong, and "it returned" (quoted in SEM-gx-engine-028) does not say which arm it returned from.
 fn one_commit(engine: &mut Engine<InjectedEvidence>, sandbox: &Sandbox, n: usize) {
     let name = format!("subject-{n}");
     sandbox.write(&name, b"before");

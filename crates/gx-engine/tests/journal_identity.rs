@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **I-1** applied to the one thing this hand canonically encodes: [`EngineJournalRecord`].
 //!
-//! req/78 §6.0-5: 「新しい IdentityView 射影には I-1 形の防御を同 turn で置く…A-10 形(canonical
-//! encode の map key 数 assert)+「1 field だけ違う 2 値の digest が異なる」を全 field 分」, and
-//! §6.2 手 1 ⑤ makes it conditional on there being an encode at all — 「`EngineJournalRecord` を
-//! canonical encode するなら I-1 形の防御を同 turn で」. There is one: a write-ahead journal is
+//! req/78 §6.0-5: "place an I-1-shaped defense in the same turn as any new IdentityView
+//! projection … A-10-shaped (an assert on the canonical encode's map key count) plus "two values
+//! differing in only one field have different digests" for every field," and
+//! §6.2 hand 1 ⑤ makes it conditional on there being an encode at all — "if
+//! `EngineJournalRecord` gets a canonical encode, an I-1-shaped defense goes in the same turn"
+//! (sem: SEM-gx-engine-748). There is one: a write-ahead journal is
 //! bytes on a device, and 41 §6 allows exactly one encoder for them.
 //!
 //! # What is being defended, and against what
@@ -147,13 +151,14 @@ fn every_record_encodes_under_the_name_its_kind_reports() {
         checked += 1;
     }
     println!("RECORDS_NAMED_ON_THE_WIRE={checked}");
-    assert_eq!(checked, 13, "thirteen variants");
+    assert_eq!(checked, 15, "fifteen variants");
 }
 
 /// The declared key count of each variant's body is its field count, and the names are its fields.
 ///
 /// The arithmetic is printed per variant so that a reader sees the shape of the whole enum in one
-/// place, which is what makes 「43 fields over thirteen records」 a statement about the type rather
+/// place, which is what makes "43 fields over thirteen records" (sem: SEM-gx-engine-749) a
+/// statement about the type rather
 /// than a literal somebody can update in one place.
 #[test]
 fn every_variant_declares_one_key_per_field() {
@@ -182,10 +187,22 @@ fn every_variant_declares_one_key_per_field() {
     }
     println!("JOURNAL_FIELDS_TOTAL={total_fields}");
     assert_eq!(
-        total_fields, 47,
-        "the thirteen variants carry forty-seven fields between them (43 T-4e added one in M5 \
+        total_fields, 59,
+        "the fifteen variants carry fifty-nine fields between them (**DR-46-33** added \
+         `Planned.input_generation`, `req/38` §413 -- the input-generation stage joined at plan \
+         time and journalled as its result so 43 §7-3b's rebuild reproduces the boundary without \
+         the actor; **DR-46-34** added \
+         `InverseEscrowed.reads_attested`, `req/38` §268 ruling 5; 43 T-4e added one in M5 \
          hand 2, hand 4 added four -- M5-25's record and AC-038's rollback outcome -- and \
-         **E-M5-13** added two to `Planned` in M6 hand 1: `locator` and `parents`)"
+         **E-M5-13** added two to `Planned` in M6 hand 1; and \
+         two-phase escrow added `pending` plus the six fields of its two records, \
+         req/38 §98 ruling 1, sem: SEM-gx-engine-750; and **DR-46-26** added \
+         `InverseEscrowed.reads` and `InverseEscrowed.undetermined`, `req/38` §258 -- the escrow's \
+         read-set, journalled because 43 §7-3b's rebuild cannot obtain it any other way, and the \
+         discriminator that tells E-M5-9's `Unavailable` from DR-46-13's `Undetermined`; and \
+         **DR-46-31** added `HumanDecision.verdict_digest`, `req/38` §261 ruling 2b -- the digest \
+         of the ruling the receipt was issued under, without which Σ named the human's verdict \
+         beside T-4c's escalation proof and no escalated commit could be re-issued)"
     );
 }
 
@@ -205,16 +222,24 @@ fn every_record_lands_on_the_canonical_wire_face() {
 // I-1: every field reaches the digest
 // ---------------------------------------------------------------------------
 
-/// 🔴 Each of the forty-three fields moves the record's digest.
+/// 🔴 Each of the fifty-eight fields moves the record's digest.
 ///
 /// The half a key count cannot see (the B-3 shape, req/67 §2.1: every key declared, one of them
 /// filled with a constant). At least one mutant per field, each differing from its baseline in that
 /// field alone, and **the coverage is asserted against the field list** rather than against a
 /// number -- a field added without a mutant is a failing probe rather than a silent gap.
 ///
-/// Forty-three fields, forty-four mutants. `Verdict.verdict_digest` has two, because M5 hand 2 made it
-/// an `Option` and 「a different digest」 and 「no digest at all」 are different records: T-4e writes
+/// Fifty-eight fields, sixty-two mutants. `Verdict.verdict_digest` has two, because M5 hand 2 made it
+/// an `Option` and "a different digest" and "no digest at all" (sem: SEM-gx-engine-751) are
+/// different records: T-4e writes
 /// the second one, and a journal that hashed it like the first would lose INV-S5's distinction.
+/// 🔴 **DR-46-31** gives `HumanDecision.verdict_digest` two for the same reason, and the second
+/// case is load-bearing here: "no digest at all" is a journal written before the field existed,
+/// which `replay.rs` degrades to the old blocked re-issue rather than repairing.
+///
+/// 🔴 The three prose numbers above were stale before this lane (they read "forty-three" and
+/// "forty-four" while the asserts read 56/59) and are corrected here rather than left, because a
+/// doc that contradicts the assert three lines below it is where the next hand's count comes from.
 #[test]
 fn every_field_of_every_record_reaches_its_digest() {
     let baselines: BTreeMap<String, Cid> = every_variant()
@@ -255,14 +280,29 @@ fn every_field_of_every_record_reaches_its_digest() {
          {missing:?}"
     );
     assert_eq!(
-        declared, 47,
-        "the thirteen records declare forty-seven fields (**E-M5-13** added `Planned.locator` and \
-         `Planned.parents` in M6 hand 1)"
+        declared, 59,
+        "the fifteen records declare fifty-nine fields (**DR-46-33** added \
+         `Planned.input_generation`, `req/38` §413; **E-M5-13** added `Planned.locator` and \
+         `Planned.parents` in M6 hand 1; two-phase escrow added `InverseEscrowed.pending` and the \
+         `ApplyObserved`/`InverseCompleted` pair, req/38 §98 ruling 1, sem: SEM-gx-engine-752; \
+         **DR-46-26** added `InverseEscrowed.reads` and `InverseEscrowed.undetermined`, \
+         `req/38` §258; **DR-46-31** added `HumanDecision.verdict_digest`, `req/38` §261 \
+         ruling 2b; and **DR-46-34** added `InverseEscrowed.reads_attested`, `req/38` §268 \
+         ruling 5 — the flag that separates a recorded empty read-set from a journal that \
+         predates the field, which is the one thing between two records `reads` alone spells \
+         identically)"
     );
     assert_eq!(
         mutants.len(),
-        49,
-        "one mutant per field, plus two absent cases: `Verdict.verdict_digest` (43 T-4e) and          `InverseEscrowed.inverse_cid` (E-M5-9)"
+        63,
+        "one mutant per field (**DR-46-33** brings its own, `Planned.input_generation`, and \
+         **DR-46-34** brings `reads_attested`, in the same \
+         commit as the field), plus four absent cases: `Verdict.verdict_digest` (43 T-4e), \
+         `InverseEscrowed.inverse_cid` (E-M5-9), `InverseCompleted.inverse_cid` (the \
+         fold of req/38 §99 ruling 2-④, sem: SEM-gx-engine-753) and **DR-46-31**'s \
+         `HumanDecision.verdict_digest`, whose absence is a pre-DR-46-31 journal and not a \
+         ruling without a proof. **DR-46-26** adds two of each -- \
+         each field and its mutant in the same commit, which is what `missing` above enforces"
     );
 
     for (variant, field, mutant) in mutants {
@@ -287,7 +327,8 @@ fn every_field_of_every_record_reaches_its_digest() {
 ///
 /// `ApplyStarted` and `InverseEscrowed` are the pair this is about: both are
 /// `{ transformation, <a Cid>, at }`, and an encoding that dropped the variant name would identify
-/// 「the inverse was escrowed」 with 「the adapter was asked to apply」. Those are the two records
+/// "the inverse was escrowed" with "the adapter was asked to apply" (sem:
+/// SEM-gx-engine-754). Those are the two records
 /// **E-M5-1** exists to keep apart — the whole of Λ4 is that a recovery must be able to tell them
 /// apart — so a probe that says so is a probe on the erratum itself.
 #[test]
@@ -298,6 +339,12 @@ fn the_variant_name_is_part_of_the_digest() {
     let escrowed = EngineJournalRecord::InverseEscrowed {
         transformation,
         inverse_cid: Some(payload),
+        pending: false,
+        reads: Vec::new(),
+        undetermined: false,
+        // 🔴 **DR-46-34** — this probe is about the variant *name* reaching the digest, so the
+        // flag takes its default; `reads_attested` has its own row in `one_field_changed`.
+        reads_attested: false,
         at,
     };
     let applying = EngineJournalRecord::ApplyStarted {
@@ -331,6 +378,7 @@ fn every_component_of_a_written_fingerprint_reaches_the_digest() {
                 .expect("a short scope is inside MAX_SCOPE_BYTES"),
         ),
         parents: Vec::new(),
+        input_generation: gx_core::BoundaryStage::Unknown,
         at: gx_core::Timestamp(101),
     };
 

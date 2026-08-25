@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Fixtures shared by hand 3's suites.
 //!
 //! Not a test target: cargo builds one integration binary per `.rs` file directly under `tests/`,
@@ -6,7 +8,7 @@
 //! `tools/e2e.sh` counting suites rather than support code.
 //!
 //! `#![allow(dead_code)]` because each suite declares the whole module and uses part of it; without
-//! it, `-D warnings` (51 §11.1 stage 2) turns 「this suite does not need `tid`」 into a build
+//! it, `-D warnings` (51 §11.1 stage 2) turns "this suite does not need `tid`" (sem: SEM-gx-log-170) into a build
 //! failure.
 
 #![allow(dead_code)]

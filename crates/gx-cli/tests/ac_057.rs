@@ -1,28 +1,30 @@
-//! 🔴 **AC-057** (FR-052, 「第三者オフライン検証横断の目玉, P-7」) — two cases, no network.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **AC-057** (FR-052, "the third-party offline-verification crossover's centerpiece, P-7"; sem: SEM-gx-cli-1071) — two cases, no network.
 //!
-//! AC-057 逐語: 「Given: Committed TransformationのReceipt（DSSE署名済み・inclusion proof付き）を
-//! JSONファイルへexportし、ネットワークアクセスを完全遮断した独立環境（例: `unshare --net`コンテナ）に
-//! 配置。When: オフライン検証バイナリ（`gx-cli receipt verify --offline`または新設`gx-verify`、
-//! いずれかの実装形態）を、gxサーバー・gx-log・gx-gateいずれにも接続せず実行。Then: 署名検証・
-//! inclusion proof検証・canonical CID整合検査がすべてpassし`valid`を返す。1bit改ざんしたreceiptでは
-//! 同一のネットワーク遮断環境下でも改ざんを検出しfailする。」判定方法 `integration（ネットワーク遮断
-//! 環境E2E, 2ケース）`, M6.
+//! AC-057 verbatim: "Given: export a Committed Transformation's Receipt (DSSE-signed, with an
+//! inclusion proof) to a JSON file, and place it in an independent environment with network access
+//! completely blocked (e.g. an `unshare --net` container). When: run an offline verification binary
+//! (`gx-cli receipt verify --offline` or a newly-established `gx-verify`, either implementation
+//! form), without connecting to the gx server, gx-log, or gx-gate at all. Then: signature verification,
+//! inclusion proof verification, and canonical CID-consistency checking all pass and it returns
+//! `valid`. A receipt tampered by 1 bit still has its tampering detected and fails, even under the same network-blocked environment." (sem: SEM-gx-cli-1070) Judgment method `integration (network-blocked environment E2E, 2 cases)`, M6.
 //!
 //! # 🔴 The Given did not exist before this hand
 //!
-//! 「既知`Checkpoint`」 has to be produced by somebody, and req/88 §4 M6-24 measured that
+//! "a known `Checkpoint`" (sem: SEM-gx-cli-1072) has to be produced by somebody, and req/88 §4 M6-24 measured that
 //! `gx_witness::dsse::sign_checkpoint` had **zero callers outside gx-witness**: no signed checkpoint
 //! existed anywhere in the shipping code, so AC-057's Given could not be constructed. §47 adopted
 //! (b) — the CLI issues one on request — and `gx log checkpoint` is that producer. This suite builds
 //! its own Given with it, which is why the first probe runs three commands and not one.
 //!
-//! # 「ネットワークアクセスを完全遮断した独立環境」, twice
+//! # "an independent environment with network access completely blocked" (sem: SEM-gx-cli-1073), twice
 //!
 //! Two claims, and they are different:
 //!
 //! 1. **the run**: `tools/verify_m6h2.sh` executes this suite's binary under `unshare -rn`, a
 //!    namespace with no interfaces at all (measured: `ip -o link` prints zero lines inside it), and
-//!    reports the exit status. That is the E2E the AC's 判定方法 asks for, and it is a *run* rather
+//!    reports the exit status. That is the E2E the AC's judgment method (sem: SEM-gx-cli-1074) asks for, and it is a *run* rather
 //!    than an assertion, so it lives in the battery;
 //! 2. **the structure**: [`the_offline_verifier_links_no_network_stack`] asserts that the binary
 //!    doing the verifying cannot reach a network in the first place. A test that passed under
@@ -30,7 +32,7 @@
 //!    dependency closure with no networking crate in it is the stronger and more durable statement,
 //!    and it is the one that keeps being true when hand 6 adds `gx serve`.
 //!
-//! The 判定 belongs to (1). (2) exists because req/88 §6.0-11's lesson is that a check for absence
+//! The judgment (sem: SEM-gx-cli-1075) belongs to (1). (2) exists because req/88 §6.0-11's lesson is that a check for absence
 //! is empty unless something would fire.
 
 mod support;
@@ -59,15 +61,15 @@ fn given(
     let (receipt, index) = support::seed_ledger(&layout, &key, 57, 8);
     println!("AC057_LEAF_INDEX={index}");
 
-    // The receipt, exported to JSON (AC-057's 「JSONファイルへexport」).
+    // The receipt, exported to JSON (AC-057's "export to a JSON file"; sem: SEM-gx-cli-1076).
     let receipt_path = write_json(
         &export.join("receipt.json"),
         &serde_json::to_value(&receipt).expect("serialises"),
     );
 
-    // 🔴 The checkpoint, produced by `gx log checkpoint` — M6-24 採(b)'s first caller of
+    // 🔴 The checkpoint, produced by `gx log checkpoint` — M6-24 adopted (b)'s first caller of (sem: SEM-gx-cli-1077)
     // `sign_checkpoint` outside gx-witness. The signing key is the ledger's owner's, which is the
-    // whole of §47's 「作れるのは台帳の持ち主だけ」.
+    // whole of §47's "only the ledger's owner can make one" (sem: SEM-gx-cli-1078).
     let secret = support::secure_scratch(&format!("{name}_key")).join("ledger.key");
     key.save(&secret).expect("save the ledger key");
     let checkpoint_path = export.join("checkpoint.json");
@@ -122,28 +124,28 @@ fn ac_057_case_one_an_exported_receipt_verifies_offline_against_a_known_checkpoi
 
     assert_eq!(
         out.code, 0,
-        "AC-057's 「`valid`を返す」 is 44 §1.2's `0=valid`"
+        "AC-057's \"returns `valid`\" (sem: SEM-gx-cli-1079) is 44 §1.2's `0=valid`"
     );
     assert_eq!(json["valid"], serde_json::json!(true));
     assert_eq!(
         json["checks"]["signature"],
         serde_json::json!(true),
-        "AC-057's 「署名検証」"
+        "AC-057's \"signature verification\" (sem: SEM-gx-cli-1080)"
     );
     assert_eq!(
         json["checks"]["canonical_cid"],
         serde_json::json!(true),
-        "AC-057's 「canonical CID整合検査」"
+        "AC-057's \"canonical CID-consistency checking\" (sem: SEM-gx-cli-1081)"
     );
     assert_eq!(
         json["checks"]["inclusion"],
         serde_json::json!("verified"),
-        "AC-057's 「inclusion proof検証」, against the checkpoint the file carries"
+        "AC-057's \"inclusion proof verification\" (sem: SEM-gx-cli-1082), against the checkpoint the file carries"
     );
     assert_eq!(json["anchor"], serde_json::json!("checkpoint-file"));
 }
 
-/// 🔴 AC-057 case 2: 「1bit改ざんしたreceiptでは同一のネットワーク遮断環境下でも改ざんを検出しfailする」.
+/// 🔴 AC-057 case 2: "a receipt tampered by 1 bit still has its tampering detected and fails, even under the same network-blocked environment" (sem: SEM-gx-cli-1083).
 #[test]
 fn ac_057_case_two_a_one_bit_tamper_fails_in_the_same_environment() {
     let (export, receipt_path, checkpoint_path, key_path) = given("ac057_fail");
@@ -172,7 +174,7 @@ fn ac_057_case_two_a_one_bit_tamper_fails_in_the_same_environment() {
 
     assert_eq!(
         out.code, 7,
-        "44 §1.2: 「7=無効（署名/CID/包含いずれか不一致）」"
+        "44 §1.2: \"7=invalid (a mismatch in signature/CID/inclusion)\" (sem: SEM-gx-cli-1084)"
     );
     assert_eq!(json["valid"], serde_json::json!(false));
     assert_eq!(
@@ -202,7 +204,7 @@ fn ac_057_case_two_a_one_bit_tamper_fails_in_the_same_environment() {
 ///
 /// `gx receipt verify --offline` with no `--checkpoint` is a legal invocation that checks the
 /// signature and cannot check the ledger claim. Reporting that as `valid` would be the fail-open
-/// req/29 §4 forbids — 「skip と pass を同じ顔にしない」 — and it would make AC-057's first case
+/// req/29 §4 forbids — "skip and pass do not wear the same face" (sem: SEM-gx-cli-1085) — and it would make AC-057's first case
 /// passable **without the checkpoint producer**, i.e. without M6-24.
 #[test]
 fn ac_057_without_a_checkpoint_the_ledger_claim_is_unanchored_and_not_a_pass() {
@@ -224,18 +226,18 @@ fn ac_057_without_a_checkpoint_the_ledger_claim_is_unanchored_and_not_a_pass() {
     assert_eq!(
         json["valid"],
         serde_json::json!(false),
-        "H5-9: 「**Unanchored を pass にしない**」"
+        "H5-9: \"**do not let Unanchored pass**\" (sem: SEM-gx-cli-1086)"
     );
     assert_eq!(out.code, 7);
 }
 
 /// 🔴 What the verifier's binary links, now that `gx serve` exists — the number M6-15's D-7 needs.
 ///
-/// **M6-15 採(a)** ships the offline verifier as a subcommand of the single binary, and §47
-/// registered the fallback (a separate `gx-verify` crate) against a firing condition: 「AC-057 の E2E
-/// で `gx` バイナリの依存閉包が第三者の受け入れを妨げると実測された時」. Hand 2 wrote this probe when
-/// the closure held **no** networking crate at all and predicted its own obsolescence — 「When hand 6
-/// adds `tokio` for `gx serve`, this probe turns red」.
+/// **M6-15 adopted (a)** ships the offline verifier as a subcommand of the single binary, and §47
+/// registered the fallback (a separate `gx-verify` crate) against a firing condition: "measured at AC-057's E2E
+/// that the `gx` binary's dependency closure blocks third-party acceptance" (sem: SEM-gx-cli-1087). Hand 2 wrote this probe when
+/// the closure held **no** networking crate at all and predicted its own obsolescence — "When hand 6
+/// adds `tokio` for `gx serve`, this probe turns red".
 ///
 /// Hand 6 did, and the prediction was half right, which is why the probe is rewritten rather than
 /// deleted. `gx-cli` still declares no networking crate: the runtime lives in gx-api
@@ -244,15 +246,15 @@ fn ac_057_without_a_checkpoint_the_ledger_claim_is_unanchored_and_not_a_pass() {
 /// measured with `tools/m6h6_dep_probe.sh` §6: **126 → 167 packages**, against a verification core
 /// (`gx-canon`'s closure) of **41**.
 ///
-/// So the claim worth keeping is not 「there is no network stack」 — that stopped being true and
+/// So the claim worth keeping is not "there is no network stack" (sem: SEM-gx-cli-1088) — that stopped being true and
 /// pretending otherwise would be the §30 disease, an absence probe reporting 0 because of where it
-/// looks. It is **「the network stack arrives through exactly one declared edge, and that edge is the
-/// one 44 §1.1 names」**: `gx-cli → gx-api`, because `gx serve` starts gx-api. A networking crate
+/// looks. It is **"the network stack arrives through exactly one declared edge, and that edge is the
+/// one 44 §1.1 names"** (sem: SEM-gx-cli-1089): `gx-cli -> gx-api`, because `gx serve` starts gx-api. A networking crate
 /// declared anywhere else in this workspace's shipping graph would be a second road, and a second
 /// road is the thing nobody would notice.
 ///
 /// 🔴 The condition has **not** fired: no third party has been blocked by the closure, and §3 Λ6's
-/// claim (「配布形は検証の量を変えない。変わるのは検証者に何を install させるか」) now has its number
+/// claim ("the distribution form doesn't change how much verification happens; what changes is what the verifier is made to install"; sem: SEM-gx-cli-1090) now has its number
 /// on the D-7 ledger rather than an action. Raised as **M6H6-10**.
 #[test]
 fn the_network_stack_reaches_the_verifier_through_exactly_one_declared_edge() {
@@ -320,7 +322,7 @@ fn the_network_stack_reaches_the_verifier_through_exactly_one_declared_edge() {
     assert_eq!(
         names,
         vec!["gx-api"],
-        "🔴 exactly one crate in this workspace may open a socket, and it is the one 41 §2 describes          as 「axum HTTP+JSONL stream（44準拠）」. Anything else here is a second road into the          verifier's binary: {declarers:?}"
+        "🔴 exactly one crate in this workspace may open a socket, and it is the one 41 §2 describes          as \"axum HTTP+JSONL stream (conforming to 44)\" (sem: SEM-gx-cli-1091). Anything else here is a second road into the          verifier's binary: {declarers:?}"
     );
 
     // And the CLI reaches it the way 47 §1(a) says — through `gx-api`, declared, and through nothing
@@ -335,21 +337,21 @@ fn the_network_stack_reaches_the_verifier_through_exactly_one_declared_edge() {
     println!("GX_CLI_DIRECT_NETWORK_DEPENDENCIES={direct:?}");
     assert!(
         direct.is_empty(),
-        "the hand-6 brief: 「gx-cli に tokio は declare しない(serve は gx-api 側)」. `gx_api::serve`          blocks and builds its own runtime precisely so that this stays true: {direct:?}"
+        "the hand-6 brief: \"gx-cli does not declare tokio (serve is on the gx-api side)\" (sem: SEM-gx-cli-1092). `gx_api::serve`          blocks and builds its own runtime precisely so that this stays true: {direct:?}"
     );
     assert!(
         declares(&cli_deps, "gx-api"),
-        "…and the one edge is declared rather than transitive: `gx serve` calls `gx_api::serve`, so          47 §1(a)'s 「gx-cli が gx serve で gx-api 機能を内包」 is a line in this manifest"
+        "...and the one edge is declared rather than transitive: `gx serve` calls `gx_api::serve`, so          47 §1(a)'s \"gx-cli embeds gx-api's functionality via gx serve\" (sem: SEM-gx-cli-1093) is a line in this manifest"
     );
 }
 
-/// 🔴 **M6H8-11 採(a)** — every answer says whether the anchor was authenticated, and by default it
+/// 🔴 **M6H8-11 adopted (a)** (sem: SEM-gx-cli-1094) — every answer says whether the anchor was authenticated, and by default it
 /// was not.
 ///
-/// Hand 8's question (§49 reserved it for the adversarial audit): 「偽 checkpoint を受け入れるか」.
+/// Hand 8's question (§49 reserved it for the adversarial audit): "does it accept a forged checkpoint" (sem: SEM-gx-cli-1095).
 /// The answer is **yes** — `verify_offline` reads `root_hash` off the checkpoint and nothing else,
 /// and `gx_witness::dsse::verify_checkpoint` had no caller in shipping code — and 44's own text is
-/// satisfied by that, because 44 calls the checkpoint 「既知」. What was missing is the record: a
+/// satisfied by that, because 44 calls the checkpoint "known" (sem: SEM-gx-cli-1096). What was missing is the record: a
 /// verifier who was handed both files by the same party got `valid: true` with no field saying that
 /// the anchor was taken on trust. This probe is that field, on the passing path.
 #[test]
@@ -374,16 +376,16 @@ fn an_unauthenticated_anchor_is_reported_as_unauthenticated() {
     assert_eq!(
         json["anchor_authenticated"],
         serde_json::json!(false),
-        "🔴 M6H8-11 採(a): 「what was not checked」 belongs on the wire, not in a document"
+        "🔴 M6H8-11 adopted (a) (sem: SEM-gx-cli-1097): \"what was not checked\" belongs on the wire, not in a document"
     );
 }
 
-/// 🔴 **M6H8-11 採(b)** — `--checkpoint-key` authenticates the anchor, and refuses a forged one.
+/// 🔴 **M6H8-11 adopted (b)** (sem: SEM-gx-cli-1098) — `--checkpoint-key` authenticates the anchor, and refuses a forged one.
 ///
 /// Three runs and each is a different claim:
 ///
 /// 1. a checkpoint whose signature was flipped is **accepted** without the flag — the audit's
-///    finding, kept as a measurement so that a future change of mind about 44's 「既知」 is visible;
+///    finding, kept as a measurement so that a future change of mind about 44's "known" (sem: SEM-gx-cli-1099) is visible;
 /// 2. the same forged checkpoint **with** the flag exits `7`, and the object says which half
 ///    refused;
 /// 3. the genuine checkpoint with the flag reports `anchor_authenticated: true` — without which (2)
@@ -425,7 +427,7 @@ fn a_checkpoint_key_authenticates_the_anchor_and_refuses_a_forged_one() {
     assert_eq!(
         accepted.code, 0,
         "🔴 the measured answer to §49's question: a checkpoint nobody authenticated is accepted, \
-         because 44 §1.2 calls it 「既知」 — and the flag below is what a third party uses instead of \
+         because 44 §1.2 calls it \"known\" (sem: SEM-gx-cli-1100) — and the flag below is what a third party uses instead of \
          believing that word"
     );
     assert_eq!(
@@ -448,7 +450,10 @@ fn a_checkpoint_key_authenticates_the_anchor_and_refuses_a_forged_one() {
         .env("HOME", export.join("no-such-home")));
     let json = refused.json();
     println!("FORGED_ANCHOR_WITH_KEY exit={} {json}", refused.code);
-    assert_eq!(refused.code, 7, "44 §1.2's 「7=無効」: {json}");
+    assert_eq!(
+        refused.code, 7,
+        "44 §1.2's \"7=invalid\" (sem: SEM-gx-cli-1101): {json}"
+    );
     assert_eq!(json["anchor_authenticated"], serde_json::json!(false));
     assert!(
         json["refusal"]
@@ -503,6 +508,6 @@ fn a_checkpoint_key_with_no_checkpoint_is_refused() {
     );
     assert_eq!(
         out.code, 1,
-        "規律52: a usage error is 1 — authenticating an anchor that was not given is no check at all"
+        "discipline 52 (sem: SEM-gx-cli-1102): a usage error is 1 — authenticating an anchor that was not given is no check at all"
     );
 }

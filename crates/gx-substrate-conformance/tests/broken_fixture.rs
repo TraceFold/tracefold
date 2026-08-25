@@ -1,9 +1,19 @@
-//! 🔴 The negative control this harness never had: an adapter that **fails**.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 The negative control this harness never had: an adapter that **fails**. (sem:
+//! SEM-gx-substrate-conformance-090, SEM-gx-substrate-conformance-091, SEM-gx-substrate-conformance-092,
+//! SEM-gx-substrate-conformance-093, SEM-gx-substrate-conformance-094, SEM-gx-substrate-conformance-095,
+//! SEM-gx-substrate-conformance-096, SEM-gx-substrate-conformance-097, SEM-gx-substrate-conformance-098,
+//! SEM-gx-substrate-conformance-099, SEM-gx-substrate-conformance-100, SEM-gx-substrate-conformance-101,
+//! SEM-gx-substrate-conformance-102, SEM-gx-substrate-conformance-103, SEM-gx-substrate-conformance-104,
+//! SEM-gx-substrate-conformance-105, SEM-gx-substrate-conformance-106, SEM-gx-substrate-conformance-107)
 //!
-//! req/38 §35 K-3 採(塞ぐ) 逐語: 「**tag blocker と認定**。fix 批で**わざと契約を破る fixture 1 本**
-//! (`is_conformant=false` / `is_complete=false` / L5 が fail を返す 3 状態を通す)→
-//! `gx-substrate-conformance` coverage **≥80 回復を数字で印字**」, and K-10 採(a): 「K-3 の fixture 1 本に
-//! 相乗り(`Fixture` 既定実装の観測を同じ subject で)」.
+//! req/38 §35 K-3, adopted (blocked), verbatim: "**recognized as a tag-blocker**. In the fix batch,
+//! **one deliberately contract-breaking fixture** (passing through the three states
+//! `is_conformant=false` / `is_complete=false` / L5 returns a fail) -> **print
+//! `gx-substrate-conformance` coverage's recovery to ≥80 as a number**", and K-10, adopted (a):
+//! "piggyback on K-3's one fixture (observe the `Fixture` trait's default implementations over the
+//! same subject)".
 //!
 //! # Why an instrument needs a subject that fails
 //!
@@ -11,13 +21,14 @@
 //! that costs from two directions and both said the same thing:
 //!
 //! * **coverage 69.51%** (51 §14 asks ≥80), with the missing lines concentrated in `contracts.rs`
-//!   63.43 and `laws.rs` 67.80 -- 「落ちる側」 と 「無い側」 の分岐が走っていない;
+//!   63.43 and `laws.rs` 67.80 -- "the failing side" and "the not-supplied side" branches never ran;
 //! * **7 of 15 `cargo mutants` survivors in the judgement functions themselves** --
 //!   `is_conformant → true`, `meets_51_7 → true`, `Report::failed → 0`, and `law_5`'s
 //!   `resulting_digest == target` guard → `true`.
 //!
-//! The second is the sharper statement. 51 §7's completion condition -- 「各adapterは上記7契約すべてに
-//! 合格しない限りM4/M7完了条件を満たさない」 -- is read off `meets_51_7`, and a `meets_51_7` that
+//! The second is the sharper statement. 51 §7's completion condition -- "no adapter satisfies the
+//! M4/M7 completion condition unless it passes all seven of the above contracts" -- is read off
+//! `meets_51_7`, and a `meets_51_7` that
 //! returned `true` unconditionally would have been reported as correct by the suite that exists to
 //! check it. **An instrument that has only ever been shown one answer is not known to have two.**
 //!
@@ -25,10 +36,10 @@
 //!
 //! [`Flaw`] is one broken obligation each, and [`BrokenFixture`] is the single fixture asked in turn
 //! to tell each lie. The point is not eighteen fixtures -- it is one negative control per obligation,
-//! because a harness that can report 「落ちた」 about contract 3 and not about L6 is a harness with a
+//! because a harness that can report "failed" about contract 3 and not about L6 is a harness with a
 //! hole in exactly the place nobody looked.
 //!
-//! # 「落ちた」 and 「無い」 stay two answers
+//! # "failed" and "NOT_SUPPLIED" stay two answers
 //!
 //! [`Flaw::NotImplemented`] is here to keep §31 M4H3-4 (b) honest in the negative direction too: an
 //! adapter that answers [`gx_substrate::Error::Unimplemented`] is **conformant and incomplete**, and
@@ -43,7 +54,7 @@ use support::{BareFixture, BrokenFixture, Flaw, MockFixture, FLAWS};
 /// Every deliberate flaw is reported, and none of them passes.
 ///
 /// The table this prints is the evidence: one row per obligation broken, with what the harness said
-/// about it. A flaw whose row shows `FAIL=0 無い=0` would be a lie the harness cannot see.
+/// about it. A flaw whose row shows `FAIL=0 NOT_SUPPLIED=0` would be a lie the harness cannot see.
 #[test]
 fn every_deliberate_flaw_is_reported_rather_than_passed() {
     let mut rows: Vec<String> = Vec::new();
@@ -63,7 +74,7 @@ fn every_deliberate_flaw_is_reported_rather_than_passed() {
         any_failed |= report.failed() > 0;
         any_incomplete |= !report.is_complete();
         rows.push(format!(
-            "{flaw:?}: FAIL={} 無い={} PASS={} conformant={} complete={}",
+            "{flaw:?}: FAIL={} NOT_SUPPLIED={} PASS={} conformant={} complete={}",
             report.failed(),
             report.not_supplied(),
             report.passed(),
@@ -90,11 +101,13 @@ fn every_deliberate_flaw_is_reported_rather_than_passed() {
 
 /// Each flaw is reported against the obligation it breaks, and not merely somewhere.
 ///
-/// §30 M4H2-6's rule one layer up: a harness that answered 「something failed」 would pass the probe
+/// §30 M4H2-6's rule one layer up: a harness that answered "something failed" would pass the probe
 /// above while telling an adapter's author nothing. The pairs below are the check each lie is aimed
 /// at, so a report that blames the wrong obligation is RED.
 #[test]
 fn each_flaw_is_reported_against_the_obligation_it_breaks() {
+    // Three of the ten right-hand strings are kept in Japanese (sem: SEM-gx-substrate-conformance-060):
+    // they are `contracts::CONTRACT_IDS` values, which stay Japanese for the reason SEM-006/007 give.
     let aimed_at: [(Flaw, &str); 10] = [
         (Flaw::AnswersAboutAnotherLocator, "snapshot"),
         (Flaw::PlansDifferentlyEachTime, "plan"),
@@ -131,7 +144,8 @@ fn each_flaw_is_reported_against_the_obligation_it_breaks() {
 /// **L5**: the prophecy is compared, and the comparison is what fails.
 ///
 /// The survivor req/76 §2.2 names is `laws.rs:307`'s guard -- `applied.resulting_digest() == &target`
-/// replaced by `true`, which makes 「adapter の自己整合」 (M4-06 採(b)) hold for every adapter that
+/// replaced by `true`, which makes "adapter self-consistency" (M4-06, adopted (b)) hold for every
+/// adapter that
 /// returns anything at all. This is the subject that tells the two apart: the substrate reaches the
 /// promised state and the adapter **reports** a different digest, so only a harness that reads the
 /// report rather than the world can see it.
@@ -161,11 +175,12 @@ fn a_promise_the_adapter_does_not_keep_is_an_l5_failure() {
     );
 }
 
-/// 「まだ無い」 is not 「落ちた」, measured from the failing side (**§31 M4H3-4 (b)**).
+/// "not yet" is not "failed", measured from the failing side (**§31 M4H3-4 (b)**).
 ///
 /// The one flaw of the eighteen that is not a defect. `Error::Unimplemented` is §32 M4H4-2's
-/// permanent vocabulary -- 「「未実装」と「失敗」は永続的に別の事実であり、M7 の git/mcp も部分実装で
-/// 立ち上がる」 -- and this asserts the harness keeps the distinction when the adapter is wrong about
+/// permanent vocabulary -- ""unimplemented" and "failure" are permanently separate facts, and M7's
+/// git/mcp also start up partially implemented" -- and this asserts the harness keeps the
+/// distinction when the adapter is wrong about
 /// nothing and silent about something.
 #[test]
 fn an_adapter_that_is_only_half_built_is_incomplete_rather_than_wrong() {
@@ -179,7 +194,7 @@ fn an_adapter_that_is_only_half_built_is_incomplete_rather_than_wrong() {
         .map(|c| c.id.as_str())
         .collect();
     println!(
-        "HALF_BUILT FAIL={} 無い={unmeasured:?} conformant={} complete={} meets={}",
+        "HALF_BUILT FAIL={} NOT_SUPPLIED={unmeasured:?} conformant={} complete={} meets={}",
         report.failed(),
         report.is_conformant(),
         report.is_complete(),
@@ -188,7 +203,7 @@ fn an_adapter_that_is_only_half_built_is_incomplete_rather_than_wrong() {
     assert_eq!(
         report.failed(),
         0,
-        "an adapter that says 「not yet」 is being reported as wrong, which would make every \
+        "an adapter that says \"not yet\" is being reported as wrong, which would make every \
          partially built M7 adapter look like a defect"
     );
     assert!(!unmeasured.is_empty(), "nothing was reported as unmeasured");
@@ -196,16 +211,17 @@ fn an_adapter_that_is_only_half_built_is_incomplete_rather_than_wrong() {
     assert!(!report.is_complete());
     assert!(
         !report.meets_51_7(),
-        "「無い」 counted toward 「7 契約すべてに合格」"
+        "NOT_SUPPLIED counted toward \"all seven contracts pass\""
     );
 }
 
 /// **K-10**: the `Fixture` trait's own default bodies, observed.
 ///
 /// req/76 §2.2 lists seven survivors in them -- `normalise` and `equivalent_spellings` -- with the
-/// reason in one line: 「既定は fs fixture が override しているので、既定の値を誰も観測しない」. The
-/// defaults are what an M7 adapter author gets before writing anything, and 「nothing」 is the answer
-/// the harness turns into 「無い」 rather than into a pass; a default that quietly returned a value
+/// reason in one line: "since the fs fixture overrides the default, nobody observes the default
+/// value". The defaults are what an M7 adapter author gets before writing anything, and "nothing" is
+/// the answer the harness turns into "NOT_SUPPLIED" rather than into a pass; a default that quietly
+/// returned a value
 /// would put an invented subject under a law.
 ///
 /// Both subjects are here because they cover different halves: [`BareFixture`] takes **all seven**
@@ -260,7 +276,8 @@ fn the_default_bodies_of_the_fixture_trait_answer_nothing() {
         "the default resolved a reference"
     );
 
-    // The same two defaults under the broken fixture, which supplies the pairs: L7 has to be 「無い」
+    // The same two defaults under the broken fixture, which supplies the pairs: L7 has to be
+    // "NOT_SUPPLIED"
     // and not a pass, on a subject where the other obligations were measured.
     let half = BrokenFixture::new(Flaw::RefusesEverything);
     assert!(half.normalise("/mock//x").is_none());
@@ -274,7 +291,7 @@ fn the_default_bodies_of_the_fixture_trait_answer_nothing() {
     println!("L7_WITH_DEFAULTS={:?}", l7.outcome);
     assert!(
         matches!(l7.outcome, Outcome::NotSupplied(_)),
-        "a fixture with no normalisation of its own was reported as {:?} rather than 「無い」",
+        "a fixture with no normalisation of its own was reported as {:?} rather than \"NOT_SUPPLIED\"",
         l7.outcome
     );
 }
@@ -287,7 +304,7 @@ fn the_default_bodies_of_the_fixture_trait_answer_nothing() {
 fn the_negative_control_did_not_break_the_positive_one() {
     let report = run_all(&MockFixture::new());
     println!(
-        "CONTROL_AFTER_BROKEN PASS={} FAIL={} 無い={} meets={}",
+        "CONTROL_AFTER_BROKEN PASS={} FAIL={} NOT_SUPPLIED={} meets={}",
         report.passed(),
         report.failed(),
         report.not_supplied(),

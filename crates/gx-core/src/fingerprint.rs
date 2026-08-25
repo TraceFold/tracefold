@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The precondition fingerprint of CON-2, and the opaque carrier M2 moved without interpreting.
 //!
 //! Spec: 42 §3.5 for what a `Fingerprint` is, 42 §3.10 for the receipt field that needs one,
@@ -11,10 +13,12 @@
 //!
 //! # M4 supplies it here, and the receipt does not move
 //!
-//! **E-M4-1** 逐語: 「`Fingerprint` 実型(substrate/scope/digest)は **gx-core**・scope 決定と比較の
-//! 計算は gx-substrate(E-M2-1「型は下層・計算は上層」・M3-13 先例)。42 §3.10 の
-//! `precondition_fingerprint` は `FingerprintBytes`=`Fingerprint.digest` 成分のまま=**M2 receipt
-//! wire 形不変**。42 §0 の fingerprint.rs 行は「計算の所在」と読み替える」.
+//! **E-M4-1**, verbatim: "the concrete `Fingerprint` type (substrate/scope/digest) is **gx-core**;
+//! deciding the scope and computing the comparison are gx-substrate (E-M2-1 'types down,
+//! computation up', M3-13 precedent). 42 §3.10's `precondition_fingerprint` stays
+//! `FingerprintBytes` = the `Fingerprint.digest` component = **the M2 receipt wire form does not
+//! change**. 42 §0's fingerprint.rs row is re-read as 'where the computation lives'" (quoted in
+//! SEM-gx-core-035).
 //!
 //! So the two types below are not a duplication. [`Fingerprint`] is what an adapter computes and
 //! what a CAS check compares; [`FingerprintBytes`] is the digest component of one, which is the
@@ -36,21 +40,24 @@ use core::fmt;
 /// Three fields and no invariant *between* them -- 42 §3.5 relates none of them -- but one bound on
 /// a field: [`Fingerprint::new`] refuses a `scope` past [`MAX_SCOPE_BYTES`] (**M4H1-2**), which is
 /// the only thing standing between 42 §3.5's advice to take a scope wide and an unbounded string in
-/// a signed receipt. `scope` is the adapter's own identifier for 「対象に干渉しうる周辺状態」 and
-/// `digest` is the digest of whatever that scope names.
+/// a signed receipt. `scope` is the adapter's own identifier for "the surrounding state that could
+/// interfere with the target" (sem: SEM-gx-core-036) and `digest` is the digest of whatever that
+/// scope names.
 ///
 /// # Why there is no `PartialEq` (**E-M4-15**)
 ///
-/// 42 §3.5 defines equality as 「`substrate` と `scope` が一致し、かつ `digest` のバイト列が一致」 and
-/// then adds a case that is not equality at all: 「`scope`不一致の比較は意味を持たないため**adapter
-/// 実装エラーとして扱う**」. `PartialEq` returns a `bool`, so the third answer would have to be
-/// spelled `false` -- and `false` at a CAS check means 「the state moved」, which would abort a commit
+/// 42 §3.5 defines equality as "`substrate` and `scope` agree, and the `digest` byte strings agree"
+/// and then adds a case that is not equality at all: "a comparison across differing `scope`s has no
+/// meaning and is **treated as an adapter implementation error**" (quoted in SEM-gx-core-037).
+/// `PartialEq` returns a `bool`, so the third answer would have to be
+/// spelled `false` -- and `false` at a CAS check means "the state moved", which would abort a commit
 /// for a change that never happened while hiding the bug that actually occurred. E-M4-15 rules the
 /// derive out and [`Fingerprint::cas_eq`] in, so the misuse is a compile error rather than a
 /// silently wrong answer.
 ///
 /// **E-M4-27** then widened the third answer to the other field: 42 §3.5's equality is read as
-/// 「**同一 adapter の産物間でのみ定義**」, so two adapters' fingerprints are a refusal rather than an
+/// "**defined only between the products of one adapter**" (sem: SEM-gx-core-038), so two adapters'
+/// fingerprints are a refusal rather than an
 /// `Ok(false)`. The same argument, one field over -- and the reason it needed a ruling rather than a
 /// reading is that 42 §3.5 names only the `scope` case in so many words.
 ///
@@ -81,18 +88,21 @@ pub struct Fingerprint {
 
 /// The bound on a fingerprint scope, in bytes (**M4H1-2**, ASM-60-4's value one type over).
 ///
-/// req/38 §29 逐語: 「gx-core にも scope 文字列の上限+超過時 digest 化(gx-gate M3-21/ASM-60-4 と同形・
-/// 1024 byte)。**scope の生成規則(ASM-69-1)が実体化する手4 と同窓**で入れる(生成と上限を別の手で
-/// 決めない)」.
+/// req/38 §29, verbatim: "gx-core too gets a bound on the scope string plus digesting when it is
+/// exceeded (the same shape as gx-gate's M3-21/ASM-60-4, 1024 bytes). It goes in **in the same
+/// window as hand 4, where the scope generation rule (ASM-69-1) materialises** (generation and
+/// bound are not decided in separate hands)" (quoted in SEM-gx-core-039).
 ///
-/// One constant, in one place, for every adapter: 42 §3.5 recommends taking a scope 「対象に干渉しうる
-/// 周辺状態」 wide, and a receipt carries what it produces into bytes gx-witness signs. The number is
+/// One constant, in one place, for every adapter: 42 §3.5 recommends taking a scope as wide as "the
+/// surrounding state that could interfere with the target" (sem: SEM-gx-core-040), and a receipt
+/// carries what it produces into bytes gx-witness signs. The number is
 /// gx-gate's [`MAX_MESSAGE_BYTES`](../../gx_gate/constant.MAX_MESSAGE_BYTES.html) rather than a
 /// second opinion about the same question, and it is an assumption an Owner may move.
 pub const MAX_SCOPE_BYTES: usize = 1024;
 
 impl Fingerprint {
-    /// Build one, refusing a scope past [`MAX_SCOPE_BYTES`] (**M4H1-2 採(a)**).
+    /// Build one, refusing a scope past [`MAX_SCOPE_BYTES`] (**M4H1-2, adopted (a)**; sem:
+    /// SEM-gx-core-041).
     ///
     /// The fields are private and read through the accessors below, which is F-6's rule
     /// (`req/46D_AUDIT_RULING_2026-08-07.md` §1) -- one spelling per field -- and, here, also what
@@ -102,11 +112,13 @@ impl Fingerprint {
     /// # The bound is at the constructor, and that is the whole of its value
     ///
     /// An adapter that wanted an unbounded scope cannot get one by not calling a helper: every
-    /// `Fingerprint` in the workspace goes through here, so 「1024 byte を超えない」 is a property of
-    /// the type rather than a discipline. What an adapter does with a longer one is
-    /// [`gx_substrate::fingerprint::elide_scope`] -- 42 §3.8's 「長文は digest 化」, in the crate that
+    /// `Fingerprint` in the workspace goes through here, so "never exceeds 1024 bytes" is a property
+    /// of the type rather than a discipline. What an adapter does with a longer one is
+    /// `gx_substrate::fingerprint::elide_scope` (a crate above this one, so the name is not a
+    /// link) -- 42 §3.8's "long text is digested", in the crate that
     /// can reach a hash (A-1 keeps every digest in gx-canon, and 41 §2 keeps this crate's
-    /// dependencies at 「serde, thiserror程度」). E-M2-1's 「型は下層・計算は上層」, one more time.
+    /// dependencies at "serde, thiserror and not much more"). E-M2-1's "types down, computation up",
+    /// one more time (sem: SEM-gx-core-042).
     ///
     /// # Errors
     /// [`crate::Error::ScopeTooLong`] when `scope` is longer than [`MAX_SCOPE_BYTES`] bytes. The
@@ -128,8 +140,9 @@ impl Fingerprint {
 
     /// 42 §3.5's equality, with the third answer kept (**E-M4-15**).
     ///
-    /// `Ok(true)` is 「同じ名前の状態に居る」, `Ok(false)` is 「動いた」, and `Err` is 「その比較は意味を
-    /// 持たない」. The CAS check of CON-2 (41 §5-5b) is the caller that has to tell the three apart:
+    /// `Ok(true)` is "still in the state of the same name", `Ok(false)` is "it moved", and `Err` is
+    /// "that comparison has no meaning" (sem: SEM-gx-core-043). The CAS check of CON-2 (41 §5-5b)
+    /// is the caller that has to tell the three apart:
     /// 43 T-10a turns `Ok(false)` into `AbortReason::PreconditionChanged`, and an `Err` is a bug in
     /// an adapter rather than a state the machine has a transition for.
     ///
@@ -137,14 +150,15 @@ impl Fingerprint {
     ///
     /// Hand 1 wrote 42 §3.5 to the letter: the sentence calls only the `scope` mismatch an
     /// implementation error, so a `substrate` mismatch answered `Ok(false)`. §29 M4H1-1 (b) ruled
-    /// that asymmetry out -- 「42 §3.5 の等価性は「**同一 adapter の産物間でのみ定義**」と読む」 -- on the
-    /// argument E-M4-15 already made about `PartialEq`: an answer of 「the state moved」 to a
+    /// that asymmetry out -- "42 §3.5's equality is read as '**defined only between the products of
+    /// one adapter**'" (sem: SEM-gx-core-044) -- on the
+    /// argument E-M4-15 already made about `PartialEq`: an answer of "the state moved" to a
     /// question that was never a comparison aborts a commit for a change nobody made and leaves the
     /// real defect, a mis-wired adapter, invisible.
     ///
     /// When both disagree the refusal names the substrate, because that is the whole diagnosis: two
-    /// adapters do not share a scope vocabulary, so 「scope が違う」 would report a symptom of the
-    /// thing that went wrong rather than the thing.
+    /// adapters do not share a scope vocabulary, so "the scopes differ" (sem: SEM-gx-core-045) would
+    /// report a symptom of the thing that went wrong rather than the thing.
     ///
     /// # Errors
     /// [`crate::Error::FingerprintSubstrateMismatch`] when the two substrates differ, and
@@ -186,11 +200,13 @@ impl Fingerprint {
 
 /// The Kani row A-2 deferred to M4, four milestones and four count-slips later (**E-M4-23**).
 ///
-/// 46 §4.2's 「`gx-core` hot path」 row is `compose`, `identity` and **`Fingerprint` comparison**.
+/// 46 §4.2's "`gx-core` hot path" row (sem: SEM-gx-core-046) is `compose`, `identity` and
+/// **`Fingerprint` comparison**.
 /// A-2 (`req/38` §1) deferred the third to M4 because M1 had no such type; §28 **E-M4-23** recorded
 /// that M4's own DoD had lost it again; and req/76 §4 K-7 counted the slip a **fourth** time --
-/// 「本手は Kani を 1 度も走らせておらず harness も書いていない…数え落としが M2-15/16・M3-19 に続いて
-/// 4 回目」. §35 K-7 採(a) put it in the fix 批's DoD, and this module is it.
+/// "this hand has not run Kani once and has written no harness ... the miscount is the fourth,
+/// after M2-15/16 and M3-19" (quoted in SEM-gx-core-047). §35 K-7, adopted (a), put it in the fix
+/// batch's DoD, and this module is it.
 ///
 /// # Why this function and not the whole type
 ///
@@ -214,7 +230,8 @@ impl Fingerprint {
 /// `String`'s own `==`, which is not this crate's code.
 ///
 /// `#[kani::unwind(40)]` is measured rather than guessed, which is **E-46-4**'s standing
-/// instruction (「Kani の unwind/bound は実測で決め harness ごとに明記する」). At 4 -- enough for the
+/// instruction ("Kani's unwind/bound is decided by measurement and stated per harness"; sem:
+/// SEM-gx-core-048). At 4 -- enough for the
 /// one-character scopes -- both harnesses fail with `unwinding assertion loop 0` inside
 /// `<builtin-library-memcmp>`: the loop that actually needs the room is the **32-byte digest**
 /// comparison, not the strings, and 40 is that with margin.
@@ -267,15 +284,17 @@ mod verification {
         let same_scope = left.scope() == right.scope();
 
         match left.cas_eq(&right) {
-            // 「同じ名前の状態に居る」 / 「動いた」: reachable only when the two name one state.
+            // "still in the state of the same name" / "it moved": reachable only when the two name
+            // one state (sem: SEM-gx-core-049).
             Ok(equal) => {
                 assert!(same_substrate);
                 assert!(same_scope);
                 assert!(equal == (left_digest == right_digest));
             }
-            // 「その比較は意味を持たない」, and which of the two mismatches it names is fixed:
+            // "that comparison has no meaning", and which of the two mismatches it names is fixed:
             // the substrate is answered first, because two adapters do not share a scope
-            // vocabulary and 「scope が違う」 would report a symptom instead of the diagnosis.
+            // vocabulary and "the scopes differ" would report a symptom instead of the diagnosis
+            // (sem: SEM-gx-core-050).
             // `crate::Error` spelled out: the name `Error` in this module is `serde::de::Error`,
             // which the serde impls below need and which is a trait.
             Err(crate::Error::FingerprintSubstrateMismatch { .. }) => assert!(!same_substrate),
@@ -293,10 +312,11 @@ mod verification {
     /// A fingerprint compares equal with itself, and the comparison does not depend on the side.
     ///
     /// Reflexivity is what the CAS check of CON-2 rests on -- a commit is admitted when the state
-    /// read at verify and the state read at commit are 「the same」, and the two reads produce two
-    /// values. **M4H1-2**'s elision was argued from this in `gx-substrate`'s `elide_scope`: 「二読の
-    /// 一つの長い path は同じ line に elide しなければ、CAS 検査が自分自身と比較した file について
-    /// 「その比較は意味を持たない」と答える」. Symmetry is the other half: an engine that compared
+    /// read at verify and the state read at commit are "the same", and the two reads produce two
+    /// values. **M4H1-2**'s elision was argued from this in `gx-substrate`'s `elide_scope`: "unless
+    /// one long path read twice elides to the same line, the CAS check answers 'that comparison has
+    /// no meaning' about a file compared with itself" (quoted in SEM-gx-core-051). Symmetry is the
+    /// other half: an engine that compared
     /// `(before, after)` and one that compared `(after, before)` must not disagree, and 42 §3.5
     /// leaves the direction unwritten.
     #[kani::proof]
@@ -325,7 +345,8 @@ mod verification {
 /// # What this is not
 ///
 /// 42 §3.5's `Fingerprint` is `{ substrate: SubstrateKind, scope: String, digest: Cid }`, computed
-/// by an adapter over 「対象に干渉しうる周辺状態」, and its equivalence is defined there as
+/// by an adapter over "the surrounding state that could interfere with the target" (sem:
+/// SEM-gx-core-052), and its equivalence is defined there as
 /// `substrate` and `scope` agreeing *and* the digest bytes matching -- a `scope` mismatch is an
 /// adapter bug, not a `false`. This type has one of those three fields and therefore cannot
 /// implement that relation. Its `PartialEq` is byte equality: the necessary half, and the half the
@@ -357,7 +378,8 @@ impl fmt::Debug for FingerprintBytes {
 
 /// A byte string on the wire and base64 in a human-readable format, which is the same pair
 /// [`crate::dsse`]'s `raw_bytes` writes and settled by the same ruling: **M2H1-4** names
-/// 「sig/FingerprintBytes」 together and recommends base64, and hand 5 takes it. A derive would
+/// "sig / FingerprintBytes" together and recommends base64 (sem: SEM-gx-core-053), and hand 5
+/// takes it. A derive would
 /// write thirty-two integers whose encoded length depends on their values.
 impl serde::Serialize for FingerprintBytes {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

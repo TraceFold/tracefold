@@ -1,8 +1,12 @@
-//! The two delta values of 42 §3.4, and the three rulings that shape their constructors.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The two delta values of 42 §3.4, and the three rulings that shape their constructors. (sem:
+//! SEM-gx-substrate-109, SEM-gx-substrate-110, SEM-gx-substrate-111, SEM-gx-substrate-112,
+//! SEM-gx-substrate-113)
 //!
 //! | ruling | what it fixes | what is measured here |
 //! |---|---|---|
-//! | **M4-17** | 「`applied_at` は engine 注入(`AppliedDelta` 構成子が `Timestamp` を引数に取る)」 | the constructor takes the moment, and this crate names no clock |
+//! | **M4-17** | "`applied_at` is **injected by the engine** (the `AppliedDelta` constructor takes `Timestamp` as an argument)" | the constructor takes the moment, and this crate names no clock |
 //! | **E-M4-15** | `Fingerprint` has no `PartialEq` | `AppliedDelta` has none either, so nothing compares two applications by `==` |
 //! | **E-M4-11** | `GateInput.planned` stays `PlannedDeltaBytes` | no gate crate is named from here, and this crate names no gate |
 //!
@@ -12,7 +16,7 @@
 //! `crates/gx-substrate/tests/planned_delta_identity.rs` holds the projection to the **I-1** form.
 //! This file therefore stops constructing a `reference` and starts reading the one that was minted --
 //! two existing probes were updated rather than deleted, which is the §21 C-9 / §29 M4H1-9 shape and
-//! is raised for追認 in req/72 §2.
+//! is raised for confirmation in req/72 §2.
 
 use gx_core::{Cid, DeltaRef, Fingerprint, SubstrateKind, Timestamp};
 use gx_substrate::{AppliedDelta, PlannedDelta};
@@ -35,7 +39,7 @@ fn planned(payload: &[u8]) -> PlannedDelta {
 
 /// The three fields of 42 §3.4, read back through the accessors F-6 asks for.
 ///
-/// The third is now derived rather than supplied (**M4H1-3** 採(a)), so what this asserts about it is
+/// The third is now derived rather than supplied (**M4H1-3**, adopted (a)), so what this asserts about it is
 /// what 42 §3.4 asks of it: the substrate agrees with the delta's own, and the digest is not the
 /// all-zero placeholder the constructor projects through. Whether the digest is the *right* one is
 /// `planned_delta_identity.rs`'s question, where the projection is the subject.
@@ -60,7 +64,7 @@ fn a_planned_delta_is_the_three_fields_of_42_3_4() {
 /// answer (E-M4-15), and it is not in this struct.
 ///
 /// Now that `reference` is minted, `==` over all three fields and agreement of the projection are
-/// the same relation -- which is the sentence 42 §3.4's 「自身のcanonical参照」 was always making.
+/// the same relation -- which is the sentence 42 §3.4's "its own canonical reference" was always making.
 #[test]
 fn two_payloads_are_two_planned_deltas() {
     assert_eq!(planned(b"a"), planned(b"a"));
@@ -69,7 +73,8 @@ fn two_payloads_are_two_planned_deltas() {
 
 /// The four fields of 42 §3.4, with the moment supplied rather than found (**M4-17**).
 ///
-/// 41 §6 逐語: 「乱数・時刻はengine境界で注入（決定的リプレイのため）」. The constructor's signature is
+/// 41 §6, verbatim: "randomness and time are injected at the engine boundary (for deterministic
+/// replay)". The constructor's signature is
 /// the enforcement: an adapter that wanted to date its own record would have to be handed a
 /// `Timestamp` first, and there is nowhere in this crate to get one from.
 #[test]

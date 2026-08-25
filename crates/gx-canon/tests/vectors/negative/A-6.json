@@ -1,18 +1,18 @@
 {
   "id": "A-6",
   "kind": "codec-deviation",
-  "statement": "64 bit 未満の精度で書かれた浮動小数点を含む byte 列は decode されない",
+  "statement": "A byte string containing a float written at less than 64-bit precision is not decoded",
   "vector": "fa3f800000",
   "expected": "REJECT",
   "expected_error": "FloatNotAllowed",
   "normative_basis": "gx-policy",
   "tier": "Tier3",
-  "deviation": "1.0 を major 7・ai=26(single precision)で書いた。DAG-CBOR は常に 64 bit を要求する。",
+  "deviation": "Wrote 1.0 as major 7, ai=26 (single precision). DAG-CBOR always requires 64 bits.",
   "spec_anchor": "ipld/ipld@a65340b spec.md L63 / 42 §2.1-4 / req/33 §2 A-6",
   "origin": "gx self-authored from spec (req/33 §2)",
   "control": {
     "vector": "fb3ff0000000000000",
     "expected": "REJECT",
-    "note": "IPLD の canonical 形(64 bit)。gx はそれも拒む——42 §2.1-4 が canonical 構造体に float を置かないため。対照が ACCEPT にならない 2 件のうちの 1 つで、その差そのものが P-1 vector の存在理由"
+    "note": "IPLD's canonical form (64 bit). gx refuses this one too -- because 42 §2.1-4 places no floats in canonical structures. One of the two cases where the control does not become ACCEPT, and that very difference is why the P-1 vector exists"
   }
 }

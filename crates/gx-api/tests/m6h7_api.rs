@@ -1,11 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! M6 hand 7's three surface changes, each of which a previous hand raised and a ruling scheduled
-//! for 「手7 以降最初に触る手」.
+//! for "the first hand from hand 7 onward that touches it" (sem: SEM-gx-api-316).
 //!
 //! | # | ruling | what changes |
 //! |---|---|---|
-//! | 1 | **E-M6-22** (§53, M6H6-4 採(a)) | the shutdown `503`'s `gx_code` stops being `INTERNAL` |
-//! | 2 | **M6H5-12 採(c)+(a)**, 手7 窓 (§52) | `/healthz`'s `engine_version` comes from the engine |
-//! | 3 | **M6H6-15** (§53, 検収者起票) | `GET /transformations` rows carry `inverse_status` |
+//! | 1 | **E-M6-22** (§53, M6H6-4, adopted (a)) | the shutdown `503`'s `gx_code` stops being `INTERNAL` |
+//! | 2 | **M6H5-12, adopted (c)+(a)**, hand 7's window (§52; sem: SEM-gx-api-317) | `/healthz`'s `engine_version` comes from the engine |
+//! | 3 | **M6H6-15** (§53, filed by the acceptance reviewer) | `GET /transformations` rows carry `inverse_status` |
 //!
 //! # Why one file rather than three edits
 //!
@@ -25,12 +27,12 @@ use support::Server;
 /// 🔴 **E-M6-22** — the refusal a shutting-down server sends names itself.
 ///
 /// Hand 6 folded it to `INTERNAL` and raised **M6H6-4** because 44 §2.3's twelve codes are all words
-/// about a *request* and none is a word about a *server*. §53 ruled 採(a): `UNAVAILABLE` (503, CLI
+/// about a *request* and none is a word about a *server*. §53 ruled adopted (a) (sem: SEM-gx-api-318): `UNAVAILABLE` (503, CLI
 /// exit 1) as 44 §2.6's backward-compatible addition.
 ///
 /// What the fold cost, said as a test rather than as a sentence: a client's retry policy reads
-/// `gx_code`, and `INTERNAL` means 「this server made a mistake」 while `UNAVAILABLE` means 「this
-/// server is going away and the replacement will answer」. Those are different instructions to a
+/// `gx_code`, and `INTERNAL` means "this server made a mistake" while `UNAVAILABLE` means "this
+/// server is going away and the replacement will answer" (sem: SEM-gx-api-319). Those are different instructions to a
 /// caller, and one of them was wrong.
 #[tokio::test]
 async fn a_shutting_down_server_answers_unavailable_rather_than_internal() {
@@ -60,7 +62,7 @@ async fn a_shutting_down_server_answers_unavailable_rather_than_internal() {
     assert_eq!(
         gx_api::gx_code::UNAVAILABLE_CLI_EXIT,
         1,
-        "44 §1.4's 1 (内部エラー) is the exit a CLI gets: there is no 「server went away」 exit"
+        "44 §1.4's 1 (internal error) is the exit a CLI gets: there is no \"server went away\" exit (sem: SEM-gx-api-320)"
     );
     assert!(
         after.json["detail"]
@@ -108,7 +110,7 @@ fn the_ruled_addition_is_named_beside_the_transcription_and_not_inside_it() {
 // 2. M6H5-12 — the engine's version, from the engine
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M6H5-12 採(c)+(a)** — `/healthz`'s `engine_version` is the **engine's**, not this crate's.
+/// 🔴 **M6H5-12, adopted (c)+(a)** (sem: SEM-gx-api-321) — `/healthz`'s `engine_version` is the **engine's**, not this crate's.
 ///
 /// Hand 5 wrote `env!("CARGO_PKG_VERSION")` and raised the borrow: it is gx-api's version, and 44
 /// §2.2's field is called `engine_version`. 41 §2 puts both crates in one workspace at one version,
@@ -145,11 +147,11 @@ async fn healthz_reports_the_engines_version_and_not_this_crates() {
 /// Unavailable`); §53's ticket says three, and the discrepancy is raised in `req/95` rather than
 /// resolved by picking one. What the row carries is the engine's own answer, and `null` for a row
 /// that has no escrow entry at all — a transformation that never reached T-10b has no undo, and
-/// saying `"Unavailable"` there would answer 「invert() refused」 about a transformation nobody ever
+/// saying `"Unavailable"` there would answer "invert() refused" (sem: SEM-gx-api-322) about a transformation nobody ever
 /// asked to invert.
 ///
 /// Why it matters on the **list** and not only on `GET /transformations/{id}`: DR-1(a)'s wedge is
-/// verified undo, and the question an operator asks a fleet is 「which of these can I still undo」.
+/// verified undo, and the question an operator asks a fleet is "which of these can I still undo" (sem: SEM-gx-api-323).
 /// One row at a time is not that question.
 #[tokio::test]
 async fn a_transformation_row_carries_its_inverse_status() {
@@ -172,7 +174,7 @@ async fn a_transformation_row_carries_its_inverse_status() {
     let row = &listed.json["items"][0];
     assert!(
         row.get("inverse_status").is_some(),
-        "the field is present even when the answer is 「none yet」: {row}"
+        "the field is present even when the answer is \"none yet\" (sem: SEM-gx-api-324): {row}"
     );
     assert!(
         row["inverse_status"].is_null(),

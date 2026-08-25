@@ -1,11 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-041** — a `Deny` under `Enforce` never reaches `apply` (FR-027, FR-036, INV-S1).
 //!
-//! 34 AC-041 逐語:
+//! 34 AC-041, verbatim:
 //!
-//! > Given: `EnforcementMode::Enforce`（既定）。When: 任意のCandidate Tに対し`Gate::verify`がDenyを
-//! > 返す。Then: Tは`Denied`終端状態に留まり、`canonicalize`（T-8r）・`commit_start`・
-//! > `adapter.apply`のいずれも呼ばれない（モック呼び出し0回）。プロパティ
-//! > `mode=Enforce ∧ verdict=Deny ⇒ status=Denied ∧ apply_called=false`を全生成ケースで検証する。
+//! > Given: `EnforcementMode::Enforce` (default). When: `Gate::verify` returns Deny for an
+//! > arbitrary Candidate T. Then: T stays at the terminal `Denied` state, and none of
+//! > `canonicalize` (T-8r), `commit_start`, or `adapter.apply` is ever called (mock call count = 0).
+//! > Verify the property `mode=Enforce ∧ verdict=Deny ⇒ status=Denied ∧ apply_called=false` over
+//! > every generated case. (sem: SEM-gx-engine-516)
 //!
 //! # Three refusals, not one
 //!
@@ -14,7 +17,8 @@
 //! must refuse for the same reason, and `adapter.apply` must not be reached — which is a **count**
 //! rather than a return value. So each run reads all three: the two `Err`s and the counter.
 //!
-//! `AC-035` measured 「apply is not called from a non-`Committing` state」 in general; this measures
+//! `AC-035` measured "apply is not called from a non-`Committing` state" (sem:
+//! SEM-gx-engine-517) in general; this measures
 //! the one road a policy refusal takes, which is the road FR-027 exists for.
 
 mod support;
@@ -126,7 +130,10 @@ fn ac_041_a_denial_under_enforce_stops_at_denied() {
         Some("InvalidState"),
         "and `commit_start` has none either"
     );
-    assert_eq!(out.applies, 0, "「モック呼び出し0回」");
+    assert_eq!(
+        out.applies, 0,
+        "\"mock call count = 0\" (sem: SEM-gx-engine-518)"
+    );
     assert_eq!(
         out.leaves, 0,
         "INV-S4: a `Denied` does not appear in the ledger"
@@ -141,16 +148,17 @@ fn ac_041_a_denial_under_enforce_stops_at_denied() {
         "nothing degraded this one: it was refused and stayed refused"
     );
     // The one thing that **is** issued: ASM-14's verdict receipt for the `Deny` (42 §3.10:
-    // 「全`Verdict`＝Admit/Deny/Escalateで発行」). A denial nobody can prove happened is a denial an
-    // operator cannot audit.
+    // "issued for every `Verdict` = Admit/Deny/Escalate", sem: SEM-gx-engine-519). A denial
+    // nobody can prove happened is a denial an operator cannot audit.
     assert_eq!(out.verdict_receipts, 1, "M5H4-6: T-4b issues one");
 }
 
-/// 🔴 The property AC-041 names, over generated cases (**M5-15 採(b)**).
+/// 🔴 The property AC-041 names, over generated cases (**M5-15, adopted (b)**; sem: SEM-gx-engine-520).
 ///
 /// The generator varies the seed, which varies the locator, the `IntentId`, the
 /// `TransformationId` and the delta CID. What it cannot vary is the mode or the verdict, because
-/// the criterion fixes both in its Given — so the 「全生成ケース」 is over the transformations, not
+/// the criterion fixes both in its Given — so "every generated case" (sem: SEM-gx-engine-521)
+/// is over the transformations, not
 /// over the quadrants (those are AC-037's grid).
 #[test]
 fn ac_041_the_property_holds_for_every_generated_case() {

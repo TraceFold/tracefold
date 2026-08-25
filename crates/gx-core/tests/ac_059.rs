@@ -1,17 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-059 (FR-054) — θ(g∘f) ≤ θ(g) + θ(f), and a property that can actually fail.
 //!
-//! AC-059 逐語: 「Given: 合成可能な2つのTransformation f, g（`f.target = g.subjectに対応するCid`）を
-//! ランダム生成し、任意の`MorphismMeasure`実装Θを与える。When: `θ(compose(g,f))`と`θ(g)+θ(f)`を
-//! 計算する。Then: 常に`θ(g∘f) ≤ θ(g) + θ(f)`が成立する。法則に違反する意図的実装（例: θを2倍で
-//! 返す壊れた実装）をconformance/に負テストとして用意し、proptestがそれを棄却する（テスト失敗する）
-//! ことも確認する。」
+//! AC-059, verbatim (quoted in SEM-gx-core-125): "Given: two composable Transformations f, g
+//! (`f.target = the Cid corresponding to g.subject`) generated at random, and any `MorphismMeasure`
+//! implementation Θ. When: `θ(compose(g,f))` and `θ(g)+θ(f)` are computed. Then: `θ(g∘f) ≤ θ(g) +
+//! θ(f)` always holds. A deliberately law-breaking implementation (e.g. a broken one that returns
+//! θ doubled) is provided under conformance/ as a negative test, and it is also confirmed that
+//! proptest rejects it (the test fails)."
 //!
 //! # Two readings that had to be settled before the first line
 //!
-//! **「任意の`MorphismMeasure`実装Θ」.** A property test cannot quantify over all implementations
-//! of a trait; nothing can. What is testable is a registry -- the implementations in
-//! `conformance/` -- plus the negative case that shows the property discriminates. That is the
-//! same shape 46 §4.1 gives the law ("Measure法則: θ(g∘f) ≤ θ(g) + θ(f) | gx-core"), and it is
+//! **"any `MorphismMeasure` implementation Θ"** (sem: SEM-gx-core-126). A property test cannot
+//! quantify over all implementations of a trait; nothing can. What is testable is a registry -- the
+//! implementations in `conformance/` -- plus the negative case that shows the property
+//! discriminates. That is the same shape 46 §4.1 gives the law ("Measure law: θ(g∘f) ≤ θ(g) + θ(f)
+//! | gx-core"; sem: SEM-gx-core-127), and it is
 //! why the law is documented on `MorphismMeasure` and enforced here rather than in the type.
 //!
 //! **`compose(g,f)` vs `compose(f,g)`.** AC-059 writes the composite `compose(g,f)` in the
@@ -116,7 +120,8 @@ fn ac_059_the_lawful_measure_is_not_the_zero_measure() {
 
 /// A pair that is not composable does not get composed.
 ///
-/// AC-059's Given is 「合成可能な2つの Transformation」, so the property says nothing about the
+/// AC-059's Given is "two composable Transformations" (sem: SEM-gx-core-128), so the property
+/// says nothing about the
 /// other case -- but the other case has to be refused rather than silently composed, or the
 /// Given would be unenforceable and the law would be measured over arrows that do not connect.
 #[test]

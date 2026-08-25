@@ -1,7 +1,7 @@
 {
   "id": "FA-7",
   "kind": "false-admit",
-  "statement": "逆 delta が作れない(invert_available=false)場合でも、拒否された変換は Escalate へ昇格してはならない",
+  "statement": "a refused transformation must not be promoted to Escalate even when no inverse delta can be built (invert_available=false) (sem: SEM-gx-gate-342)",
   "expected": "MUST_DENY",
   "expected_reason": {
     "source": "Policy",
@@ -15,7 +15,7 @@
     "invert_available": false,
     "evidence": 0
   },
-  "why": "E-M3-4 の Escalate 生成規則(invert_available=false)と AC-027 の Deny 優越が同時に当たる唯一の入力。3 本の腕の順が入れ替わると、拒否された変換が「人間に承認を求める」形になる=2 つの系統が既に拒否した物を人へ回す。**Escalate は Deny でない**ので、これは偽 Admit と同じ穴の別の綴り(admit されなくても『通り道が開く』)。",
+  "why": "the one input that hits both E-M3-4's Escalate generation rule (invert_available=false) and AC-027's Deny precedence at once. If the three arms' order were swapped, a refused transformation would take the shape of 'asking a human for approval' -- routing to a person what two systems already refused. Since **Escalate is not Deny**, this is a different spelling of the same hole as false-admit (a 'road opens' even without admitting). (sem: SEM-gx-gate-343)",
   "spec_anchor": "34 AC-027 / 34 AC-048 / req/38 §19 M3-04(E-M3-4)",
   "origin": "gx self-authored for M3 hand 6",
   "control": {
@@ -27,6 +27,6 @@
       "evidence": 0
     },
     "expected": "MUST_ESCALATE",
-    "note": "**対照が Admit ではなく Escalate である事が要点**: flag は同じなので、負例が Deny になる理由は flag ではなく locator だと言える。対照を Admit にすると flag を変える事になり、対にならない"
+    "note": "**the point is that the control is Escalate, not Admit**: the flag is the same, so the reason the negative case is Deny can be said to be the locator, not the flag. Making the control Admit would mean changing the flag, and it would stop being a pair (sem: SEM-gx-gate-344)"
   }
 }

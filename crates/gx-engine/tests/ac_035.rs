@@ -1,26 +1,30 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-035 (FR-035) — `apply` is called from the `Committing` state, after the CAS, once.
 //!
-//! 34 AC-035 逐語: 「Given: パイプラインの非Committing状態全て（Candidate/Verifying/Admitted/
-//! Canonicalized）。When: 通常実行。Then: モックadapterの`apply`呼び出し回数=0。Committing状態で
-//! CAS通過後にのみ`apply`が1回呼ばれる。」
+//! 34 AC-035, verbatim: "Given: every non-Committing state of the pipeline (Candidate/Verifying/
+//! Admitted/Canonicalized). When: ordinary execution. Then: the mock adapter's `apply` call count
+//! = 0. `apply` is called exactly once, only in the Committing state after the CAS passes."
+//! (sem: SEM-gx-engine-447)
 //!
-//! 32 FR-035: 「gx-engineは commit承認後にのみ `adapter.apply(delta)` を呼び出さなければならず、engine
-//! 自身がsubstrateへの変更処理を実行してはならない（MUST）」.
+//! 32 FR-035: "gx-engine MUST call `adapter.apply(delta)` only after a commit is approved, and the
+//! engine itself MUST NOT perform the substrate change" (sem: SEM-gx-engine-447).
 //!
-//! # 則 2, with two instruments (req/78 §6.2 手 4)
+//! # Rule 2, with two instruments (req/78 §6.2, hand 4)
 //!
-//! > AC-035 green(非 Committing 全状態で apply 0 回+**Committing で CAS 通過後に 1 回**=則 2 の
-//! > 単一性を source 走査と counter の**二計器**で)
+//! > AC-035 green (apply 0 times across every non-Committing state, **and once in Committing after
+//! > the CAS passes** -- Rule 2's singleness measured by **two instruments**, a source scan and a
+//! > counter) (sem: SEM-gx-engine-447)
 //!
 //! The counter is here. The scan is `tests/commit_protocol.rs`
-//! (`adapter_apply_is_invoked_from_one_line_in_the_crate`), and the two答える different questions: a
+//! (`adapter_apply_is_invoked_from_one_line_in_the_crate`), and the two answer different questions (sem: SEM-gx-engine-448): a
 //! counter says how many times a road was walked in one scenario, and a scan says how many roads
 //! exist. Neither implies the other — a second call site that this scenario does not reach is
 //! invisible to the counter, and a road walked twice is invisible to the scan.
 //!
 //! # Why the state list is walked rather than asserted at the end
 //!
-//! 「非Committing状態全て」 is four states, and a probe that ran the whole pipeline and then checked
+//! "every non-Committing state" (sem: SEM-gx-engine-449) is four states, and a probe that ran the whole pipeline and then checked
 //! the counter would be measuring the sum. The counter is read **after each transition**, so a
 //! `verify` that applied and a `canonicalize` that applied are different failures rather than one.
 
@@ -131,7 +135,7 @@ fn ac_035_the_verifying_state_is_covered_by_the_journal_rather_than_by_a_return(
 /// 43's transition table gives `commit_start` one from-state, and the states either side of it are
 /// the ones a caller is most likely to reach for: `Candidate` (before verification) and `Committed`
 /// (again). Neither may touch the substrate, and the second is 43 T-9's idempotency rule rather than
-/// a refusal — 「二重commit_start要求は既にCommittingなら無視」, with `Committed` terminal under 43 §1.
+/// a refusal — "a duplicate `commit_start` request is ignored once already Committing" (sem: SEM-gx-engine-450), with `Committed` terminal under 43 §1.
 #[test]
 fn ac_035_a_commit_from_the_wrong_state_applies_nothing() {
     let (mut e, counts) = engine("ac035_wrong_state");
@@ -180,8 +184,8 @@ fn ac_035_a_commit_from_the_wrong_state_applies_nothing() {
     assert_eq!(
         e.journal().len(),
         records,
-        "「無視」 in a journal means no record: a re-entry recorded as an event is a re-entry \
-         reported as a second commit"
+        "\"ignored\" in a journal means no record: a re-entry recorded as an event is a re-entry \
+         reported as a second commit (sem: SEM-gx-engine-451)"
     );
     assert_eq!(e.ledger().log().len(), 1, "INV-S3: at most one leaf per id");
 }

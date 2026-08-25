@@ -1,18 +1,20 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! What a gate answers, and the record it keeps of how it got there (42 §3.8).
 //!
 //! Spec: 41 §4 for `Verdict`'s three arms, 42 §3.8 for the field tables, 42 §1.3 for what of them
 //! reaches a CID. Rulings: **E-M3-3** (the error path), **E-M3-8** (`ProofRef` is gx-core's),
-//! **E-M3-9** (the order of the vectors), **E-M3-10** (which 「合成」 this file is about).
+//! **E-M3-9** (the order of the vectors), **E-M3-10** (which "composition" this file is about). (sem: SEM-gx-gate-138)
 //!
 //! # This hand builds the shapes and none of the evaluation
 //!
-//! req/60 §5.2 gives hand 1 「型と構成子のみ」: Cedar evaluation is hand 2 (`policy.rs`), the
+//! req/60 §5.2 gives hand 1 "types and constructors only" (sem: SEM-gx-gate-139): Cedar evaluation is hand 2 (`policy.rs`), the
 //! invariant registry is hand 3 (`invariant.rs`), and composing the two into a `Verdict` --
 //! AC-027's Deny-precedence over the four quadrants -- is hand 4. So nothing here decides
 //! anything. What is here is the vocabulary those hands will fill, plus the one invariant that
 //! belongs to the *shape* rather than to the evaluation: the canonical order of E-M3-9.
 //!
-//! # Two things called 「合成」 (E-M3-10)
+//! # Two things called "composition" (E-M3-10) (sem: SEM-gx-gate-140)
 //!
 //! [`AdmitProof::composed_from`] is the composition of **transformations** (T5's witness chain, 42
 //! §3.8), and AC-027's Deny-precedence is the meet of the two **evaluation systems**. 51 §3 wrote
@@ -46,11 +48,12 @@ use serde::{Deserialize, Serialize};
 use crate::policy::EscalationTicket;
 use crate::{Error, Result, MAX_MESSAGE_BYTES, REASON_CODES};
 
-/// 41 §4 逐語: `Verdict { Admit(AdmitProof), Deny(Vec<Reason>), Escalate(EscalationTicket) }`.
+/// 41 §4 verbatim: `Verdict { Admit(AdmitProof), Deny(Vec<Reason>), Escalate(EscalationTicket) }`. (sem: SEM-gx-gate-141)
 ///
 /// Three arms and no fourth. **Evaluation that could not be performed is not an arm** -- that is
-/// `Err` from [`crate::Gate::verify`], and E-M3-3 is explicit about why: 「評価不能(⊥)は Deny でも
-/// Escalate でもない——『拒否』と『壊れている』を同じ verdict で語ると判定の意味論が濁る」. A
+/// `Err` from [`crate::Gate::verify`], and E-M3-3 is explicit about why: "unevaluable (⊥) is neither
+/// Deny nor Escalate -- naming 'refused' and 'broken' with the same verdict muddies the semantics of
+/// the decision" (sem: SEM-gx-gate-142). A
 /// caller that treats an `Err` as a `Deny` has made a policy decision the engine makes for it
 /// (43 T-4d: fail-closed lives up there, not in here).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -86,10 +89,11 @@ impl Verdict {
     ///
     /// req/38 §22's D-1 ruling:
     ///
-    /// > 「D-1(方向裁定=案 a・実装は手 4): `Verdict::Deny(Vec<Reason>)` の正準順は**全 Reason を
-    /// > (source 種別, id, code) の辞書順で全順序化**する。M2-10 が Deny の proof_digest を Vec の
-    /// > CID とする以上、順序は identity の一部——意味を持たない順序を identity に残す事は「決定
-    /// > 不変・記録可変」への道」 → **E-M3-12**
+    /// > "D-1 (directional ruling = option a, implemented in hand 4): `Verdict::Deny(Vec<Reason>)`'s
+    /// > canonical order **totally orders every Reason by (source kind, id, code), lexicographic**.
+    /// > Since M2-10 makes a Deny's `proof_digest` the CID of the Vec, order is part of identity --
+    /// > leaving a meaningless order inside identity is a road to 'the decision is fixed, the record
+    /// > is mutable'" -> **E-M3-12** (sem: SEM-gx-gate-143)
     ///
     /// Hand 3 concatenated the policy reasons before the invariant ones, which is a fact about
     /// which system [`crate::Gate::verify`] asks first rather than about the refusal. Sorting is
@@ -102,7 +106,7 @@ impl Verdict {
     /// within an equivalence class the ruling leaves unordered; it is reported in req/64 §4 rather
     /// than treated as settled.
     ///
-    /// Duplicates are kept, not folded (H4-3: 「多重度は畳まない・順序のみ正準化」).
+    /// Duplicates are kept, not folded (H4-3: "multiplicity is not folded; only order is canonicalized"). (sem: SEM-gx-gate-144)
     ///
     /// # Errors
     /// [`crate::Error::EmptyDeny`] if `reasons` is empty. 42 §3.8 gives `Deny` a `Vec<Reason>` and
@@ -121,15 +125,16 @@ impl Verdict {
     ///
     /// # The rule M2-10 asked for, as a function (req/49 §3)
     ///
-    /// > 「**M2-10**: Deny/Escalate の `proof_digest` 元が未定義。42 §3.10 は `verdict:
-    /// > VerdictSummary { kind, proof_digest: Cid }` だが `AdmitProof` は Admit 用のみ …
-    /// > Deny=`Vec<Reason>`・Escalate=`EscalationTicket` の CID を取る規則を明記(型自体は M3)」
+    /// > "**M2-10**: the source of Deny/Escalate's `proof_digest` is undefined. 42 §3.10 gives
+    /// > `verdict: VerdictSummary { kind, proof_digest: Cid }` but `AdmitProof` is Admit-only ...
+    /// > spell out the rule for taking Deny=`Vec<Reason>`'s and Escalate=`EscalationTicket`'s CID
+    /// > (the type itself is M3)" (sem: SEM-gx-gate-145)
     ///
     /// So each arm digests **the payload it carries**, and nothing else:
     ///
     /// | arm | what is digested | projection |
     /// |---|---|---|
-    /// | `Admit` | [`AdmitProof`] | 42 §1.3: 「全フィールド」 |
+    /// | `Admit` | [`AdmitProof`] | 42 §1.3: "every field" | (sem: SEM-gx-gate-146)
     /// | `Deny` | the `Vec<Reason>` | every reason, in E-M3-12's order |
     /// | `Escalate` | the [`EscalationTicket`] | 42 §1.3: `{transformation, reasons, required_approval}` |
     ///
@@ -167,7 +172,7 @@ pub(crate) fn digest_of<T: IdentityView + ?Sized>(value: &T) -> Result<Cid> {
 
 /// The `Deny` arm's payload, as something with an identity (M2-10).
 ///
-/// A newtype rather than an impl on `Vec<Reason>`: the projection is 「the reasons themselves」 and
+/// A newtype rather than an impl on `Vec<Reason>`: the projection is "the reasons themselves" and (sem: SEM-gx-gate-147)
 /// wrapping them says so at the call site, where `digest_of(&DenyReasons(reasons))` reads as the
 /// rule M2-10 wrote.
 pub struct DenyReasons<'r>(pub &'r [Reason]);
@@ -187,17 +192,18 @@ impl IdentityView for DenyReasons<'_> {
 ///
 /// # Why the fields are private
 ///
-/// 42 §1.3 puts `AdmitProof` in the IdentityView table as 「全フィールド」, so **the order of every
+/// 42 §1.3 puts `AdmitProof` in the IdentityView table as "every field" (sem: SEM-gx-gate-148), so **the order of every
 /// vector in here reaches the CID**. 42 fixes no order, and req/38 §19's M3-20 ruling does:
 ///
-/// > 「Vec 正準化=id 昇順(policy_id/invariant_id 辞書順・evidence_digests は CID byte 昇順)。
-/// > **`composed_from` のみ合成順序を保持**(T5 の verdict 鎖復元に順序が意味を持つ——昇順に畳んでは
-/// > ならない)」 → **E-M3-9**
+/// > "Vec canonicalization = ascending id (policy_id/invariant_id lexicographic; evidence_digests
+/// > ascending CID byte order). **Only `composed_from` keeps composition order** (order carries
+/// > meaning for T5's verdict-chain reconstruction -- it must not be folded into ascending)" ->
+/// > **E-M3-9** (sem: SEM-gx-gate-149)
 ///
 /// A rule that reorders on construction cannot be enforced by a public field, so the fields are
 /// private and [`AdmitProof::new`] is the only road in. This is the same trade `ObjectSnapshot`
 /// makes in gx-core. The test that the road cannot be walked around is hand 4's, per req/60 §5.2
-/// (「実装は構成子で強制(手 4 で test)」); what hand 1 owes is that there *is* one road.
+/// ("the implementation is enforced by the constructor, tested in hand 4") (sem: SEM-gx-gate-150); what hand 1 owes is that there *is* one road.
 ///
 /// # Why no `Serialize`
 ///
@@ -223,7 +229,7 @@ impl AdmitProof {
     /// order the transformations were composed in, and T5 asks for the chain back.
     ///
     /// Duplicates are kept rather than folded away. H4-3 settled that shape for `Provenance`
-    /// (「多重度は畳まない・順序のみ正準化」) and the reason carries: two policies that both
+    /// ("multiplicity is not folded; only order is canonicalized") (sem: SEM-gx-gate-151) and the reason carries: two policies that both
     /// answered, or one evidence item cited twice, are facts about the evaluation, and a
     /// constructor that deleted them would make the proof describe a different evaluation from the
     /// one that happened.
@@ -261,8 +267,8 @@ impl AdmitProof {
         &self.invariant_results
     }
 
-    /// The evidence the decision rested on, by CID and in byte order (42 §3.8: 「本体ではなく参照。
-    /// T4 根拠」).
+    /// The evidence the decision rested on, by CID and in byte order (42 §3.8: "a reference, not
+    /// the body itself. T4 grounds"). (sem: SEM-gx-gate-152)
     #[must_use]
     pub fn evidence_digests(&self) -> &[Cid] {
         &self.evidence_digests
@@ -285,17 +291,23 @@ impl AdmitProof {
     }
 }
 
-/// `AdmitProof`'s projection: 42 §1.3 lists it as 「全フィールド」, so every one is here.
+/// `AdmitProof`'s projection: 42 §1.3 lists it as "every field", so every one is here. (sem: SEM-gx-gate-153)
 ///
 /// Borrowed, like gx-canon's own views, so that taking a digest copies nothing. The field names
 /// are the struct's, which makes the map keys of the projection the keys a reader already knows
 /// from 42 §3.8's table.
 #[derive(Debug, Serialize)]
 pub struct AdmitProofView<'a> {
+    /// [`AdmitProof::policy_decisions`], identity-bearing.
     pub policy_decisions: &'a [PolicyDecisionRecord],
+    /// [`AdmitProof::invariant_results`], identity-bearing.
     pub invariant_results: &'a [InvariantResult],
+    /// [`AdmitProof::evidence_digests`], identity-bearing.
     pub evidence_digests: &'a [Cid],
+    /// [`AdmitProof::composed_from`], identity-bearing and order-preserving (T5's composition
+    /// order is part of what the proof says).
     pub composed_from: &'a [TransformationId],
+    /// [`AdmitProof::proof_ref`], identity-bearing.
     pub proof_ref: Option<&'a ProofRef>,
 }
 
@@ -321,8 +333,8 @@ impl IdentityView for AdmitProof {
 pub struct PolicyDecisionRecord {
     /// Cedar's policy id, as the `PolicySet` spells it.
     pub policy_id: String,
-    /// `Allow | Deny`, gx-witness's type because 42 §3.7 already fixed it there and 「`cedar_policy
-    /// ::Decision`と同一語彙」 -- one vocabulary, defined once.
+    /// `Allow | Deny`, gx-witness's type because 42 §3.7 already fixed it there and "the same
+    /// vocabulary as `cedar_policy::Decision`" (sem: SEM-gx-gate-154) -- one vocabulary, defined once.
     pub decision: PolicyDecision,
     /// Cedar's diagnostics, by digest rather than inline (42 §3.8).
     pub diagnostics_digest: Option<Cid>,
@@ -345,9 +357,10 @@ impl InvariantResult {
     /// One answer, with `detail` held to [`crate::MAX_MESSAGE_BYTES`] (**M3-21**, ASM-60-4).
     ///
     /// A `detail` longer than the bound is **not** a refusal: an invariant that says too much has
-    /// still decided, and turning verbosity into ⊥ would collide with E-M3-3's line between 「拒否」
-    /// and 「壊れている」. It is replaced by [`elide`]'s one-line reference to the digest of what it
-    /// said, which is 42 §3.8's own instruction (「短い人間可読メッセージ(長文は digest 化)」) made
+    /// still decided, and turning verbosity into ⊥ would collide with E-M3-3's line between "refused"
+    /// and "broken". It is replaced by [`elide`]'s one-line reference to the digest of what it
+    /// said, which is 42 §3.8's own instruction ("a short human-readable message (long text gets
+    /// digested)") made (sem: SEM-gx-gate-155)
     /// mechanical.
     ///
     /// # Errors
@@ -375,7 +388,7 @@ impl InvariantResult {
         self.holds
     }
 
-    /// 42 §3.8: 「短い人間可読メッセージ(長文は digest 化)」, at most
+    /// 42 §3.8: "a short human-readable message (long text gets digested)", at most (sem: SEM-gx-gate-156)
     /// [`crate::MAX_MESSAGE_BYTES`] bytes.
     #[must_use]
     pub fn detail(&self) -> Option<&str> {
@@ -387,16 +400,17 @@ impl InvariantResult {
 ///
 /// # `code` is not a free string any more (**E-M3-6**, req/38 §19's M3-08)
 ///
-/// 42 §3.8 types it `String` and says 「44 の gx_code と語彙を揃える」, and req/60 §3 measured that
-/// 44 §2.3's twelve codes contain no way to say 「a policy refused this」. The ruling makes three
+/// 42 §3.8 types it `String` and says "align the vocabulary with 44's gx_code", and req/60 §3
+/// measured that 44 §2.3's twelve codes contain no way to say "a policy refused this" (sem: SEM-gx-gate-157). The ruling makes three
 /// names and a containment:
 ///
-/// > 「M3-08(採用): gate 内語彙 3 語新設(`POLICY_DENIED`/`INVARIANT_VIOLATED`/
-/// > `EVIDENCE_INSUFFICIENT`)+包含関係「gate の理由 code ⊃ API の gx_code」。手 4 の error 語彙窓で
-/// > **crate 毎 Error 語彙表(E-M2-23 起票の実体)を 1 箇所宣言・宣言外は構成時拒否**」
+/// > "M3-08 (adopted): 3 new words in the gate's own vocabulary (`POLICY_DENIED`/`INVARIANT_VIOLATED`/
+/// > `EVIDENCE_INSUFFICIENT`) plus the containment 'the gate's reason codes ⊇ the API's gx_code'. In
+/// > hand 4's error-vocabulary window, **declare a crate's Error vocabulary table (the substance of
+/// > what E-M2-23 filed) in one place; anything outside it is refused at construction**" (sem: SEM-gx-gate-158)
 ///
 /// Three names were created; **two survive**. `EVIDENCE_INSUFFICIENT` was retired by **E-7** in M5
-/// hand 2 (req/38 §37, M5-04 採(b)) after three milestones with no producer, and the containment is
+/// hand 2 (req/38 §37, M5-04 adopted (b)) (sem: SEM-gx-gate-159) after three milestones with no producer, and the containment is
 /// unaffected -- it was never one of 44's words. See [`crate::EVIDENCE_INSUFFICIENT`].
 ///
 /// [`crate::REASON_CODES`] is that one declaration and [`Reason::new`] is the refusal. The fields
@@ -414,7 +428,7 @@ impl Reason {
     ///
     /// # Errors
     /// [`crate::Error::UnknownReasonCode`] when `code` is not in [`crate::REASON_CODES`]. That is
-    /// the whole of 「宣言外の code は構成時拒否」: a receipt that carried `POLCIY_DENIED` would be
+    /// the whole of "a code outside the declaration is refused at construction": a receipt that carried `POLCIY_DENIED` would be (sem: SEM-gx-gate-160)
     /// unreadable by anything matching on the vocabulary, and the misspelling would survive every
     /// test that only asks whether a refusal happened.
     ///
@@ -433,13 +447,13 @@ impl Reason {
         })
     }
 
-    /// 42 §3.8's 「機械可読エラーコード」, always one of [`crate::REASON_CODES`].
+    /// 42 §3.8's "machine-readable error code", always one of [`crate::REASON_CODES`]. (sem: SEM-gx-gate-161)
     #[must_use]
     pub fn code(&self) -> &str {
         &self.code
     }
 
-    /// 42 §3.8's 「人間可読」, at most [`crate::MAX_MESSAGE_BYTES`] bytes.
+    /// 42 §3.8's "human-readable", at most [`crate::MAX_MESSAGE_BYTES`] bytes. (sem: SEM-gx-gate-162)
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message
@@ -468,7 +482,7 @@ impl Reason {
     }
 }
 
-/// 42 §3.8's 「長文は digest 化」, with M3-21's threshold.
+/// 42 §3.8's "long text gets digested", with M3-21's threshold. (sem: SEM-gx-gate-163)
 ///
 /// Under the bound the text is itself. Over it, the text is replaced by a line naming how many
 /// bytes were elided and the CID of what they were, so the record still identifies the message
@@ -480,8 +494,8 @@ impl Reason {
 /// half: the whole string is replaced or none of it is.
 ///
 /// **Not for use outside the gate** (req/38 §23's E-14). It is public because the boundary has two
-/// sides and a test that could only reach one of them would measure half of it -- 「境界を測る test
-/// は公開面から測る」 -- not because a caller elsewhere has a reason to elide text. The constructors
+/// sides and a test that could only reach one of them would measure half of it -- "a test that
+/// measures a boundary measures it from the public face" (sem: SEM-gx-gate-164) -- not because a caller elsewhere has a reason to elide text. The constructors
 /// call it; everything a consumer of this crate needs happens on the way into a [`Reason`] or an
 /// [`InvariantResult`].
 ///
@@ -515,21 +529,22 @@ impl IdentityView for ElidedText<'_> {
     }
 }
 
-/// Where a reason came from (42 §3.8 逐語: `Policy{policy_id} | Invariant{invariant_id} |
+/// Where a reason came from (42 §3.8 verbatim: `Policy{policy_id} | Invariant{invariant_id} | (sem: SEM-gx-gate-165)
 /// Precondition | Adapter{detail}`), plus the one **E-M3-11** adds.
 ///
 /// # The fifth variant (C-3, req/38 §21)
 ///
-/// Cedar's third rule refuses a request that no policy satisfied, and 「If the decision is Deny
-/// because no policies were satisfied (rule 3), then the list of determining policies is empty」
+/// Cedar's third rule refuses a request that no policy satisfied, and "If the decision is Deny
+/// because no policies were satisfied (rule 3), then the list of determining policies is empty" (sem: SEM-gx-gate-166)
 /// (<https://docs.cedarpolicy.com/auth/authorization.html>). Hand 2 met that case and had no
 /// truthful source to name: the refusal is not `Policy{..}` -- there is no policy -- and it is
 /// certainly not `Precondition` or `Adapter`. It spelled a sentinel policy id
 /// (`cedar:default-deny`) as an interim and raised the gap; the ruling closed it:
 ///
-/// > 「🔴C-3(採用=案 a・erratum E-M3-11): 42 §3.8 の `ReasonSource` に **`NoPolicyApplied` 相当の
-/// > variant を足す**(spec 欠陥の erratum)… 実装は手 4(ReasonSource 語彙に触る唯一の窓)で variant
-/// > へ置換・sentinel 綴りは同時に削除」
+/// > "🔴C-3 (adopted = option a, erratum E-M3-11): **add a variant equivalent to
+/// > `NoPolicyApplied`** to 42 §3.8's `ReasonSource` (an erratum for a spec defect) ... the
+/// > implementation is replaced by a variant in hand 4 (the only window that touches the
+/// > ReasonSource vocabulary), and the sentinel spelling is deleted at the same time" (sem: SEM-gx-gate-167)
 ///
 /// Both halves are done here: the variant exists and the sentinel is gone from the crate. What the
 /// sentinel cost while it existed was a policy id that a policy could *claim* -- hand 2 had to
@@ -539,14 +554,22 @@ impl IdentityView for ElidedText<'_> {
 /// distinguishable.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum ReasonSource {
+    /// A policy in the set refused (42 §3.8).
     Policy {
+        /// Cedar's own id of the determining policy, as the `PolicySet` spells it.
         policy_id: String,
     },
+    /// A registered invariant did not hold (42 §3.8).
     Invariant {
+        /// The refusing check's `InvariantCheck::id()` (41 §4).
         invariant_id: String,
     },
+    /// The CAS precondition failed: the state the plan was made against is not the state found
+    /// (42 §3.8, CON-2's vocabulary).
     Precondition,
+    /// The substrate adapter refused (42 §3.8).
     Adapter {
+        /// The adapter's account of the refusal, in words.
         detail: String,
     },
     /// Cedar's rule 3: the request satisfied nothing, so no policy decided (**E-M3-11**).
@@ -572,7 +595,7 @@ impl ReasonSource {
     /// The second component: the id the source names, or the empty string for the two variants
     /// that name nothing.
     ///
-    /// Public because a reader of a refusal wants 「which one」 without matching on five variants,
+    /// Public because a reader of a refusal wants "which one" without matching on five variants, (sem: SEM-gx-gate-168)
     /// and because the ordering above is easier to check against E-M3-12 when the key it uses is
     /// one a test can read.
     #[must_use]

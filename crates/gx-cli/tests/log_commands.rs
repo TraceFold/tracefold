@@ -1,13 +1,15 @@
-//! `gx log proof` / `gx log consistency` / `gx log checkpoint` — 44 §1.2 and **M6-24 採(b)**.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! `gx log proof` / `gx log consistency` / `gx log checkpoint` — 44 §1.2 and **M6-24 adopted (b); sem: SEM-gx-cli-1907**.
 //!
 //! # What each probe is for
 //!
 //! `proof` and `consistency` are thin: the arithmetic is gx-log's and was measured in M2 (AC-021 —
 //! AC-023). What the CLI adds and what is measured here is the **resolution** 44 §1.2 asks for
-//! (「`--leaf <INDEX|TRANSFORMATION_ID>`」), the refusal shape for a leaf that is not there, and the
+//! ("`--leaf <INDEX|TRANSFORMATION_ID>`"; sem: SEM-gx-cli-1908), the refusal shape for a leaf that is not there, and the
 //! fact that a read command does not create a ledger it did not find.
 //!
-//! `checkpoint` is not thin. It is M6-24 採(b), the first caller of `gx_witness::dsse::sign_checkpoint`
+//! `checkpoint` is not thin. It is M6-24 adopted (b; sem: SEM-gx-cli-1909), the first caller of `gx_witness::dsse::sign_checkpoint`
 //! outside gx-witness, and without it AC-057 has no Given.
 
 mod support;
@@ -67,9 +69,9 @@ fn proof_resolves_both_spellings_of_leaf_and_the_proof_holds() {
     );
 }
 
-/// A leaf that is not in the log is 44 §1.2's `1=範囲外/未検出`, with the tree size in the object.
+/// A leaf that is not in the log is 44 §1.2's `1=out-of-range/not-found` (sem: SEM-gx-cli-1910), with the tree size in the object.
 ///
-/// 🔴 44 §1.4's common table gives 「未検出」 the code **6** and 44 §1.2's `log` line gives it 1. The
+/// 🔴 44 §1.4's common table gives "not-found" (sem: SEM-gx-cli-1911) the code **6** and 44 §1.2's `log` line gives it 1. The
 /// per-command text wins here because it is the more specific statement; the divergence is M6-25's
 /// material and `crates/gx-cli/src/exit.rs` carries it as a note rather than repairing it.
 #[test]
@@ -90,8 +92,8 @@ fn a_leaf_that_is_not_there_is_refused_with_the_tree_size() {
         println!("LOG_PROOF_MISSING {leaf} exit={} {json}", out.code);
         assert_eq!(
             out.code, 6,
-            "🔴 **E-M6-24** (req/38 §55): 44 §1.2's `log` line writes 「1=範囲外/未検出」 and §1.4's \
-             common table gives 「未検出（not-found）」 the code **6**. M6-25 rules that the common \
+            "🔴 **E-M6-24** (req/38 §55): 44 §1.2's `log` line writes \"1=out-of-range/not-found\" (sem: SEM-gx-cli-1912) and §1.4's \
+             common table gives \"not-found\" (sem: SEM-gx-cli-1912) the code **6**. M6-25 rules that the common \
              table wins and the per-command list is an excerpt; E-M6-13/16 applied that to \
              `cancel`, `escalation` and `undo`, and this verb is the third"
         );
@@ -99,8 +101,8 @@ fn a_leaf_that_is_not_there_is_refused_with_the_tree_size() {
         assert_eq!(json["tree_size"], serde_json::json!(3));
     }
 
-    // And a `--leaf` that is neither an index nor an id is 「入力不正」 — a different failure, and
-    // 規律52 still sends it to 1 rather than to clap's 2.
+    // And a `--leaf` that is neither an index nor an id is "invalid input" (sem: SEM-gx-cli-1913) — a different failure, and
+    // discipline 52 (sem: SEM-gx-cli-1913) still sends it to 1 rather than to clap's 2.
     let out = run(support::gx()
         .arg("--project")
         .arg(&dir)
@@ -159,7 +161,7 @@ fn consistency_proves_between_sizes_and_reports_an_impossible_pair() {
     println!("LOG_CONSISTENCY_BACKWARDS exit={} {json}", out.code);
     assert_eq!(
         out.code, 6,
-        "**E-M6-24**: 「範囲外」 is 「未検出」's other face here and both take §1.4's 6"
+        "**E-M6-24**: \"out-of-range\" is \"not-found\"'s other face here and both take §1.4's 6 (sem: SEM-gx-cli-1914)"
     );
     assert_eq!(json["tree_size"], serde_json::json!(6));
     assert!(
@@ -168,7 +170,7 @@ fn consistency_proves_between_sizes_and_reports_an_impossible_pair() {
     );
 }
 
-/// 🔴 **M6-24 採(b)**: the checkpoint producer, and the fact that its signature checks out.
+/// 🔴 **M6-24 adopted (b); sem: SEM-gx-cli-1915**: the checkpoint producer, and the fact that its signature checks out.
 ///
 /// Before this hand `sign_checkpoint` had no caller outside gx-witness, so no signed head existed in
 /// the shipping code at all. The probe verifies the signature with `gx_witness::dsse::verify_checkpoint`
@@ -216,7 +218,7 @@ fn checkpoint_publishes_a_signed_head_whose_signature_verifies() {
         serde_json::from_slice(&std::fs::read(&out_path).expect("read")).expect("json");
     assert_eq!(stored, json, "one serialisation for the pipe and the file");
 
-    // 🔴 §47 M6-24: 「作れるのは台帳の持ち主だけ」. Without a key there is nothing to sign with, and
+    // 🔴 §47 M6-24: "only the ledger's owner can create it" (sem: SEM-gx-cli-1916). Without a key there is nothing to sign with, and
     // the refusal says so rather than inventing one.
     let out = run(support::gx()
         .arg("--project")
@@ -236,7 +238,7 @@ fn checkpoint_publishes_a_signed_head_whose_signature_verifies() {
 ///
 /// `LedgerStore::open` creates the file when it is absent, which is right for an engine starting up
 /// and wrong for four commands that read: a `gx log proof` that left an empty ledger behind would
-/// make 「this project has no ledger」 unobservable after the first attempt, and the second run would
+/// make "this project has no ledger" (sem: SEM-gx-cli-1917) unobservable after the first attempt, and the second run would
 /// report an empty tree instead of an absent one.
 #[test]
 fn reading_a_project_with_no_ledger_leaves_no_ledger_behind() {
@@ -257,11 +259,11 @@ fn reading_a_project_with_no_ledger_leaves_no_ledger_behind() {
     );
     assert_eq!(
         out.code, 6,
-        "44 §1.4's 「未検出」 — there is no log to be out of range of"
+        "44 §1.4's \"not-found\" (sem: SEM-gx-cli-1918) — there is no log to be out of range of"
     );
     assert!(out.stderr.contains("NOT_FOUND"));
     assert!(
         !layout.ledger_path().exists(),
-        "the read created a ledger: 「無い」 has become 「空」 and the difference is gone"
+        "the read created a ledger: \"absent\" has become \"empty\" (sem: SEM-gx-cli-1919) and the difference is gone"
     );
 }

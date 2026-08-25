@@ -1,24 +1,30 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **M4H1-2**: the bound on a fingerprint scope, declared once and refused at construction.
 //!
-//! req/38 §29 逐語: 「**M4H1-2 採(a)・窓は手4**: gx-core にも scope 文字列の上限+超過時 digest 化
-//! (gx-gate M3-21/ASM-60-4 と同形・1024 byte)。**scope の生成規則(ASM-69-1)が実体化する手4 と同窓**で
-//! 入れる(生成と上限を別の手で決めない)」.
+//! req/38 §29, verbatim: "**M4H1-2, adopted (a); the window is hand 4**: gx-core too gets a bound on
+//! the scope string plus digesting when it is exceeded (the same shape as gx-gate's
+//! M3-21/ASM-60-4, 1024 bytes). It goes in **in the same window as hand 4, where the scope
+//! generation rule (ASM-69-1) materialises** (generation and bound are not decided in separate
+//! hands)" (quoted in SEM-gx-core-193).
 //!
 //! # The half that is here and the half that is not
 //!
 //! The ruling names two things and this crate can only hold one of them. A-1 keeps every digest in
-//! gx-canon and 41 §2 keeps this crate's dependencies at 「serde, thiserror程度」, so 「超過時 digest 化」
-//! cannot happen here: there is no hash to reach. What is here is the **bound and the refusal**, and
-//! the elision lives one layer up in [`gx_substrate::elide_scope`], where gx-canon is in scope.
+//! gx-canon and 41 §2 keeps this crate's dependencies at "serde, thiserror and not much more", so
+//! "digesting when exceeded" (sem: SEM-gx-core-194) cannot happen here: there is no hash to reach.
+//! What is here is the **bound and the refusal**, and the elision lives one layer up in
+//! [`gx_substrate::elide_scope`], where gx-canon is in scope.
 //!
-//! That is E-M2-1's split (「型は下層・計算は上層」) applied to the same type E-M4-1 already split for
+//! That is E-M2-1's split ("types down, computation up"; sem: SEM-gx-core-195) applied to the same
+//! type E-M4-1 already split for
 //! the same reason -- the `Fingerprint` type is here and its scope arithmetic is in gx-substrate. The
 //! consequence is the useful one: because the refusal is at the constructor, **no** `Fingerprint`
 //! anywhere in the workspace can carry an unbounded scope, whichever adapter built it. An elision
 //! helper alone would have left a door (E-M3-18's word for it) open beside it.
 //!
-//! M4 hand 4 raises the divergence from the ruling's literal 「digest 化を gx-core に」 as an起票 in
-//! `req/73` §2 rather than deciding it here.
+//! M4 hand 4 raises the divergence from the ruling's literal "the digesting goes in gx-core" as a
+//! filed item in `req/73` §2 rather than deciding it here (sem: SEM-gx-core-196).
 
 use gx_core::{Cid, Error, Fingerprint, SubstrateKind, ERROR_KINDS, MAX_SCOPE_BYTES};
 
@@ -32,12 +38,15 @@ fn build(scope: String) -> gx_core::Result<Fingerprint> {
 
 /// The value, and that it is written in one place.
 ///
-/// gx-gate's `MAX_MESSAGE_BYTES` is 1024 for ASM-60-4 and this is 1024 for the same reason: 「同形」 in
-/// the ruling means the same number as well as the same shape, and two constants that agree today
-/// are two constants that disagree eventually.
+/// gx-gate's `MAX_MESSAGE_BYTES` is 1024 for ASM-60-4 and this is 1024 for the same reason: "the
+/// same shape" in the ruling (sem: SEM-gx-core-197) means the same number as well as the same
+/// shape, and two constants that agree today are two constants that disagree eventually.
 #[test]
 fn the_bound_is_one_declaration_at_the_value_the_ruling_named() {
-    assert_eq!(MAX_SCOPE_BYTES, 1024, "M4H1-2: 「1024 byte」");
+    assert_eq!(
+        MAX_SCOPE_BYTES, 1024,
+        "M4H1-2: '1024 bytes' (sem: SEM-gx-core-198)"
+    );
 
     let source = std::fs::read_to_string(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/fingerprint.rs"),

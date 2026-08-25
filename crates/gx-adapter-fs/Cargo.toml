@@ -1,6 +1,6 @@
-# The first real `SubstrateAdapter`. 41 §2 gives this crate one line -- 「gx-adapter-fs/ # dep:
-# landlock (apply時sandbox, v0.2+)」 -- and **E-M4-26** (`req/38_ERRATA_2026-08-07.md` §28) is the
-# erratum that reads the rest of it: 「`gx-adapter-fs # dep: 0 本(landlock は v0.2+)`」.
+# The first real `SubstrateAdapter`. 41 §2 gives this crate one line -- "gx-adapter-fs/ # dep:
+# landlock (sandboxed at apply time, v0.2+)" -- and **E-M4-26** (`req/38_ERRATA_2026-08-07.md` §28) is the
+# erratum that reads the rest of it: "`gx-adapter-fs # dep: 0 (landlock is v0.2+)`" (sem: SEM-gx-adapter-fs-001).
 #
 # M4 hand 4 builds `kind`/`snapshot`/`plan`/`precondition`; `apply`/`invert` are hand 5 and
 # `commutation` hand 6 (req/69 §6.2). N-05 keeps landlock out of v0.1 entirely.
@@ -9,17 +9,18 @@ name = "gx-adapter-fs"
 description = "The filesystem SubstrateAdapter: single-file whole replacement, lexical locators (41 §4, M4-13(a))."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-adapter-fs-002)
 license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
-# **Zero external dependencies**, which is what N-05 and E-M4-26 mean by 「依存 0 本」: the three
+# **Zero external dependencies**, which is what N-05 and E-M4-26 mean by "zero dependencies": the three
 # entries below are workspace members and `serde` is already resolved by every one of them, so the
-# external package count does not move (§29 M4H1-6 fixed that as the way to say 「依存追加 0」).
+# external package count does not move (§29 M4H1-6 fixed that as the way to say "zero dependencies added") (sem: SEM-gx-adapter-fs-003).
 #
 # gx-canon is here rather than in a dev-dependency because the payload of an fs delta is canonical
 # DAG-CBOR (42 §3.4) and 41 §6 admits exactly one encoder: **N-14** is the ruling that keeps this
-# adapter from writing a parser of its own -- 「fs delta の payload は canonical DAG-CBOR なので既存
-# `fuzz_dagcbor_decode` の射程内——adapter 固有の parser を作るなら話が変わる」.
+# adapter from writing a parser of its own -- "the fs delta's payload is canonical DAG-CBOR, so it is within
+# `fuzz_dagcbor_decode`'s existing reach -- it would be a different matter if the adapter wrote its own parser" (sem: SEM-gx-adapter-fs-004).
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement (M2 hand 6, req/55 §4 H6-1).
@@ -31,17 +32,28 @@ gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }  # the delta grammar of 42 §3.4
 
 # The shared contract harness of 51 §7, which an adapter crate calls from one `#[test]`
-# (「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」). proptest is
-# L7's property (req/69 §3.4) and AC-047's 判定方法 column (34: 「unit + property」); both are already
+# ("each adapter crate only calls this harness from one `#[test]` to inherit the contract tests"). proptest is
+# L7's property (req/69 §3.4) and AC-047's judgment-method column (34: "unit + property"); both are already (sem: SEM-gx-adapter-fs-005)
 # in the graph.
 #
-# **M4-18 採(a)** (req/38 §28) puts AC-048's integration test here rather than in the gate's own
-# suite: 「AC-048 結合 test は gx-adapter-fs の tests に **gx-gate を dev-dependency** で(E-M3-2 先例・
-# 循環なし)」. The gate half is M3's (E-M3-4: `invert_available=false → Escalate`) and the adapter half
+# **M4-18, adopted (a)** (req/38 §28) puts AC-048's integration test here rather than in the gate's own
+# suite: "AC-048's integration test goes in gx-adapter-fs's tests, with **gx-gate as a dev-dependency** (E-M3-2 precedent,
+# no cycle)". The gate half is M3's (E-M3-4: `invert_available=false → Escalate`) and the adapter half
 # is hand 5's `Ok(None)`; what had never run is the join. A dev-dependency reaches no shipped graph
 # (`cargo tree -e normal` does not see it) and adds no package -- gx-gate is a workspace member and
-# everything it resolves is already in the graph, which is the sense §29 M4H1-6 fixed for 「依存追加 0」.
+# everything it resolves is already in the graph, which is the sense §29 M4H1-6 fixed for "zero dependencies added" (sem: SEM-gx-adapter-fs-006).
 [dev-dependencies]
 gx-gate = { path = "../gx-gate", version = "0.1.0" }
 gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.0" }
 proptest = "1.11"
+
+# 🔴 **R35 / `req/470` L-02** — `tests/pack_locators.rs` reads `policies/fs/scenarios.json`, the
+# shipped artifact itself rather than a Rust copy of it, so PACK_FORMAT F7 is measured on what a
+# third party would install. Precedent and wording are `gx-adapter-postgres`'s, which reads its own
+# pack's scenario file the same way for the same clause.
+#
+# This does not move the "zero external dependencies" claim at the top of this file: that claim is
+# about the package count on the normal graph (§29 M4H1-6), a dev-dependency cannot reach
+# `cargo tree -e normal`, and serde_json is already resolved by gx-gate — which is a dev-dependency
+# of this crate two lines above.
+serde_json = "1"

@@ -1,8 +1,8 @@
-# cargo-deny, 51 §10: 「`licenses`（Apache-2.0/MIT/BSD系許可リスト、DR-5準拠でGPL/AGPL排除）、`bans`
-# （重複バージョン・禁止依存）、`sources`（不明レジストリ拒否）の3チェックすべてブロッキングgate」.
+# cargo-deny, 51 §10: "`licenses` (an Apache-2.0/MIT/BSD-family allow-list, GPL/AGPL excluded per
+# DR-5), `bans` (duplicate versions, banned dependencies), `sources` (unknown registries rejected) -- all three checks as one blocking gate." (sem: SEM-deny.toml-001)
 #
-# Until M2 hand 6 the audit stage of tools/ci.sh was a **declared skip** -- 「cargo-audit and
-# cargo-deny are not installed」 -- which is honest but is not a gate. This file is what turns it
+# Until M2 hand 6 the audit stage of tools/ci.sh was a **declared skip** -- "cargo-audit and
+# cargo-deny are not installed" -- which is honest but is not a gate. This file is what turns it (sem: SEM-deny.toml-002)
 # into one.
 #
 # Scope note: `probes/doubt` depends by path on ../../../Glovrex_Alpha, so on a machine that holds
@@ -31,8 +31,8 @@ ignore = []
 # ---------------------------------------------------------------------------
 #
 # Every crate in this repository is published `Apache-2.0` (35 DR-5, DEFAULT column). The rule that
-# follows is not 「permissive licences are nicer」 but 「a dependency whose terms cannot be met while
-# shipping Apache-2.0 cannot be in the tree」. So this list holds exactly the permissive families
+# follows is not "permissive licences are nicer" but "a dependency whose terms cannot be met while
+# shipping Apache-2.0 cannot be in the tree". So this list holds exactly the permissive families (sem: SEM-deny.toml-003)
 # 51 §10 names, plus `Unicode-3.0`, which one crate requires by *conjunction* rather than as an
 # alternative (`(MIT OR Apache-2.0) AND Unicode-3.0`) and which is a data licence with no copyleft
 # obligation.
@@ -67,19 +67,19 @@ allow = [
     #   * `foldhash` 0.2.0 ← `hashbrown` 0.16 ← `clru` ← `gix-pack`. A hasher for a cache.
     #
     # 32 FR-045 makes `gix` a MUST and 41 §2 names it on the crate row, so this is a cost the canon
-    # chose rather than one this hand did. DR-5's line is 「GPL/AGPL 排除」 and the Zlib licence is on
+    # chose rather than one this hand did. DR-5's line is "GPL/AGPL excluded" and the Zlib licence is on (sem: SEM-deny.toml-004)
     # the other side of it by a wide margin: it is OSI-approved, has **no copyleft**, requires no
-    # notice in a binary, and its only obligations are 「do not misrepresent the origin」 and 「mark
-    # altered versions」 -- both of which shipping an unmodified crates.io dependency satisfies by
+    # notice in a binary, and its only obligations are "do not misrepresent the origin" and "mark
+    # altered versions" -- both of which shipping an unmodified crates.io dependency satisfies by (sem: SEM-deny.toml-005)
     # construction. It sits beside MIT and BSD-2-Clause in every practical respect.
     #
     # 🔴 It is nonetheless an **addition to 35 DR-5's list**, and this file is not where that column
     # is decided. Raised for the Owner's desk in `req/99` §9 R-12 rather than paid silently; the
     # entry is here so that CI states the truth in the meantime, not so that the decision is skipped.
     #
-    # 🔴 2026-08-13, v0.2.2 spec 批 (§67 R-12 採). **The meantime is over.** `req/38` §63 raised this
-    # to the Owner's desk and said the entry's standing was 「暫定」 until it came back; §67 采用 it,
-    # and `35-open-questions.md` §D now carries a **DR-5 付表** — a dependency licence allow-list,
+    # 🔴 2026-08-13, v0.2.2 spec batch (§67 R-12 adopted). **The meantime is over.** `req/38` §63 raised this
+    # to the Owner's desk and said the entry's standing was "provisional" until it came back; §67 adopted it,
+    # and `35-open-questions.md` §D now carries a **DR-5 appendix** — a dependency licence allow-list, (sem: SEM-deny.toml-006)
     # kept apart from the licence Glovrex itself ships under (Apache-2.0, untouched by any of this).
     # So this entry is no longer provisional and no longer the only place the decision lives: 35 is
     # the column, this file is the gate that enforces it. The paragraph above is left exactly as
@@ -109,7 +109,7 @@ allow-wildcard-paths = true # path dependencies inside the workspace are not reg
 # skipped, and the reason was a measurement: `Cargo.lock` held two versions of each,
 # `cargo tree --duplicates` reported both pairs, and cargo-deny 0.20.2's ban graph saw **one** of
 # each -- because the second `getrandom` arrived through `tempfile → proptest`, a dev-dependency.
-# req/55 §4 H6-2 raised the gap (「a bans gate whose reach is narrower than `cargo tree`'s」) and left
+# req/55 §4 H6-2 raised the gap ("a bans gate whose reach is narrower than `cargo tree`'s") and left (sem: SEM-deny.toml-007)
 # the cause unestablished.
 #
 # The cause is established now, by the thing that changed: `gix` pulls `getrandom` 0.4 through
@@ -207,6 +207,60 @@ name = "unicode-width"
 version = "=0.1.14"
 # 0.1.14 under `miette` (cedar's diagnostics renderer), 0.2.2 under `pretty` (its formatter). Both
 # are display-side and neither reaches a decision.
+
+# ---------------------------------------------------------------------------
+# 2026-08-14, P2.1 cleanup lane (req/131b): `wasi`, `phf_shared`, `rand_core` -- the duplicates
+# `cargo deny check bans` measured once it was run to completion for the first time
+# ---------------------------------------------------------------------------
+#
+# `req/38` §77's own PASS report of `cargo deny check` was `licenses`-scoped only (its own words:
+# "cargo deny licenses ok", not the full four-check run 51 §10 asks for), and `req/131` §5's P2 (sem: SEM-deny.toml-008)
+# report repeated the same narrowing and named only `wasi`. This lane is the first to send `bans`
+# through to completion, and it found three crates duplicated rather than one -- all downstream of
+# `gx-adapter-postgres` (P1, req/115 §A) or `gx-witness`'s at-rest key encryption (P2, req/130) --
+# neither of which chose the versions on the other side of each pair.
+#
+# `wasi 0.11.1+wasi-snapshot-preview1` arrives under `mio ← tokio`, the runtime `gx-api`'s `axum`
+# stack and `gx-adapter-postgres`'s `tokio-postgres` both sit on. It is the workspace's one async
+# runtime's own platform shim.
+[[bans.skip]]
+name = "wasi"
+version = "=0.11.1+wasi-snapshot-preview1"
+
+# `wasi 0.14.7+wasi-0.2.4` arrives on the far side of `postgres`: `postgres → tokio-postgres →
+# whoami → wasite`, a machine-identity crate `whoami` pulls in for a platform it does not build for
+# here. Closes when `whoami`/`wasite` release against a `wasi` that matches `mio`'s, or when the
+# `postgres` crate stops pulling `whoami` in on this platform.
+[[bans.skip]]
+name = "wasi"
+version = "=0.14.7+wasi-0.2.4"
+
+# `phf_shared 0.11.3` is `cedar-policy-core`'s own build-time dependency (`lalrpop ← string_cache`,
+# M3 hand 1), present since before P1. `phf_shared 0.13.1` arrives with `gx-adapter-postgres`'s
+# `postgres → tokio-postgres → phf` (P1, req/115 §A) -- a second crate that happens to share a name
+# with the first and shares nothing else. Skipping the older half, the same choice this file already
+# made for `getrandom`, `hashbrown`, `arrayvec` and the rest of cedar's seven.
+[[bans.skip]]
+name = "phf_shared"
+version = "=0.11.3"
+
+# `rand_core`, three versions in `Cargo.lock`, but the ban graph counts only two: `0.9.5` (under
+# `rand 0.9.5 ← proptest`, dev-only and predating P1/P2 -- proptest's own pin) never crosses the
+# other two on any path `cargo-deny`'s ban graph walks, and a `bans.skip` entry for it was measured
+# to be a warned `unmatched-skip` rather than a silence -- named here as a fact this file checked
+# rather than assumed, and left **out** of `[[bans.skip]]` for that reason.
+#
+# The two the graph does count:
+#   * `0.6.4` under `password-hash ← argon2` (P2, req/130's at-rest key encryption, `crates/
+#     gx-witness/Cargo.toml`) -- RustCrypto's older trait generation.
+#   * `0.10.1` under `chacha20 ← chacha20poly1305` (P2, the same key-encryption dependency) *and*
+#     under `rand 0.10.2 ← postgres-protocol ← ... ← gx-adapter-postgres` (P1) *and* under
+#     `getrandom 0.4.3 ← gix-utils ← gix` (M7, already the newer half of this file's `getrandom`
+#     entry above) -- the version three separate, unrelated chains already agree on. Skipping the
+#     minority (`0.6.4`) leaves that agreement as the counted one, same shape as `getrandom` above.
+[[bans.skip]]
+name = "rand_core"
+version = "=0.6.4"
 
 # ---------------------------------------------------------------------------
 # sources -- where a crate may come from

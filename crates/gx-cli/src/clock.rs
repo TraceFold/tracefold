@@ -1,7 +1,10 @@
-//! 🔴 則 2 (req/88 §3.1) — the one place this binary reads a clock.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 Rule 2 (req/88 §3.1) — the one place this binary reads a clock (sem: SEM-gx-cli-001).
 //!
-//! > 41 §6「乱数・時刻はengine境界で注入」…∴ **実 clock と実 rng を呼ぶ箇所が CLI 全体で各 1 箇所**
-//! > である事を機械検査する
+//! > 41 §6 "randomness and time are injected at the engine boundary" … therefore it is
+//! > machine-checked that the real clock and the real rng are each called from exactly one place
+//! > across the whole CLI (sem: SEM-gx-cli-002)
 //!
 //! Every engine entry point takes `at: Timestamp` and `submit` takes `rng_seed: u64`, so the layer
 //! that reads the real clock is this one. M6-28 puts the full instrument in hand 3's DoD, alongside
@@ -11,8 +14,8 @@
 //!
 //! # 🔴 There is no `--at`
 //!
-//! M6-28's own warning: 「`--at` の隠し flag を作らない——時計を CLI 引数にすると receipt の
-//! `issued_at` が嘘をつける」. A test that needs a fixed clock calls the library function that takes
+//! M6-28's own warning: "do not make `--at` a hidden flag -- turning the clock into a CLI
+//! argument lets the receipt's `issued_at` lie" (sem: SEM-gx-cli-003). A test that needs a fixed clock calls the library function that takes
 //! a `Timestamp`, which is every one of them; `now()` is called by `main` and by nothing else.
 
 use gx_core::Timestamp;

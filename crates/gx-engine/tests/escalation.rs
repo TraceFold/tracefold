@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **E-5 / E-6 / M5H4-6** — the ticket's clock, the ticket's name, and ASM-14's second receipt.
 //!
 //! Spec: 43 T-4c for where a ticket comes from, 43 T-5/T-5b for what a person does with it, 42 §3.8
@@ -6,15 +8,19 @@
 //!
 //! Three rulings land here and each one is a probe rather than a comment:
 //!
-//! > **E-5** (`req/38_ERRATA_2026-08-07.md` §23): ticket `created_at` は engine が注入
-//! > **E-6** (§23): ticket 読み戻しは checked constructor 必須(M2 の `ReceiptPayload` と同形)
-//! > **M5H4-6** (§41): `VerdictReceipt` は**手 6 の T-5/T-5b 実装と同 turn で T-4a/b/c 分も実装**する
+//! > **E-5** (`req/38_ERRATA_2026-08-07.md` §23): the ticket's `created_at` is injected by the
+//! >   engine
+//! > **E-6** (§23): reading a ticket back requires a checked constructor (the same shape as M2's
+//! >   `ReceiptPayload`)
+//! > **M5H4-6** (§41): `VerdictReceipt` is **implemented for T-4a/b/c too, in the same turn as
+//! >   hand 6's T-5/T-5b implementation** (sem: SEM-gx-engine-725)
 //!
 //! # Why E-5 needs a probe and not just a line of code
 //!
-//! gx-gate says what it cannot do, in its own source: 「`created_at` is the one field with no honest
+//! gx-gate says what it cannot do, in its own source: "`created_at` is the one field with no honest
 //! source. 41 §6 keeps clocks out of this layer…so the value written is `Timestamp(0)` -- the epoch,
-//! as a placeholder the engine overwrites when it records the ticket」. `Timestamp(0)` is a **legal
+//! as a placeholder the engine overwrites when it records the ticket" (sem: SEM-gx-engine-726).
+//! `Timestamp(0)` is a **legal
 //! value**, so an engine that forgot to overwrite it would produce a ticket that verifies, encodes,
 //! and claims to have been raised in 1970. That is E-M4-31's shape one type over, and hand 4's
 //! answer there was the same: a probe that fails when the placeholder survives.
@@ -78,7 +84,7 @@ fn e_5_the_engine_injects_the_tickets_created_at() {
     );
     assert_eq!(
         ticket.created_at, AT,
-        "E-5: 「ticket `created_at` は engine が注入」"
+        "E-5: \"the ticket's `created_at` is injected by the engine\" (sem: SEM-gx-engine-727)"
     );
     assert_ne!(
         ticket.created_at,
@@ -131,7 +137,8 @@ fn the_injected_clock_is_outside_the_tickets_identity() {
 
 /// 🔴 **E-6**: a ticket whose name disagrees with its contents is refused at the door.
 ///
-/// 「読み戻しは checked constructor 必須」. The door is the boundary between gx-gate and the engine,
+/// "reading back requires a checked constructor" (sem: SEM-gx-engine-728). The door is the
+/// boundary between gx-gate and the engine,
 /// and the check is [`gx_engine::Error::InconsistentTicket`].
 ///
 /// # 🔴 The refusal has no reachable producer in v0.1, and that is said rather than hidden
@@ -190,14 +197,15 @@ fn e_6_a_ticket_that_does_not_hash_to_its_own_name_is_refused() {
 
 /// 🔴 **M5H4-6**: `VerdictReceipt` has a producer, and the two kinds are issued at different times.
 ///
-/// §41 wrote the state of affairs this probe ends: 「**v0.1 に実在する receipt は `CommitReceipt`
-/// のみ**(ASM-14 の 2 種のうち 1 種は未実装)」. Four claims:
+/// §41 wrote the state of affairs this probe ends: "**the only receipt that actually exists in
+/// v0.1 is `CommitReceipt`** (one of ASM-14's two kinds is unimplemented)" (sem:
+/// SEM-gx-engine-729). Four claims:
 ///
 /// 1. a verdict-stage receipt exists **before** anything is committed;
 /// 2. it satisfies ASM-14's obligations for its kind (no proof, no postcondition, no inverse) —
 ///    which `Receipt::issue` checks before signing, so an unsatisfiable one is never signed;
 /// 3. a second one is added by the human ruling, signed under the ruler's key (43 T-5's
-///    「provenance鎖に追記」);
+///    "append to the provenance chain" (sem: SEM-gx-engine-730));
 /// 4. the `CommitReceipt` that follows is a **different** kind, and both survive.
 #[test]
 fn m5h4_6_both_of_asm_14s_receipt_kinds_are_issued() {
@@ -222,9 +230,12 @@ fn m5h4_6_both_of_asm_14s_receipt_kinds_are_issued() {
     assert_eq!(
         first.verdict.as_ref().map(|v| v.kind),
         Some(VerdictKind::Escalate),
-        "42 §3.10: 「全`Verdict`＝Admit/Deny/Escalateで発行」"
+        "42 §3.10: \"every `Verdict` is issued as Admit/Deny/Escalate\" (sem: SEM-gx-engine-731)"
     );
-    assert!(!first.inclusion_proof.is_some(), "ASM-14: 「常に`None`」");
+    assert!(
+        !first.inclusion_proof.is_some(),
+        "ASM-14: \"always `None`\" (sem: SEM-gx-engine-731)"
+    );
     assert!(first.postcondition_fingerprint.is_none());
     assert!(first.inverse_delta.is_none(), "escrow is 43 T-10b");
     assert_eq!(engine.ledger().log().len(), 0, "nothing is committed yet");
@@ -272,7 +283,7 @@ fn m5h4_6_both_of_asm_14s_receipt_kinds_are_issued() {
     assert_eq!(commit.receipt_kind, gx_witness::ReceiptKind::CommitReceipt);
     assert!(
         commit.inclusion_proof.is_some(),
-        "ASM-14: 「`CommitReceipt`は必須（`Some`）」"
+        "ASM-14: \"`CommitReceipt` is mandatory (`Some`)\" (sem: SEM-gx-engine-732)"
     );
     assert_eq!(engine.ledger().log().len(), 1);
 }
@@ -280,7 +291,8 @@ fn m5h4_6_both_of_asm_14s_receipt_kinds_are_issued() {
 /// A verdict receipt is checkable by a stranger with no ledger (AC-018's shape, one hand later).
 ///
 /// The point of issuing them at all: 42 §3.10's two kinds exist so that a **verdict** can be
-/// witnessed before anything is applied. `InclusionCheck::NotApplicable` is AC-018's 「skipped」 and
+/// witnessed before anything is applied. `InclusionCheck::NotApplicable` is AC-018's "skipped"
+/// (sem: SEM-gx-engine-733) and
 /// not a pass that hides a missing check — `Checks::verified()` is what draws that line.
 #[test]
 fn a_verdict_receipt_verifies_offline_with_no_anchor() {

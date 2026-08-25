@@ -1,8 +1,11 @@
-//! 🔴 **M6-02 採(a)** — 44 §0's id-resolution, from the engine's side.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-02 adopted (a)** (sem: SEM-gx-engine-741) — 44 §0's id-resolution, from the engine's side.
 //!
-//! 44 §0 逐語: 「`gx plan`等、Draft/Candidateをまたいで対象を指定するコマンド・エンドポイントは
-//! `IntentId`と`TransformationId`のいずれの`gx1:...`値も受理し（id-resolution規則）、`plan()`完了後は
-//! 正準の`TransformationId`へ解決する」. req/88 §4 M6-02 measured that the engine had only the forward
+//! 44 §0, verbatim (sem: SEM-gx-engine-741): "commands and endpoints such as `gx plan`, which
+//! name a target across Draft/Candidate, accept either an `IntentId`'s or a `TransformationId`'s
+//! `gx1:...` value (the id-resolution rule), and after `plan()` completes resolve to the
+//! canonical `TransformationId`." req/88 §4 M6-02 measured that the engine had only the forward
 //! map and called the hole a **hand 1 blocker**; req/38 §47 adopted (a)+(b) — the inverse is the
 //! engine's and the `.gx/index/` copy is the CLI's cache.
 //!
@@ -10,13 +13,16 @@
 //!
 //! 1. after `plan`, an `IntentId` resolves to the `TransformationId` it was planned into;
 //! 2. before `plan` — while the intent is a **draft** — it resolves to nothing, which is E-M5-3 in
-//!    the answer rather than in the type (43 T-1: 「`TransformationId`はまだ確定しない」);
+//!    the answer rather than in the type (43 T-1: "`TransformationId` is not yet fixed," sem:
+//!    SEM-gx-engine-742);
 //! 3. when one intent has been planned **more than once**, the answer is the most recently planned
 //!    one, in **journal** order.
 //!
-//! The third is req/88 §3 Λ3(ii): 「43 §8 が…再`plan()`（再fingerprint）を強制する=同一 IntentId から
-//! 2 つ目の TID が生じうるので r は多価になりうる」, with the note that the rule 「規則として書かれて
-//! いない」. §6.2 手 1 ⑥ asks this hand to write it — 「再 plan で多価になる場合の規則を doc に 1 行」 —
+//! The third is req/88 §3 Λ3(ii): "43 §8 … forces a re-`plan()` (a re-fingerprint), which means
+//! a second TID can arise from the same IntentId, so r can become multi-valued," with the note
+//! that the rule is "not written down as a rule." §6.2 hand 1 ⑥ (sem: SEM-gx-engine-743) asks
+//! this hand to write it — "one line in the doc for the rule covering the multi-valued case on a
+//! re-plan" —
 //! and [`gx_engine::Engine::resolved`]'s documentation is that line. This file is the measurement of
 //! it, including the part a doc line cannot state: that the order is the journal's and not the
 //! table's, so it is the same before and after a restart.
@@ -81,7 +87,8 @@ fn resolution_is_partial_before_plan_and_inverse_after_it() {
 }
 
 /// An intent nobody submitted resolves to nothing, and so does a `TransformationId`'s worth of
-/// noise. Fail-closed: 「読めない」 is not 「無い」 (E-M4-35), and an unknown id is 「無い」.
+/// noise. Fail-closed: "unreadable" is not "absent" (sem: SEM-gx-engine-744) (E-M4-35), and an
+/// unknown id is "absent".
 #[test]
 fn an_unknown_intent_resolves_to_nothing() {
     let dir = scratch("id_res_unknown");
@@ -94,11 +101,12 @@ fn an_unknown_intent_resolves_to_nothing() {
 /// A re-plan of the **same** intent against the **same** world is idempotent, and resolution is
 /// unmoved by it.
 ///
-/// 43 T-2's idempotency column: 「同一snapshotに対し再実行しても同一`PlannedDelta`・同一
-/// `TransformationId`（安全に再試行可）」. The stub adapter answers as a function of its arguments, so
+/// 43 T-2's idempotency column: "re-run against the same snapshot and it is still the same
+/// `PlannedDelta`, the same `TransformationId` (safe to retry)" (sem: SEM-gx-engine-745). The
+/// stub adapter answers as a function of its arguments, so
 /// this is the case the test harness can produce directly — and it is the case where Λ3's
 /// multi-valuedness does **not** arise. It is measured first so that the probe below is read as
-/// 「the other case」 rather than as the only one.
+/// "the other case" (sem: SEM-gx-engine-746) rather than as the only one.
 #[test]
 fn an_idempotent_replan_does_not_move_the_answer() {
     let dir = scratch("id_res_replan_same");
@@ -161,6 +169,7 @@ fn a_replanned_intent_resolves_to_the_most_recent_transformation() {
                     delta_cid: support::cid(11),
                     fp0: support::fp(1),
                     parents: Vec::new(),
+                    input_generation: gx_core::BoundaryStage::Unknown,
                     at,
                 })
                 .expect("append");
@@ -178,8 +187,9 @@ fn a_replanned_intent_resolves_to_the_most_recent_transformation() {
     assert_eq!(
         e.resolved(&shared),
         Some(two),
-        "Λ3(ii): the rule is 「the most recently planned」, and 「recent」 is the journal's append \
-         order -- not the table's, which is CID order and therefore arbitrary with respect to time"
+        "Λ3(ii): the rule is \"the most recently planned\", and \"recent\" is the journal's \
+         append order -- not the table's, which is CID order and therefore arbitrary with \
+         respect to time (sem: SEM-gx-engine-747)"
     );
 }
 

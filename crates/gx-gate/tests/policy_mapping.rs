@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! ASM-60-1 — the table in `policy.rs`'s module doc, as assertions.
 //!
-//! req/60 §5.2 asks hand 2 to 「**写像を doc に 1 表で書く**(何が principal/action/resource/context に
-//! なるか)」, and req/38 §19 attaches a condition to the ruling: 「**条件=手 2 着手前に Cedar 一次 doc
-//! (req/60 §8-3)を fetch し「発明でなく引用」を確認**(相違があれば写像を一次に合わせて改訂)」. A table
+//! req/60 §5.2 asks hand 2 to "**write the mapping in one table in the doc** (what becomes
+//! principal/action/resource/context)", and req/38 §19 attaches a condition to the ruling:
+//! "**condition = before starting hand 2, fetch Cedar's primary doc (req/60 §8-3) and confirm
+//! 'quotation, not invention'** (revise the mapping to match the primary if they differ)" (sem: SEM-gx-gate-301). A table
 //! nothing reads is a table that drifts, so every row of it is a case below, and the two facts the
-//! primary fixes -- 「P, A, and R are entity references, while C is a record」 and that `like` matches
+//! primary fixes -- "P, A, and R are entity references, while C is a record" (sem: SEM-gx-gate-302) and that `like` matches
 //! strings rather than entity references -- are what decide which side of the request each gx field
 //! lands on.
 //!
@@ -91,6 +94,10 @@ fn the_request_view_is_the_asm_60_1_table() {
         planned: &planned,
         evidence: &collected,
         invert_available: false,
+        // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+        // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+        // varying this field alone moves no verdict) about the field and not about this fixture.
+        decided_at: Timestamp(0),
     });
 
     assert_eq!(view.principal_id(), "key-agent-1");
@@ -136,7 +143,7 @@ fn the_request_view_is_the_asm_60_1_table() {
     assert_eq!(
         view.context().len(),
         4,
-        "the context holds ASM-60-1's 「残り」 and nothing invented beside it"
+        "the context holds ASM-60-1's \"the rest\" and nothing invented beside it" // (sem: SEM-gx-gate-303)
     );
 }
 
@@ -148,7 +155,7 @@ fn the_request_view_is_the_asm_60_1_table() {
 ///
 /// Putting the variant into the entity type -- `GxHuman::` / `GxAgent::` -- would make every policy
 /// scope branch on it, and 42 §3.2 already made `KeyId` the identity that crosses the DSSE
-/// boundary. What that costs is that a policy cannot ask 「was this an agent?」, which is raised in
+/// boundary. What that costs is that a policy cannot ask "was this an agent?" (sem: SEM-gx-gate-304), which is raised in
 /// `req/62_M3_HAND2_REPORT_2026-08-08.md` §4 rather than fixed by inventing a row.
 #[test]
 fn the_principal_is_the_actor_key_whichever_variant_it_is() {
@@ -176,6 +183,7 @@ fn the_principal_is_the_actor_key_whichever_variant_it_is() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         });
         assert_eq!(view.principal_id(), "one-key");
     }
@@ -213,6 +221,7 @@ fn the_action_is_the_change_context() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         });
         assert_eq!(view.action_id(), expected);
         assert!(seen.insert(view.action_id().to_string()), "ids collide");
@@ -244,6 +253,7 @@ fn the_resource_carries_the_substrate_and_the_locator() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         });
         assert_eq!(view.resource_id(), format!("{tag}:/tmp/x"));
         assert_eq!(
@@ -273,6 +283,7 @@ fn a_locator_that_reads_like_cedar_syntax_cannot_name_another_entity() {
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        decided_at: Timestamp(0),
     };
 
     let view = RequestView::of(&input);
@@ -310,6 +321,7 @@ fn the_context_carries_the_order_the_inverse_flag_and_the_evidence_summary() {
             planned: &planned,
             evidence: &[],
             invert_available: order == 1,
+            decided_at: Timestamp(0),
         });
         assert_eq!(
             view.context().get(CONTEXT_ORDER),
@@ -364,6 +376,7 @@ fn the_evidence_summary_is_the_four_kinds_of_42_3_7() {
         planned: &planned,
         evidence: &collected,
         invert_available: true,
+        decided_at: Timestamp(0),
     });
 
     assert_eq!(
@@ -392,9 +405,10 @@ fn the_evidence_summary_is_the_four_kinds_of_42_3_7() {
 
 /// P-6: the payload reaches no part of the request.
 ///
-/// 42 §3.4: 「`payload` ｜ adapter のみが解釈する **opaque な変更記述。core/gate/witness は byte 列と
-/// してのみ扱う(P-6)**」, and req/38 §19's M3-10 requires the consequence to be stated rather than
-/// discovered: 「v0.1 pack の実効範囲=**locator/actor/context/order 級と明記**(overclaim 禁)」. Two
+/// 42 §3.4: "`payload` -- **an opaque change description that only the adapter interprets.
+/// core/gate/witness treat it only as a byte string (P-6)**", and req/38 §19's M3-10 requires the
+/// consequence to be stated rather than discovered: "the v0.1 pack's effective reach is **stated
+/// explicitly as the locator/actor/context/order class** (no overclaiming)" (sem: SEM-gx-gate-305). Two
 /// inputs differing only in what the change *does* are one request.
 #[test]
 fn the_planned_payload_reaches_no_part_of_the_request() {
@@ -409,6 +423,7 @@ fn the_planned_payload_reaches_no_part_of_the_request() {
         planned: &harmless,
         evidence: &[],
         invert_available: true,
+        decided_at: Timestamp(0),
     });
     let b = RequestView::of(&GateInput {
         t: &t,
@@ -416,6 +431,7 @@ fn the_planned_payload_reaches_no_part_of_the_request() {
         planned: &ruinous,
         evidence: &[],
         invert_available: true,
+        decided_at: Timestamp(0),
     });
 
     assert_eq!(a, b, "a policy cannot see what the change does (P-6)");
@@ -423,11 +439,11 @@ fn the_planned_payload_reaches_no_part_of_the_request() {
 
 /// A policy that reads an attribute the mapping does not supply is an error, not a decision.
 ///
-/// This is the fail-open Cedar's own default would produce. The primary: 「skip on error: if a
+/// This is the fail-open Cedar's own default would produce. The primary: "skip on error: if a (sem: SEM-gx-gate-306)
 /// policy's evaluation returns error, the policy does not factor into the authorization response;
-/// it is skipped」, and in the same paragraph the escape hatch gx takes -- 「applications can always
+/// it is skipped", and in the same paragraph the escape hatch gx takes -- "applications can always (sem: SEM-gx-gate-307)
 /// choose to look at the authorization response's diagnostics and take a different decision if an
-/// evaluated policy produces errors」. Left alone, a forbid with a typo in an attribute name is
+/// evaluated policy produces errors". Left alone, a forbid with a typo in an attribute name is (sem: SEM-gx-gate-308)
 /// silently skipped and the response is an ordinary-looking Allow. **E-M3-3** makes it `Err`.
 #[test]
 fn a_policy_reading_an_attribute_the_mapping_does_not_supply_is_not_a_decision() {
@@ -451,6 +467,7 @@ fn a_policy_reading_an_attribute_the_mapping_does_not_supply_is_not_a_decision()
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        decided_at: Timestamp(0),
     });
 
     match outcome {

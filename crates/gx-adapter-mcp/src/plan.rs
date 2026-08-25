@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `plan`, with no server in it, and the reason that is a law rather than a preference.
 //!
-//! 41 §4 calls `plan` 「純関数・副作用なし」 and §30 M4H2-3 採(b) read that for the trait as 「(intent, pre)
-//! の対に対する決定性+substrate への**書き込み** 0」, adding 「読み込みは禁じない」.
+//! 41 §4 calls `plan` "a pure function, no side effects" and §30 M4H2-3, adopted (b), reads that for the trait as "determinism over the (intent, pre) (sem: SEM-gx-adapter-mcp-063)
+//! pair + zero **writes** to the substrate", adding "reads are not forbidden". (sem: SEM-gx-adapter-mcp-064)
 //!
 //! 🔴 **The road is open and this module does not take it.** The reason is **L1** (req/69 §3.4), which
 //! quantifies determinism over the pair and moves the substrate in between: the same `(intent, pre)`
@@ -10,12 +12,12 @@
 //! different payload each time the server moved.
 //!
 //! What the payload says is therefore exactly what the agent asked for and nothing about the world:
-//! 「call this tool, at this position, with these arguments」. [`crate::apply`] is where the world is
+//! "call this tool, at this position, with these arguments". [`crate::apply`] is where the world is (sem: SEM-gx-adapter-mcp-065)
 //! touched, at the moment the engine's CAS has just declared the pre-state current (41 §5-5b).
 //!
 //! # Why a module rather than a function in `adapter.rs`
 //!
-//! Because 「reaches no transport」 is a claim about source, and the cheapest honest way to measure it is
+//! Because "reaches no transport" is a claim about source, and the cheapest honest way to measure it is (sem: SEM-gx-adapter-mcp-066)
 //! a file that never names one. `adapter.rs` reads resources -- `snapshot` and `precondition` must --
 //! so a scan of that file could only ever be a scan of a function body. `tests/mcp_plan_purity.rs`
 //! reads both, and adds the measurement text cannot make: a counting transport is handed to the
@@ -23,7 +25,7 @@
 //!
 //! The `pre` argument is unused, and that is the finding rather than an oversight -- the same one the
 //! other two adapters record. **E-M4-4** put `pre` in the signature because 43 T-2 quantifies
-//! determinism over 「同一snapshot」; an adapter whose payload is the intent restated does not need it,
+//! determinism over "the same snapshot"; an adapter whose payload is the intent restated does not need it, (sem: SEM-gx-adapter-mcp-067)
 //! and L1 holds a fortiori for one that ignores it.
 
 use gx_core::{Intent, ObjectSnapshot, SubstrateKind};
@@ -34,15 +36,15 @@ use crate::locator;
 
 /// Work out the change an intent asks for, without making it (41 §4, FR-042, FR-046).
 ///
-/// FR-046's verb is 「candidate 化」: what comes back is a candidate, and the gate is what decides
+/// FR-046's verb is "candidating": what comes back is a candidate, and the gate is what decides (sem: SEM-gx-adapter-mcp-068)
 /// whether it becomes a call.
 ///
 /// # Errors
 /// [`Error::NotPlannable`] when the intent is for another substrate, when its goal is not this
 /// adapter's `{arguments, tool}` grammar, or when the payload would exceed
-/// [`MAX_FORWARD_PAYLOAD_BYTES`] (**M4H5-4 採(b)**). [`Error::NotAPosition`] when the locator does not
-/// name a scheme-carrying server and a resource -- 「引数が位置でない」 rather than 「適用に失敗した」
-/// (**M4H5-5 採(b)**). [`Error::NotDigestible`] when the sequence has no canonical form.
+/// [`MAX_FORWARD_PAYLOAD_BYTES`] (**M4H5-4, adopted (b)**). [`Error::NotAPosition`] when the locator does not (sem: SEM-gx-adapter-mcp-069)
+/// name a scheme-carrying server and a resource -- "the argument is not a position" rather than "the apply failed" (sem: SEM-gx-adapter-mcp-070)
+/// (**M4H5-5, adopted (b)**). [`Error::NotDigestible`] when the sequence has no canonical form. (sem: SEM-gx-adapter-mcp-071)
 pub fn plan(intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
     if intent.substrate() != &SubstrateKind::Mcp {
         return Err(Error::NotPlannable {
@@ -57,7 +59,7 @@ pub fn plan(intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
     // Parsed rather than merely normalised: a locator that is not a position is refused **here**,
     // before a payload exists, so that no delta this adapter minted can carry a spelling `apply` would
     // have to refuse. The refusal is `NotAPosition` and not `NotPlannable` because the two answer
-    // different questions -- 「that is not a place」 and 「no change reaches that goal from here」.
+    // different questions -- "that is not a place" and "no change reaches that goal from here". (sem: SEM-gx-adapter-mcp-072)
     let position = locator::parse(intent.locator())?;
     let call = ToolIntent::decode(&intent.goal().0)?;
 
@@ -67,7 +69,7 @@ pub fn plan(intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
         call.arguments().to_vec(),
     ))
     .encode()?;
-    // **M4H5-4 採(b)**: the bound is on the payload rather than on the arguments, because the payload
+    // **M4H5-4, adopted (b)**: the bound is on the payload rather than on the arguments, because the payload (sem: SEM-gx-adapter-mcp-073)
     // is what a gate carries and a journal keeps (E-M4-8) -- a bound on the arguments would leave the
     // encoding's own overhead outside the number that was declared.
     if payload.len() > MAX_FORWARD_PAYLOAD_BYTES {

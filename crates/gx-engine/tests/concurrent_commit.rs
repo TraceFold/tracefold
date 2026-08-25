@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **K-6** — two threads, one critical section (req/38 §35, and §37 §5 row 13).
 //!
-//! §35 K-6 sent the concurrency case forward with a reason: 「並行性は engine 層が同期 hook を持って
-//! から」. The engine layer exists now, and this suite is what that ruling asked for — 「2 thread の
-//! CAS 競合 test=engine が hook を持つ最初の層」.
+//! §35 K-6 sent the concurrency case forward with a reason: "concurrency, once the engine layer
+//! has a sync hook" (sem: SEM-gx-engine-680). The engine layer exists now, and this suite is
+//! what that ruling asked for — "the two-thread CAS race test: the engine's first layer with a
+//! hook."
 //!
 //! # 🔴 The hook is `&mut self`, and that is a finding rather than a shortcut
 //!
@@ -17,8 +20,9 @@
 //!
 //! # What the two probes measure
 //!
-//! 1. **The same transformation, twice** — 43 T-9's idempotency column (「二重commit_start要求は既に
-//!    Committingなら無視」). One thread does the work; the other must find it done and write nothing.
+//! 1. **The same transformation, twice** — 43 T-9's idempotency column (a duplicate commit_start
+//!    request is ignored if already Committing, sem: SEM-gx-engine-681). One thread does the
+//!    work; the other must find it done and write nothing.
 //! 2. **Two transformations, one object** — 43 §7's CAS. One wins; the other's `Fingerprint₀` is
 //!    stale by the time it reaches T-10a and it is `Aborted(PreconditionChanged)` **without an
 //!    apply**. This is AC-034's property arrived at by racing rather than by injection.
@@ -105,10 +109,14 @@ fn k6_two_threads_committing_one_transformation_pass_t9_once() {
     }
     assert_eq!(
         starts, 1,
-        "43 T-9: 「二重commit_start要求は既にCommittingなら無視」"
+        "43 T-9: a duplicate commit_start request is ignored if already Committing (sem: SEM-gx-engine-682)"
     );
     assert_eq!(commits, 1, "one T-11");
-    assert_eq!(counts.apply.load(Ordering::SeqCst), 1, "則 2, once");
+    assert_eq!(
+        counts.apply.load(Ordering::SeqCst),
+        1,
+        "Rule 2, once (sem: SEM-gx-engine-683)"
+    );
     assert_eq!(engine.ledger().log().len(), 1, "INV-S3");
     assert!(engine.ledger_agrees());
 }

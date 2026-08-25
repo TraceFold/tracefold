@@ -1,10 +1,14 @@
-//! **M4H1-2**, the half that needs a digest: `elide_scope`.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! **M4H1-2**, the half that needs a digest: `elide_scope`. (sem: SEM-gx-substrate-107,
+//! SEM-gx-substrate-108)
 //!
-//! 42 §3.8's 「長文は digest 化」 is the shape M3-21 gave gx-gate for a `Reason.message`, and M4H1-2
+//! 42 §3.8's "long text becomes a digest" is the shape M3-21 gave gx-gate for a `Reason.message`,
+//! and M4H1-2
 //! asks for the same thing one type over -- a scope past [`gx_core::MAX_SCOPE_BYTES`] becomes a line
 //! naming how many bytes were replaced and the CID of what they were. gx-core cannot do it (A-1
 //! keeps the hash in gx-canon), so it is here, in the module 41 §2 gave this crate for exactly this:
-//! `gx-substrate/src/fingerprint.rs`, which **E-M4-1** re-read as 「計算の所在」.
+//! `gx-substrate/src/fingerprint.rs`, which **E-M4-1** re-read as "where the computation lives".
 //!
 //! # What an elided scope still is
 //!

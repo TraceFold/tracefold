@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **ASM-69-1**: what an fs `Fingerprint` covers, and what it deliberately does not.
 //!
-//! req/38 §28 M4-16 逐語:
+//! req/38 §28 M4-16, verbatim: (sem: SEM-gx-adapter-fs-163)
 //!
-//! > 「fs の `scope`=正規化済み絶対 path 1 本(v0.1)・`digest`=**内容のみ**(metadata 除外)。形の理由:
-//! > rename 原子 apply は mtime を必ず動かすので、metadata 込み digest は L2(再入安全)と**構造的に矛盾**
-//! > する。狭 scope 側の TOCTOU 残存(metadata 面)は doc に明記」
+//! > "fs's `scope` = one normalised absolute path (v0.1); `digest` = **content only** (metadata excluded). The reason for the shape:
+//! > a rename-atomic apply always moves the mtime, so a digest that includes metadata is **structurally contradictory**
+//! > with L2 (reentrancy safety). The narrow scope's remaining TOCTOU (on the metadata face) is stated explicitly in the doc" (sem: SEM-gx-adapter-fs-164)
 //!
 //! The argument is worth restating because it is the reason a *narrow* scope is the right answer
-//! here rather than a lazy one. 42 §3.5 recommends widening a scope to 「対象に干渉しうる周辺状態」, and
+//! here rather than a lazy one. 42 §3.5 recommends widening a scope to "the surrounding state that could interfere with the target", and (sem: SEM-gx-adapter-fs-165)
 //! widening costs false aborts; narrowing costs TOCTOU. What settles it for v0.1 is neither
 //! preference: hand 5's `apply` gets its atomicity from `rename`, and a rename always writes a new
 //! mtime, so a digest that covered metadata would make the second `apply` of one delta observe a
@@ -46,7 +48,7 @@ fn the_scope_is_one_normalised_absolute_path() {
 
 /// Two spellings of one file are one scope, so a CAS check compares rather than refuses.
 ///
-/// Without this the `Err` arm of `cas_eq` -- 「scope 不一致は adapter 実装エラー」 (E-M4-15) -- would
+/// Without this the `Err` arm of `cas_eq` -- "a scope mismatch is an adapter implementation error" (E-M4-15) -- would (sem: SEM-gx-adapter-fs-166)
 /// fire on a locator that reached the adapter through `/a/./b` instead of `/a/b`, and an engine
 /// would see a bug report where there was a spelling.
 #[test]
@@ -92,7 +94,7 @@ fn the_digest_covers_content_and_not_metadata() {
     assert!(
         !before.cas_eq(&moved).expect("one scope"),
         "the fingerprint did not move when the content did, so the CAS check of 41 §5-5b would be \
-         unfalsifiable (51 §7 契約 3)"
+         unfalsifiable (51 §7 contract 3) (sem: SEM-gx-adapter-fs-167)"
     );
 }
 

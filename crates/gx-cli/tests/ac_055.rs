@@ -1,21 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **AC-055** — the CLI and the HTTP surface, on one intent, answering the same three things.
 //!
 //! 34's verification method for FR-050, and 51 §7's instrument:
 //!
-//! > integration（axum test client で CLI と比較）
-//! > axum test client（`tower::ServiceExt`相当）でCLIと同一パイプラインを叩き、レスポンスを比較する
+//! > integration (compare against the CLI via an axum test client; sem: SEM-gx-cli-1941)
+//! > hit the same pipeline as the CLI through an axum test client (equivalent to `tower::ServiceExt`), and compare the responses (sem: SEM-gx-cli-1942)
 //!
-//! req/88 §6.2's DoD for this hand states the comparison: 「**CLI と HTTP が同一 intent に対し同一
-//! `TransformationId`・同一 `Verdict`・同一 `Committed` を返す**」.
+//! req/88 §6.2's DoD for this hand states the comparison: "**the CLI and HTTP return the same
+//! `TransformationId`, the same `Verdict`, and the same `Committed` for the same intent**" (sem: SEM-gx-cli-1943).
 //!
-//! # 🔴 「同一」 is 「同一 from `Candidate` onward」 — req/88 §3 Λ2, and it is not a weakening
+//! # 🔴 "the same" is "the same from `Candidate` onward" (sem: SEM-gx-cli-1944) — req/88 §3 Λ2, and it is not a weakening
 //!
 //! Λ2 proves that N single-shot CLI runs and one long-lived engine are observationally equal on Σ,
-//! and names the one place the equality breaks: 「`Σ` に入らない state を CLI が持った瞬間に等価が
-//! 壊れる——M6-01(a) の `.gx/drafts/` がまさにそれである」. 44 §0 permits that asymmetry explicitly —
-//! 「HTTP `POST /candidates`は submit+plan を一括atomically実行するためDraft単独状態を公開せず、この
-//! 規則の対象外となる」 — so a suite that compared the **Draft** phase would be asserting something 44
-//! says is not observable, and 「a correct implementation would fail it」 (req/88 §8.2).
+//! and names the one place the equality breaks: "the moment the CLI holds state that is not in
+//! `Σ`, the equality breaks — M6-01(a)'s `.gx/drafts/` is exactly that" (sem: SEM-gx-cli-1945). 44 §0 permits that asymmetry explicitly —
+//! "HTTP `POST /candidates` executes submit+plan together atomically, so it does not expose a
+//! standalone Draft state, and falls outside this rule" (sem: SEM-gx-cli-1946) — so a suite that compared the **Draft** phase would be asserting something 44
+//! says is not observable, and "a correct implementation would fail it" (sem: SEM-gx-cli-1947) (req/88 §8.2).
 //!
 //! So the comparison starts at the `TransformationId`, which is the first value both surfaces have.
 //!
@@ -91,12 +93,9 @@ impl ReceiptArchive for CliArchive {
             .map_err(|e| e.to_string())
     }
 
-    fn load(&self, id: &TransformationId) -> Option<Receipt> {
-        self.store
-            .first_available(id)
-            .ok()
-            .flatten()
-            .map(|(_, r)| r)
+    /// 🔴 **R3 / `req/222` H-02** — the commit slot alone, as `gx serve`'s own archive now reads it.
+    fn load_commit(&self, id: &TransformationId) -> Option<Receipt> {
+        self.store.get(id, StoredKind::Commit).ok().flatten()
     }
 }
 
@@ -116,11 +115,11 @@ impl ServerKeys for OneKey {
 /// What one surface answered about one transformation — AC-055's three values.
 #[derive(Debug, PartialEq, Eq)]
 struct Answered {
-    /// 「同一 `TransformationId`」.
+    /// "the same `TransformationId`" (sem: SEM-gx-cli-1948).
     transformation: String,
-    /// 「同一 `Verdict`」.
+    /// "the same `Verdict`" (sem: SEM-gx-cli-1949).
     verdict: String,
-    /// 「同一 `Committed`」.
+    /// "the same `Committed`" (sem: SEM-gx-cli-1950).
     state: String,
 }
 
@@ -247,6 +246,13 @@ impl Fixture {
     /// 44 §2.2's three calls, over 51 §7's test client.
     async fn drive_http(&self) -> Answered {
         let evidence = RequestEvidence::new();
+        // 🔴 **R10 / `req/238` H-01** — the layout is made **before** the journal, which is the
+        // order every road in the binary uses (`Session::open_wired_with_posture` calls
+        // `Layout::create` and then `open_engine_wired`; `gx demo` does the same). This fixture had
+        // it the other way round and got away with it while `Layout::create` re-created a missing
+        // `Nature::Meta` file in silence; since R10 that silence is the finding, so a directory
+        // holding a journal and no declaration is a project that lost one.
+        let layout = gx_cli::layout::Layout::create(&self.http_project).expect("create .gx/");
         let journal = self.http_project.join(".gx").join("ledger").join("journal");
         std::fs::create_dir_all(journal.parent().expect("a parent")).expect("create .gx/ledger");
         let gate =
@@ -257,7 +263,6 @@ impl Fixture {
             Arc::new(gx_adapter_fs::FsAdapter::new()),
             "gx-cli ac_055 fixture",
         );
-        let layout = gx_cli::layout::Layout::create(&self.http_project).expect("create .gx/");
         let archive = CliArchive {
             store: ReceiptStore::in_layout(&layout),
         };
@@ -365,7 +370,7 @@ async fn ac_055_the_cli_and_the_http_surface_answer_the_same_three_things() {
     assert_eq!(after_cli, "after\n", "the CLI applied the delta");
 
     // 🔴 The world is put back, because the second surface plans against it. 43 §8 is explicit that a
-    // committed predecessor makes `Fingerprint₀` stale — 「再`plan()`（再fingerprint）を強制する」 — so
+    // committed predecessor makes `Fingerprint₀` stale — "forces a re-`plan()` (a re-fingerprint)" (sem: SEM-gx-cli-1951) — so
     // running the two against a moved substrate would compare two transformations of two different
     // worlds and find them different for a reason that says nothing about either surface.
     fixture.reset_target();
@@ -386,20 +391,20 @@ async fn ac_055_the_cli_and_the_http_surface_answer_the_same_three_things() {
 
     assert_eq!(
         cli.transformation, http.transformation,
-        "🔴 同一 `TransformationId`. The id is the CID of the canonical transformation (41 §3), so \
+        "🔴 the same `TransformationId` (sem: SEM-gx-cli-1952). The id is the CID of the canonical transformation (41 §3), so \
          two surfaces naming one change with two names would mean one of them encodes differently — \
-         which 41 §6's 「全canonical encodeはgx-canon経由のみ」 exists to make impossible and which \
-         則 1 (i) is the mechanical check for"
+         which 41 §6's \"every canonical encode goes through gx-canon only\" exists to make impossible and which \
+         Rule 1(i) is the mechanical check for"
     );
     assert_eq!(
         cli.verdict, http.verdict,
-        "🔴 同一 `Verdict`. 41 §4 keeps the judgement in one function; a difference here would mean \
+        "🔴 the same `Verdict` (sem: SEM-gx-cli-1953). 41 §4 keeps the judgement in one function; a difference here would mean \
          a surface decided something"
     );
     assert_eq!(cli.state, "Committed", "the CLI reached 43 T-11");
     assert_eq!(
         cli.state, http.state,
-        "🔴 同一 `Committed`. 42 §1.3-3 keeps the state table on the engine side (則 1 (iii))"
+        "🔴 the same `Committed` (sem: SEM-gx-cli-1954). 42 §1.3-3 keeps the state table on the engine side (Rule 1(iii))"
     );
     assert_eq!(
         after_cli, after_http,
@@ -409,9 +414,9 @@ async fn ac_055_the_cli_and_the_http_surface_answer_the_same_three_things() {
 
 /// 🔴 Λ2's asymmetry, measured rather than asserted: the CLI has a `.gx/drafts/` and the server does not.
 ///
-/// req/88 §3 Λ2's counter-example, and the reason AC-055's 「同一」 reads as 「同一 from `Candidate`
-/// onward」. 44 §0 permits it (「HTTP `POST /candidates`は…Draft単独状態を公開せず」) and req/56 §2's
-/// drafts row records the cost since M6H4-5 (「plan と undo ができない」) — so the right place for it in
+/// req/88 §3 Λ2's counter-example, and the reason AC-055's "the same" reads as "the same from `Candidate`
+/// onward" (sem: SEM-gx-cli-1955). 44 §0 permits it ("HTTP `POST /candidates` … does not expose a standalone Draft state"; sem: SEM-gx-cli-1956) and req/56 §2's
+/// drafts row records the cost since M6H4-5 ("plan and undo aren't possible"; sem: SEM-gx-cli-1957) — so the right place for it in
 /// a suite is a **count**, beside the ids that do match.
 #[tokio::test]
 async fn the_draft_phase_is_the_one_place_the_two_surfaces_differ() {
@@ -430,7 +435,7 @@ async fn the_draft_phase_is_the_one_place_the_two_surfaces_differ() {
     println!("CLI_DRAFTS={cli_drafts} HTTP_DRAFTS={http_drafts}");
     assert_eq!(
         cli_drafts, 1,
-        "M6-01 採(a): `gx submit` and `gx plan` are two processes and the intent body has nowhere \
+        "M6-01 adopted (a; sem: SEM-gx-cli-1958): `gx submit` and `gx plan` are two processes and the intent body has nowhere \
          else to live"
     );
     assert_eq!(
@@ -445,7 +450,7 @@ async fn the_draft_phase_is_the_one_place_the_two_surfaces_differ() {
 ///
 /// `gx_api::ReceiptSlot` and `gx_cli::receipt::StoredKind` are two enums because the dependency
 /// direction leaves no third place for one (47 §1(a): gx-cli contains gx-api). Two spellings of a
-/// three-word vocabulary is exactly the drift E-M2-23's 「1 箇所宣言」 is about, so the one place they
+/// three-word vocabulary is exactly the drift E-M2-23's "declare in one place" (sem: SEM-gx-cli-1959) is about, so the one place they
 /// meet — this suite's archive adapter — is where the equality is asserted.
 #[test]
 fn the_two_receipt_vocabularies_are_one_vocabulary() {

@@ -1,7 +1,7 @@
 {
   "id": "D-65K",
   "kind": "policy-limit",
-  "statement": "深さの上限は map の key を読む前に効く(key が壊れていても TooDeep が先に返る)",
+  "statement": "The depth ceiling takes effect before reading a map's key (TooDeep returns first even when the key is broken)",
   "vector": "a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16261",
   "expected": "REJECT",
   "expected_error": "TooDeep",
@@ -11,12 +11,12 @@
   },
   "normative_basis": "gx-policy",
   "tier": "gx",
-  "deviation": "`{\"a\": ...}` を 64 組 入れ子にし、65 組目の map header `a1` の直後を**途中で切れた text string header** `62 61`(長さ 2 の text と宣言して 1 byte しか持たない)で終えた。scanner は map の key を `item(depth + 1)` で読むので、65 組目の key は depth 65 に達し、key の byte を 1 つも読まないうちに `depth > MAX_DEPTH`(64)で TooDeep になる。D-65 が array/map-value 側の site を通るのに対し、**この 1 本だけが map の key 側の `depth + 1` を判別する**: その加算を消すと key は depth 64 で通ってしまい、壊れた header を読んで `Truncated` を返す。∴ `expected_error` の宣言が変異を捕まえる。42 §2.1 のどの条項にも違反していない(D-65 と同じく gx-policy)。",
-  "spec_anchor": "41 §6(panic=bug) / 42 §2.1(この条項には該当しない事を明記) / req/38 §18 A-9",
-  "origin": "gx self-authored for M3 hand 4 (req/38 §18 A-9 の裁定・手順は req/58 §4 A-9 に byte 単位で在る)",
+  "deviation": "Nested `{\"a\": ...}` 64 times, and ended the 65th map header `a1` immediately with a **mid-cut text string header** `62 61` (declaring a length-2 text string but holding only 1 byte). The scanner reads a map's key via `item(depth + 1)`, so the 65th key reaches depth 65, becoming TooDeep at `depth > MAX_DEPTH` (64) before it has read even one byte of the key. Where D-65 passes through the array/map-value site, **this one alone discriminates the map's key-side `depth + 1`**: removing that addition would let the key pass at depth 64 and read the broken header, returning `Truncated`. ∴ the `expected_error` declaration is what catches the mutation. It violates no clause of 42 §2.1 (gx-policy, same as D-65).",
+  "spec_anchor": "41 §6(panic=bug) / 42 §2.1(explicitly stating this clause does not apply) / req/38 §18 A-9",
+  "origin": "gx self-authored for M3 hand 4 (req/38 §18 A-9's ruling; the recipe is at req/58 §4 A-9, byte by byte)",
   "control": {
     "vector": "a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a16161a1616100",
     "expected": "ACCEPT",
-    "note": "同じ 64 組の入れ子に、65 組目の map の key ではなく**整数 0 を value として**置いた形=最深の item が depth 64 ちょうど。受理される。∴ 負例との差は「65 段目に到達したか」だけであり、上限の位置ではなく key 側の加算そのものを測っている事の対照になる"
+    "note": "The same 64-nesting, but with **the integer 0 placed as a value** rather than a 65th map's key = the deepest item is exactly depth 64. Accepted. ∴ the difference from the negative vector is only \"whether the 65th level was reached\", making this the control that measures the key-side addition itself rather than the ceiling's position"
   }
 }

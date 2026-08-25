@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-023 (FR-023) — consistency proofs: the new tree still contains the old one.
 //!
-//! AC-023 逐語: 「Given: root_0（50件）とroot_1（root_0を含む形で100件へ追記後）。When:
-//! `verify_consistency(root_0, root_1)`を呼ぶ。Then: `Ok(true)`。root_1を改変したものでは
-//! `Ok(false)`。」 判定方法欄: 「property」.
+//! AC-023 verbatim: "Given: root_0 (50 entries) and root_1 (after appending to 100, in a way that
+//! contains root_0). When: `verify_consistency(root_0, root_1)` is called. Then: `Ok(true)`. For a
+//! modified root_1: `Ok(false)`." Judgement-method column: "property". (sem: SEM-gx-log-114)
 //!
 //! # The signature is the erratum, not the behaviour
 //!
-//! **E-M2-8** (`req/38_ERRATA_2026-08-07.md` §8): 「`verify_consistency` は `ConsistencyProof`
-//! 引数を取る形が正・AC の 2 引数呼びは 34 erratum」. Two roots alone carry no information about
+//! **E-M2-8** (`req/38_ERRATA_2026-08-07.md` §8): "the correct shape for `verify_consistency` is
+//! one that takes a `ConsistencyProof` argument; the AC's two-argument call is 34's erratum" (sem: SEM-gx-log-115). Two roots alone carry no information about
 //! how one grew into the other -- 42 §3.11 defines `ConsistencyProof { old_size, new_size, path }`
 //! precisely because the check needs the intermediate hashes. A two-argument
 //! `verify_consistency(root_0, root_1)` could only ever return `true`, which is why the AC as
@@ -62,7 +64,7 @@ fn ac_023_fifty_grown_to_a_hundred_is_consistent() {
     assert_eq!(verify_consistency(&proof, &root_0, &root_1), Ok(true));
 }
 
-/// 「root_1を改変したものでは `Ok(false)`」, and the same for root_0.
+/// "for a modified root_1: `Ok(false)`" (sem: SEM-gx-log-116), and the same for root_0.
 #[test]
 fn ac_023_a_modified_root_rejects() {
     let log = log_of(100);
@@ -189,7 +191,7 @@ fn ac_023_impossible_sizes_are_refused() {
 }
 
 // ---------------------------------------------------------------------------
-// The property AC-023's 判定方法 column asks for
+// The property AC-023's judgement-method column asks for (sem: SEM-gx-log-117)
 // ---------------------------------------------------------------------------
 
 proptest! {

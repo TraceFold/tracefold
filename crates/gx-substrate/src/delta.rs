@@ -1,4 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The two delta values an adapter produces: what it plans, and what it observed after applying.
+//! (sem: SEM-gx-substrate-060, SEM-gx-substrate-061, SEM-gx-substrate-062, SEM-gx-substrate-063,
+//! SEM-gx-substrate-064, SEM-gx-substrate-065, SEM-gx-substrate-066, SEM-gx-substrate-067,
+//! SEM-gx-substrate-068)
 //!
 //! Spec: 42 §3.4 for both field tables, 42 §1.3 for `PlannedDelta`'s projection, 41 §4 for the
 //! methods that pass them. 42 §0 files both types in this crate and this is where they are.
@@ -9,15 +14,17 @@
 //! them is hand 4 (req/69 §6.2). Three questions are therefore visible here as absences, each one
 //! with a ruling behind it:
 //!
-//! * **`reference` is derived, as of hand 3.** 42 §3.4 requires 「自身のcanonical参照(`DeltaRef.cid`
-//!   と一致)」. Hand 1 took it on trust and raised the gap (req/70 §3 M4H1-3); §29 ruled case (a) --
-//!   「`PlannedDelta::new` を `Result` 化し projection から `DeltaRef` を鋳造」 -- so the constructor now
-//!   projects through [`gx_canon::cid::IdentityView`] and mints the CID itself, which is also what
-//!   completes **E-M4-26**'s gx-canon dependency line. The agreement is a property of the type
-//!   rather than a claim in a comment, and 「指し先の無い CID」 (M4-14) cannot be built here.
-//! * **`applied_at` is an argument.** 41 §6 逐語: 「乱数・時刻はengine境界で注入（決定的リプレイの
-//!   ため）」, and **M4-17** takes case (a): 「`applied_at` は **engine 注入**(`AppliedDelta` 構成子が
-//!   `Timestamp` を引数に取る)」. An adapter that read a clock would make a replay of the same
+//! * **`reference` is derived, as of hand 3.** 42 §3.4 requires "its own canonical reference
+//!   (matches `DeltaRef.cid`)". Hand 1 took it on trust and raised the gap (req/70 §3 M4H1-3); §29
+//!   ruled case (a) -- "turn `PlannedDelta::new` into a `Result` and mint `DeltaRef` from the
+//!   projection" -- so the constructor now projects through [`gx_canon::cid::IdentityView`] and
+//!   mints the CID itself, which is also what completes **E-M4-26**'s gx-canon dependency line. The
+//!   agreement is a property of the type rather than a claim in a comment, and "a CID with no
+//!   destination to point to" (M4-14) cannot be built here.
+//! * **`applied_at` is an argument.** 41 §6, verbatim: "randomness and time are injected at the
+//!   engine boundary (for deterministic replay)", and **M4-17** takes case (a): "`applied_at` is
+//!   **injected by the engine** (the `AppliedDelta` constructor takes `Timestamp` as an argument)".
+//!   An adapter that read a clock would make a replay of the same
 //!   commit produce a different record, so the constructor takes the moment rather than finding
 //!   one. `substrate_contract.rs` asserts that this crate names no clock at all.
 //! * **`postcondition` is a [`gx_core::Fingerprint`] and therefore not comparable by `==`.**
@@ -35,8 +42,9 @@ use crate::error::{Error, Result};
 
 /// A change an adapter has worked out but not performed (42 §3.4).
 ///
-/// `payload` is 「adapterのみが解釈するopaqueな変更記述。core/gate/witnessはbyte列としてのみ扱う
-/// (P-6)」. This crate does not read it either: interpreting a payload is what an *adapter* does,
+/// `payload` is "an opaque change description that only the adapter interprets; core/gate/witness
+/// handle it only as a byte string (P-6)". This crate does not read it either: interpreting a
+/// payload is what an *adapter* does,
 /// and the boundary crate is not one. `crates/gx-core/src/planned.rs` carries the same bytes for
 /// gx-gate under E-M3-1, and **E-M4-11** made that carrier permanent -- `GateInput.planned` stays
 /// `PlannedDeltaBytes` so that no gate learns this type exists.
@@ -62,7 +70,8 @@ pub struct PlannedDelta {
 pub struct PayloadView<'a>(&'a [u8]);
 
 /// Opaque, like [`gx_core::GoalBytes`]'s. A payload is an adapter's grammar, so printing it in a
-/// `{:?}` would be the one place where 「byte 列としてのみ扱う」 quietly stops being true. The length is
+/// `{:?}` would be the one place where "handled only as a byte string" quietly stops being true.
+/// The length is
 /// printed because the length is not the content.
 impl fmt::Debug for PayloadView<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -82,7 +91,8 @@ impl Serialize for PayloadView<'_> {
 
 /// `PlannedDelta` minus `reference` (42 §1.3, row 4).
 ///
-/// The row's exclusion column reads 「`reference`（=自身のCID格納フィールド）」 with the reason 「自己参照」,
+/// The row's exclusion column reads "`reference` (= the field that holds its own CID)" with the
+/// reason "self-reference",
 /// so this is the one projection in this crate that is **not** the whole struct -- including
 /// `reference` would ask the value to contain its own digest.
 #[derive(Debug, Serialize)]
@@ -105,9 +115,10 @@ impl IdentityView for PlannedDelta {
 impl PlannedDelta {
     /// Build one from an adapter's own encoding of a change, and mint its own reference.
     ///
-    /// **M4H1-3 採(a)** (req/38 §29): 「`PlannedDelta::new` を `Result` 化し projection から `DeltaRef`
-    /// を鋳造(E-M4-26 の gx-canon 行の完成と同窓)。M4-14(residual)と同じ「CID の指し先」束」. 42 §3.4
-    /// requires `reference` to be 「自身のcanonical参照(`DeltaRef.cid`と一致)」 and 42 §1.3 fixes what is
+    /// **M4H1-3, adopted (a)** (req/38 §29): "turn `PlannedDelta::new` into a `Result` and mint
+    /// `DeltaRef` from the projection (the same window that completes E-M4-26's gx-canon row). The
+    /// same 'CID's destination' bundle as M4-14 (residual)". 42 §3.4 requires `reference` to be "its
+    /// own canonical reference (matches `DeltaRef.cid`)" and 42 §1.3 fixes what is
     /// hashed -- `{substrate, payload}` -- so the only way the field can be *right* rather than
     /// *claimed* is for the constructor to compute it.
     ///
@@ -164,7 +175,7 @@ impl PlannedDelta {
 /// The asymmetry with [`PlannedDelta`] is 41 §4's and worth reading out loud: `apply` does not take
 /// a pre-state and does not return a post-state, so what comes back is an *observation* -- a
 /// fingerprint of the scope and a digest of the object -- rather than the new world. req/69 §3.1
-/// puts it as 「post は返り値でなく観測値である」.
+/// puts it as "post is not a return value but an observation".
 ///
 /// No `PartialEq`: `postcondition` is a [`Fingerprint`], whose comparison is
 /// [`Fingerprint::cas_eq`] and not `==` (**E-M4-15**).
@@ -174,6 +185,20 @@ pub struct AppliedDelta {
     postcondition: Fingerprint,
     resulting_digest: Cid,
     applied_at: Timestamp,
+    /// 🔴 The observation seat (`req/38` §98 ruling 1, DR-1 option A / two-phase escrow).
+    ///
+    /// The raw bytes the substrate's own answer to the applied call carried, when the adapter made
+    /// the call **in this entry** — `None` on a retry the adapter's idempotency short-circuited
+    /// (the answer is not re-obtainable, which is why an engine that needs it journals it), and
+    /// `None` for every adapter that has no do-time answer to report (fs, git: the constructor
+    /// leaves the seat empty, so nothing about the existing adapters moves).
+    ///
+    /// This is deliberately **not** a second source for the post-state (the module's asymmetry
+    /// note): `postcondition` and `resulting_digest` stay the read-back. What this carries is
+    /// material for the one thing a read-back cannot supply — a do-time server-assigned value a
+    /// declared inverse needs (`InverseCompletion`), recorded as an observation rather than
+    /// trusted as a state.
+    observation: Option<Vec<u8>>,
 }
 
 impl AppliedDelta {
@@ -190,7 +215,25 @@ impl AppliedDelta {
             postcondition,
             resulting_digest,
             applied_at,
+            observation: None,
         }
+    }
+
+    /// The same record, carrying what the substrate's answer to the call said (the observation
+    /// seat above). A builder rather than a fifth `new` argument so that the three shipped
+    /// adapters and every existing constructor call read exactly as before (additive; `req/38`
+    /// §98 ruling 1's permitted gx-substrate change).
+    #[must_use]
+    pub fn with_observation(mut self, observation: Vec<u8>) -> Self {
+        self.observation = Some(observation);
+        self
+    }
+
+    /// The do-time answer, where the adapter captured one. `None` is "no answer was captured in
+    /// this entry" — a retry, or an adapter with nothing to report — and is not a failure.
+    #[must_use]
+    pub fn observation(&self) -> Option<&[u8]> {
+        self.observation.as_deref()
     }
 
     /// Which delta was applied (42 §3.4).

@@ -1,28 +1,33 @@
-//! ASM-14's two receipts, and the branch offline verification takes between them.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! ASM-14's two receipts, and the branch offline verification takes between them. (sem:
+//! SEM-gx-witness-239, SEM-gx-witness-240, SEM-gx-witness-241, SEM-gx-witness-242,
+//! SEM-gx-witness-243, SEM-gx-witness-244, SEM-gx-witness-245, SEM-gx-witness-246,
+//! SEM-gx-witness-247, SEM-gx-witness-248)
 //!
-//! The hand's DoD asks that 「VerdictReceipt(3 verdict)と CommitReceipt の 2 種が offline 検証で
-//! 分岐する事を test で示す」. AC-018 and AC-070 each show one side; this file is the table, so that
-//! 「they differ」 is a checked claim rather than an inference from two files that never meet.
+//! The hand's DoD asks that "it be shown by test that the two kinds, VerdictReceipt (3 verdicts) and
+//! CommitReceipt, branch under offline verification". AC-018 and AC-070 each show one side; this file is the table, so that
+//! "they differ" is a checked claim rather than an inference from two files that never meet.
 //!
-//! 42 §3.10 逐語: 「両者とも同一の`DsseEnvelope`/`ReceiptPayload`スキーマを共有し、
-//! `ReceiptPayload.receipt_kind`で判別する」. One schema, one discriminant, and four differences --
+//! 42 §3.10 verbatim: "both share the same `DsseEnvelope`/`ReceiptPayload` schema and are told
+//! apart by `ReceiptPayload.receipt_kind`". One schema, one discriminant, and four differences --
 //! three fields whose permitted values depend on the kind, and one verification outcome.
 //!
 //! # The three fields, and where each rule comes from
 //!
 //! | field | `VerdictReceipt` | source |
 //! |---|---|---|
-//! | `inclusion_proof` | `None` | ASM-14 / 42 §3.10 「`VerdictReceipt`は常に`None`」 |
-//! | `postcondition_fingerprint` | `None` | 42 §3.10 「`VerdictReceipt`では常にNone」 |
-//! | `inverse_delta` | `None` | 42 §3.10 「escrowはcommit中の43 T-10bで行われる」 |
+//! | `inclusion_proof` | `None` | ASM-14 / 42 §3.10 "always `None` on `VerdictReceipt`" |
+//! | `postcondition_fingerprint` | `None` | 42 §3.10 "always None on `VerdictReceipt`" |
+//! | `inverse_delta` | `None` | 42 §3.10 "escrow happens in 43 T-10b, during commit" |
 //!
 //! # And the field that is deliberately *not* checked
 //!
-//! `enforced`. 42 §3.10 says 「`VerdictReceipt`では意味を持たないため`true`固定」 and 35 ASM-13 with
-//! 43 T-4e say a verdict-stage receipt records `enforced=false` together with
-//! `fail_posture_engaged=true`. req/49 §3 M2-9's 既定案 -- 「field を 1 本足し、`VerdictReceipt` の
-//! true 固定を条件つきに読み替える」 -- is taken in both halves: E-M2-7 added the flag, and this hand
-//! reads the 固定 conditionally by leaving it out of the schema. A check that enforced it would
+//! `enforced`. 42 §3.10 says "fixed to `true` because it carries no meaning on `VerdictReceipt`"
+//! and 35 ASM-13 with 43 T-4e say a verdict-stage receipt records `enforced=false` together with
+//! `fail_posture_engaged=true`. req/49 §3 M2-9's default proposal -- "add one field, and reread
+//! `VerdictReceipt`'s fixed `true` conditionally" -- is taken in both halves: E-M2-7 added the flag, and this hand
+//! reads the fixed value conditionally by leaving it out of the schema. A check that enforced it would
 //! refuse the receipt ASM-13 requires, which is why `both_postures_are_legal` exists.
 
 mod support;
@@ -172,8 +177,8 @@ fn a_commit_receipt_without_its_proof_is_refused() {
 }
 
 /// The commit side may leave the two optional fields empty. 42 §3.10 makes only the proof
-/// mandatory -- 「構成不能なら`CommitReceipt`でもNone」 for the inverse, and the postcondition is set
-/// 「record-onlyモードで適用された場合」 -- so a schema that required all three would refuse legal
+/// mandatory -- "None even on a `CommitReceipt` if composition is impossible" for the inverse, and the postcondition is set
+/// "when applied under record-only mode" -- so a schema that required all three would refuse legal
 /// receipts.
 #[test]
 fn a_commit_receipt_may_omit_the_two_optional_fields() {
@@ -202,8 +207,8 @@ fn a_commit_receipt_may_omit_the_two_optional_fields() {
 // The posture flags (E-M2-7, and the half of M2-9 that is a non-check)
 // ---------------------------------------------------------------------------
 
-/// Both postures are legal on both kinds. This is the conditional reading of 42 §3.10's 「`true`
-/// 固定」, and the case that matters is the first: 35 ASM-13's verdict-stage receipt, with
+/// Both postures are legal on both kinds. This is the conditional reading of 42 §3.10's "fixed to
+/// `true`", and the case that matters is the first: 35 ASM-13's verdict-stage receipt, with
 /// `enforced=false` and `fail_posture_engaged=true`, which a literal reading of 42 would refuse.
 #[test]
 fn both_postures_are_legal_on_a_verdict_receipt() {
@@ -289,10 +294,11 @@ fn the_kind_cannot_be_changed_after_signing() {
 // M5H6-8① — the pairing rule 42 §3.10 never wrote down
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5H6-8① 採(a)** (`req/38_ERRATA_2026-08-07.md` §43), verbatim:
+/// 🔴 **M5H6-8① adopted (a)** (`req/38_ERRATA_2026-08-07.md` §43), verbatim:
 ///
-/// > **M5H6-8 ①採(a)・実装窓=fix批**: gx-witness `check_schema` に「`verdict=None` ⇒
-/// > `fail_posture_engaged=true`」の対規則を足す(fail-closed の二重防衛・42 §3.10 erratum 相当)。
+/// > **M5H6-8 ① adopted (a), implementation window = fix batch**: add the paired rule
+/// > "`verdict=None` ⇒ `fail_posture_engaged=true`" to gx-witness's `check_schema` (a fail-closed
+/// > double defense, equivalent to a 42 §3.10 erratum).
 ///
 /// # Why this is a *second* defence and not the first one
 ///
@@ -302,8 +308,8 @@ fn the_kind_cannot_be_changed_after_signing() {
 /// every schema exists to close — **a receipt is a wire format, and a wire format has producers
 /// this repository did not write**. A payload that reaches `check_schema` from a decoder, a fuzz
 /// corpus, or M6's API face has never met the engine's refusal. `tests/receipt_verdict_wire.rs`
-/// wrote the question down at the time (「Whether `check_schema` should carry the same rule is
-/// raised in the hand's report as a ticket, not decided here」) and §43 answered it.
+/// wrote the question down at the time ("Whether `check_schema` should carry the same rule is
+/// raised in the hand's report as a ticket, not decided here") and §43 answered it.
 ///
 /// # What the rule says, in the direction it says it
 ///
@@ -356,6 +362,16 @@ fn the_pairing_rule_refuses_only_the_shape_it_names() {
     let (proof_receipt, _anchor) = commit_receipt_in_a_log(&key, 25, 3);
     let mut commit = proof_receipt.payload().expect("decodes");
     commit.verdict = None;
+    // 🔴 **DR-46-28** — the boundary moves with the verdict, and that is the rule interacting
+    // rather than a fixture detail. `commit_payload` carries `mixed(llm_originated /
+    // deterministic_replay)`; taking the verdict away makes that value false, because 43 T-4e
+    // called no gate and there is no derivation left for the second stage to be about. Leaving it
+    // would make this bed refused for a reason that is not the pairing rule it exists to measure —
+    // which is what the floor caught when the field landed.
+    commit.determinism_boundary = gx_core::DeterminismBoundary::Mixed {
+        input_generation: gx_core::BoundaryStage::LlmOriginated,
+        verdict_derivation: gx_core::BoundaryStage::Unknown,
+    };
     commit.fail_posture_engaged = true;
     assert!(commit.check_schema().is_ok(), "{:?}", commit.check_schema());
 

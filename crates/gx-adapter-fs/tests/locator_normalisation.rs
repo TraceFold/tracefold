@@ -1,15 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **E-M4-12** as behaviour, **L7** as a property, and **M4-22** as a scan of the crate's own
 //! documentation.
 //!
 //! Three obligations meet here, and they are different in kind:
 //!
-//! * **E-M4-12** (req/38 §28 M4-12 採(a)) fixes *what* the normalisation is -- 「字句(lexical)のみ…
-//!   dot-segment 畳込み・重複区切り除去・末尾区切り規約」 -- and files symlink resolution as v0.2+ with
-//!   「TH-2 残存…を doc と受領書側 disclosure に明示」.
+//! * **E-M4-12** (req/38 §28 M4-12, adopted (a)) fixes *what* the normalisation is -- "**purely lexical**...
+//!   dot-segment folding, duplicate-separator removal, trailing-separator convention" -- and files symlink resolution as v0.2+ with
+//!   "the TH-2 residue... is made explicit in the doc and the receipt-side disclosure". (sem: SEM-gx-adapter-fs-250)
 //! * **L7** (req/69 §3.4) is the property: `normalize(normalize(l)) == normalize(l)` and
 //!   `l ≈ l' → normalize(l) == normalize(l')`. It is T3's shape one layer over -- gx-canon chooses a
 //!   representative for a value, an adapter chooses one for a position.
-//! * **M4-22** (§28) makes 42 §2.3's 「`SubstrateAdapter`実装のドキュメントに記載を**必須とする**」 a
+//! * **M4-22** (§28) makes 42 §2.3's "documentation of a `SubstrateAdapter` implementation is **required** to record it" a (sem: SEM-gx-adapter-fs-251)
 //!   machine check rather than an intention: the `≈` this adapter implements has to be written where
 //!   an implementor reads it.
 //!
@@ -35,8 +37,8 @@ fn crate_root_source() -> String {
 /// The body of one `//! # ...` section, with quoted lines removed (§31 M4H3-5).
 ///
 /// Lines are joined with a space rather than a newline and runs of whitespace collapse, because
-/// prose wraps: 「duplicate separator」 written across two lines is the same clause as 「duplicate
-/// separator」 written on one, and a scanner that said otherwise would be measuring the line width.
+/// prose wraps: "duplicate separator" written across two lines is the same clause as "duplicate
+/// separator" written on one, and a scanner that said otherwise would be measuring the line width. (sem: SEM-gx-adapter-fs-252)
 fn clause_body(source: &str, heading: &str) -> String {
     let mut body = String::new();
     let mut inside = false;
@@ -89,7 +91,7 @@ fn duplicate_separators_collapse() {
 
 /// Clause 4: this adapter drops a trailing separator, except at the root.
 ///
-/// E-M4-12 leaves the choice to each adapter and forbids only 「deciding it per call site」. The root
+/// E-M4-12 leaves the choice to each adapter and forbids only "deciding it per call site". The root (sem: SEM-gx-adapter-fs-253)
 /// keeps its separator because `""` is not a position and `/` is.
 #[test]
 fn a_trailing_separator_is_dropped_except_at_the_root() {
@@ -102,7 +104,7 @@ fn a_trailing_separator_is_dropped_except_at_the_root() {
 /// A `..` that would climb past the root is dropped, and cannot escape it.
 ///
 /// The fail-open direction this closes is the reason the gate needs normalisation at all: M3-10
-/// fixed a v0.1 policy pack's effective range at 「locator 級」, so `/etc/../../etc/passwd` and
+/// fixed a v0.1 policy pack's effective range at the "locator level", so `/etc/../../etc/passwd` and (sem: SEM-gx-adapter-fs-254)
 /// `/etc/passwd` have to be one subject or a `/etc/**` forbid is a spelling contest.
 #[test]
 fn a_double_dot_cannot_climb_past_the_root() {
@@ -114,8 +116,8 @@ fn a_double_dot_cannot_climb_past_the_root() {
 
 /// A relative locator keeps the `..` it cannot cancel, and stays relative.
 ///
-/// E-M4-12 clause 2 leaves this to the adapter -- 「A leading `..` that cannot cancel is the
-/// adapter's to define and to write down」 -- and this adapter keeps it, because dropping it would
+/// E-M4-12 clause 2 leaves this to the adapter -- "A leading `..` that cannot cancel is the
+/// adapter's to define and to write down" -- and this adapter keeps it, because dropping it would (sem: SEM-gx-adapter-fs-255)
 /// turn `../secret` into `secret` and invent a position the caller did not name. The refusal happens
 /// where the locator is *used*, not where it is spelled: [`gx_adapter_fs::locator::is_absolute`] is
 /// what `snapshot` and `plan` consult.
@@ -180,8 +182,8 @@ proptest! {
     ///
     /// The alphabet is the one that makes the clauses collide -- separators, `.`, `..` and ordinary
     /// segments -- because a generator over arbitrary strings would spend its cases on inputs where
-    /// nothing folds. 34's 判定方法 column for AC-047 reads 「unit + property」 and `tools/ci.sh`
-    /// stage 4i runs this file at the declared count (51 §3: 「≥1000ケース/PR」).
+/// nothing folds. 34's judgment-method column for AC-047 reads "unit + property" and `tools/ci.sh`
+/// stage 4i runs this file at the declared count (51 §3: "≥1000 cases/PR"). (sem: SEM-gx-adapter-fs-256)
     #[test]
     fn normalisation_is_idempotent(spelling in prop::collection::vec(
         prop_oneof![
@@ -232,29 +234,29 @@ fn equivalent_spellings_share_a_representative() {
 // M4-22: the documentation 42 §2.3 requires
 // ---------------------------------------------------------------------------
 
-/// 42 §2.3's 「必須とする」, measured: the `≈` this adapter implements is written in its documentation.
+/// 42 §2.3's "required", measured: the `≈` this adapter implements is written in its documentation. (sem: SEM-gx-adapter-fs-257)
 ///
 /// One clause per row of E-M4-12, looked for **inside the section** rather than anywhere in the file
-/// (§30 M4H2-6: 「どこかに書いてある」は「その場所に書いてある」ではない).
+/// (§30 M4H2-6: "somewhere in the file" is not "written in that spot"). (sem: SEM-gx-adapter-fs-258)
 ///
-/// 🔴 The 「位置は絶対」 row is **K-2 採(a) の最小形** (`req/38` §35). req/76 §2.10 counted the section's
+/// 🔴 The "positions are absolute" row is **the minimal form of K-2, adopted (a)** (`req/38` §35). req/76 §2.10 counted the section's (sem: SEM-gx-adapter-fs-259)
 /// five numbered clauses against this list and found clause 5 (**ASM-69-3**) named by no token; §2.1
 /// (B-1) then deleted that clause from the crate root and **every suite stayed green**. The behaviour
 /// it describes is guarded three times over (`scope.rs`'s two probes and `fs_delta.rs`'s
 /// `NotAPosition`), so what the deletion removed was not the rule but the place 42 §2.3 requires the
-/// rule to be written -- 「`SubstrateAdapter`実装のドキュメントに記載を**必須とする**」 is a requirement
+/// rule to be written -- "documentation of a `SubstrateAdapter` implementation is **required** to record it" is a requirement (sem: SEM-gx-adapter-fs-260)
 /// about the documentation, and only a token in this list measures it.
 #[test]
 fn the_equivalence_relation_is_documented_where_42_2_3_requires_it() {
     let body = clause_body(&crate_root_source(), "# The equivalence `≈` (normative)");
     let clauses = [
-        ("字句のみ", "purely lexical"),
+        ("lexical only", "purely lexical"),
         ("dot-segment", "dot-segment"),
-        ("重複区切り", "duplicate separator"),
-        ("末尾区切り", "trailing separator"),
+        ("duplicate separator", "duplicate separator"),
+        ("trailing separator", "trailing separator"),
         ("byte-literal", "byte-literal"),
-        ("位置は絶対", "Positions are absolute"),
-        ("symlink 非解決", "symbolic link"),
+        ("positions absolute", "Positions are absolute"),
+        ("symlink unresolved", "symbolic link"), // (sem: SEM-gx-adapter-fs-261)
     ];
     let missing: Vec<&str> = clauses
         .iter()
@@ -273,7 +275,7 @@ fn the_equivalence_relation_is_documented_where_42_2_3_requires_it() {
     );
 }
 
-/// TH-2's residue is disclosed, not implied (**E-M4-12**: 「doc と受領書側 disclosure に明示」).
+/// TH-2's residue is disclosed, not implied (**E-M4-12**: "made explicit in the doc and the receipt-side disclosure"). (sem: SEM-gx-adapter-fs-262)
 ///
 /// 45 §4 forbids overclaiming, and a lexical normaliser that called its output a canonical path
 /// would be doing exactly that: an actor who can create a symbolic link still chooses which spelling

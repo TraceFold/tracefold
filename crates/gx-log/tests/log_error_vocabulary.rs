@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **E-M2-23 / M6H5-2 (b)** — `ERROR_KINDS` is the variants of `Error`, and stays so.
 //!
-//! The gx-log half of the pair req/38 §55 (M6H8-16 採(a)) orders. Hand 8's mutation was
+//! The gx-log half of the pair req/38 §55 (M6H8-16, adopted (a)) orders. Hand 8's mutation was (sem: SEM-gx-log-165)
 //! `"OutOfRange"` → `"OutOfRang"`: it compiles, `kind()` still returns the right word, and the array
 //! that gx-api reads as a **denominator** now holds one entry nothing produces. Every suite in the
 //! workspace stayed green (req/96 §7.3, `RC=0`), which is what makes the ghost dangerous — the

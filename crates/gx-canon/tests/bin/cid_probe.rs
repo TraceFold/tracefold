@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The second process of AC-011.
 //!
-//! AC-011 asks for the CID to be computed 「完全に独立した子プロセスB（別バイナリ・キャッシュ非共有・
-//! 別ワーキングディレクトリ）」 and compared with the one the test process computed. A separate
+//! AC-011 asks for the CID to be computed in "a completely independent child process B (a
+//! separate binary, no shared cache, a separate working directory)" (sem: SEM-gx-canon-074) and compared with the one the test process computed. A separate
 //! binary is therefore part of the acceptance criterion rather than a convenience, and this is
 //! it: read a `Transformation` as JSON on standard input, compute its CID with the same library
 //! function, print the result in the `gx1:` form of 42 §1.2.

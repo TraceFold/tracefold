@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The canonical map order, measured rather than assumed (H3-1).
 //!
 //! Every field table in this crate is declared in the order 42 §2.1-2 wants the encoded map to
-//! carry, and hand 2 recorded a safety net for it (req/51 §3.6: 「順序を違えても `encode` が
-//! `NotCanonicalizable` で落ちる（=沈黙しない）」). That net does not exist. `serde_ipld_dagcbor`
+//! carry, and hand 2 recorded a safety net for it (req/51 §3.6: "even with the wrong order,
+//! `encode` fails with `NotCanonicalizable` (= it does not stay silent)" (sem: SEM-gx-log-166)). That net does not exist. `serde_ipld_dagcbor`
 //! sorts a struct's keys itself, so declaration order changes nothing about the bytes and a
 //! wrongly ordered declaration fails nothing.
 //!
@@ -14,7 +16,7 @@
 //! The second assertion is the one hand 2's prose got wrong in the other direction: E-42-3
 //! (req/38 §4) settles that the order is over the **encoded** key -- length first, letters second
 //! -- and not over the bare UTF-8 bytes, which several doc comments in this crate still describe
-//! as 「bytewise」. `index` before `appended_at` is the case that tells the two readings apart.
+//! as "bytewise" (sem: SEM-gx-log-167). `index` before `appended_at` is the case that tells the two readings apart.
 
 use gx_canon::cbor;
 use serde::Serialize;

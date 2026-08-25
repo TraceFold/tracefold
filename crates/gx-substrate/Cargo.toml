@@ -1,5 +1,6 @@
 # The substrate boundary. 41 §2 gives this crate its module list
-# (`src/{lib,adapter,delta,fingerprint}.rs`) and calls it 「P-6の担保点」; 41 §4 gives it the
+# (`src/{lib,adapter,delta,fingerprint}.rs`) and calls it "the point that secures P-6" (sem:
+# SEM-gx-substrate-001); 41 §4 gives it the
 # `SubstrateAdapter` trait and 42 §3.4 the delta tables `delta.rs` carries.
 #
 # M4 hand 1 creates the crate and the data skeleton only. The trait itself is hand 2, the
@@ -9,21 +10,25 @@ name = "gx-substrate"
 description = "The SubstrateAdapter boundary and its delta types (41 §2 / §4, 42 §3.4)."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the
+                                       # workspace (sem: SEM-gx-substrate-002)
 license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
 # **E-M4-26** (req/38 §28) is the erratum for 41 §2's missing dependency line:
-# 「`gx-substrate # dep: gx-core, gx-canon`(ObjectSnapshot.id/DeltaRef.cid の鋳造)」. Hand 1 declared
-# half of it and said why the other half was not there yet, on the rule gx-witness set and gx-gate
-# followed for three hands -- 「a dependency declared before its first use cannot be reviewed against
-# a reason」. **Hand 3 is the hand that mints the first CID**: `PlannedDelta::new` now projects
-# through `IdentityView` and mints its own `DeltaRef` (M4H1-3 採(a), req/38 §29), so the gx-canon
+# "`gx-substrate # dep: gx-core, gx-canon` (the minting of `ObjectSnapshot.id`/`DeltaRef.cid`)" (sem:
+# SEM-gx-substrate-003). Hand 1 declared half of it and said why the other half was not there yet, on
+# the rule gx-witness set and gx-gate followed for three hands -- "a dependency declared before its
+# first use cannot be reviewed against a reason". **Hand 3 is the hand that mints the first CID**:
+# `PlannedDelta::new` now projects through `IdentityView` and mints its own `DeltaRef` (M4H1-3,
+# adopted (a), req/38 §29), so the gx-canon
 # edge has a call site and E-M4-26 is complete.
 #
-# `thiserror` arrives with **E-M4-28** (§30 M4H2-2 (a)) and 41 §6's 「エラーは thiserror で型化」: this
-# crate now declares its own `Error`, because gx-core's ten variants are all rejected arguments and
-# an adapter has to be able to say 「読めなかった」. It adds no package to the graph -- every other
-# member already depends on it -- which is the sense §29 M4H1-6 fixed for 「依存追加 0」.
+# `thiserror` arrives with **E-M4-28** (§30 M4H2-2 (a)) and 41 §6's "errors are typed with thiserror"
+# (sem: SEM-gx-substrate-004): this crate now declares its own `Error`, because gx-core's ten
+# variants are all rejected arguments and an adapter has to be able to say "could not be read". It
+# adds no package to the graph -- every other member already depends on it -- which is the sense §29
+# M4H1-6 fixed for "zero new dependencies".
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement (M2 hand 6, req/55 §4 H6-1).
@@ -32,4 +37,5 @@ gx-core = { path = "../gx-core", version = "0.1.0" }
 gx-canon = { path = "../gx-canon", version = "0.1.0" }
 
 serde = { version = "1", features = ["derive"] }  # the IdentityView projections of 42 §1.3
-thiserror = "2"                       # 41 §6, "エラーは thiserror で型化"
+thiserror = "2"                       # 41 §6, "errors are typed with thiserror" (sem:
+                                       # SEM-gx-substrate-005)

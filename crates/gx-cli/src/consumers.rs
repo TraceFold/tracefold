@@ -1,17 +1,20 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The accessors M5 armed with kill conditions, and who consumes them.
 //!
 //! Two tickets end here, and they are the same shape: an accessor exists, nothing calls it, and M5
-//! refused to let 「a hand will use it later」 stand as an answer. D-7's rule is that a deferral
+//! refused to let "a hand will use it later" stand as an answer (sem: SEM-gx-cli-004). D-7's rule is that a deferral
 //! carries a kill condition; M5H4-8 wrote one and M5FIX-3 wrote another.
 //!
 //! # M6-21 — `Gate::policies` / `Gate::invariants` / `PolicyEngine::is_empty`
 //!
-//! §41 M5H4-8 armed them: 「**M6 reqdef が具体的な消費者(`gx policy lint`/`gx serve` 等)を 1 つも名指せ
-//! なければ、M6 手 1 で退役印形(E-7 の形)を実施**」. req/88 §4 M6-21 named three and req/38 §47 採(a)
+//! §41 M5H4-8 armed them: "**if the M6 reqdef names not a single concrete consumer
+//! (`gx policy lint`/`gx serve`, etc.), M6 hand 1 carries out the retirement-mark form (E-7's
+//! form)**" (sem: SEM-gx-cli-005). req/88 §4 M6-21 named three and req/38 §47 adopted (a)
 //! dissolved the kill condition — with a second condition attached, because naming is cheap:
 //!
-//! > 名指しただけでは消費者にならない——**該当手の DoD に「3 accessor それぞれの呼び出し箇所を機械で
-//! > 数え、0 なら RED」を含める**
+//! > naming alone does not make a consumer -- **the relevant hand's DoD must include "machine-count
+//! > each of the 3 accessors' call sites; 0 is RED"** (sem: SEM-gx-cli-006)
 //!
 //! [`GATE_ACCESSOR_CONSUMERS`] is that naming, in a form a probe reads
 //! (`probes/doubt/tests/m6_surface_doubt.rs`). The wiring hand is **hand 4** and this is hand 1, so
@@ -23,14 +26,16 @@
 //!
 //! §46 M5FIX-3 left one survivor in gx-witness and sent the consumer question to M6. req/88 §4
 //! M6-22 wrote the dependency: the answer depends on **M6-16**'s ruling about staged disclosure.
-//! req/38 §47 settled M6-16 as 採(a) — `gx receipt show --level 1..4` — and therefore settled M6-22
+//! req/38 §47 settled M6-16 as adopted (a) — `gx receipt show --level 1..4` — and therefore settled M6-22 (sem: SEM-gx-cli-007)
 //! as (b):
 //!
-//! > M6-16 採(a)(段階開示 `--level 1..4`)を採用したので従属どおり **(b)=L4(生署名)出力が
-//! > `signature_for` の消費者**として結線(退役印は打たない)
+//! > having adopted M6-16's (a) (staged disclosure `--level 1..4`), per the dependency it is
+//! > wired as **(b) = the L4 (raw signature) output is `signature_for`'s consumer** (no retirement
+//! > mark is stamped) (sem: SEM-gx-cli-008)
 //!
 //! So: **no retirement mark**, and the consumer is level 4 of `gx receipt show`, which is **hand 2**.
-//! req/88 §6.2 手 1 ⑧ asks this hand for exactly one thing about it — 「従属を doc に 1 行(隠さない)」 —
+//! req/88 §6.2 hand 1 ⑧ asks this hand for exactly one thing about it — "one line of the
+//! dependency in the doc (do not hide it)" (sem: SEM-gx-cli-009) —
 //! and [`SIGNATURE_FOR_CONSUMER`] is that line in a place a probe can find it.
 
 /// One armed accessor and the file that has to call it.
@@ -56,7 +61,7 @@ pub const GATE_ACCESSOR_CONSUMERS: [AccessorConsumer; 3] = [
         consumer_path: "crates/gx-cli/src/policy.rs",
         hand: 4,
         because: "`gx policy lint` reads how many policies a pack parsed into, and `gx serve`'s \
-                  startup log (44 §1.2: 「起動ログ（構造化JSON行）」) records which policy set it \
+                  startup log (44 §1.2: \"startup log (structured JSON line)\") (sem: SEM-gx-cli-010) records which policy set it \
                   came up with. A gate whose policy set is invisible at startup is a gate nobody \
                   can testify about afterwards.",
     },
@@ -66,14 +71,14 @@ pub const GATE_ACCESSOR_CONSUMERS: [AccessorConsumer; 3] = [
         hand: 4,
         because: "44 §1.2's `lint` text describes Cedar syntax only, but a `Verdict` is the \
                   composition of policy **and** invariant (FR-027). A diagnostic that checked one \
-                  half would misreport what it checked, which is M4H4-2's 「未実装と失敗を同じ顔に \
-                  するな」 wearing a linter's clothes.",
+                  half would misreport what it checked, which is M4H4-2's \"do not give the unimplemented \
+                  and a failure the same face\" wearing a linter's clothes. (sem: SEM-gx-cli-011)",
     },
     AccessorConsumer {
         accessor: "is_empty",
         consumer_path: "crates/gx-cli/src/policy.rs",
         hand: 4,
-        because: "「policy 0 本で立った」 is the most dangerous configuration a fail-closed \
+        because: "\"came up with zero policies\" (sem: SEM-gx-cli-012) is the most dangerous configuration a fail-closed \
                   deployment can be in — the gate is present and decides nothing — and it is \
                   invisible unless something asks. This is the startup warning.",
     },
@@ -85,7 +90,7 @@ pub const GATE_ACCESSOR_CONSUMERS: [AccessorConsumer; 3] = [
 /// one. The sentence exists so that a later reader finds the decision rather than an unused
 /// accessor and a guess about it.
 pub const SIGNATURE_FOR_CONSUMER: &str = "\
-`Receipt::signature_for` is not retired. req/38 §47 settled M6-16 as 採(a) (staged disclosure, \
+`Receipt::signature_for` is not retired. req/38 §47 settled M6-16 as adopted (a) (sem: SEM-gx-cli-013) (staged disclosure, \
 `gx receipt show --level 1..4`), and M6-22 follows it as (b): **level 4 — the raw signatures — is \
 the consumer**, and it is written in M6 hand 2. Hand 1 owns none of it; what hand 1 owes is this \
 line, because a dependency between two rulings that lives only in a report is a dependency the next \

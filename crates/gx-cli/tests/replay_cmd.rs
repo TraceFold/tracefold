@@ -1,13 +1,15 @@
-//! `gx replay` — 44 §1.2, **E-M5-2**, **M6-26 採(a)**.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! `gx replay` — 44 §1.2, **E-M5-2**, **M6-26 adopted (a)** (sem: SEM-gx-cli-1318).
 //!
 //! # What is actually being compared
 //!
-//! E-M5-2 made replay 「Σ のみを再構成する read-only 操作」, so `gx_engine::reconstruct` is the whole
+//! E-M5-2 made replay "a read-only operation that reconstructs only Σ" (sem: SEM-gx-cli-1319), so `gx_engine::reconstruct` is the whole
 //! of it and a reconstruction compared against itself would answer `matches: true` about nothing.
 //! What a single-shot process holds is two durable artefacts written by different code — the engine
 //! journal and the ledger file — and Σ's `ledger` component is the journal's **claim** about the
-//! second (`CommittedRow`'s own documentation: 「This is the journal's claim about the ledger, not
-//! the ledger's own root」). So `matches` is that claim checked, and `unchecked` names the three
+//! second (`CommittedRow`'s own documentation: "This is the journal's claim about the ledger, not
+//! the ledger's own root"; sem: SEM-gx-cli-1320). So `matches` is that claim checked, and `unchecked` names the three
 //! components of Σ that have no second copy on disk.
 //!
 //! The probes below are therefore in pairs: one where the two agree, one where they are made to
@@ -54,23 +56,26 @@ fn replay_matches_when_the_journal_and_the_ledger_agree() {
     let out = run(support::gx().arg("--project").arg(&dir).arg("replay"));
     let json = out.json();
     println!("REPLAY_MATCH exit={} {json}", out.code);
-    assert_eq!(out.code, 0, "44 §1.2: 「exit: 0=一致」");
+    assert_eq!(
+        out.code, 0,
+        "44 §1.2: \"exit: 0=match\" (sem: SEM-gx-cli-1321)"
+    );
     assert_eq!(json["matches"], serde_json::json!(true));
     assert_eq!(json["diffs"], serde_json::json!([]));
     assert_eq!(json["ledger_consulted"], serde_json::json!(true));
     assert_eq!(
         json["unchecked"],
         serde_json::json!(["drafts", "transformations", "escrow"]),
-        "M6-26 採(a): the three components of Σ with no independent witness are named, so \
-         `matches: true` cannot be read as 「all of Σ was compared」"
+        "M6-26 adopted (a): the three components of Σ with no independent witness are named, so \
+         `matches: true` cannot be read as \"all of Σ was compared\" (sem: SEM-gx-cli-1322)"
     );
     assert_eq!(json["records_replayed"], serde_json::json!(2));
 }
 
 /// 🔴 A journal that claims the wrong sequence number is caught, and `diffs` names the component.
 ///
-/// M6-26 採(a): 「`diffs` は『不一致の時に最初に食い違った成分名』の列」. The transformation and both
-/// numbers travel with the component name, because 「the ledger disagrees」 on its own is not
+/// M6-26 adopted (a): "`diffs` is the list of names of the first component that disagreed, for when there is a mismatch" (sem: SEM-gx-cli-1323). The transformation and both
+/// numbers travel with the component name, because "the ledger disagrees" on its own is not
 /// something an operator can act on.
 #[test]
 fn replay_reports_a_component_and_a_name_when_they_disagree() {
@@ -83,7 +88,10 @@ fn replay_reports_a_component_and_a_name_when_they_disagree() {
     let out = run(support::gx().arg("--project").arg(&dir).arg("replay"));
     let json = out.json();
     println!("REPLAY_DIFF exit={} {json}", out.code);
-    assert_eq!(out.code, 1, "44 §1.2: 「1=不一致または実行不能」");
+    assert_eq!(
+        out.code, 1,
+        "44 §1.2: \"1=mismatch or unable to execute\" (sem: SEM-gx-cli-1324)"
+    );
     assert_eq!(json["matches"], serde_json::json!(false));
     let diffs = json["diffs"].as_array().expect("a list");
     assert_eq!(diffs.len(), 1);
@@ -96,7 +104,7 @@ fn replay_reports_a_component_and_a_name_when_they_disagree() {
     );
 
     // A commit the ledger has never heard of: `ledger_index` is `null` rather than absent, so the
-    // two failures are told apart (「wrong place」 and 「not there at all」).
+    // two failures are told apart ("wrong place" and "not there at all"; sem: SEM-gx-cli-1325).
     seed_journal(&layout, &[(999, 3)]);
     let out = run(support::gx().arg("--project").arg(&dir).arg("replay"));
     let json = out.json();
@@ -110,10 +118,10 @@ fn replay_reports_a_component_and_a_name_when_they_disagree() {
     assert_eq!(missing, 1, "the commit the ledger does not hold");
 }
 
-/// 🔴 A replay with no ledger to consult is 「実行不能」 and not 「一致」.
+/// 🔴 A replay with no ledger to consult is "unable to execute" and not "a match" (sem: SEM-gx-cli-1326).
 ///
 /// The first reading of this command answered 0 when there was nothing to check, which is `matches`
-/// meaning 「nothing disagreed with me」 — the vacuous pass M6-26(c) was refused for.
+/// meaning "nothing disagreed with me" (sem: SEM-gx-cli-1327) — the vacuous pass M6-26(c) was refused for.
 #[test]
 fn replay_without_a_ledger_is_not_a_match() {
     let (dir, layout) = project("replay_no_ledger");
@@ -174,7 +182,7 @@ fn the_two_ways_of_narrowing_select_what_they_say_they_select() {
     assert_eq!(out.code, 0);
     assert_eq!(out.json()["records_replayed"], serde_json::json!(2));
 
-    // A range this journal has not got is 「入力不正」 (1), and the message says which index space it
+    // A range this journal has not got is "invalid input" (sem: SEM-gx-cli-1328) (1), and the message says which index space it
     // is in — because the whole risk of M6H2-8 is a caller using the other one.
     let out = run(support::gx()
         .arg("--project")

@@ -5,15 +5,16 @@ name = "gx-core"
 description = "Core types of the Glovrex transformation calculus. No I/O, deterministic (41 §3 / §6)."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-core-001)
 license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
-# 41 §2 allows this crate "serde, thiserror 程度" and step 2 spends exactly that much.
+# 41 §2 allows this crate "serde, thiserror and not much more" and step 2 spends exactly that much.
 # serde is not optional here: AC-004 and AC-005 are stated as serde round-trip properties,
 # so the derive is the acceptance criterion rather than a convenience. thiserror is named
-# by 41 §6 ("エラーは thiserror で型化") and carries `Error::OrderExceeded` (AC-003).
+# by 41 §6 ("errors are typed with thiserror") and carries `Error::OrderExceeded` (AC-003).
 # Neither performs I/O, which is what AC-008 actually forbids -- the DoD line in req/31 §9
-# reads "cargo tree に I/O 系 crate 0", not "zero dependencies".
+# reads "zero I/O crates in cargo tree", not "zero dependencies". (sem: SEM-gx-core-002)
 #
 # The dependency that matters in the other direction is the one that is absent for good:
 # gx-core never names gx-canon (A-1 / ASM-16), so the two crates cannot cycle.

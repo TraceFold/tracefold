@@ -1,17 +1,17 @@
 {
   "id": "A-4",
   "kind": "codec-deviation",
-  "statement": "tag 42 を最短でない形で書いた byte 列は decode されない",
+  "statement": "A byte string writing tag 42 in non-shortest form is not decoded",
   "vector": "d9002a582500017012208888888888888888888888888888888888888888888888888888888888888888",
   "expected": "REJECT",
   "normative_basis": "IPLD-SHOULD+gx-policy",
   "tier": "Tier2",
-  "deviation": "spec が唯一許す tag token は `0xd82a`。ai=25(uint16 追加)形式に冗長化し、後ろに CIDv1 の byte-string payload を続けた。gx では最短形の `d82a` 自体も禁(P-2 参照)。",
+  "deviation": "The only tag token the spec allows is `0xd82a`. Made it redundant into the ai=25 (extra uint16) form, and followed it with a CIDv1 byte-string payload. In gx even the shortest form `d82a` itself is forbidden (see P-2).",
   "spec_anchor": "ipld/ipld@a65340b spec.md L57 / 42 §2.1-5 / req/33 §2 A-4",
   "origin": "gx self-authored from spec (req/33 §2)",
   "control": {
     "vector": "58208888888888888888888888888888888888888888888888888888888888888888",
     "expected": "ACCEPT",
-    "note": "gx が Cid を載せる形=tag 無しの 32 byte byte-string(42 §1.1・§2.1-5)。tag 42 には gx canonical な対照が存在しない"
+    "note": "The form gx carries a Cid in = a tag-free 32-byte byte-string (42 §1.1, §2.1-5). No gx-canonical counterpart exists for tag 42."
   }
 }

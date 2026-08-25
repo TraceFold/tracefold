@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The DSSE signature, as data.
 //!
 //! Spec: 42 §3.10 for the field table (`DsseSignature { keyid: KeyId, sig: Vec<u8> }`), 41 §2 for
@@ -28,8 +30,10 @@ use serde::{Deserialize, Serialize};
 /// where the bytes are parsed, where it cannot be reported as a signature failure.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DsseSignature {
+    /// Which key signed (42 §3.10). The same namespace as `ReceiptPayload.key_id` and
+    /// [`crate::context::Actor`]'s key, so verifier and record join without a translation table.
     pub keyid: KeyId,
-    /// Raw signature bytes. See [`raw_bytes`] for why this field is not left to the derive.
+    /// Raw signature bytes. See `raw_bytes` below for why this field is not left to the derive.
     #[serde(with = "raw_bytes")]
     pub sig: Vec<u8>,
 }
@@ -39,13 +43,15 @@ pub struct DsseSignature {
 /// The derive would emit `Vec<u8>` the way serde emits any sequence, and in DAG-CBOR that is a
 /// 64-element array whose elements above 23 each grow a header byte -- so the encoded length of a
 /// signature would depend on how many of its bytes happen to be large. 42 §1.1 states the rule for
-/// `Cid` (「32byte byte-string（major type 2）として直接格納」) and the same reasoning applies to
+/// `Cid` ("stored directly as a 32-byte byte-string, major type 2"; sem: SEM-gx-core-010) and the
+/// same reasoning applies to
 /// every raw-byte field: a signature is bytes, and bytes have a major type of their own.
 /// [`crate::Cid`] hand-writes its impls for this reason; this module is the same fix where a
 /// derive is otherwise wanted.
 ///
-/// The human-readable side is base64 (**M2H1-4**, `req/38_ERRATA_2026-08-07.md` §9: 「既定推奨=
-/// base64」). Hand 1 left it as a byte string in both faces, which serde_json writes as a list of
+/// The human-readable side is base64 (**M2H1-4**, `req/38_ERRATA_2026-08-07.md` §9: "default
+/// recommendation = base64"; sem: SEM-gx-core-011). Hand 1 left it as a byte string in both faces,
+/// which serde_json writes as a list of
 /// sixty-four integers -- a spelling nothing in the canon asks for, next to a `payload` 44 §2.2
 /// already spells in base64. Hand 5 settles it the way the ruling recommended; the table is
 /// [`crate::b64`] and `gx-core/tests/base64_vectors.rs` checks it against RFC 4648 §10.

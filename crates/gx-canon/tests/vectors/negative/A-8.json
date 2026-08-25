@@ -1,7 +1,7 @@
 {
   "id": "A-8",
   "kind": "codec-deviation",
-  "statement": "1 個の top-level object の後ろに余剰 byte を持つ byte 列は decode されない",
+  "statement": "A byte string with excess bytes after one top-level object is not decoded",
   "vector": "0100",
   "expected": "REJECT",
   "expected_error": "TrailingBytes",
@@ -11,12 +11,12 @@
   },
   "normative_basis": "IPLD-MUST",
   "tier": "Tier1",
-  "deviation": "整数 1 の最短形 `01` の後ろに余剰 byte `00` を足した。先頭 object だけ切り出して残余を無視する事は許されず、blob 全体が invalid になる。",
+  "deviation": "Added the excess byte `00` after the integer 1's shortest form `01`. It is not permitted to cut out only the leading object and ignore the remainder; the whole blob becomes invalid.",
   "spec_anchor": "ipld/ipld@a65340b spec.md L66 / 42 §2.1 / req/33 §2 A-8",
   "origin": "gx self-authored from spec (req/33 §2)",
   "control": {
     "vector": "01",
     "expected": "ACCEPT",
-    "note": "余剰 byte を除いた物"
+    "note": "The same with the excess byte removed"
   }
 }

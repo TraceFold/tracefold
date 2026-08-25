@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `apply`: the two operations, and the short circuit that makes a retry a retry.
 //!
-//! Spec: 41 §4 (「commit承認後にのみ呼ばれる」, 「適用は冪等に設計する」), 51 §7 contract 7, 43 T-10c for what
+//! Spec: 41 §4 ("only called after commit approval", "apply is designed to be idempotent"), 51 §7 contract 7, 43 T-10c for what (sem: SEM-gx-adapter-git-017)
 //! the idempotence is *for*, 42 §3.4 for the observation that comes back. The rulings are **E-M4-3**
 //! (the quantifier), **E-M4-31** (`applied_at` is the engine's) and **M4-17** (no clock here).
 //!
 //! # The quantifier, and the two short circuits that implement it
 //!
-//! **E-M4-3**: idempotence is quantified over 「**同一 delta の再入**(retry)」 and not over every state.
+//! **E-M4-3**: idempotence is quantified over "**the same delta re-entering** (retry)" and not over every state. (sem: SEM-gx-adapter-git-018)
 //! 43 T-10c is the situation it exists for — a crash between the write and the journal record, whose
 //! recovery is running the same delta again — so what has to hold is that the second run leaves the
 //! repository, and the observation, exactly where the first did.
@@ -23,14 +25,14 @@
 //! is here to prevent, and `tests/git_conformance.rs` is where it is measured rather than reasoned
 //! about.
 //!
-//! 🔴 A consequence worth stating: 「already made」 is a fact about the **state**, so a `content` apply
+//! 🔴 A consequence worth stating: "already made" is a fact about the **state**, so a `content` apply (sem: SEM-gx-adapter-git-019)
 //! is also a no-op when somebody else independently gave the entry those bytes. That is the meaning
 //! of the quantifier and not a hole in it — the delta says what the state should be, and it is.
 //!
 //! # What comes back is an observation
 //!
 //! 41 §4 gives `apply` no pre-state and no post-state, so [`AppliedDelta`] carries what the adapter
-//! *saw* afterwards (req/69 §3.1: 「post は返り値でなく観測値である」): the digest of the entry, read back
+//! *saw* afterwards (req/69 §3.1: "post is an observation, not a return value"): the digest of the entry, read back (sem: SEM-gx-adapter-git-020)
 //! out of the object database, and a fingerprint of the **branch**. Both are read after the reference
 //! moved, through the same functions `snapshot` and `precondition` use, so a bug that wrote the
 //! change somewhere else shows up as a digest that is not the one the plan promised (L5).
@@ -81,7 +83,7 @@ pub(crate) fn apply(delta: &PlannedDelta) -> Result<AppliedDelta> {
     observe(&repository, &position, delta)
 }
 
-/// 「The entry at this path becomes these bytes」 — AC-050's 「commit操作delta」.
+/// "The entry at this path becomes these bytes" -- AC-050's "commit-operation delta". (sem: SEM-gx-adapter-git-021)
 fn apply_content(repository: &gix::Repository, position: &Position, op: &GitOp) -> Result<()> {
     let tip = repo::tip(repository, position)?;
     let current = match tip {
@@ -96,7 +98,7 @@ fn apply_content(repository: &gix::Repository, position: &Position, op: &GitOp) 
     repo::move_branch(repository, position, tip, commit)
 }
 
-/// 「This branch points at this commit」 — AC-050's 「branch操作delta」, and what an inverse is.
+/// "This branch points at this commit" -- AC-050's "branch-operation delta", and what an inverse is. (sem: SEM-gx-adapter-git-022)
 fn apply_reset(repository: &gix::Repository, position: &Position, op: &GitOp) -> Result<()> {
     let target = repo::object_id(op.target().ok_or_else(|| Error::PayloadUnreadable {
         detail: "a reset operation names the commit it resets to".to_string(),
@@ -138,8 +140,8 @@ fn observe(
         delta.reference().clone(),
         postcondition,
         digest,
-        // **E-M4-31** (req/38 §31): 「`applied_at` は engine が commit 時に上書きする…adapter は
-        // `Timestamp(0)` placeholder」. The same value this adapter writes into a commit header, and
+        // **E-M4-31** (req/38 §31): "`applied_at` is overwritten by the engine at commit time... the adapter writes a
+        // `Timestamp(0)` placeholder". The same value this adapter writes into a commit header, and (sem: SEM-gx-adapter-git-023)
         // for the same reason (41 §6): the moment is the engine's to inject.
         Timestamp(0),
     ))

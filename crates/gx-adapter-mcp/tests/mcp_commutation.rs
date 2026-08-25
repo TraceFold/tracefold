@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-052**'s third pair, and the case this adapter's answer costs something.
 //!
-//! 34 AC-052 逐語: 「Given: fs/git/mcp各adapterについて可換な2delta…と非可換な2delta…。When:
-//! `adapter.commutation(a,b)`を呼ぶ。Then: 可換ペアで`Commutes`、非可換ペアで`Conflicts{residual}`（各adapter
-//! 最低1組ずつ、**計6ケース**）」. `req/38` §35 M4H6-9: 「AC-052 の行の完了は M7 の **6/6** 時」. fs supplied
+//! 34 AC-052, verbatim: "Given: two commuting deltas... and two non-commuting deltas... for each of the fs/git/mcp adapters. When: (sem: SEM-gx-adapter-mcp-281)
+//! call `adapter.commutation(a,b)`. Then: `Commutes` for the commuting pair, `Conflicts{residual}` for the non-commuting pair (at least one pair per (sem: SEM-gx-adapter-mcp-282)
+//! adapter, **6 cases total**)". `req/38` §35 M4H6-9: "AC-052's row is complete at M7's **6/6**". fs supplied (sem: SEM-gx-adapter-mcp-283)
 //! two in M4, `gx-adapter-git` two in M7 hand 1 (req/99 §2-3), and this file is the last two.
 
 mod support;
@@ -115,7 +117,7 @@ fn the_verdict_is_symmetric_and_a_call_conflicts_with_itself() {
     );
 }
 
-/// Nothing in `commutation` touches a server, which is what makes AC-053's 「engineパイプライン外」 easy.
+/// Nothing in `commutation` touches a server, which is what makes AC-053's "outside the engine pipeline" easy. (sem: SEM-gx-adapter-mcp-284)
 #[test]
 fn deciding_independence_reaches_no_server() {
     let fixture = McpFixture::new();

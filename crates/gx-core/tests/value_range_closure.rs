@@ -1,13 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **E-M3-18** (H-1) — every door that hands out a `Transformation` closes the value range.
 //!
-//! `req/38_ERRATA_2026-08-07.md` §25 逐語: 「🔴**H-1(採用=erratum E-M3-18・実装は M4 冒頭必須 DoD)**:
-//! `identity` も `Result` 化し**全構成子で値域を閉じる**。infallible の根拠(error 腕到達不能)は D-6 で
-//! 偽になった——unchecked door が 1 つ残る限り「gx-core の Transformation は値域内」という不変条件は型で
-//! 言えない」.
+//! `req/38_ERRATA_2026-08-07.md` §25, verbatim (quoted in SEM-gx-core-199): "🔴 **H-1 (adopted =
+//! erratum E-M3-18; implementation is a mandatory DoD at the start of M4)**: make `identity` return
+//! a `Result` too and **close the value range at every constructor**. The ground for infallibility
+//! (the error arm being unreachable) became false with D-6 -- as long as one unchecked door
+//! remains, the invariant 'a gx-core Transformation is within range' cannot be stated in the
+//! type".
 //!
 //! # Why two instruments and not one
 //!
-//! 「値域を閉じる」 is two claims, and one test cannot hold both.
+//! "close the value range" (sem: SEM-gx-core-200) is two claims, and one test cannot hold both.
 //!
 //! * **The shape**: no public function of this crate hands back a bare `Transformation`. That is a
 //!   fact about the source, so it is read out of the source -- a `match` or a call list would be
@@ -179,7 +183,8 @@ fn names(type_expression: &str, token: &str) -> bool {
 /// A door is a public function whose return type names `Transformation`. An unchecked door is one
 /// that does so without a `Result` around it: a caller of such a function cannot be handed a
 /// refusal, so no predicate the crate holds can be enforced there. The count is printed whether it
-/// is zero or not, because 「値域が閉じている」 is a number a reader should see rather than infer
+/// is zero or not, because "the value range is closed" (sem: SEM-gx-core-201) is a number a reader
+/// should see rather than infer
 /// from a green run.
 #[test]
 fn every_door_that_hands_out_a_transformation_returns_a_result() {
@@ -205,8 +210,8 @@ fn every_door_that_hands_out_a_transformation_returns_a_result() {
     assert!(
         unchecked.is_empty(),
         "these public functions hand out a `Transformation` with no way to refuse one: \
-         {unchecked:?}. E-M3-18: 「unchecked door が 1 つ残る限り『gx-core の Transformation は値域内』 \
-         という不変条件は型で言えない」"
+         {unchecked:?}. E-M3-18: 'as long as one unchecked door remains, the invariant \"a gx-core \
+         Transformation is within range\" cannot be stated in the type' (sem: SEM-gx-core-202)"
     );
 
     let mut named: Vec<String> = doors.iter().map(|d| d.name.clone()).collect();
@@ -256,10 +261,12 @@ fn call_every_door(
     ]
 }
 
-/// 「①`created_at ≥ 0`」 at all three doors, and 「②`intent_id ≠ 全 0 placeholder`」 at all three.
+/// "① `created_at ≥ 0`" at all three doors, and "② `intent_id ≠ the all-zero placeholder`" at all
+/// three (sem: SEM-gx-core-203).
 ///
 /// The count is what makes this more than three assertions: `DOORS_REFUSING_OUT_OF_RANGE=3/3` and
-/// `UNCHECKED_DOORS=0` are the two halves of 「全構成子で値域を閉じる」, and a reader of the log has
+/// `UNCHECKED_DOORS=0` are the two halves of "close the value range at every constructor" (sem:
+/// SEM-gx-core-204), and a reader of the log has
 /// both numbers without opening this file.
 #[test]
 fn every_door_refuses_the_two_predicates_e_m3_13_names() {
@@ -303,7 +310,8 @@ fn every_door_still_builds_an_arrow_inside_the_range() {
 
 /// The refusal a door gives is the same refusal the others give, named the same way.
 ///
-/// H-3's table is what makes 「same way」 checkable: [`gx_core::Error::kind`] is the word, and two
+/// H-3's table is what makes "same way" (sem: SEM-gx-core-205) checkable: [`gx_core::Error::kind`]
+/// is the word, and two
 /// doors that refused the same value under two names would be two vocabularies. This is the join
 /// between E-M3-18 and E-M2-23, and it is one line because both were done in one hand.
 #[test]

@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-060 (FR-055) — the opt-in Lyapunov law `m(Y) ≤ m(X) + θ(f)`.
 //!
-//! AC-060 逐語: 「Given: opt-inで`m(Y) ≤ m(X)+θ(f)`則を有効化した`ObjectMeasure`実装と、
-//! 無効化（opt-out）した実装。When: proptestを実行。Then: 有効化した実装のみ当該proptestの対象に
-//! なり法則を満たす。無効化した実装ではテストがスキップされる（設定フラグで切替を確認）。」
+//! AC-060, verbatim (quoted in SEM-gx-core-129): "Given: an `ObjectMeasure` implementation that
+//! has opted in to the `m(Y) ≤ m(X)+θ(f)` law, and one that has opted out. When: proptest is run.
+//! Then: only the opted-in implementation is subject to that proptest and satisfies the law. For
+//! the opted-out implementation the test is skipped (confirm the switch by a configuration flag)."
 //!
 //! # What "opt-in" is, mechanically
 //!

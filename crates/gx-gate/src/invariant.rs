@@ -1,28 +1,30 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The registry of invariants, and the one place every one of them is run (FR-026).
 //!
-//! Spec: 32 FR-026 for the registry and its duty (「全登録invariantに対し実行しなければならない」),
+//! Spec: 32 FR-026 for the registry and its duty ("must be run against every registered invariant") (sem: SEM-gx-gate-015),
 //! 34 AC-026 for the mock counter, 34 AC-029 for the order-2 path, 41 §4 for the trait, 42 §3.8 for
 //! `InvariantResult` and `ReasonSource::Invariant`. Rulings: **E-M3-7** (the signature), **E-M3-9**
 //! (the canonical order of the results), **E-M3-6** (the code a violation carries).
 //!
 //! # The signature 41 §4 writes, and the one this file declares
 //!
-//! 41 §4 逐語: `fn check(&self, pre: &ObjectSnapshot, planned: &PlannedDelta) -> Result<InvariantResult>`.
+//! 41 §4 verbatim: `fn check(&self, pre: &ObjectSnapshot, planned: &PlannedDelta) -> Result<InvariantResult>`. (sem: SEM-gx-gate-016)
 //! That signature cannot state AC-029, which asks an invariant to refuse an **order-2**
 //! transformation -- `order` is a field of `Transformation` (41 §3) and neither argument carries
 //! one. req/38 §19 rules the erratum:
 //!
-//! > 「M3-09(採用=案 a): `InvariantCheck::check(&GateInput)` へ署名変更(41 §4 erratum・監査#10 の
-//! > 趣旨と一致)。E-A7-2/E-M2-5 と同型」 → **E-M3-7**
+//! > "M3-09 (adopted = option a): change the signature to `InvariantCheck::check(&GateInput)` (a 41
+//! > §4 erratum, consistent with audit #10's intent); the same shape as E-A7-2/E-M2-5" -> **E-M3-7** (sem: SEM-gx-gate-017)
 //!
-//! `GateInput` is the structure 監査#10 asked for so that 「invariant 実行に必要な入力を含む」, so
+//! `GateInput` is the structure audit #10 asked for so that "it carries the input an invariant needs to run" (sem: SEM-gx-gate-018), so
 //! taking it whole is the reading that makes the struct earn its existence. The two arguments 41 §4
 //! names are still reachable, as `input.pre` and `input.planned` -- nothing was taken away.
 //!
 //! # What runs, and when
 //!
 //! Every registered check, once per [`crate::Gate::verify`], whatever the policy set answered.
-//! FR-026 says 「全登録invariantに対し実行」 without a condition, and a registry that stopped early
+//! FR-026 says "run against every registered invariant" without a condition (sem: SEM-gx-gate-019), and a registry that stopped early
 //! on a policy `Deny` would make an `AdmitProof`'s record depend on the order the two systems were
 //! consulted in. The cost is real -- work is done whose answer may be discarded on the `Deny` arm,
 //! since 42 §3.8 gives reasons to a `Deny` and a proof only to an `Admit` -- and it is reported
@@ -43,30 +45,31 @@
 //!
 //! # The A-7 residual: this is not where a composed `created_at` is checked
 //!
-//! req/38 §7 left 「合成後 `created_at`/`intent_id` の許容値域が未定義のまま `compose()` は無検査で
-//! 通す(46B WARN)」 and req/60 §4 routes the placement decision to this hand: 「値域検査は invariant
-//! として書けるのか、それとも gx-core の `compose` が持つべきか」. **It cannot be written here.** A
+//! req/38 §7 left "the admissible range of a composed `created_at`/`intent_id` undefined, and
+//! `compose()` passes it through unchecked (46B WARN)" and req/60 §4 routes the placement decision to
+//! this hand: "can the range check be written as an invariant, or does gx-core's `compose` have to
+//! own it?" (sem: SEM-gx-gate-020). **It cannot be written here.** A
 //! check receives one `GateInput`, and a `GateInput` carries the composite (`t`) and the object it
 //! is about (`pre`) -- not `f` and `g`. `t.parents` holds their **ids**, and resolving an id needs a
-//! store, which 41 §6 does not give this crate. So the parts of the question with content -- 「a
-//! composite is not older than what it composes」 and 「its intent is one of theirs」 -- are
+//! store, which 41 §6 does not give this crate. So the parts of the question with content -- "a
+//! composite is not older than what it composes" and "its intent is one of theirs" (sem: SEM-gx-gate-021) -- are
 //! unaskable from here, and the parts that remain (a timestamp is not negative, an intent id is not
 //! the all-zero placeholder) are value-domain checks that belong beside the ceiling check
 //! `compose` already performs through `Transformation::with_order`. The placement decision and the
 //! erratum it raises are in `req/63_M3_HAND3_REPORT_2026-08-08.md` §3 and §4; **gx-core is not
-//! modified by this hand** (52: 裁定禁, and req/60 §5.2 手 3 makes it 起票のみ).
+//! modified by this hand** (52: ruling forbidden, and req/60 §5.2 hand 3 makes it filed only). (sem: SEM-gx-gate-022)
 //!
 //! # What this file does not build
 //!
-//! Shipped invariants. FR-028's 「既製invariant集」 is the policy pack, and req/60 §5.2 puts it in
-//! hand 5; M3-10's ruling already fixes what such a pack can reach (「v0.1 pack の実効範囲=locator/
-//! actor/context/order 級」). The registry ships **empty**, and an empty registry is not the same
-//! claim as 「every invariant held」 -- see [`InvariantRegistry::is_empty`].
+//! Shipped invariants. FR-028's "ready-made invariant set" is the policy pack, and req/60 §5.2 puts it
+//! in hand 5; M3-10's ruling already fixes what such a pack can reach ("v0.1 pack's effective reach =
+//! locator/actor/context/order class"). The registry ships **empty**, and an empty registry is not the
+//! same claim as "every invariant held" (sem: SEM-gx-gate-023) -- see [`InvariantRegistry::is_empty`].
 //!
 //! The meet of the two systems over all four quadrants (AC-027, with the Deny-precedence property
 //! and the `verdict_meet` suite E-M3-10 names) is hand 4's, and so is E-M3-4's escalation rule and
-//! the error-vocabulary window. What this hand owes AC-029 is one quadrant of that meet -- 「gate
-//! 自体の policy(order-2 変換に対する invariant)が Deny を返せる」 -- and [`crate::Gate::verify`]
+//! the error-vocabulary window. What this hand owes AC-029 is one quadrant of that meet -- "the gate's
+//! own policy (an invariant against an order-2 transformation) can return Deny" (sem: SEM-gx-gate-024) -- and [`crate::Gate::verify`]
 //! is where it lands, once, so that hand 4 widens a fold rather than writing a second one.
 
 use std::collections::BTreeSet;
@@ -75,8 +78,8 @@ use crate::verdict::{InvariantResult, Reason, ReasonSource};
 use crate::{Error, GateInput, Result};
 
 // `INVARIANT_VIOLATED` was declared here until hand 4 and is now `crate::INVARIANT_VIOLATED`, in
-// the crate root with the other three (**E-M3-6**). The window's requirement is 「crate 毎 Error
-// 語彙表を 1 箇所宣言」, and a vocabulary spread across the modules that happen to use it is a
+// the crate root with the other three (**E-M3-6**). The window's requirement is "declare a crate's
+// Error vocabulary in one place" (sem: SEM-gx-gate-025), and a vocabulary spread across the modules that happen to use it is a
 // vocabulary nobody can read in one place. The re-export in `lib.rs` keeps every caller's path.
 
 /// One invariant (41 §4, with **E-M3-7**'s argument).
@@ -94,7 +97,7 @@ pub trait InvariantCheck: Send + Sync {
     /// # Errors
     /// Whatever the implementation cannot do. An `Err` here is the ⊥ of **E-M3-3** and not a
     /// refusal: [`crate::Gate::verify`] turns it into [`Error::Unevaluable`] rather than into a
-    /// `Deny`, because 「『拒否』と『壊れている』を同じ verdict で語ると判定の意味論が濁る」.
+    /// `Deny`, because "naming 'refused' and 'broken' with the same verdict muddies the semantics of the decision" (sem: SEM-gx-gate-026).
     fn check(&self, input: &GateInput<'_>) -> Result<InvariantResult>;
 }
 
@@ -181,7 +184,7 @@ impl InvariantRegistry {
     /// Whether nothing is registered.
     ///
     /// An empty registry answers every input with an empty result vector, and that is **not** the
-    /// same statement as 「every invariant held」: it is 「nobody was asked」. The two look alike in
+    /// same statement as "every invariant held": it is "nobody was asked" (sem: SEM-gx-gate-027). The two look alike in
     /// an `AdmitProof` -- both leave `invariant_results` empty -- which is why FR-028's shipped pack
     /// (hand 5) is what turns a deployment's gate from the first into the second.
     #[must_use]
@@ -197,7 +200,7 @@ impl InvariantRegistry {
     ///
     /// # Errors
     /// [`Error::Unevaluable`] when any check returned an `Err`, or when a check returned a result
-    /// naming an `invariant_id` other than its own (42 §3.8: 「`InvariantCheck::id()` と等しい」).
+    /// naming an `invariant_id` other than its own (42 §3.8: "equal to `InvariantCheck::id()`") (sem: SEM-gx-gate-028).
     /// **Every check still runs first**: stopping at the first failure would make the reported
     /// error depend on registration order, which is the property this file exists to hold. The ids
     /// are sorted into the message for the same reason.
@@ -241,11 +244,11 @@ impl InvariantRegistry {
 /// is 42 §3.8's own variant, so unlike hand 2's Cedar-rule-3 case there is nothing here that the
 /// vocabulary cannot name (`req/62_M3_HAND2_REPORT_2026-08-08.md` §4 C-3).
 ///
-/// The message carries `detail` when there is one. 42 §3.8 asks for 「短い人間可読メッセージ(長文は
-/// digest 化)」 and **M3-21** fixes the threshold at [`crate::MAX_MESSAGE_BYTES`]; both ends are
+/// The message carries `detail` when there is one. 42 §3.8 asks for "a short human-readable message
+/// (long text gets digested)" (sem: SEM-gx-gate-029) and **M3-21** fixes the threshold at [`crate::MAX_MESSAGE_BYTES`]; both ends are
 /// held, since a `detail` was bounded when its [`InvariantResult`] was built and the message built
-/// from it is bounded again here. The second bound is not redundant: 「invariant {id} does not hold:
-/// {detail}」 is longer than `detail`, so a detail just inside the bound produces a message just
+/// from it is bounded again here. The second bound is not redundant: "invariant {id} does not hold:
+/// {detail}" is longer than `detail` (sem: SEM-gx-gate-030), so a detail just inside the bound produces a message just
 /// outside it, and the elision moves to the message.
 ///
 /// # Errors

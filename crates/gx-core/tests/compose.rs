@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! T-18 / T-19 — the shape of `compose` and `identity`, against 46 §2.1 line by line.
 //!
 //! AC-059 and AC-060 measure the composite; nothing in them looks at what the composite *is*.

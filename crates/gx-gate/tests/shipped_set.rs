@@ -1,20 +1,24 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 The **composed** shipped set — the obligation that arrived with the third pack (**M7 hand 4**).
 //!
-//! `req/38` §60 ruled the pair req/100 §9 R-1 raised: 「既定 policy set と既定 registry は**対**で決まる
-//! (pack を足しても adapter が register されなければ NotFound)」, and took req/101 §9-1 as its material.
+//! `req/38` §60 ruled the pair req/100 §9 R-1 raised: "the default policy set and the default
+//! registry are decided **as a pair** (adding a pack without the adapter being registered still
+//! yields NotFound)" (sem: SEM-gx-gate-313), and took req/101 §9-1 as its material.
 //! That material named this file before it existed:
 //!
-//! > **AC-074**(pack 単位の conformance)——`check_pack` は pack ごとに gate を作るので、**既定 set を
-//! > 変えても AC-074 は動かない**。逆に言えば AC-074 は「合わせた set」を測っていない。合わせるなら
-//! > **合成 set の conformance** が新しい obligation として要る(既存の 3 pack が互いの判定を変えない事)。
+//! > **AC-074** (per-pack conformance) -- `check_pack` builds a gate per pack, so **changing the
+//! > default set does not move AC-074**. Put the other way, AC-074 does not measure the 'combined
+//! > set'. If they are combined, **the composed set's conformance** is required as a new obligation
+//! > (that the existing 3 packs do not change each other's judgment). (sem: SEM-gx-gate-314)
 //!
 //! # The obligation, stated so that it can be false
 //!
-//! 「互いの判定を変えない」 is not quite the property, and the difference is the whole of what this
+//! "does not change each other's judgment" is not quite the property, and the difference is the whole of what this (sem: SEM-gx-gate-315)
 //! file measures. Composing the packs **does** change one thing on purpose: a request on a substrate
 //! whose pack has now joined the set stops falling to Cedar's third rule (nothing satisfied → `Deny`
 //! with [`gx_gate::ReasonSource::NoPolicyApplied`]) and starts being judged by that pack's rules.
-//! req/101 §9-1: 「それは緩和ではなく『判定されるようになる』であり…**新たに到達可能になる**」.
+//! req/101 §9-1: "that is not mitigation but 'coming to be judged' ... **becomes newly reachable**". (sem: SEM-gx-gate-316)
 //!
 //! What must **not** change is any judgement a pack was already making. So the property is
 //! **locality**:
@@ -32,7 +36,7 @@
 //! **The deciding ids and not only the arm.** 42 §1.3 puts `PolicyDecisionRecord` inside
 //! `AdmitProof`'s IdentityView and an `AdmitProof` reaches a receipt's CID, so a composition that
 //! kept every answer and moved which statement gave it would move what receipts say about changes
-//! nobody touched. That is `AC-025`'s half of hand 4's brief — 「AC-025 の policy_id 確認」 — and it
+//! nobody touched. That is `AC-025`'s half of hand 4's brief -- "confirming AC-025's policy_id" -- and it (sem: SEM-gx-gate-317)
 //! has a test of its own below.
 //!
 //! # What this file does not measure
@@ -143,6 +147,35 @@ fn rows() -> Vec<Row> {
             .because(
                 "the mcp forbid. In the composed set this is the row that shows the fs pack's rule \
                  is no longer bypassable by changing substrate",
+            ),
+        ),
+        row(
+            "custom:postgres",
+            PackCase::new(
+                "postgres: a write into pg_catalog",
+                SubstrateKind::Custom("postgres".to_string()),
+                "postgres://main/pg_catalog.pg_authid?oid=10",
+                PackExpectation::deny_by("postgres-deny-system-catalogs"),
+            )
+            .because(
+                "the postgres forbid — the pack's only statement, and the one row that makes the \
+                 completeness obligation below non-vacuous for a fourth pack",
+            ),
+        ),
+        row(
+            "custom:postgres",
+            PackCase::new(
+                "postgres: a write into a business table",
+                SubstrateKind::Custom("postgres".to_string()),
+                "postgres://main/public.orders?id=7",
+                PackExpectation::DenyByNoPolicy,
+            )
+            .because(
+                "🔴 the deny-default. The other three packs answer their non-forbidden row with a \
+                 permit of their own; this pack ships none, so the row it does not forbid keeps \
+                 falling to Cedar's third rule exactly as it did before the pack existed. That is \
+                 the whole of req/446 V0-C, stated as a row of the composition table rather than \
+                 as a sentence in a header",
             ),
         ),
     ]
@@ -298,14 +331,14 @@ fn a_substrate_no_pack_speaks_for_reaches_cedars_third_rule() {
 
 /// 🔴 **AC-025's ids do not move when the set is composed** (hand 4's brief).
 ///
-/// req/101 §9-1 raised it as the thing nobody had measured: 「`fs-permit-default` は substrate scope
-/// なので、git/mcp の statement が増えても fs の判定は動かない。ただし *`policy_id` が変わらない事*は
-/// 測られていないので、pack を合わせる手が `PolicyDecisionRecord` の id を確認する必要が在る(receipt の
-/// CID に入る=42 §1.3)」.
+/// req/101 §9-1 raised it as the thing nobody had measured: "`fs-permit-default` is
+/// substrate-scoped, so fs's judgment does not move even as git/mcp statements grow. But *that
+/// `policy_id` does not change* has not been measured, so the hand that combines the packs needs to
+/// confirm `PolicyDecisionRecord`'s id (it enters the receipt's CID = 42 §1.3)". (sem: SEM-gx-gate-318)
 ///
 /// Written against AC-025's own two locators and its own two ids, so that this is the criterion's
-/// question and not a paraphrase of it: 34 AC-025 逐語 「`/etc/passwd`への書き込みTransformationを評価。
-/// Then: Cedar評価結果がDeny相当に写像される。`/tmp/x`へは Admit相当。」
+/// question and not a paraphrase of it: 34 AC-025 verbatim "a write Transformation to `/etc/passwd`
+/// is evaluated. Then: the Cedar evaluation result maps to the Deny equivalent. `/tmp/x` maps to the Admit equivalent." (sem: SEM-gx-gate-319)
 #[test]
 fn ac_025_answers_and_ids_are_unmoved_by_the_composition() {
     let fs_alone = one_pack_gate(&pack_for("fs").expect("the fs pack ships"));
@@ -328,7 +361,7 @@ fn ac_025_answers_and_ids_are_unmoved_by_the_composition() {
             locator,
             expect,
         )
-        .because("34 AC-025 逐語");
+        .because("34 AC-025 verbatim"); // (sem: SEM-gx-gate-320)
         let alone = answered(&fs_alone, &case);
         let together = answered(&composed, &case);
         println!(

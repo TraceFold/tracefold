@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-008 (FR-008) — no I/O, no `unsafe`, no clippy warnings.
 //!
-//! AC-008 逐語: 「Given: `crates/gx-core`のソース全体。When: `cargo clippy -p gx-core -- -D
-//! warnings`および`cargo tree -p gx-core`を実行。Then: clippy警告0件・
-//! `#![forbid(unsafe_code)]`宣言あり・I/O系crate（`tokio`, `std::net`等）が依存グラフに
-//! 現れない。」
+//! AC-008, verbatim (quoted in SEM-gx-core-118): "Given: the whole source of `crates/gx-core`.
+//! When: `cargo clippy -p gx-core -- -D warnings` and `cargo tree -p gx-core` are run. Then: zero
+//! clippy warnings; the `#![forbid(unsafe_code)]` declaration is present; no I/O crate (`tokio`,
+//! `std::net`, etc.) appears in the dependency graph."
 //!
 //! Two of the three clauses are commands, and they are run by `tools/verify_hand2.sh` with their
 //! output recorded in `req/40_M1_HAND2_REPORT_2026-08-07.md`; a test process cannot honestly
@@ -21,7 +23,8 @@
 //! The scan is not vacuous: `finds_a_planted_violation` shows the detector firing.
 
 /// Crate names and std paths that would mean this crate had started doing I/O. The `std::`
-/// entries are what FR-008「I/Oを行わず（外部呼び出しゼロ）」rules out from inside; the crate
+/// entries are what FR-008's "performs no I/O (zero external calls)" (sem: SEM-gx-core-119) rules
+/// out from inside; the crate
 /// names are what AC-008 rules out from the dependency side.
 const DENY: &[&str] = &[
     "tokio",
@@ -45,11 +48,18 @@ const LIB: &str = include_str!("../src/lib.rs");
 const SOURCES: &[(&str, &str)] = &[
     ("lib.rs", LIB),
     ("b64.rs", include_str!("../src/b64.rs")),
+    // 🔴 **DR-46-28** — a third comes down, by the same rule and for the same reason
+    // (`req/38` §255 ruling 4, `req/459` ruling 1): the declaration face is
+    // `gx-adapter-mcp`'s catalogue and the attest face is `gx-witness`'s receipt, and
+    // neither of those crates can name the other. `of_stages` is arithmetic on two values
+    // its caller already holds; nothing here reads, hashes, signs or compares.
+    ("boundary.rs", include_str!("../src/boundary.rs")),
     ("commutation.rs", include_str!("../src/commutation.rs")),
     ("context.rs", include_str!("../src/context.rs")),
     ("delta.rs", include_str!("../src/delta.rs")),
     ("dsse.rs", include_str!("../src/dsse.rs")),
-    // M5 hand 1: DR-2's two axes come down here (M5-08 採(a)), the way `VerdictKind` did.
+    // M5 hand 1: DR-2's two axes come down here (M5-08, adopted (a); sem: SEM-gx-core-120), the
+    // way `VerdictKind` did.
     ("enforcement.rs", include_str!("../src/enforcement.rs")),
     ("error.rs", include_str!("../src/error.rs")),
     ("fingerprint.rs", include_str!("../src/fingerprint.rs")),
@@ -59,6 +69,13 @@ const SOURCES: &[(&str, &str)] = &[
     ("object.rs", include_str!("../src/object.rs")),
     ("planned.rs", include_str!("../src/planned.rs")),
     ("proof.rs", include_str!("../src/proof.rs")),
+    // 🔴 **DR-46-26** — two more come down here, and the rule is the one that brought every entry
+    // above: the data comes down, the computation stays up. `ReadEntry` is `{Cid, String}` and
+    // `Reversibility` is three words with an `as_str`; neither reads, hashes, signs or compares.
+    // (`req/38` §258. `gx-substrate` cannot name `gx-adapter-mcp` and `gx-witness` cannot name
+    // `gx-substrate`, so this is the one crate both parties already depend on.)
+    ("reads.rs", include_str!("../src/reads.rs")),
+    ("reversibility.rs", include_str!("../src/reversibility.rs")),
     (
         "transformation.rs",
         include_str!("../src/transformation.rs"),
@@ -119,7 +136,8 @@ fn ac_008_no_source_file_reaches_for_io() {
 
 #[test]
 fn ac_008_manifest_dependencies_stay_inside_the_allowlist() {
-    // 41 §2 allows "serde, thiserror 程度" and nothing wider. The dev-dependencies section is a
+    // 41 §2 allows "serde, thiserror and not much more" (sem: SEM-gx-core-121) and nothing wider.
+    // The dev-dependencies section is a
     // separate matter: `cargo tree -p gx-core -e normal` is the graph a consumer gets, and
     // proptest/serde_json are absent from it. tools/verify_hand2.sh records both trees.
     let deps = MANIFEST
@@ -143,7 +161,8 @@ fn ac_008_manifest_dependencies_stay_inside_the_allowlist() {
         let name = line.split(['=', ' ']).next().unwrap_or_default();
         assert!(
             matches!(name, "serde" | "thiserror"),
-            "unexpected runtime dependency `{name}` (41 §2: serde, thiserror 程度)"
+            "unexpected runtime dependency `{name}` (41 §2: serde, thiserror and not much more; \
+             sem: SEM-gx-core-122)"
         );
     }
 }

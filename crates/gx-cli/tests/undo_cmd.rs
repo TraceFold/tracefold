@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 `gx undo` (44 §1.2) — the last verb of AC-054, and **44 §1.4's 2 on a third command**.
 //!
 //! 34 AC-054 lists `undo` among the subcommands it wants one normal and one abnormal case for, and
@@ -5,16 +7,16 @@
 //! road: `tools/ttfv.sh` declared `gx undo` as step 8 and reported it **unimplemented** rather than
 //! dropping it, exactly so that the road could not get shorter by omission (req/29 §4).
 //!
-//! # 🔴 What is measured that a 「it exited 0」 test would miss
+//! # 🔴 What is measured that a "it exited 0" test would miss (sem: SEM-gx-cli-1358)
 //!
 //! * the **substrate went back** — a `gx undo` that returned a receipt and left the file alone would
 //!   pass every status check in this file;
-//! * the original is **`Superseded`** and not rewritten (P-5, 43 T-12: 「`T_o`のcanonical record・
-//!   receiptは不変のまま」);
+//! * the original is **`Superseded`** and not rewritten (P-5, 43 T-12: "`T_o`'s canonical record and
+//!   receipt stay unchanged"; sem: SEM-gx-cli-1359);
 //! * a **second** undo of one commit is refused (42 §3.12's `Consumed`), which is what makes
-//!   「一度だけ」 a fact rather than a hope — and it is refused **across processes**, which is the
+//!   "only once" (sem: SEM-gx-cli-1360) a fact rather than a hope — and it is refused **across processes**, which is the
 //!   half a single-process engine test cannot see;
-//! * a **denied** undo exits **2** and not 1 (M6-25 採(a)+(c)), and the original stays `Committed`.
+//! * a **denied** undo exits **2** and not 1 (M6-25 adopted (a)+(c); sem: SEM-gx-cli-1361), and the original stays `Committed`.
 
 mod support;
 
@@ -45,10 +47,10 @@ fn ac_054_undo_returns_the_substrate_to_what_it_was() {
     );
     assert_eq!(
         undone.code, 0,
-        "44 §1.2 `gx undo`: 「0=成功」. stderr: {}",
+        "44 §1.2 `gx undo`: \"0=success\" (sem: SEM-gx-cli-1362). stderr: {}",
         undone.stderr
     );
-    // 44 §1.2: 「stdout: 新`Transformation`の`Receipt`」.
+    // 44 §1.2: "stdout: the new `Transformation`'s `Receipt`" (sem: SEM-gx-cli-1363).
     assert!(
         undone.json()["envelope"]["payload"].is_string(),
         "an undo prints the new transformation's receipt: {}",
@@ -75,7 +77,7 @@ fn ac_054_undo_returns_the_substrate_to_what_it_was() {
     // 42 §3.12's `Consumed`, across processes: the escrow row is rebuilt from Σ by
     // `Engine::rehydrate_committed`, **status included**, so a second undo is refused rather than
     // being allowed by a restart. A rebuild that reset the status to `Available` would make
-    // 「一度だけ」 false exactly where nobody was looking.
+    // "only once" false exactly where nobody was looking. (sem: SEM-gx-cli-1364)
     let again = run(fixture.gx().args(["undo", &committed]));
     println!(
         "UNDO_TWICE exit={} stderr={}",
@@ -94,7 +96,7 @@ fn ac_054_undo_returns_the_substrate_to_what_it_was() {
     );
 }
 
-/// 🔴 **AC-054's abnormal case for `undo`** — 「6=未検出」, by number.
+/// 🔴 **AC-054's abnormal case for `undo`** — "6=not-found" (sem: SEM-gx-cli-1365), by number.
 #[test]
 fn ac_054_undo_of_an_unknown_transformation_is_six() {
     let fixture = pipeline("m6h4_undo_absent", "before\n");
@@ -102,7 +104,7 @@ fn ac_054_undo_of_an_unknown_transformation_is_six() {
     println!("UNDO_ABSENT exit={}", undone.code);
     assert_eq!(
         undone.code, 6,
-        "44 §1.2 `gx undo`: 「6=未検出」. stderr: {}",
+        "44 §1.2 `gx undo`: \"6=not-found\" (sem: SEM-gx-cli-1366). stderr: {}",
         undone.stderr
     );
     assert!(
@@ -114,16 +116,16 @@ fn ac_054_undo_of_an_unknown_transformation_is_six() {
 
 /// 🔴 **M6-25's body** — a **denied** undo exits **2**, and the original stays `Committed`.
 ///
-/// req/38 §47 M6-25 採(a)+(c) reads 44 §1.2's list (0/1/3/5/6) as an excerpt and §1.4's common table
-/// as the answer, because AC-040's second case — 「T_uに対応するinvariant/policyを故意にDenyへ
-/// セットしたケースではT_uがCommittedへ到達せずDeniedのまま」 — has existed in the engine since M5 and
-/// had no status of its own at the surface. Folding it into 1 would put 「the escrowed inverse is
-/// unusable」 and 「the gate refused to let you undo」 under one number, and an operator's next move
+/// req/38 §47 M6-25 adopted (a)+(c) reads 44 §1.2's list (0/1/3/5/6) as an excerpt and §1.4's common table
+/// as the answer, because AC-040's second case — "in the case where the invariant/policy corresponding
+/// to T_u is deliberately set to Deny, T_u fails to reach Committed and stays Denied" (sem: SEM-gx-cli-1367) — has existed in the engine since M5 and
+/// had no status of its own at the surface. Folding it into 1 would put "the escrowed inverse is
+/// unusable" and "the gate refused to let you undo" under one number, and an operator's next move
 /// differs completely between them.
 ///
 /// The Given is built with **E-M6-12**'s `--policy`: the commit happens under the shipped pack, and
 /// the undo is verified against a pack that refuses the locator. That is also the only honest way to
-/// state 「the policy changed between the commit and the undo」, which is the real-world shape of
+/// state "the policy changed between the commit and the undo" (sem: SEM-gx-cli-1368), which is the real-world shape of
 /// this case.
 #[test]
 fn a_denied_undo_exits_two_and_leaves_the_original_committed() {
@@ -151,8 +153,8 @@ fn a_denied_undo_exits_two_and_leaves_the_original_committed() {
     );
     assert_eq!(
         undone.code, 2,
-        "🔴 M6-25 採(a)+(c): 44 §1.4's 2 is 「拒否（denied）」 and an undo has a verdict of its own \
-         (43 §5-2: 「undoであっても検証を免除されない」). stdout: {} stderr: {}",
+        "🔴 M6-25 adopted (a)+(c): 44 §1.4's 2 is \"refused (denied)\" and an undo has a verdict of its own \
+         (43 §5-2: \"an undo is not exempt from verification either\"; sem: SEM-gx-cli-1369). stdout: {} stderr: {}",
         undone.stdout, undone.stderr
     );
     assert_eq!(undone.json()["state"], "Denied");
@@ -161,6 +163,22 @@ fn a_denied_undo_exits_two_and_leaves_the_original_committed() {
         undone.json()["superseded_state"],
         "Committed",
         "43 §5-3 draws the supersede edge only when T_u reaches `Committed`; it did not"
+    );
+    // 🔴 **R44 item 4 (`req/324` §5(d), `req/334` M-01)** — the cause travels with the value on
+    // **this** surface too. `halted` reads `Engine::rollback` into `detail`, and the paired
+    // `rollback_not_attempted_because` is the member `rollback_facts` (gx-api's assembler) and
+    // `pipeline.rs` (the commit road's twin) both carry beside the value, so a reader that branches
+    // on the word can also see why it is what it is. It is `null` on a denied undo — this process
+    // reached no `NotAttempted` abort of its own — which is the same "null when there is nothing to
+    // say" the two other surfaces use, and the point is that the **member is here to read** rather
+    // than only in the journal.
+    assert!(
+        undone.json().get("not_attempted_because").is_some(),
+        "🔴 `req/334` M-01: the undo-refused surface put the roll-back word in `detail` and dropped \
+         the cause. The member the two other surfaces carry is absent, so a reader here cannot tell \
+         a `NotAttempted` that has a reason from one that does not — the value is on a signed record \
+         and the accessor is one call away. stdout: {}",
+        undone.stdout
     );
     assert_eq!(
         fixture.target_contents(),
@@ -171,8 +189,8 @@ fn a_denied_undo_exits_two_and_leaves_the_original_committed() {
 
 /// 🔴 **43 T-12's guard, checkable from the journal alone** — the probe req/88's brief asks for.
 ///
-/// > `T_u.parents` が `T_o.id` を含む・undo の journal 記録は `Superseded`。E-M5-13 で
-/// > `Planned.parents` が journal に入った(手1)ので「journal だけで検査可能」——その probe を置く
+/// > `T_u.parents` contains `T_o.id`; undo's journal record is `Superseded`. Once E-M5-13 put
+/// > `Planned.parents` into the journal (hand 1), "checkable from the journal alone" (sem: SEM-gx-cli-1370) became true -- that probe is placed
 ///
 /// Before E-M5-13 the supersede metadata lived only in the in-memory `Transformation`, so a crash
 /// between `Planned` and the commit lost it and the guard could not be re-checked from the log
@@ -217,14 +235,14 @@ fn t_12s_guard_is_checkable_from_the_journal_alone() {
     );
     assert_eq!(
         parents_edge, 1,
-        "43 T-12's guard is 「`T_u.parents`が`T_o.id`を含み」, and **E-M5-13** put `parents` in the \
+        "43 T-12's guard is \"`T_u.parents` contains `T_o.id`\" (sem: SEM-gx-cli-1371), and **E-M5-13** put `parents` in the \
          `Planned` record so that the guard survives a crash between planning and committing"
     );
     assert_eq!(
         supersede_records, 1,
-        "and the edge itself is journalled once: 「journal: `Superseded{{T_o.id, by: T_u.id}}`」. \
-         Twice would mean T-12's idempotency column (「`superseded_by`が既に設定済みなら再設定 \
-         しない」) stopped holding"
+        "and the edge itself is journalled once: \"journal: `Superseded{{T_o.id, by: T_u.id}}`\" (sem: SEM-gx-cli-1372). \
+         Twice would mean T-12's idempotency column (\"if `superseded_by` is already set, do not re-set \
+         it\") stopped holding"
     );
 }
 
@@ -312,7 +330,10 @@ fn the_undo_flag_with_nowhere_to_go_is_refused() {
         refused.code,
         refused.stderr.trim()
     );
-    assert_eq!(refused.code, 1, "規律52: a usage error is 「入力不正」");
+    assert_eq!(
+        refused.code, 1,
+        "discipline 52: a usage error is \"invalid input\" (sem: SEM-gx-cli-1373)"
+    );
     assert!(
         refused.stderr.contains("M6H4-3"),
         "the refusal names the ticket that carries the question: {}",

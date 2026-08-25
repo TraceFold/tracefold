@@ -1,7 +1,7 @@
 {
   "id": "FA-5",
   "kind": "false-admit",
-  "statement": "出荷 set が語らない substrate の変換を、他の substrate の permit で admit してはならない",
+  "statement": "a transformation on a substrate the shipped set does not speak for must not be admitted under another substrate's permit (sem: SEM-gx-gate-336)",
   "expected": "MUST_DENY",
   "expected_reason": {
     "source": "NoPolicyApplied"
@@ -14,7 +14,7 @@
     "invert_available": true,
     "evidence": 0
   },
-  "why": "ASM-60-1 の写像から `resource.substrate` が落ちる/どれかの pack から `resource.substrate == \"…\"` が消える と、語られていない substrate の変換がその permit に当たって admit される。∴ 出荷物は「語らない substrate は Cedar の第 3 規則(何も satisfy しない→Deny)へ落ちる」でなければならない。\n\n🔴 **M7 手 4 で書き直した(H-9)**。M3 手 6 の綴りは request が `git` で、statement は「fs pack が語らない substrate」だった——`policies/git/deny-nonbranch-refs.cedar` が出荷された M7 手 2 の瞬間にこの期待は偽になり(git は語られる substrate になった)、負例 suite が fs pack 単独に対して走り続けていたので 2 手のあいだ緑のままだった。req/38 §25 H-9 の予約(「FA-5 の期待は M7 で反転する」)はこの事であり、req/66 §4 が同時に起票した「vector に期限を持たせる仕組みが無い」は `expires_when_a_pack_speaks_for` と `false_admit.rs::no_vector_outlives_the_pack_that_makes_it_true` が塞いだ。\n\n測っている性質は 1 mm も弱めていない: 「語られていない substrate は permit に当たらない」は同じで、その subject が(fs/git/mcp の 3 本が出荷された今)`custom:` の側へ移っただけである。locator の綴りは M3 手 6 のまま——対照との差が substrate の行**だけ**である事が、この vector の設計そのものだから。",
+  "why": "If `resource.substrate` drops out of ASM-60-1's mapping, or `resource.substrate == \"…\"` disappears from any pack, a transformation on an unspoken-for substrate hits that permit and is admitted. ∴ the shipped artifact must be such that 'an unspoken-for substrate falls through Cedar's third rule (nothing satisfied -> Deny)'.\n\n🔴 **Rewritten in M7 hand 4 (H-9)**. M3 hand 6's spelling had the request as `git`, and the statement was 'a substrate the fs pack does not speak for' -- the moment `policies/git/deny-nonbranch-refs.cedar` shipped in M7 hand 2, this expectation went false (git became a spoken-for substrate), and it stayed green for two hands because the negative-vector suite kept running against the fs pack alone. req/38 §25 H-9's reservation ('FA-5's expectation reverses in M7') is this fact, and req/66 §4's simultaneous filing of 'no mechanism for giving a vector an expiry' is what `expires_when_a_pack_speaks_for` and `false_admit.rs::no_vector_outlives_the_pack_that_makes_it_true` closed.\n\nThe property being measured has not weakened by 1mm: 'an unspoken-for substrate does not hit a permit' is the same; its subject has simply moved to the `custom:` side (now that fs/git/mcp's three have shipped). The locator's spelling stays as M3 hand 6 left it -- that the difference from the control is **only** the substrate line is the vector's design itself. (sem: SEM-gx-gate-337)",
   "spec_anchor": "32 FR-028 / 34 AC-028 / 34 AC-074 / req/38 §21 C-3(E-M3-11: NoPolicyApplied)/ req/38 §25 H-9",
   "origin": "gx self-authored for M3 hand 6, restated for the shipped set in M7 hand 4",
   "control": {
@@ -26,6 +26,6 @@
       "evidence": 0
     },
     "expected": "MUST_ADMIT",
-    "note": "**locator の文字列は 1 文字も違わず substrate だけを変えた対照**。∴ この対を分けているのは substrate の行だけであり、写像からその行が落ちれば負例と対照が同じ答えになる"
+    "note": "**the control changes only the substrate, not one character of the locator string**. ∴ what separates this pair is only the substrate line, and if that line drops out of the mapping, the negative case and the control give the same answer (sem: SEM-gx-gate-338)"
   }
 }

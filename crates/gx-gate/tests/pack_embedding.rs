@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The shipped pack reaches a build by one road, and the road ends at the file (FR-028).
 //!
-//! req/60 §5.2's hand 5 DoD: 「pack の file が build に埋め込まれる経路が 1 本(=第 2 の経路を作らない・
-//! **AC-014 と同型の機械検査**)」. AC-014's shape is a source scan asserting that one line does a thing
+//! req/60 §5.2's hand 5 DoD: "there is exactly one road by which a pack's file gets embedded into the
+//! build (i.e. do not create a second road; **a mechanical check of the same shape as AC-014**)"
+//! (sem: SEM-gx-gate-282). AC-014's shape is a source scan asserting that one line does a thing
 //! nothing else may do -- there, take a hash; here, embed the pack -- and req/60 §7.2 says what such a
-//! claim costs: 「『無い事』の検査には変異が要る … 経路を 1 本足したら RED になる事を変異で実測しないと
-//! 空虚になる」. `tools/verify_m3h5.sh` §8 adds a second road and shows this suite go red.
+//! claim costs: "checking for 'absence' needs a mutation ... it is empty unless a mutation measures
+//! that adding one road turns it RED" (sem: SEM-gx-gate-283). `tools/verify_m3h5.sh` §8 adds a second road and shows this suite go red.
 //!
 //! Four claims live here, and each one fails differently:
 //!
@@ -17,7 +20,7 @@
 //!
 //! Two smaller ones follow them: the module states the range a pack may reason over (M3-10 requires
 //! that range be written down, so this checks it is), and no ready-made [`gx_gate::InvariantCheck`]
-//! ships (**D-9**, as a source scan -- the same instrument hand 3 used to report 「出荷 invariant 0」).
+//! ships (**D-9**, as a source scan -- the same instrument hand 3 used to report "0 shipped invariants"). (sem: SEM-gx-gate-284)
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -132,7 +135,7 @@ fn pack_text(rel: &str) -> String {
 /// Exactly one embedding **per shipped pack**, and every one of them is in `packs.rs`.
 ///
 /// 🔴 The claim moved with M7 hand 2 and did not weaken. Until the git pack there was one pack, so
-/// 「one road」 and 「one road under `policies/`」 were the same sentence; with two packs the second
+/// "one road" and "one road under `policies/`" were the same sentence; with two packs the second (sem: SEM-gx-gate-285)
 /// reading would forbid the second pack rather than forbid a second copy of one. What FR-028 is
 /// against is a pack embedded twice -- two constants free to diverge the day one of them is edited --
 /// so the count is taken per path, and the total is still asserted against the declared set so that
@@ -238,8 +241,8 @@ fn nothing_ships_in_policies_that_no_build_loads() {
 
 /// Every statement in the pack carries `@id`, and the ids are the declared ones (**ASM-62-1**, C-4).
 ///
-/// Counted off the file rather than off the parsed set, because the parsed set cannot tell 「every
-/// statement was annotated」 from 「the statements that were annotated parsed」 -- `PolicyEngine::parse`
+/// Counted off the file rather than off the parsed set, because the parsed set cannot tell "every
+/// statement was annotated" from "the statements that were annotated parsed" (sem: SEM-gx-gate-286) -- `PolicyEngine::parse`
 /// refuses the whole set on a missing annotation, so by the time an engine exists the question is
 /// already answered. The count is line-shaped (`@id(` and `permit (` / `forbid (` at the start of a
 /// line), which is how this pack is written and is a requirement on the pack rather than on Cedar:
@@ -284,7 +287,7 @@ fn every_statement_in_every_pack_is_named_by_an_annotation() {
 /// 🔴 The substrate a pack **declares** is the one every statement in it **scopes on** (M7 hand 4).
 ///
 /// [`gx_gate::packs::ShippedPack::substrate`] is a declaration, and two things now read it: the
-/// locality obligation of `shipped_set.rs` (「each pack decides only its own substrate」, which is what
+/// locality obligation of `shipped_set.rs` ("each pack decides only its own substrate", which is what (sem: SEM-gx-gate-287)
 /// makes composing the packs safe) and the vector-expiry gate of `false_admit.rs` (**H-9**). A
 /// declaration those two trust and nobody compares with the artifact is the failure this whole module
 /// is built against — so the clauses are read out of the pack's own text.
@@ -330,19 +333,19 @@ fn the_declared_substrate_is_the_one_every_statement_scopes_on() {
 
 /// The module says what a pack may reason over, and the three things it may not (**M3-10**).
 ///
-/// M3-10's ruling is 「v0.1 pack の実効範囲=locator/actor/context/order 級と明記(overclaim 禁)」 -- an
+/// M3-10's ruling is "the v0.1 pack's effective reach is stated explicitly as the locator/actor/context/order class (no overclaiming)" -- an (sem: SEM-gx-gate-288)
 /// obligation to write something down. A documentation obligation nobody checks is a promise, so the
-/// clauses the rulings name by name are asserted to be present: the range itself, C-8's 「読み取りは
-/// gate を通らない」, C-1's 「actor は key でのみ識別できる」, the `@id` refusal C-4 asks for, and P-6,
+/// clauses the rulings name by name are asserted to be present: the range itself, C-8's "a read does
+/// not pass through the gate", C-1's "the actor can be identified only by key" (sem: SEM-gx-gate-289), the `@id` refusal C-4 asks for, and P-6,
 /// which is why the payload is absent from the range.
 #[test]
 fn the_pack_module_states_its_effective_range() {
     let text = fs::read_to_string(repo_root().join("crates/gx-gate/src/packs.rs"))
         .expect("the module this test is about");
     for clause in [
-        "locator/actor/context/order 級",
-        "読み取りは gate を通らない",
-        "actor は key でのみ識別できる",
+        "locator/actor/context/order class",   // (sem: SEM-gx-gate-290)
+        "read does not pass through the gate", // (sem: SEM-gx-gate-291)
+        "actor can be identified only by key", // (sem: SEM-gx-gate-292)
         "PolicySetUnreadable",
         "P-6",
         "D-9",

@@ -1,19 +1,22 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-043** — crash injection at three points, ten times each, in real processes.
 //!
-//! 34 AC-043 逐語:
-//!
-//! > Given: crash-injection環境。When: T-9（`CommittingStarted`journal直後）・T-10b
-//! > （`InverseEscrowed`直後）・apply成功直後かつ`ledger.append`前、の3injection pointそれぞれで
-//! > `kill -9`し、43 §7のリカバリ手順に従い再起動する（各injection point 10回試行）。Then: 全試行を
-//! > 通じ同一TransformationIdについて`ledger`entryが高々1件（重複0件）。
+//! 34 AC-043, verbatim: "Given: a crash-injection environment. When: at each of three injection
+//! points -- T-9 (immediately after the `CommittingStarted` journal record), T-10b (immediately
+//! after `InverseEscrowed`), and immediately after a successful apply but before `ledger.append` --
+//! `kill -9` is issued and the process is restarted following 43 §7's recovery procedure (10 trials
+//! per injection point). Then: across all trials, there is at most one `ledger` entry per
+//! TransformationId (zero duplicates)." (sem: SEM-gx-engine-536)
 //!
 //! # The criterion counts entries; this suite also checks the sentence underneath it
 //!
-//! 「高々1件」 is satisfied by an engine that never commits anything at all. So every trial below
-//! checks the ledger count **and** the three faces together: the journal (what was recorded), the
-//! ledger (what was witnessed) and the world (what actually happened). The conjunction that must
-//! never appear is 「the world moved and the ledger is empty」 — P-4, and the reason this project
-//! exists. A count on its own cannot see it.
+//! "at most one" (sem: SEM-gx-engine-537) is satisfied by an engine that never commits
+//! anything at all. So every trial below checks the ledger count **and** the three faces together:
+//! the journal (what was recorded), the ledger (what was witnessed) and the world (what actually
+//! happened). The conjunction that must never appear is "the world moved and the ledger is empty"
+//! (sem: SEM-gx-engine-538) — P-4, and the reason this project exists. A count on its own
+//! cannot see it.
 //!
 //! # Why the third point is the one that matters
 //!
@@ -28,7 +31,8 @@ mod support;
 
 use support::{copy_tree, kill_at, need, probe, scratch, value};
 
-/// How many trials each injection point gets (34 AC-043: 「各injection point 10回試行」).
+/// How many trials each injection point gets (34 AC-043: "10 trials per injection point"; sem:
+/// SEM-gx-engine-539).
 const TRIALS: usize = 10;
 
 /// One trial: a run armed for `point`, killed there, then a restart that recovers.
@@ -56,7 +60,8 @@ fn trial(point: &str, n: usize) -> (String, String, u64) {
     // 🔴 P-4, at every point and in both directions.
     assert!(
         !(world == "after" && leaves == 0),
-        "{point} trial {n}: the world moved and the ledger is empty -- 「適用されたのに記録が無い」\n\
+        "{point} trial {n}: the world moved and the ledger is empty -- \"it was applied, yet \
+         nothing recorded it\" (sem: SEM-gx-engine-540)\n\
          crash-time world {world_at_crash:?}, id {tid}\n{out}"
     );
     assert_eq!(
@@ -70,7 +75,8 @@ fn trial(point: &str, n: usize) -> (String, String, u64) {
 /// 51 §8.1's first point: `CommittingStarted` is journalled and the world has not been touched.
 ///
 /// The recovery folds this to `Aborted(InternalError)` and re-runs nothing, because 43 §7-3c's
-/// 「最初から再実行」 needs a locator the journal does not carry (see `Engine::recover`, and
+/// "re-run from the beginning" (sem: SEM-gx-engine-541) needs a locator the journal does not
+/// carry (see `Engine::recover`, and
 /// **M5H5-2**). The criterion is met the strong way: **zero** ledger entries, and a world still
 /// holding what `plan` saw.
 #[test]
@@ -91,7 +97,8 @@ fn ac_043_a_crash_after_t9_leaves_no_entry_and_an_untouched_world() {
             .to_string();
         // The reason is named, not just the terminal. `PreconditionChanged` would claim somebody
         // moved the world and `ApplyFailed` would claim an adapter refused; neither happened, and
-        // 「事実の誤記」 is what §32 M4H4-2 and §33 M4H5-5 refused twice. `InternalError` is 43
+        // "misstating the fact" (sem: SEM-gx-engine-542) is what §32 M4H4-2 and §33 M4H5-5
+        // refused twice. `InternalError` is 43
         // T-13's receptacle and the least wrong of six -- which is exactly why **M5H5-2** raises it
         // rather than settling it.
         assert!(
@@ -129,7 +136,8 @@ fn ac_043_a_crash_after_the_escrow_reapplies_and_witnesses_once() {
 
 /// 🔴 51 §8.1's third point — **Λ4's window**: the apply succeeded and nothing has recorded it.
 ///
-/// 51 §8.1 on this point: 「43はこの区間に個別のjournal record名を定義しない」. E-M5-1 defines one,
+/// 51 §8.1 on this point: "43 does not define a distinct journal record name for this interval"
+/// (sem: SEM-gx-engine-543). E-M5-1 defines one,
 /// and this is the trial that says what it buys: ten crashes with a changed world and an empty
 /// ledger, ten recoveries that reach `Committed` with exactly one entry each.
 #[test]
@@ -157,11 +165,13 @@ fn ac_043_a_crash_between_apply_and_append_is_recovered_not_misread() {
 
 /// The recovery is itself idempotent: recovering twice does not witness twice.
 ///
-/// INV-S3 is 「各`TransformationId`について`ledger`entryは高々1件」 and a recovery that ran twice —
+/// INV-S3 is "for each `TransformationId`, there is at most one `ledger` entry" (sem:
+/// SEM-gx-engine-544) and a recovery that ran twice —
 /// because the operator restarted twice, or because the first restart also crashed — is the case
 /// that would break it if the second run treated the first run's work as absent. The copy is taken
 /// **before** the first recovery so that the third run starts from the same crashed bytes as the
-/// first, which makes 「recover, recover」 and 「recover」 comparable rather than sequential.
+/// first, which makes "recover, recover" and "recover" comparable rather than sequential (sem:
+/// SEM-gx-engine-545).
 #[test]
 fn recovering_twice_does_not_witness_twice() {
     let dir = scratch("ac043_twice");

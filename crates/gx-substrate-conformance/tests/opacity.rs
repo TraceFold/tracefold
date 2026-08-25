@@ -1,21 +1,28 @@
-//! **L8** — the five crates below the boundary read no delta grammar.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! **L8** — the five crates below the boundary read no delta grammar. (sem:
+//! SEM-gx-substrate-conformance-108, SEM-gx-substrate-conformance-109, SEM-gx-substrate-conformance-110,
+//! SEM-gx-substrate-conformance-111, SEM-gx-substrate-conformance-112, SEM-gx-substrate-conformance-113)
 //!
-//! req/69 §3.4, law L8: 「gx-core/canon/gate/witness/log の src に fs delta 文法を読む code が 0」,
-//! grounded in 11 §3's P-6 and 42 §3.4's 「adapterのみが解釈するopaqueな変更記述。core/gate/witnessは
-//! byte列としてのみ扱う」. req/69 §6.2 makes the scan a DoD of hand 3.
+//! req/69 §3.4, law L8: "zero code in the src of gx-core/canon/gate/witness/log reads fs delta
+//! grammar", grounded in 11 §3's P-6 and 42 §3.4's "an opaque change description that only the
+//! adapter interprets; core/gate/witness handle it only as a byte string". req/69 §6.2 makes the
+//! scan a DoD of hand 3.
 //!
 //! # Why L8 is not in the law table next door
 //!
-//! Because it is not a property of an adapter. L1〜L7 are questions a fixture can be asked; L8 is a
-//! question about the rest of the workspace, and the subject of the sentence is 「gx-core/canon/gate/
-//! witness/log」. Running it through the harness's fixture interface would put an adapter in the
+//! Because it is not a property of an adapter. L1-L7 are questions a fixture can be asked; L8 is a
+//! question about the rest of the workspace, and the subject of the sentence is
+//! "gx-core/canon/gate/witness/log". Running it through the harness's fixture interface would put an
+//! adapter in the
 //! position of vouching for the crates it is supposed to be opaque to. `src/laws.rs` says where it
 //! went; this file is where it is.
 //!
-//! # 「無い事」 needs a mutation, and there is one
+//! # "the absence" needs a mutation, and there is one
 //!
-//! req/69 §8.2: 「**「無い事」の検査には変異が要る**…**経路を 1 本足したら RED になる**事を実測しないと
-//! 空虚になる(AC-029/AC-028 の先例)」. `tools/verify_m4h3.sh` §5 adds one line to gx-gate that decodes
+//! req/69 §8.2: "**checking 'the absence' needs a mutation** ... it becomes empty unless you measure
+//! that **adding one path turns it RED** (the precedent of AC-029/AC-028)". `tools/verify_m4h3.sh`
+//! §5 adds one line to gx-gate that decodes
 //! `GateInput.planned` and prints what falls; without that measurement the three probes below would
 //! be three ways of saying that a `grep` found nothing.
 
@@ -156,7 +163,8 @@ fn no_crate_below_the_boundary_names_the_boundary_crate_in_code() {
 
 /// No line below the boundary both holds a delta and decodes something.
 ///
-/// The precise form of 「fs delta 文法を読む code」 that a scan can decide. A lower crate may hold a
+/// The precise form of "code that reads fs delta grammar" that a scan can decide. A lower crate may
+/// hold a
 /// `PlannedDeltaBytes`, hash it, sign it, put it in a receipt and compare it -- 42 §3.4 asks for
 /// exactly that -- and the one thing it may not do is turn those bytes into structure. The pairing
 /// is what makes the check specific: `cbor::decode` on its own is gx-canon's job and gx-witness's
@@ -178,7 +186,8 @@ fn no_crate_below_the_boundary_decodes_a_delta_carrier() {
     println!("L8_CARRIER_DECODES={}", offenders.len());
     assert!(
         offenders.is_empty(),
-        "a crate below the boundary reads a delta rather than carrying it: {offenders:?}. 42 §3.4 \
-         逐語: 「adapterのみが解釈するopaqueな変更記述。core/gate/witnessはbyte列としてのみ扱う（P-6）」"
+        "a crate below the boundary reads a delta rather than carrying it: {offenders:?}. 42 §3.4, \
+         verbatim: \"an opaque change description that only the adapter interprets; core/gate/\
+         witness handle it only as a byte string (P-6)\""
     );
 }

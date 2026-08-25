@@ -1,0 +1,35 @@
+{
+  "$server": {
+    "name": "github-mcp-server",
+    "version": "v1.9.0",
+    "features": [],
+    "toolsets": ["context", "repos", "issues", "pull_requests", "users", "gists"]
+  },
+  "create_or_update_file": {
+    "restored_by": "create_or_update_file",
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "path": { "forward": "path" },
+      "branch": { "forward": "branch" },
+      "message": { "const": "gx undo: restore the prior contents (A2 tool-aware invert, req/153)" },
+      "content": "prior_contents_utf8",
+      "sha": { "git_blob_sha1_of_forward": "content" }
+    }
+  },
+  "update_gist": {
+    "restored_by": "update_gist",
+    "read_by": {
+      "by_tool": "get_gist",
+      "arguments": {
+        "gist_id": { "forward": "gist_id" }
+      },
+      "identity": ["gist:", { "answer": "/id" }]
+    },
+    "arguments": {
+      "gist_id": { "forward": "gist_id" },
+      "filename": { "forward": "filename" },
+      "content": { "prior_json": ["/files/", { "forward": "filename" }, "/content"] }
+    }
+  }
+}

@@ -1,25 +1,27 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **FR-M7-3** and **FR-M7-4** at the command line: `gx key rotate|revoke`, `gx key gen --record`,
 //! and `gx receipt verify --revocations`.
 //!
 //! # What each of the two requirements asks for, and where it is measured here
 //!
-//! **FR-M7-3** (裁定 #6, req/98 §3-2): 「失効済み鍵で署名された receipt が、失効時刻より後の verify で
-//! **無効**と判定される(遡及範囲は政策設定であり、設定後の一貫性のみを機械が検査する)」. The library
+//! **FR-M7-3** (ruling #6, req/98 §3-2): "a receipt signed by a revoked key is judged
+//! **invalid** by a verify after the revocation time (the retroaction range is a policy setting; the machine checks only post-setting consistency)" (sem: SEM-gx-cli-1053). The library
 //! half is `crates/gx-witness/tests/revocation.rs`; this file is the operator's half — a revocation
 //! an operator writes with one command, and a verification that consults it.
 //!
-//! **FR-M7-4** (裁定 #7, req/98 §3-2): 「`gx key gen --record` が生成鍵の keyid を設定へ記録し、fresh
-//! volume からの起動で **手で書き写す手順が 0 になる**」. The measurement is the one M6H7-8 raised
+//! **FR-M7-4** (ruling #7, req/98 §3-2): "`gx key gen --record` records the generated key's keyid into the config, so a
+//! boot from a fresh volume has **zero manual copy-down steps**" (sem: SEM-gx-cli-1054). The measurement is the one M6H7-8 raised
 //! (`req/95` §4 ③): `.gx/config.toml`'s `engine_signing_keyid` had a reader (`gx serve`) and **no
 //! writer**, and the `scratch` container image has no shell to write one with. So the probe is not
-//! 「the file contains a line」 — it is that the value the writer wrote is the value the reader reads,
+//! "the file contains a line" (sem: SEM-gx-cli-1055) — it is that the value the writer wrote is the value the reader reads,
 //! with no editor in between.
 //!
 //! # 44 §1.2 does not have these two verbs, and that is stated rather than smuggled
 //!
 //! `gx key gen|list` is the whole of 44 §1.2's key section. `rotate` and `revoke` are added by
-//! 裁定 #6 ("U-06/13 鍵ローテ=M7 採"), which is a ruling and not this hand's idea, and they follow
-//! **M6-24 採(b)**'s precedent for `gx log checkpoint` — a verb 44 §1.1 does not list, added because a
+//! ruling #6 (sem: SEM-gx-cli-1056) ("U-06/13 key rotation = adopted for M7"), which is a ruling and not this hand's idea, and they follow
+//! **M6-24 adopted (b)**'s precedent for `gx log checkpoint` — a verb 44 §1.1 does not list, added because a
 //! ruling required the capability and the synopsis had nowhere to put it. `--revocations` is the same
 //! shape as `--checkpoint-key` (M6H8-11): a flag the AC needs and 44 §1.2 does not write.
 
@@ -87,7 +89,11 @@ fn fr_m7_4_gen_record_writes_the_keyid_the_server_reads() {
         out.code,
         out.stderr.trim()
     );
-    assert_eq!(out.code, 0, "44 §1.2: 「0=成功」. stderr: {}", out.stderr);
+    assert_eq!(
+        out.code, 0,
+        "44 §1.2: \"0=success\" (sem: SEM-gx-cli-1057). stderr: {}",
+        out.stderr
+    );
     assert!(
         !key_id.is_empty(),
         "the two fields 44 §1.2 fixes are still there"
@@ -103,7 +109,7 @@ fn fr_m7_4_gen_record_writes_the_keyid_the_server_reads() {
     assert_eq!(
         after,
         Some(key_id.clone()),
-        "the writer wrote the value the reader reads (M6H7-8: 「読み手はあり、書き手が無い」)"
+        "the writer wrote the value the reader reads (M6H7-8: \"there is a reader, but no writer\"; sem: SEM-gx-cli-1058)"
     );
 
     // 🔴 The whole point of the flag: no hand copying. The config file holds the id and nothing an
@@ -141,7 +147,7 @@ fn gen_without_record_touches_no_project() {
 
 /// 🔴 Recording twice replaces the value and **keeps the rest of the file**.
 ///
-/// The ordinary rotation is 「a project that already records a key id records the successor's」, and a
+/// The ordinary rotation is "a project that already records a key id records the successor's" (sem: SEM-gx-cli-1059), and a
 /// writer that truncated would take an operator's other settings with it the first time they
 /// rotated. req/56 §2 gives this file one job today, which is exactly why it will be given others.
 #[test]
@@ -206,11 +212,15 @@ fn fr_m7_3_revoke_writes_a_signed_entry() {
         .arg("the laptop was lost"));
     let json = out.json();
     println!("FRM73_REVOKE exit={} {json}", out.code);
-    assert_eq!(out.code, 0, "44 §1.2: 「0=成功」. stderr: {}", out.stderr);
+    assert_eq!(
+        out.code, 0,
+        "44 §1.2: \"0=success\" (sem: SEM-gx-cli-1060). stderr: {}",
+        out.stderr
+    );
     assert_eq!(json["key_id"], serde_json::json!(key_id));
     assert!(
         json["revoked_at"].as_i64().unwrap_or(0) > 0,
-        "the moment is the verifier's own clock reading, not an argument (則 2)"
+        "the moment is the verifier's own clock reading, not an argument (Rule 2; sem: SEM-gx-cli-1061)"
     );
     assert_eq!(json["entries"], serde_json::json!(1));
 
@@ -233,10 +243,10 @@ fn fr_m7_3_revoke_writes_a_signed_entry() {
 
 /// 🔴 Revoking a key the store does not hold is **6**, not 1 (**E-M6-24**'s reading).
 ///
-/// 44 §1.2's key section is `gen|list` and neither can name a key that is not there, so 「そんな鍵は
-/// 無い」 becomes reachable in this section for the first time with `revoke`. §1.4's common table
-/// gives 未検出 the code **6** and every other verb of this binary returns it; folding it into 1
-/// would make a script branching on 「not found」 special-case the key verbs.
+/// 44 §1.2's key section is `gen|list` and neither can name a key that is not there, so "there is no such
+/// key" (sem: SEM-gx-cli-1062) becomes reachable in this section for the first time with `revoke`. §1.4's common table
+/// gives not-found the code **6** and every other verb of this binary returns it; folding it into 1
+/// would make a script branching on "not found" special-case the key verbs.
 /// `gx_cli::exit::SPEC_44_EXIT_ADDITIONS` carries the citation, and this measures the status rather
 /// than leaving that table to assert about itself.
 #[test]
@@ -254,7 +264,7 @@ fn revoking_a_key_the_store_does_not_hold_is_not_found() {
     );
     assert_eq!(
         out.code, 6,
-        "44 §1.4: 「6=未検出（not-found）」. stderr: {}",
+        "44 §1.4: \"6=not-found\" (sem: SEM-gx-cli-1063). stderr: {}",
         out.stderr
     );
     assert!(
@@ -330,7 +340,7 @@ fn fr_m7_3_verify_consults_the_revocation_list() {
     );
     assert_eq!(
         refused.code, 7,
-        "44 §1.2's 「7=無効」, the code a receipt that does not verify already had. stderr: {}",
+        "44 §1.2's \"7=invalid\" (sem: SEM-gx-cli-1064), the code a receipt that does not verify already had. stderr: {}",
         refused.stderr
     );
     assert_eq!(refused.json()["valid"], serde_json::json!(false));
@@ -355,13 +365,13 @@ fn fr_m7_3_verify_consults_the_revocation_list() {
     assert_eq!(
         accepted.json()["checks"]["revocation"],
         serde_json::json!("valid_at_issue"),
-        "ASM-45-2 の DEFAULT: 「失効前に発行済みのreceiptは遡及無効化しない」"
+        "ASM-45-2's DEFAULT: \"a receipt already issued before revocation is not retroactively invalidated\" (sem: SEM-gx-cli-1065)"
     );
 }
 
 /// `--retroaction all` is the other setting, and it changes the same receipt's answer.
 ///
-/// 「遡及範囲は政策設定であり、設定後の一貫性のみを機械が検査する」 — the machine checks that each
+/// "the retroaction range is a policy setting; the machine checks only post-setting consistency" (sem: SEM-gx-cli-1066) — the machine checks that each
 /// setting answers the way its definition says, and the choice between them is the operator's.
 #[test]
 fn fr_m7_3_the_retroaction_setting_is_the_operators() {
@@ -384,9 +394,9 @@ fn fr_m7_3_the_retroaction_setting_is_the_operators() {
 
 /// Without `--revocations` the answer says `not_consulted`, and it is not a pass in disguise.
 ///
-/// ASM-45-2 makes consulting the list the verifier's option — 「revocation list参照はverifier側任意」 —
-/// so the run succeeds; what it must not do is print a word that reads as 「checked, and clean」.
-/// This is `anchor_authenticated`'s lesson (M6H8-11 採(a)) applied to the second thing a verification
+/// ASM-45-2 makes consulting the list the verifier's option — "consulting the revocation list is optional, at the verifier's discretion" (sem: SEM-gx-cli-1067) —
+/// so the run succeeds; what it must not do is print a word that reads as "checked, and clean".
+/// This is `anchor_authenticated`'s lesson (M6H8-11 adopted (a); sem: SEM-gx-cli-1103) applied to the second thing a verification
 /// can skip: what was **not** checked belongs on the wire.
 #[test]
 fn a_verification_that_consults_no_list_says_so() {
@@ -403,7 +413,7 @@ fn a_verification_that_consults_no_list_says_so() {
         assert_eq!(
             out.json()["checks"]["revocation"],
             serde_json::json!("not_consulted"),
-            "req/29 §4: skip と pass を同じ顔にしない"
+            "req/29 §4: skip (sem: SEM-gx-cli-1068) and pass do not wear the same face"
         );
     }
 }
@@ -412,7 +422,7 @@ fn a_verification_that_consults_no_list_says_so() {
 ///
 /// The entry cannot be authenticated by this verifier (it holds one public key), and it says nothing
 /// about this receipt's key either way. Ignoring it is not the same as accepting it: the answer is
-/// `not_revoked`, which means 「a list was consulted and this key is not in it」.
+/// `not_revoked`, which means "a list was consulted and this key is not in it" (sem: SEM-gx-cli-1069).
 #[test]
 fn a_list_about_other_keys_does_not_revoke_this_one() {
     let (export, key_path, _, before, _) = revoked_key_fixture("m7h2_other_keys");

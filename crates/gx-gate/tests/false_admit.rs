@@ -1,27 +1,30 @@
-//! The false-admit suite — 「deny されるべき変換が admit された」 has to be a red CI run.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The false-admit suite -- "a transformation that should have been denied was admitted" has to be a red CI run. (sem: SEM-gx-gate-234)
 //!
-//! req/60 §5.2 hand 6 逐語: 「**負例 suite**: 「deny されるべき変換が admit された」を検出する vector 群
-//! を新設(系統 A/B/C の次の系統・**expected は `MUST_DENY`**)」.
+//! req/60 §5.2 hand 6 verbatim: "**a negative-vector suite**: create a new vector family that
+//! detects 'a transformation that should have been denied was admitted' (the family after A/B/C,
+//! **expected = `MUST_DENY`**)". (sem: SEM-gx-gate-235)
 //!
-//! # Where it sits among the three系統 req/29 already has
+//! # Where it sits among the three families req/29 already has (sem: SEM-gx-gate-236)
 //!
 //! req/29 §2 names three vector families: **A** codec deviation, **B** adversarial CJK text, **C**
-//! forged judgement. All three are gx-canon's, and all three ask 「is this byte string refused?」.
+//! forged judgement. All three are gx-canon's, and all three ask "is this byte string refused?". (sem: SEM-gx-gate-237)
 //! This is the fourth, and it asks a different question of a different layer: **given a request the
 //! shipped pack must refuse, does the gate refuse it?** The unit is not a byte string but a
 //! `GateInput`, and the answer is not `Err` but a `Verdict`.
 //!
 //! `expected` is therefore `MUST_DENY` rather than `REJECT`. The two are not synonyms here, and the
 //! difference is the whole reason this file exists: an `Err` from [`gx_gate::Gate::verify`] is ⊥
-//! (**E-M3-3**: 「評価不能(⊥)は Deny でも Escalate でもない」), so a vector that fell over during
+//! (**E-M3-3**: "unevaluable (⊥) is neither Deny nor Escalate") (sem: SEM-gx-gate-238), so a vector that fell over during
 //! evaluation would not have been denied — it would have failed to be judged. A suite that accepted
 //! ⊥ as a refusal would go green on a gate that had stopped working, which is the fail-open req/29
 //! §4 forbids. So `MUST_DENY` means: the gate reached a decision, and the decision was `Deny`.
 //!
 //! # What each vector is worth, and why every one carries a control
 //!
-//! req/29 §2: 「正例の対照を必ず対で持つ」. Without one, a gate that denied everything would pass this
-//! file — and 「deny everything」 is exactly what a broken pack looks like from the negative side. The
+//! req/29 §2: "always carry a positive-case control, paired". Without one, a gate that denied everything would pass this
+//! file — and "deny everything" is exactly what a broken pack looks like from the negative side. The (sem: SEM-gx-gate-239)
 //! controls are written to differ from their vector in **one** respect (FA-5's differ only in the
 //! substrate, FA-7's only in the locator, with the inverse flag held false in both), so a control
 //! that goes red names the row of the mapping that moved.
@@ -39,8 +42,8 @@
 //!
 //! # What this suite does **not** claim
 //!
-//! It is not a statement that the shipped pack is sufficient. req/29 §1 逐語: 「網羅は主張しない …
-//! suite が言えるのは「この一覧は弾いた」まで」. It also cannot see the change itself (P-6 / M3-10), so
+//! It is not a statement that the shipped pack is sufficient. req/29 §1 verbatim: "coverage is not
+//! claimed ... all the suite can say is 'this list was refused'" (sem: SEM-gx-gate-240). It also cannot see the change itself (P-6 / M3-10), so
 //! nothing here is about what a transformation *does* — only about what it is addressed to. And it
 //! is not the fold's test: `verdict_meet.rs` measures AC-027 over its four quadrants, while this file
 //! measures the artifact a deployment installs.
@@ -59,12 +62,14 @@ use gx_gate::{packs, Gate, GateInput, ReasonSource, Verdict};
 use gx_witness::{Evidence, TestOutcome};
 use std::path::{Path, PathBuf};
 
-/// Ten, written down so that adding a vector without accounting for it fails rather than passes
+/// Eleven, written down so that adding a vector without accounting for it fails rather than passes
 /// unnoticed — the count guard `negative_vectors.rs` carries for its own directory.
 ///
 /// Eight until **M7 hand 4**, which added one vector per pack AC-074 ships
-/// ([`every_shipped_pack_is_refused_by_a_vector_of_this_suite`] is why it had to).
-const EXPECTED_VECTOR_COUNT: usize = 10;
+/// ([`every_shipped_pack_is_refused_by_a_vector_of_this_suite`] is why it had to). Ten until
+/// **policy pack v0** (req/446 V0-C), which added FA-11 for the postgres pack — and had to, for the
+/// same reason and by the same test.
+const EXPECTED_VECTOR_COUNT: usize = 11;
 
 /// The five keys a `request` object may hold. An unknown key is a vector saying something this
 /// harness does not read, and silently ignoring it would be the fail-open form of a typo.
@@ -95,19 +100,19 @@ struct Vector {
     statement: String,
     request: Request,
     /// The source and code the refusal must carry, when the vector names them. `is_err()` was not
-    /// enough for gx-canon (H6-4) and 「it was denied」 is not enough here: a `Deny` produced by the
+    /// enough for gx-canon (H6-4) and "it was denied" is not enough here: a `Deny` produced by the (sem: SEM-gx-gate-241)
     /// wrong policy is a pack whose reason no operator can act on.
     expected_source: Option<ReasonSource>,
     expected_code: Option<String>,
     control: Request,
     control_expected: VerdictKind,
-    /// 🔴 **H-9's 期限**: the substrate whose *absence from the shipped set* is what makes this
+    /// 🔴 **H-9's expiry**: the substrate whose *absence from the shipped set* is what makes this (sem: SEM-gx-gate-242)
     /// vector's expectation true.
     ///
     /// A vector that expects `NoPolicyApplied` is not asserting a rule; it is asserting that
     /// **nothing** in the artifact has an opinion. That is a statement with an expiry date, and
-    /// before this hand there was no way to write the date down: req/66 §4 filed the gap as 「vector
-    /// に期限を持たせる仕組みは今の schema に無い」 and H-9 reserved the fix for M7.
+    /// before this hand there was no way to write the date down: req/66 §4 filed the gap as "the
+    /// current schema has no mechanism for giving a vector an expiry" (sem: SEM-gx-gate-243) and H-9 reserved the fix for M7.
     ///
     /// [`no_vector_outlives_the_pack_that_makes_it_true`] is the mechanism, and what it does is not
     /// keep the vector true — it makes the vector **fail loudly on the day it stops being true**,
@@ -384,6 +389,10 @@ fn verdict_for(gate: &Gate, r: &Request, who: &str) -> Verdict {
         planned: &planned,
         evidence: &ev,
         invert_available: r.invert_available,
+        // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+        // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+        // varying this field alone moves no verdict) about the field and not about this fixture.
+        decided_at: Timestamp(0),
     })
     .unwrap_or_else(|e| {
         panic!("{who}: the gate could not evaluate this request at all ({e}) — ⊥ is not a Deny")
@@ -392,17 +401,18 @@ fn verdict_for(gate: &Gate, r: &Request, who: &str) -> Verdict {
 
 /// 🔴 **H-9** — the gate this suite measures is the **whole shipped artifact**, not one pack of it.
 ///
-/// req/38 §25's H-9 reserved the reversal for M7: 「FA-5 の期待は **M7 で反転する**——M7 reqdef 必須
-/// ticket(G-4 と同窓)に「vector 期限/pack 出荷との連動」を含める」, and req/66 §4 wrote why: 「git
-/// pack(AC-074/M7)が出荷された瞬間、「git の変換は NoPolicyApplied で拒まれる」は偽になる。vector に
-/// 期限を持たせる仕組みは今の schema に無い」.
+/// req/38 §25's H-9 reserved the reversal for M7: "FA-5's expectation **reverses in M7** -- include
+/// 'vector expiry / linkage to pack shipping' in M7's required reqdef ticket (the same window as
+/// G-4)", and req/66 §4 wrote why: "the moment the git pack (AC-074/M7) ships, 'a git transformation
+/// is refused with NoPolicyApplied' becomes false. The current schema has no mechanism for giving a
+/// vector an expiry". (sem: SEM-gx-gate-244)
 ///
 /// Both halves of that ticket are below: [`no_vector_outlives_the_pack_that_makes_it_true`] is the
-/// 期限, and [`every_shipped_pack_is_refused_by_a_vector_of_this_suite`] is the 連動.
+/// expiry, and [`every_shipped_pack_is_refused_by_a_vector_of_this_suite`] is the linkage. (sem: SEM-gx-gate-245)
 ///
 /// The set is [`packs::shipped_pack_set`] because that is what a deployment installs after **M7 hand
-/// 4** (`req/38` §60's R-9 対裁定): the module header calls this suite 「the artifact a deployment
-/// installs」 and the artifact grew from one pack to three.
+/// 4** (`req/38` §60's counter-ruling to R-9): the module header calls this suite "the artifact a
+/// deployment installs" and the artifact grew from one pack to three. (sem: SEM-gx-gate-246)
 fn shipped_gate() -> Gate {
     Gate::with_policies(packs::shipped_pack_set().expect("the shipped packs compose into one set"))
 }
@@ -450,7 +460,7 @@ fn false_admit_no_vector_reaches_a_verdict_other_than_deny() {
 
 /// The refusal is the declared one — which policy said no, and under which code.
 ///
-/// `negative_vectors.rs` learned this from H6-4: 「「it was refused」 did not say *why*」. A pack that
+/// `negative_vectors.rs` learned this from H6-4: "'it was refused' did not say *why*" (sem: SEM-gx-gate-247). A pack that
 /// refused `/etc/passwd` because nothing matched (rather than because its forbid did) would satisfy
 /// the probe above and mean something entirely different — it would mean the permit had vanished.
 #[test]
@@ -490,7 +500,7 @@ fn false_admit_the_refusal_carries_the_declared_source_and_code() {
 }
 
 /// The controls. A gate that denied everything would pass the two probes above and fail this one,
-/// which is the whole of req/29 §2's 「正例の対照を必ず対で持つ」.
+/// which is the whole of req/29 §2's "always carry a positive-case control, paired". (sem: SEM-gx-gate-248)
 #[test]
 fn false_admit_every_control_is_not_denied() {
     let gate = shipped_gate();
@@ -522,10 +532,10 @@ fn false_admit_every_control_is_not_denied() {
 // 🔴 H-9 — vector expiry, and the linkage to what ships
 // ---------------------------------------------------------------------------
 
-/// 🔴 **H-9's first half (期限)**: no vector outlives the absence that made it true.
+/// 🔴 **H-9's first half (expiry)**: no vector outlives the absence that made it true. (sem: SEM-gx-gate-249)
 ///
-/// A vector expecting `NoPolicyApplied` says 「nothing in the shipped artifact has an opinion about
-/// this substrate」. The day a pack for that substrate ships, the sentence is false — and the vector
+/// A vector expecting `NoPolicyApplied` says "nothing in the shipped artifact has an opinion about
+/// this substrate" (sem: SEM-gx-gate-250). The day a pack for that substrate ships, the sentence is false — and the vector
 /// does not become *wrong* so much as it becomes **about something else**, which is worse, because a
 /// suite whose rows have quietly changed subject still prints green.
 ///
@@ -534,7 +544,7 @@ fn false_admit_every_control_is_not_denied() {
 /// later hand ends every vector that depended on its absence, in the run that adds it.
 ///
 /// It has already fired once. M7 hand 2 shipped `policies/git/deny-nonbranch-refs.cedar` while FA-5
-/// still read 「fs pack が語らない substrate の変換を…admit してはならない」 with a **git** request in
+/// still read "a transformation on a substrate the fs pack does not speak for ... must not be admitted" with a **git** request in (sem: SEM-gx-gate-251)
 /// it, and the suite stayed green for two hands because it was still being run against the fs pack
 /// alone. Hand 4's red-first commit is that reversal, measured.
 #[test]
@@ -567,12 +577,12 @@ fn no_vector_outlives_the_pack_that_makes_it_true() {
     );
 }
 
-/// 🔴 **H-9's second half (pack 出荷との連動)**: every shipped pack is refused by a vector here.
+/// 🔴 **H-9's second half (linkage to pack shipping)**: every shipped pack is refused by a vector here. (sem: SEM-gx-gate-252)
 ///
 /// The expiry above is the defensive direction — a pack arriving must not silently invalidate a
 /// row. This is the other one: a pack arriving must **bring** a row. Without it the negative suite
 /// would go on measuring the fs pack while the artifact a deployment installs grew two more, which
-/// is the same 分母 failure this project keeps finding in absence checks (§30).
+/// is the same denominator failure this project keeps finding in absence checks (§30). (sem: SEM-gx-gate-253)
 ///
 /// The requirement is deliberately the strong one — a vector whose declared refusal names a
 /// statement **of that pack** — because a vector that merely used the substrate could be satisfied
@@ -604,7 +614,7 @@ fn every_shipped_pack_is_refused_by_a_vector_of_this_suite() {
     );
 }
 
-/// What ran, with the denominator (req/29 §4: 「出力に必ず『見ていない範囲』を載せる」).
+/// What ran, with the denominator (req/29 §4: "always put 'the range not looked at' in the output"). (sem: SEM-gx-gate-254)
 #[test]
 fn false_admit_breakdown() {
     let vectors = load();
@@ -631,8 +641,8 @@ fn false_admit_breakdown() {
     println!(
         "NOT COVERED: the payload (P-6 keeps it opaque — so on the mcp substrate, **which tool is \
          being called**), any substrate but the four above, any pack but the shipped set, the \
-         composition of a deployment's own statements with it, and 「網羅」 — this list is what was \
-         tried, not what is safe (req/29 §1)"
+         composition of a deployment's own statements with it, and \"coverage\" — this list is what was \
+         tried, not what is safe (req/29 §1) (sem: SEM-gx-gate-255)"
     );
     assert_eq!(vectors.len(), EXPECTED_VECTOR_COUNT);
 }

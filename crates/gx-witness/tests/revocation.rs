@@ -1,23 +1,30 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **FR-M7-3** — key revocation, and what an offline verifier can say about a receipt signed by a
-//! key that has been revoked.
+//! key that has been revoked. (sem: SEM-gx-witness-267, SEM-gx-witness-268, SEM-gx-witness-269,
+//! SEM-gx-witness-270, SEM-gx-witness-271, SEM-gx-witness-272, SEM-gx-witness-273,
+//! SEM-gx-witness-274, SEM-gx-witness-275, SEM-gx-witness-276, SEM-gx-witness-277,
+//! SEM-gx-witness-278, SEM-gx-witness-279, SEM-gx-witness-280)
 //!
-//! req/98 §3-2's AC: 「失効済み鍵で署名された receipt が、失効時刻より後の verify で **無効**と判定
-//! される(**遡及範囲は政策設定であり、設定後の一貫性のみを機械が検査する**)」. The two halves are
+//! req/98 §3-2's AC: "a receipt signed by a revoked key is judged **invalid** on a verify after the
+//! revocation time (**the retroactive range is a policy setting, and the machine checks only
+//! consistency after the setting**)". The two halves are
 //! measured separately, because they are two different kinds of statement:
 //!
 //! | half | measured by |
 //! |---|---|
 //! | the invariant | `revocation_status` over the four inputs, every combination of them named |
-//! | 「設定後の一貫性」 | the same receipt under both settings, and the same setting over a table of receipts |
+//! | "consistency after the setting" | the same receipt under both settings, and the same setting over a table of receipts |
 //!
 //! # 🔴 What this suite also measures, on purpose: the limit
 //!
-//! `Receipt.issued_at` is **unsigned** (**E-M2-6**, CM-5: 「signed payload から clock read 排除」), so
-//! `Retroaction::FromRevocation` — which is ASM-45-2's DEFAULT, 「失効前に発行済みのreceiptは遡及無効化
-//! しない（『発行時点の鍵状態』で有効性判定）」 — rests on a timestamp nobody signed. Whoever holds the
+//! `Receipt.issued_at` is **unsigned** (**E-M2-6**, CM-5: "exclude the clock read from the signed
+//! payload"), so `Retroaction::FromRevocation` — which is ASM-45-2's DEFAULT, "a receipt issued
+//! before the revocation is not retroactively invalidated (validity judged by 'the key's state at
+//! the moment of issue')" — rests on a timestamp nobody signed. Whoever holds the
 //! compromised secret can re-issue the same payload with an earlier `issued_at` and stay valid under
-//! that setting. 45 §3's own residual register says as much (TH-5: 「TSA連携なしのv0.1では失効時刻の
-//! 第三者証明が弱い」, resolved in v0.2 with ASM-4's TSA), and
+//! that setting. 45 §3's own residual register says as much (TH-5: "in v0.1, without TSA
+//! integration, third-party proof of the revocation time is weak", resolved in v0.2 with ASM-4's TSA), and
 //! `the_default_setting_cannot_see_a_backdated_receipt` is that sentence as a running test rather
 //! than as a paragraph. A limit with a test is a limit somebody can find; a limit in prose is one
 //! that gets quoted after it has already been relied on.
@@ -96,7 +103,7 @@ fn a_revocation_is_signed_by_the_key_it_revokes() {
 ///
 /// Two defences for one rule, and the reason is timing rather than doubt: an operator whose command
 /// produced a record no verifier will accept should learn it from their own command, not from a
-/// stranger months later (M6H3-5's shape: 「a flag with nowhere to go is refused, never dropped」).
+/// stranger months later (M6H3-5's shape: "a flag with nowhere to go is refused, never dropped").
 /// The **load-bearing** half is the verifier's, since an attacker does not call this function —
 /// which is why the test above forges without it.
 #[test]
@@ -217,11 +224,11 @@ fn fr_m7_3_a_receipt_signed_after_revocation_is_invalid() {
     assert_eq!(checks.revocation, RevocationCheck::Revoked);
     assert!(
         !checks.verified(),
-        "「失効済み鍵で署名された receipt が、失効時刻より後の verify で無効」"
+        "a receipt signed with a revoked key is invalid on a verify after the revocation time"
     );
     // 🔴 The signature itself still verifies. A verifier that reported this as a bad signature
     // would be telling an operator to look for tampering that did not happen (E-M3-3's shape, one
-    // crate along: 「could not be evaluated」 and 「said something else」 are different facts).
+    // crate along: "could not be evaluated" and "said something else" are different facts).
     assert!(checks.canonical_cid);
 }
 
@@ -243,12 +250,12 @@ fn the_default_setting_keeps_receipts_issued_before_the_revocation() {
     assert_eq!(checks.revocation, RevocationCheck::ValidAtIssue);
     assert!(
         checks.verified(),
-        "ASM-45-2 の DEFAULT: 「失効前に発行済みのreceiptは遡及無効化しない」"
+        "ASM-45-2's DEFAULT: a receipt issued before the revocation is not retroactively invalidated"
     );
 }
 
 /// The other setting, on the same receipt: invalid. **The machine checks consistency, not the
-/// choice** — this pair is what 「遡及範囲は政策設定」 means as a measurement.
+/// choice** — this pair is what "the retroactive range is a policy setting" means as a measurement.
 #[test]
 fn the_retroactive_setting_invalidates_the_same_receipt() {
     let key = keypair(1);
@@ -280,8 +287,8 @@ fn the_retroactive_setting_invalidates_the_same_receipt() {
 
 /// A revocation dated in the verifier's future is **not yet in force**, under either setting.
 ///
-/// This is the other half of the AC's 「失効時刻より後の verify」: before that moment there is nothing
-/// to apply. A verifier that applied it early would answer 「invalid」 about a receipt that is valid
+/// This is the other half of the AC's "a verify after the revocation time": before that moment there is nothing
+/// to apply. A verifier that applied it early would answer "invalid" about a receipt that is valid
 /// at the time the question is being asked.
 #[test]
 fn a_revocation_dated_later_than_the_verification_is_not_yet_in_force() {
@@ -300,9 +307,9 @@ fn a_revocation_dated_later_than_the_verification_is_not_yet_in_force() {
 /// A key with no entry in a consulted ledger is `NotRevoked`, which is not the same word as
 /// `NotConsulted`.
 ///
-/// req/29 §4: 「skip と pass を同じ顔にしない」. `verify_offline` — the road every caller took before
-/// this hand — consults nothing and says so, and ASM-45-2 is why that is a pass rather than a
-/// failure: 「revocation list参照はverifier側任意とする」. A verifier that consulted a ledger and
+/// req/29 §4: "a skip and a pass must not look the same". `verify_offline` — the road every caller
+/// took before this hand — consults nothing and says so, and ASM-45-2 is why that is a pass rather
+/// than a failure: "consulting the revocation list is optional, at the verifier's discretion". A verifier that consulted a ledger and
 /// found nothing has made a stronger statement, and the two are different words on the wire.
 #[test]
 fn consulting_nothing_and_finding_nothing_are_different_words() {
@@ -314,7 +321,7 @@ fn consulting_nothing_and_finding_nothing_are_different_words() {
     assert!(
         unconsulted.verified(),
         "ASM-45-2 makes consulting the list the verifier's option, so not consulting is not a \
-         failure — and the word on the answer is what keeps it from reading as 「checked, clean」"
+         failure — and the word on the answer is what keeps it from reading as 'checked, clean'"
     );
 
     let empty = RevocationLedger::empty();
@@ -338,8 +345,8 @@ fn consulting_nothing_and_finding_nothing_are_different_words() {
 /// `issued_at` is outside the signed core (**E-M2-6**), so the holder of a compromised secret can
 /// re-issue the same signed payload with an earlier timestamp. Under `FromRevocation` the result is
 /// indistinguishable from a receipt that really was issued early; under `All` it is not. That is the
-/// whole reason the setting exists, and 45 §3's TH-5 residual (「TSA連携なしのv0.1では失効時刻の第三者
-/// 証明が弱い」) is the same fact in the threat model's words.
+/// whole reason the setting exists, and 45 §3's TH-5 residual ("in v0.1, without TSA integration,
+/// third-party proof of the revocation time is weak") is the same fact in the threat model's words.
 #[test]
 fn the_default_setting_cannot_see_a_backdated_receipt() {
     let key = keypair(1);
@@ -388,7 +395,7 @@ fn the_default_setting_cannot_see_a_backdated_receipt() {
 
 /// 🔴 Consistency: over a table of receipts, one setting gives one answer per receipt, every time.
 ///
-/// 「設定後の一貫性のみを機械が検査する」 is a statement about a **function**, so it is measured as
+/// "the machine checks only consistency after the setting" is a statement about a **function**, so it is measured as
 /// one: the same inputs answer the same way twice, and the two settings order the receipts the way
 /// their definitions say (`All` refuses everything `FromRevocation` refuses, and more).
 #[test]

@@ -1,20 +1,22 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-072** — an escalation rejected by a person (FR-058, DR-11, 43 T-5b).
 //!
-//! 34 AC-072 逐語:
+//! 34 AC-072, verbatim (sem: SEM-gx-engine-575):
 //!
-//! > Given: `Escalated`状態のCandidate T。When: `gx escalation reject <ticket-id> --reason "policy
-//! > violation"`（またはAPI同等）を実行する。Then: Tは`Denied`へ遷移し終端となる（record-onlyモード
-//! > 以外ではそれ以上commitへ進めない）。journal記録に`Evidence(HumanDecision)`（decision=Deny,
-//! > reason）が含まれることを確認する。
+//! > Given: a Candidate T in the `Escalated` state. When: `gx escalation reject <ticket-id> --reason
+//! > "policy violation"` (or the API equivalent) is run. Then: T transitions to `Denied` and is
+//! > terminal (outside of record-only mode it cannot proceed to commit any further). Confirm that the
+//! > journal record includes `Evidence(HumanDecision)` (decision=Deny, reason).
 //!
-//! The parenthesis is the interesting half. 「record-onlyモード**以外では**」 says the terminality of
+//! The parenthesis is the interesting half. "**outside of** record-only mode" (sem: SEM-gx-engine-575) says the terminality of
 //! a rejected escalation is the same terminality 43 §1 gives `Denied` — conditional on
 //! `EnforcementMode`. So this suite runs the rejection **twice**, once in each mode, and the two
 //! answers differ: under `Enforce` the transformation stops, and under `RecordOnly` T-8r carries it
 //! through with `enforced=false` on its receipt. A suite that only ran the first would be asserting
 //! half the sentence.
 //!
-//! See `tests/ac_071.rs` for why 「`Evidence(HumanDecision)`」 is read as the journal record plus the
+//! See `tests/ac_071.rs` for why "`Evidence(HumanDecision)`" (sem: SEM-gx-engine-576) is read as the journal record plus the
 //! signed verdict receipt (**E-M2-3**, **M5H6-2**, **M5H6-7**).
 
 mod support;
@@ -115,7 +117,7 @@ fn ac_072_a_rejected_escalation_is_denied_and_goes_no_further() {
     assert_eq!(
         out.after_canonicalize.as_ref().err().map(String::as_str),
         Some("InvalidState"),
-        "「record-onlyモード以外ではそれ以上commitへ進めない」"
+        "\"outside of record-only mode it cannot proceed to commit any further\" (quoted in SEM-gx-engine-575, sem: SEM-gx-engine-577)"
     );
     assert!(out.committed.is_none());
     assert_eq!(out.applies, 0);
@@ -124,16 +126,16 @@ fn ac_072_a_rejected_escalation_is_denied_and_goes_no_further() {
     assert_eq!(
         out.reason_in_journal.as_deref(),
         Some(REASON),
-        "AC-072: 「journal記録に…（decision=Deny, reason）が含まれる」"
+        "AC-072: \"the journal record includes ... (decision=Deny, reason)\" (quoted in SEM-gx-engine-575, sem: SEM-gx-engine-578)"
     );
 }
 
 /// 🔴 AC-072's parenthesis: under `RecordOnly` the same rejection is carried through.
 ///
-/// 43 T-8r opens from `Denied` 「`EnforcementMode = RecordOnly`（substrate単位または全体設定, DR-2
-/// 併設モード）」, and a rejection by a person is a `Denied` like any other — 43 gives T-5b the same
-/// to-state as T-4b and no separate arm. So the receipt records 「適用は通ったが、ポリシー上は拒否
-/// されていた」 for a person's refusal exactly as it does for a policy's, which is the property
+/// 43 T-8r opens from `Denied` "`EnforcementMode = RecordOnly` (a per-substrate or global setting,
+/// DR-2's co-existing mode)" (sem: SEM-gx-engine-579), and a rejection by a person is a `Denied` like any other — 43 gives T-5b the same
+/// to-state as T-4b and no separate arm. So the receipt records "the apply went through, but it was
+/// refused at the policy level" for a person's refusal exactly as it does for a policy's, which is the property
 /// AC-037 states and this is the human-ruling instance of it.
 #[test]
 fn ac_072_the_same_rejection_under_record_only_commits_with_enforced_false() {
@@ -149,7 +151,7 @@ fn ac_072_the_same_rejection_under_record_only_commits_with_enforced_false() {
     assert_eq!(
         out.receipt_enforced,
         Some(false),
-        "43 §4: 「receipt には必ず `enforced=false` を刻む」"
+        "43 §4: \"the receipt must always be stamped `enforced=false`\" (sem: SEM-gx-engine-580)"
     );
     assert_eq!(out.applies, 1);
     assert_eq!(out.leaves, 1);
@@ -190,7 +192,7 @@ fn ac_072_a_person_cannot_escalate_an_escalation() {
             RULED_AT,
             &signing_key(),
         )
-        .expect_err("42 §3.13: 「kindはAdmit|Denyのみ」");
+        .expect_err("42 §3.13: \"kind is Admit|Deny only\" (sem: SEM-gx-engine-581)");
     // And an empty reason: 44 §1.2's trigger carries `--reason <text>`, and a ruling nobody can
     // audit is what `Verdict::deny` refuses one layer down for an empty `Vec<Reason>`.
     let empty = engine

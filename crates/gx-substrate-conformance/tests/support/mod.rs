@@ -1,15 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! An in-memory `SubstrateAdapter` and the [`Fixture`] over it, so that hand 3's harness can be run
-//! before hand 4 exists.
+//! before hand 4 exists. (sem: SEM-gx-substrate-conformance-121, SEM-gx-substrate-conformance-122,
+//! SEM-gx-substrate-conformance-123, SEM-gx-substrate-conformance-124, SEM-gx-substrate-conformance-125,
+//! SEM-gx-substrate-conformance-126, SEM-gx-substrate-conformance-127, SEM-gx-substrate-conformance-128,
+//! SEM-gx-substrate-conformance-129, SEM-gx-substrate-conformance-130, SEM-gx-substrate-conformance-131,
+//! SEM-gx-substrate-conformance-132, SEM-gx-substrate-conformance-133)
 //!
-//! req/69 §6.2 hand 3: 「adapter 実装が無い本手では mock adapter(test 専用・fs を読まない)で red-first」.
+//! req/69 §6.2 hand 3: "since this hand has no adapter implementation, red-first with a mock adapter
+//! (test-only, does not read fs)".
 //! This is that mock. It is a **test double**, not a preview of `gx-adapter-fs`: it keeps a
 //! `BTreeMap` in a `Mutex`, opens no file, resolves no path and reads no clock, and every decision
 //! in it that an fs adapter would have to think about is marked as the mock's own.
 //!
 //! # What the mock's payload grammar is, and why it is a sequence
 //!
-//! `crates/gx-substrate/src/lib.rs`'s `# Composite deltas (normative)` section (**M4-07 採(c)**) makes
-//! a composite delta a **free monoid** -- 「単一 file 操作の列」 with 「列の連結が合成の witness」. The
+//! `crates/gx-substrate/src/lib.rs`'s `# Composite deltas (normative)` section (**M4-07, adopted
+//! (c)**) makes a composite delta a **free monoid** -- "a sequence of single-file operations" with
+//! "the concatenation of the sequence is the witness of composition". The
 //! mock's payload is therefore a concatenation of framed write operations:
 //!
 //! ```text
@@ -24,16 +32,17 @@
 //!
 //! # Two things the mock had to decide, and both are seams in the canon
 //!
-//! * **`applied_at`.** M4-17 (a) rules 「`applied_at` は engine 注入」, but 41 §4's `apply(&self, delta)`
-//!   has no parameter an engine could inject through, and the adapter is the caller of
-//!   [`AppliedDelta::new`]. The mock writes `Timestamp(0)`, which is the placeholder gx-gate already
-//!   uses for the same reason (「gx-gate writes `Timestamp(0)` into an escalation ticket as the
-//!   placeholder an engine overwrites」, `gx_core::Error::CreatedAtNegative`'s documentation). The
-//!   seam is raised in `req/72` §2 rather than closed here.
-//! * **The escrow ceiling.** M4-21 (a) fixes the *form* -- 「逆 delta payload の上限を**定数 1 箇所**で
-//!   宣言・超過は `invert`=`Ok(None)`」 -- and leaves the value to hand 5. [`MOCK_INVERSE_CEILING`] is
-//!   the mock's own and says so; it exists to give contract 5 a real `Ok(None)`, which req/69 §4
-//!   M4-21 calls 「AC-048 の None の実在する第 1 の理由」.
+//! * **`applied_at`.** M4-17 (a) rules "`applied_at` is injected by the engine", but 41 §4's
+//!   `apply(&self, delta)` has no parameter an engine could inject through, and the adapter is the
+//!   caller of [`AppliedDelta::new`]. The mock writes `Timestamp(0)`, which is the placeholder
+//!   gx-gate already uses for the same reason ("gx-gate writes `Timestamp(0)` into an escalation
+//!   ticket as the placeholder an engine overwrites", `gx_core::Error::CreatedAtNegative`'s
+//!   documentation). The seam is raised in `req/72` §2 rather than closed here.
+//! * **The escrow ceiling.** M4-21 (a) fixes the *form* -- "declare the inverse delta payload's
+//!   ceiling in **one constant place**; exceeding it makes `invert` = `Ok(None)`" -- and leaves the
+//!   value to hand 5. [`MOCK_INVERSE_CEILING`] is the mock's own and says so; it exists to give
+//!   contract 5 a real `Ok(None)`, which req/69 §4 M4-21 calls "AC-048's first real reason for
+//!   `None`".
 
 // Every binary that says `mod support;` compiles the whole file, and no binary uses all of it.
 #![allow(dead_code)]
@@ -46,14 +55,14 @@ use gx_core::{
     Actor, ChangeContext, Cid, Commutation, DeltaRef, Fingerprint, GoalBytes, Intent, ObjectId,
     ObjectSnapshot, ReprKind, SubstrateKind, Timestamp,
 };
-use gx_substrate::{AppliedDelta, Error, PlannedDelta, Result, SubstrateAdapter};
+use gx_substrate::{AppliedDelta, Error, InvertOutcome, PlannedDelta, Result, SubstrateAdapter};
 use gx_substrate_conformance::Fixture;
 
 /// The locator the fixture points the harness at. Already normalised (41 §4's `snapshot` receives
 /// one: H-2 / E-M4-12).
 pub const SUBJECT: &str = "/mock/x";
 
-/// A second locator, so that 51 §7's 可換 case has two changes that touch different things.
+/// A second locator, so that 51 §7's commuting case has two changes that touch different things.
 pub const OTHER: &str = "/mock/y";
 
 /// A locator whose content is larger than the mock's escrow ceiling, for contract 5.
@@ -210,7 +219,8 @@ impl SubstrateAdapter for MockAdapter {
     }
 
     /// Ignores everything about the substrate: the answer is a function of the pair and of nothing
-    /// else, which is E-M4-4's determinism and E-M4-29's 「substrate への書き込み 0」 at the same time.
+    /// else, which is E-M4-4's determinism and E-M4-29's "zero writes to the substrate" at the same
+    /// time.
     fn plan(&self, intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
         if intent.locator().is_empty() {
             return Err(Error::NotPlannable {
@@ -262,20 +272,29 @@ impl SubstrateAdapter for MockAdapter {
     /// Reads the state at call time, which is why 43 T-10b calls this **before** `apply`.
     ///
     /// The mock cannot reconstruct old content from `pre`: an `ObjectSnapshot` carries a digest, not
-    /// a body. That is not a limitation of the mock -- it is why 42 §5 escrows the inverse 「本体
-    /// payloadを保持」 and why the harness runs the round trip in T-10b's order.
-    fn invert(&self, delta: &PlannedDelta, _pre: &ObjectSnapshot) -> Result<Option<PlannedDelta>> {
+    /// a body. That is not a limitation of the mock -- it is why 42 §5 escrows the inverse "keeps the
+    /// body payload" and why the harness runs the round trip in T-10b's order.
+    fn invert(&self, delta: &PlannedDelta, _pre: &ObjectSnapshot) -> Result<InvertOutcome> {
         let ops = self.ours(delta)?;
         let mut payload = Vec::new();
         for (locator, _) in ops {
             let old = self.read(&locator).unwrap_or_default();
             if old.len() > MOCK_INVERSE_CEILING {
-                // M4-21 (a): 「上限超過は `invert`=`Ok(None)`」 -- a real reason, not a stub.
-                return Ok(None);
+                // M4-21 (a): "exceeding the ceiling makes `invert` = `Ok(None)`" -- a real reason,
+                // not a stub.
+                //
+                // 🔴 **DR-46-26** — `Reversibility::False`, and no read attested. The mock's
+                // "read" is a map lookup in this process, not a read of a substrate through a
+                // transport, so attesting it would put a locator in a receipt about an object
+                // nothing outside this test ever held.
+                return Ok(InvertOutcome::none(Vec::new()));
             }
             payload.extend_from_slice(&frame(&locator, &old));
         }
-        Ok(Some(PlannedDelta::new(self.kind(), payload)?))
+        Ok(InvertOutcome::inverted(
+            PlannedDelta::new(self.kind(), payload)?,
+            Vec::new(),
+        ))
     }
 
     fn commutation(&self, a: &PlannedDelta, b: &PlannedDelta) -> Result<Commutation> {
@@ -454,12 +473,12 @@ impl Fixture for MockFixture {
 /// and `laws.rs` at 67.80; and **7 of 15** `cargo mutants` survivors sitting in the judgement
 /// functions themselves (`is_conformant → true`, `meets_51_7 → true`, `law_5`'s
 /// `resulting_digest == target` guard → `true`). Both numbers say the same thing: **the code that
-/// decides whether an adapter passed had no negative control**, so a harness that answered 「合格」 to
+/// decides whether an adapter passed had no negative control**, so a harness that answered "pass" to
 /// everything would have been reported as green by its own suite.
 ///
 /// The subject that closes it is one deliberately broken fixture, asked in turn to break each
 /// obligation. A single flaw would move the coverage number and leave most arms unmeasured; a flaw
-/// per obligation is what makes 「落ちた」 a thing this harness is known to be able to say.
+/// per obligation is what makes "failed" a thing this harness is known to be able to say.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Flaw {
     /// Nothing can be read, so every obligation fails at its first step.
@@ -472,7 +491,7 @@ pub enum Flaw {
     Deaf,
     /// Two plans of one `(intent, snapshot)` differ (contract 2, L1).
     PlansDifferentlyEachTime,
-    /// `plan` writes to the substrate (contract 2's 「副作用なし」, E-M4-29).
+    /// `plan` writes to the substrate (contract 2's "no side effects", E-M4-29).
     WritesWhilePlanning,
     /// An inverse is produced for the delta the fixture calls uninvertible (contract 5).
     InventsAnInverse,
@@ -488,7 +507,7 @@ pub enum Flaw {
     BreaksThePromise,
     /// Two fingerprints of one object are not comparable (**E-M4-15** / **E-M4-27**'s `Err`).
     ScopeDrifts,
-    /// The adapter says 「not yet」, which is 「無い」 and not 「落ちた」 (§31 M4H3-4 (b)).
+    /// The adapter says "not yet", which is "NOT_SUPPLIED" and not "failed" (§31 M4H3-4 (b)).
     NotImplemented,
     /// The fixture cannot put its substrate back before a check.
     ResetFails,
@@ -603,7 +622,7 @@ impl SubstrateAdapter for BrokenAdapter {
     fn precondition(&self, snap: &ObjectSnapshot) -> Result<Fingerprint> {
         match self.flaw {
             // A scope that changes between two reads of one object: 42 §3.5's third answer, which
-            // `cas_eq` reports as `Err` rather than as 「動いた」 (E-M4-15).
+            // `cas_eq` reports as `Err` rather than as "moved" (E-M4-15).
             Flaw::ScopeDrifts => Ok(Fingerprint::new(
                 self.kind(),
                 format!("{}#{}", snap.locator(), self.tick()),
@@ -659,21 +678,23 @@ impl SubstrateAdapter for BrokenAdapter {
         }
     }
 
-    fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<Option<PlannedDelta>> {
+    fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcome> {
         match self.flaw {
             // An inverse for the delta the fixture itself calls uninvertible: one of the two is
             // wrong and contract 5 is what says the harness cannot tell which.
             Flaw::InventsAnInverse => {
                 let ops = self.inner.ours(delta)?;
                 let (locator, _) = ops.first().cloned().unwrap_or_default();
-                self.inner.write_delta(&locator, b"invented").map(Some)
+                self.inner
+                    .write_delta(&locator, b"invented")
+                    .map(|d| InvertOutcome::inverted(d, Vec::new()))
             }
             Flaw::UndoesNothing => {
                 let ops = self.inner.ours(delta)?;
                 let (locator, _) = ops.first().cloned().unwrap_or_default();
                 self.inner
                     .write_delta(&locator, b"not what was there before")
-                    .map(Some)
+                    .map(|d| InvertOutcome::inverted(d, Vec::new()))
             }
             _ => self.inner.invert(delta, pre),
         }
@@ -700,8 +721,9 @@ impl SubstrateAdapter for BrokenAdapter {
 /// 🔴 It deliberately does **not** override [`Fixture::normalise`] or
 /// [`Fixture::equivalent_spellings`] except for the two flaws that are about them. That is **K-10**
 /// (`req/38` §35): 7 of the 15 conformance survivors are the `Fixture` trait's own default bodies,
-/// unobserved because `FsFixture` overrides every one of them, and 「M7 で git/mcp が部分実装で立ち
-/// 上がる時に**初めて既定が使われる**」. Running the harness over a fixture that takes the defaults is
+/// unobserved because `FsFixture` overrides every one of them, and "**the default is only ever used
+/// the day M7's git/mcp stand up partially implemented**". Running the harness over a fixture that
+/// takes the defaults is
 /// what puts a subject under them a milestone before M7 does.
 pub struct BrokenFixture {
     adapter: BrokenAdapter,
@@ -819,7 +841,8 @@ impl Fixture for BrokenFixture {
 
 /// The same adapter behind a fixture that supplies none of the optional subjects.
 ///
-/// This is what 「対応の無い契約は「無い」と印字」 is measured with: an adapter can be perfectly correct
+/// This is what "an unmatched contract is printed as NOT_SUPPLIED" is measured with: an adapter can
+/// be perfectly correct
 /// and still leave three obligations unmeasured, and the report has to say so rather than counting
 /// them as passes. Without this second fixture the rule would be a sentence in a doc comment.
 #[derive(Default)]

@@ -1,0 +1,13 @@
+v0.4-h corpus (req/38 S107 residual 6 / S113 residual): three further issuer-documented shapes, one line each.
+Every value below is constructed to the issuer's documented FORMAT with EXAMPLE markers in the
+material; no real credential was generated, copied, or ever existed for any of them.
+Formats collected from primary documentation (recorded in Desktop/GitRepo/REFERENCES.md 2026-08-15):
+microsoft/security-utilities HighConfidenceSecurityModels.json, MIT (AAD client-app secret:
+three alphabet characters, a 7Q~ or 8Q~ signature, then 31-34 more over A-Za-z0-9 ~ . _ -);
+docs.cloud.google.com docs/authentication/api-keys (the documented example key string is
+AIza plus 35 characters over A-Za-z0-9 _ -);
+github.blog announcing-npms-new-access-token-format (npm prefix, underscore delimiter, Base62
+alphabet, last six characters a CRC32 checksum, 178 bits of entropy = 36 characters after the prefix).
+AZURE_AD_CLIENT_SECRET_EXAMPLE="Fak8Q~EXAMPLEfakeEXAMPLEfakeEXAMPLEfk"
+GCP_API_KEY_EXAMPLE="AIzaEXAMPLEfakeEXAMPLEfakeEXAMPLEfake01"
+NPM_AUTOMATION_TOKEN_EXAMPLE="npm_EXAMPLEfakeEXAMPLEfakeEXAMPLEfake012"

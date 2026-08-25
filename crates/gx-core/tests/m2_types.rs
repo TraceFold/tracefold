@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The M2 types that the rulings of `req/38_ERRATA_2026-08-07.md` §8 place in gx-core.
 //!
 //! No acceptance criterion is claimed here. AC-015..AC-024, AC-069 and AC-070 are M2's set and
@@ -9,7 +11,8 @@
 //! * **E-M2-1** — 42 §3.10 asks `ReceiptPayload` (gx-witness) to carry an `InclusionProof`
 //!   (gx-log), and 42 §3.11 asks `Checkpoint` (gx-log) to carry a `DsseSignature` (gx-witness).
 //!   Written that way the two crates name each other and cargo refuses the workspace. The ruling
-//!   applies A-1's shape -- 「型は下層・計算は上層」 -- so the *data* moves down here and the
+//!   applies A-1's shape -- "types down, computation up" (sem: SEM-gx-core-162) -- so the *data*
+//!   moves down here and the
 //!   merkle arithmetic (gx-log) and the signing (gx-witness) stay up there. The cycle is then not
 //!   forbidden by a rule anybody has to remember; it is absent from the graph.
 //! * **E-M2-2** — `ReceiptPayload.precondition_fingerprint` is typed `Fingerprint`, which 42 §0
@@ -25,7 +28,7 @@
 
 use gx_core::{
     Checkpoint, Cid, DsseSignature, FingerprintBytes, InclusionProof, Proof, ProofRef, TheoremId,
-    Timestamp,
+    Timestamp, VerdictCheckpoint, VerdictTally,
 };
 
 /// A digest that is easy to tell apart from another one by eye in a failure message.
@@ -50,7 +53,8 @@ where
 // 42 §3.11 -- the two ledger types the receipt refers to
 // ---------------------------------------------------------------------------
 
-/// 42 §3.11 逐語: `InclusionProof` は `leaf_index: u64`・`tree_size: u64`・`audit_path: Vec<Cid>`。
+/// 42 §3.11, verbatim: `InclusionProof` is `leaf_index: u64`, `tree_size: u64`, `audit_path:
+/// Vec<Cid>` (sem: SEM-gx-core-163).
 #[test]
 fn inclusion_proof_carries_the_three_fields_42_3_11_names() {
     let p = InclusionProof {
@@ -78,8 +82,8 @@ fn inclusion_proof_admits_the_single_leaf_tree() {
     assert_eq!(round_trip(&p), p);
 }
 
-/// 42 §3.11 逐語: `Checkpoint`(signed tree head) は `origin: String`・`tree_size: u64`・
-/// `root_hash: Cid`・`timestamp: Timestamp`・`signature: DsseSignature`。
+/// 42 §3.11, verbatim: `Checkpoint` (signed tree head) is `origin: String`, `tree_size: u64`,
+/// `root_hash: Cid`, `timestamp: Timestamp`, `signature: DsseSignature` (sem: SEM-gx-core-164).
 ///
 /// `timestamp` is kept as 42 writes it. E-M2-6 took `issued_at` out of the *receipt's* signed
 /// core (CM-5, clock-free signed payload), and 43 T-11 is the list that ruling read; neither says
@@ -144,6 +148,196 @@ fn dsse_signature_round_trips_raw_bytes_of_any_length() {
     }
 }
 
+/// 🔴 **NFR-011 close, C2 (JSON face)** — `DsseSignature` serialises to **exactly two fields**,
+/// `keyid` and `sig`, and neither of them is an `alg`.
+///
+/// `req/38` §109 (DR-46-5, option (b); sem: SEM-gx-core-165) rules that the signing algorithm is a
+/// property of the *verifier's pinned key* — the key material's own type,
+/// `ed25519_dalek::VerifyingKey` — and never a wire field: DSSE's maintainers refused an in-band
+/// `alg` as a feature with "a history of security vulnerabilities" and answered "the recommended
+/// solution is to make this a property of the public key" (secure-systems-lab/dsse issue #35), and
+/// RFC 8725 §3.1 gives the JWT lesson as a norm — "each key MUST be used with exactly one
+/// algorithm" (sem: SEM-gx-core-166). So the wire form `{keyid, sig}` is permanent, and using any
+/// wire-carried algorithm name for crypto dispatch is permanently forbidden (33 NFR-011 closing
+/// note; sem: SEM-gx-core-167).
+///
+/// What this test is **not**: a check on readers. DSSE's own parsing rule is "Consumers MUST
+/// ignore unrecognized fields" (envelope.md; sem: SEM-gx-core-168), so a reader's tolerance of
+/// unknown fields is
+/// required by the standard and deliberately out of scope here. This test is a gate on **our own
+/// writer**: gx must never begin emitting a third field — an `alg` least of all — without a
+/// ruling that turns this line RED first. The DAG-CBOR face of the same claim is
+/// `gx-canon/tests/golden_vectors.rs` (gx-core may not name that encoder — A-1).
+#[test]
+fn dsse_signature_serialises_exactly_two_fields_and_neither_is_alg() {
+    let signature = DsseSignature {
+        keyid: "key-1".to_string(),
+        sig: vec![0xde, 0xad, 0xbe, 0xef],
+    };
+    let value = serde_json::to_value(&signature).expect("a signature serialises");
+    let object = value.as_object().expect("a signature is a JSON object");
+    let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    println!("DSSE_SIGNATURE_JSON_KEYS={keys:?}");
+    assert_eq!(
+        keys,
+        ["keyid", "sig"],
+        "42 §3.10 / req/38 §109: the wire form is {{keyid, sig}} and nothing else"
+    );
+}
+
+/// 🔴 **Field census, `Checkpoint`** (v0.4-e; the residue row carried over from `req/38` §110:
+/// "the field census of `DsseEnvelope`/`Checkpoint` as a whole is not pinned (the denominator of
+/// self-adversarial item 1)"; quoted in SEM-gx-core-169) — a signed tree head serialises to
+/// **exactly the five keys** 42 §3.11 names, and the signature riding inside it stays
+/// `{keyid, sig}`.
+///
+/// # Why the census exists at the *carrier*, not only at the signature
+///
+/// 33 NFR-011's note 5 (the revising note plus close, `req/38` §109/§110) permanently forbids a
+/// wire-side alg-like field used for crypto dispatch — "using an alg-like field on the wire for
+/// crypto dispatch is permanently forbidden" (quoted in SEM-gx-core-170). The C2 gates fixed
+/// `DsseSignature` alone; but an `alg` smuggled in *beside*
+/// the signature — on the structure that carries it — would slip past those gates while doing
+/// the exact thing the prohibition is about. Fixing the carrier's whole key set is the
+/// constructive form of the prohibition at this face: any silent addition, alg-like least of
+/// all, turns the key set and goes RED in **our own writer** before a reader ever sees it.
+///
+/// # The declared limit (same as C2's, and it is DSSE's own rule)
+///
+/// Readers are not policed and cannot be: serde's derive ignores unknown fields on decode, and
+/// DSSE's norm says so too (envelope.md "Consumers MUST ignore unrecognized fields"; sem:
+/// SEM-gx-core-171). A census
+/// on the serialize face therefore protects only what gx **emits** — a peer that mails us extra
+/// fields is out of this test's reach, and out of its scope. The DAG-CBOR face has no golden
+/// vector for this struct (gx-canon's suite covers Cid/ObjectSnapshot/Transformation/DeltaRef
+/// plus the `DsseSignature` entry-count pin), so the JSON face is what is pinned here; the two
+/// faces share one derive, so a field added to the struct moves both.
+#[test]
+fn checkpoint_serialises_exactly_the_five_keys_and_carries_no_alg_beside_its_signature() {
+    let c = Checkpoint {
+        origin: "glovrex-ledger/v1".to_string(),
+        tree_size: 100,
+        root_hash: cid(7),
+        timestamp: Timestamp(1_754_000_000_000_000_000),
+        signature: DsseSignature {
+            keyid: "key-1".to_string(),
+            sig: vec![0xab; 64],
+        },
+    };
+    let value = serde_json::to_value(&c).expect("a checkpoint serialises");
+    let object = value.as_object().expect("a checkpoint is a JSON object");
+    let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    println!("CHECKPOINT_JSON_KEYS={keys:?}");
+    assert_eq!(
+        keys,
+        ["origin", "root_hash", "signature", "timestamp", "tree_size"],
+        "42 §3.11: a signed tree head is these five fields and nothing else"
+    );
+    let signature = object["signature"]
+        .as_object()
+        .expect("the signature is an object");
+    let mut signature_keys: Vec<&str> = signature.keys().map(String::as_str).collect();
+    signature_keys.sort_unstable();
+    assert_eq!(
+        signature_keys,
+        ["keyid", "sig"],
+        "33 NFR-011 note 5 (sem: SEM-gx-core-172): the signature stays {{keyid, sig}} where it \
+         travels, not only in isolation"
+    );
+}
+
+/// 🔴 **Field census, `VerdictCheckpoint`** (v0.4-e; the same residue row (sem: SEM-gx-core-173)
+/// as `Checkpoint`'s census
+/// above) — a signed verdict count serialises to **exactly the eight keys** FR-M04 gave it, its
+/// tally to exactly the four buckets, and its signature to `{keyid, sig}`.
+///
+/// This is the structure where the census earns its keep most directly: the signer is the party
+/// the count is evidence *against* (this type's own doc), so its wire face is the one a
+/// deployment has the most interest in quietly growing. The prohibition being supported and the
+/// declared reader-side limit are the `Checkpoint` census's, one test up.
+///
+/// The second serialisation pins a JSON-face fact worth a line of its own: an **absent value is
+/// not an absent key**. `ledger_root_hash: None` — the all-refusals window FR-M04 exists for —
+/// writes `null` under its own name, so the key set is stable across the interesting case and a
+/// consumer keying on shape cannot tell the two windows apart by key census alone.
+#[test]
+fn verdict_checkpoint_serialises_exactly_the_eight_keys_fr_m04_names() {
+    let vc = VerdictCheckpoint {
+        origin: "glovrex-ledger/v1".to_string(),
+        tally: VerdictTally {
+            deny: 3,
+            admit: 5,
+            escalate: 1,
+            unverdicted: 1,
+        },
+        window_start: 0,
+        window_end: 10,
+        ledger_root_hash: Some(cid(9)),
+        ledger_tree_size: 5,
+        timestamp: Timestamp(1_754_000_000_000_000_000),
+        signature: DsseSignature {
+            keyid: "key-1".to_string(),
+            sig: vec![0xab; 64],
+        },
+    };
+    let value = serde_json::to_value(&vc).expect("a verdict checkpoint serialises");
+    let object = value
+        .as_object()
+        .expect("a verdict checkpoint is a JSON object");
+    let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    println!("VERDICT_CHECKPOINT_JSON_KEYS={keys:?}");
+    assert_eq!(
+        keys,
+        [
+            "ledger_root_hash",
+            "ledger_tree_size",
+            "origin",
+            "signature",
+            "tally",
+            "timestamp",
+            "window_end",
+            "window_start"
+        ],
+        "FR-M04: the signed count is these eight fields and nothing else"
+    );
+    let mut tally_keys: Vec<&str> = object["tally"]
+        .as_object()
+        .expect("the tally is an object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    tally_keys.sort_unstable();
+    assert_eq!(
+        tally_keys,
+        ["admit", "deny", "escalate", "unverdicted"],
+        "the four buckets, 43 T-4e's included — a fifth would be a count nobody ruled"
+    );
+    let mut signature_keys: Vec<&str> = object["signature"]
+        .as_object()
+        .expect("the signature is an object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    signature_keys.sort_unstable();
+    assert_eq!(signature_keys, ["keyid", "sig"]);
+
+    // The empty-ledger window: `None` keeps its key and writes `null`.
+    let empty_window = VerdictCheckpoint {
+        ledger_root_hash: None,
+        ledger_tree_size: 0,
+        ..vc
+    };
+    let value = serde_json::to_value(&empty_window).expect("serialises");
+    let object = value.as_object().expect("an object");
+    assert!(
+        object.contains_key("ledger_root_hash") && object["ledger_root_hash"].is_null(),
+        "an all-refusals window keeps the key and writes null — the key set does not move"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // E-M2-2 -- the fingerprint carrier
 // ---------------------------------------------------------------------------
@@ -187,8 +381,10 @@ fn fingerprint_bytes_does_not_print_its_bytes() {
 // E-M2-12 / FR-017 -- the proof family
 // ---------------------------------------------------------------------------
 
-/// 46 §2.5 fixes the count: 「5本固定（T1 合成保存, T2 不変条件合成, T3 正準化冪等+表現非依存,
-/// T4 receipt健全性, T5 witness lax合成）」. FR-017 asks for a type that can hold any one of them.
+/// 46 §2.5 fixes the count: "fixed at five (T1 composition preservation, T2 invariant composition,
+/// T3 canonicalisation idempotence + representation independence, T4 receipt soundness, T5 witness
+/// lax composition)" (quoted in SEM-gx-core-174). FR-017 asks for a type that can hold any one of
+/// them.
 #[test]
 fn f0_has_exactly_five_theorems_and_each_survives_a_round_trip() {
     assert_eq!(TheoremId::ALL.len(), 5);
@@ -207,8 +403,9 @@ fn f0_has_exactly_five_theorems_and_each_survives_a_round_trip() {
 }
 
 /// F0 has five theorems, so `"T6"` names nothing. 42 §3.8 types `theorem_ids` as `Vec<String>`,
-/// where it would have been accepted; the typed enum is the E-FR055-1 move -- 「flag が実装と
-/// 乖離できる」 -- applied to an identifier. The wire form is unchanged for every valid value.
+/// where it would have been accepted; the typed enum is the E-FR055-1 move -- "a flag can diverge
+/// from the implementation" (sem: SEM-gx-core-175) -- applied to an identifier. The wire form is
+/// unchanged for every valid value.
 #[test]
 fn a_theorem_f0_does_not_have_is_refused() {
     assert!(serde_json::from_str::<TheoremId>("\"T6\"").is_err());
@@ -217,7 +414,8 @@ fn a_theorem_f0_does_not_have_is_refused() {
     assert!(serde_json::from_str::<TheoremId>("\"T1\"").is_ok());
 }
 
-/// 42 §3.8 逐語: `ProofRef { lean_spec_version: String, theorem_ids: Vec<String> }`.
+/// 42 §3.8, verbatim: `ProofRef { lean_spec_version: String, theorem_ids: Vec<String> }` (sem:
+/// SEM-gx-core-176).
 #[test]
 fn proof_ref_is_42_3_8_with_its_theorem_ids_typed() {
     let r = ProofRef {
@@ -230,7 +428,8 @@ fn proof_ref_is_42_3_8_with_its_theorem_ids_typed() {
     assert_eq!(back, r);
 }
 
-/// FR-017 逐語: 「`Proof`（Lean定理参照または検証器の検証結果への参照構造）」 -- two forms, so an
+/// FR-017, verbatim: "`Proof` (a reference structure to a Lean theorem or to a checker's
+/// verification result)" (quoted in SEM-gx-core-177) -- two forms, so an
 /// enum of two variants. A proof that cites no theorem is admitted by the type: 46 §2.5 records
 /// T2/T4/T5 as unproven (`Invariant.lean` and `Receipt.lean` do not exist -- req/38 §7's red flag),
 /// so a receipt issued today cites an empty list, and a type that refused one would force the

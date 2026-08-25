@@ -1,7 +1,10 @@
-//! 🔴 則 2 (req/88 §3.1) — the one place this binary draws entropy.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 Rule 2 (req/88 §3.1) — the one place this binary draws entropy (sem: SEM-gx-cli-057).
 //!
-//! > 41 §6「乱数・時刻はengine境界で注入」…∴ **実 clock と実 rng を呼ぶ箇所が CLI 全体で各 1 箇所**
-//! > である事を機械検査する
+//! > 41 §6 "randomness and time are injected at the engine boundary" … therefore it is
+//! > machine-checked that the real clock and the real rng are each called from exactly one place
+//! > across the whole CLI (sem: SEM-gx-cli-058)
 //!
 //! [`crate::clock`] is the other half. `Engine::submit(intent, rng_seed, at)` is the only entry
 //! point of the eight that takes a seed, and 42 §3.13's `DraftCreated{intent_id, rng_seed, at}` is
@@ -15,7 +18,7 @@
 //!
 //! # Why `RandomState` and not a crate
 //!
-//! 則 2 is a claim about *how many* places read the outside world, not about the quality of the
+//! Rule 2 is a claim about *how many* places read the outside world, not about the quality of the (sem: SEM-gx-cli-059)
 //! bits, and this is the only source in the standard library that is seeded by the operating
 //! system. `rand` would be an external package added for one `u64` — req/89 §2's whole section is a
 //! count of what the two new crates cost, and this hand keeps that number where hand 2 left it

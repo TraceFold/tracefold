@@ -1,11 +1,13 @@
-// what : 🔴 **則 1 (M6)** — the two secondary surfaces hold no semantic authority. Three counters
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+// what : 🔴 **Rule 1 (M6)** (sem: SEM-gx-canon-042) — the two secondary surfaces hold no semantic authority. Three counters
 //         over `crates/gx-cli/src` and `crates/gx-api/src`:
-//           (i)   calls into gx-canon        = 0   (41 §6「全canonical encodeはgx-canon経由のみ」)
+//           (i)   calls into gx-canon        = 0   (41 §6 "every canonical encode goes through gx-canon only")
 //           (ii)  constructions of `Verdict` = 0   (41 §4: judging is the gate's)
-//           (iii) writes of a `Lifecycle`    = 0   (42 §1.3-3: 状態は engine 側の外部テーブル)
-// why  : req/88 §3 Λ1 makes this M6's central claim rather than a hygiene rule — 「M6 が意味論を
-//         足したらそれは実装欠陥であって設計選択ではない」 — and req/88 §6.0-11 says an absence check
-//         is empty without a mutation: 「不在の検査は変異なしでは空虚」. `tools/verify_m6h1.sh` §4
+//           (iii) writes of a `Lifecycle`    = 0   (42 §1.3-3: state is an external table on the engine side)
+// why  : req/88 §3 Λ1 makes this M6's central claim rather than a hygiene rule — "if M6 adds
+//         semantics, that is an implementation defect, not a design choice" — and req/88 §6.0-11 says an absence check
+//         is empty without a mutation: "a check for absence is empty without a mutation". `tools/verify_m6h1.sh` §4
 //         fires all three and prints which probes fall.
 // where: **gx-canon's `tests/`, and neither of the crates it is about.** Two reasons, and the second
 //         is the one that chose the file. `unsafe_forbidden.rs` (this same directory) already set the
@@ -13,21 +15,21 @@
 //         crate asserting its own source is a crate reading the file it wrote. And `probes/doubt`,
 //         where the other membership gates live, is **dropped from `GLOVREX_CI_SCOPE`** on a runner
 //         that does not hold the Glovrex_Alpha tree (tools/ci.sh, `fmt_scope`'s narrowed spelling);
-//         a gate that vanishes on some machines is 「時々在る gate」, and this is the claim M6 is
+//         a gate that vanishes on some machines is a "sometimes-present gate" (sem: SEM-gx-canon-043), and this is the claim M6 is
 //         about. gx-canon is in scope everywhere, and (i) is a claim about gx-canon's monopoly.
 // deps : std only. Nothing here compiles the crates it reads — the guard has to fire on a tree that
-//         does **not** build too, because 「somebody added a canonical encode to the CLI」 is caught
+//         does **not** build too, because "somebody added a canonical encode to the CLI" is caught
 //         by the text before it is caught by the linker.
-// note : M6 hand 1 (req/88 §6.2 手 1 ③). The three names are the ones req/88 §3 Λ1 writes:
-//         「`gx-cli`/`gx-api` の `src/` で **(i) `gx_canon::` の呼び出し 0 (ii) `Verdict` を構成する
-//         行 0 (iii) `Lifecycle` を書く行 0**」.
+// note : M6 hand 1 (req/88 §6.2 hand 1 ③). The three names are the ones req/88 §3 Λ1 writes:
+//         "in `gx-cli`/`gx-api`'s `src/`: **(i) 0 calls to `gx_canon::` (ii) 0 lines
+//         constructing `Verdict` (iii) 0 lines writing `Lifecycle`**".
 
 use std::path::{Path, PathBuf};
 
 /// The two surfaces this file is about, named rather than globbed, for `SHIPPED_CRATE_ROOTS`'s
 /// reason: a third secondary surface added tomorrow should be a decision somebody writes down.
 ///
-/// 🔴 **M6H8-1 採(a), attack A6** (req/38 §55). 「書き留められる事に依存している」 was the whole of the
+/// 🔴 **M6H8-1, adopted (a), attack A6** (req/38 §55) (sem: SEM-gx-canon-044). "Depends on it being written down" was the whole of the
 /// guarantee until this hand: hand 8 added `crates/gx-ext/src/lib.rs`, called gx-canon from it, and
 /// all three counters stayed at zero because a third surface is not in a two-name array. The list
 /// stays — a decision somebody writes down is still what it is — and it is now **compared against a
@@ -40,7 +42,7 @@ const SECONDARY_SURFACES: [&str; 2] = ["crates/gx-cli", "crates/gx-api"];
 /// **A surface over the engine is a crate that names the engine**: `gx-cli` and `gx-api` are the two
 /// members of this workspace that declare `gx-engine` as a shipping dependency, and every other
 /// member is a layer below it (`gx-engine` itself is not a surface *over* itself). That is the
-/// predicate 則 1 is actually about — a crate holding the eight entrances is a crate that could mint
+/// predicate Rule 1 (sem: SEM-gx-canon-045) is actually about — a crate holding the eight entrances is a crate that could mint
 /// what it should only be reading — and it is one `cargo`-visible fact rather than a memory.
 ///
 /// The manifest is read as text for `sources`'s reason: nothing here compiles anything, because the
@@ -63,7 +65,7 @@ fn derived_secondary_surfaces() -> Vec<String> {
 /// The ledger the derivation walks: every workspace member under `crates/`, as the root manifest
 /// spells it.
 ///
-/// Split out of [`derived_secondary_surfaces`] by **M7 fix批 ③** so that the denominator is a value
+/// Split out of [`derived_secondary_surfaces`] by **M7 fix batch ③** (sem: SEM-gx-canon-046) so that the denominator is a value
 /// something can be compared against, rather than a loop counter nobody can see.
 fn manifest_crate_members() -> Vec<String> {
     let root = repo_root();
@@ -90,15 +92,15 @@ fn manifest_crate_members() -> Vec<String> {
 
 /// The members whose manifest the derivation **actually read**.
 ///
-/// 🔴 **M7 fix批 ③, 起票 A-5** (`req/38` §64, `req/105` §4-2). [`derived_secondary_surfaces`] ends a
+/// 🔴 **M7 fix batch ③, filed A-5** (`req/38` §64, `req/105` §4-2) (sem: SEM-gx-canon-047). [`derived_secondary_surfaces`] ends a
 /// member's turn with `else { continue; }` when its `Cargo.toml` will not open, and that skip left
 /// no trace anywhere: a member the derivation never looked at and a member that declares nothing
-/// produce the identical answer, and the answer is 「not a secondary surface」. §30's disease, inside
+/// produce the identical answer, and the answer is "not a secondary surface". §30's disease, inside
 /// the instrument A6 built to cure a neighbouring case of it.
 ///
 /// This function is the same walk with the outcome kept, so
 /// [`the_declared_surfaces_are_the_surfaces_this_workspace_has`] can require it to equal
-/// [`manifest_crate_members`] — 「歩いた数を印字し、台帳の crates/ member 数と assert する」.
+/// [`manifest_crate_members`] — "print the count walked and assert it against the ledger's crates/ member count".
 fn walked_crate_members() -> Vec<String> {
     let root = repo_root();
     manifest_crate_members()
@@ -143,9 +145,9 @@ fn sources() -> Vec<(String, String)> {
         let dir = root.join(&surface).join("src");
         assert!(
             dir.is_dir(),
-            "{} has no src/ — 則 1's three counters would all be 0 because there is nothing to \
-             count, which is a green gate over an absent subject (req/88 §6.2 手 1 creates both \
-             crates)",
+            "{} has no src/ — Rule 1's three counters would all be 0 because there is nothing to \
+             count, which is a green gate over an absent subject (req/88 §6.2 hand 1 creates both \
+             crates) (sem: SEM-gx-canon-048)",
             dir.display()
         );
         walk(&dir, &root, &mut out);
@@ -178,13 +180,13 @@ fn walk(dir: &Path, root: &Path, out: &mut Vec<(String, String)>) {
 
 /// The source with `//`-comments removed, line by line.
 ///
-/// The M5 lesson §30 recorded twice: 「無い事」の grep は comment を除外し invocation 行のみ. Both
+/// The M5 lesson §30 recorded twice: a grep for "the absence of X" excludes comments and scans only invocation lines (sem: SEM-gx-canon-049). Both
 /// crates discuss `gx_canon` and `Verdict` at length in their documentation — that discussion is
 /// *why* the rule holds — and a scanner that read prose would report the explanation as the
 /// violation. Only `//` is handled: neither crate uses `/* */`, and a stripper that tried to would
 /// have to lex Rust.
 ///
-/// # 🔴 **M6H8-1 採(a), attack A2** — a `//` inside a string is not a comment
+/// # 🔴 **M6H8-1, adopted (a), attack A2** (sem: SEM-gx-canon-050) — a `//` inside a string is not a comment
 ///
 /// The first spelling cut every line at its first `//`, and 44 §2.3 defines `type` as a URI, so
 /// **the specification requires the shipped code to contain `https://`** — two lines of it today
@@ -239,7 +241,7 @@ fn code_of_line(line: &str) -> &str {
 
 /// (i) Lines that reach into gx-canon.
 ///
-/// Both spellings, because either one is the迂回 41 §6 forbids: a `use gx_canon::…` import and a
+/// Both spellings, because either one is the bypass (sem: SEM-gx-canon-051) 41 §6 forbids: a `use gx_canon::…` import and a
 /// `gx_canon::…` path expression.
 fn canon_reaches(code: &str) -> usize {
     code.lines()
@@ -251,7 +253,7 @@ fn canon_reaches(code: &str) -> usize {
 ///
 /// The three variants by name (41 §3: `Admit(AdmitProof) | Deny(Vec<Reason>) | Escalate(Ticket)`).
 /// **Not** every mention of the word: a CLI that prints a verdict the engine handed it is doing
-/// exactly what 則 1 permits, and `VerdictKind` — the display-only discriminant gx-core owns — is a
+/// exactly what Rule 1 (sem: SEM-gx-canon-052) permits, and `VerdictKind` — the display-only discriminant gx-core owns — is a
 /// different type. What is forbidden is *minting* one.
 fn verdict_constructions(code: &str) -> usize {
     code.lines()
@@ -265,8 +267,8 @@ fn verdict_constructions(code: &str) -> usize {
 
 /// (iii) Lines that write a lifecycle.
 ///
-/// Two shapes, because 42 §1.3-3's claim (「状態は`TransformationId`をキーとしたengine側の外部
-/// テーブルで管理される」) is broken in two different ways and only one of them is a constructor:
+/// Two shapes, because 42 §1.3-3's claim ("state is managed in an external table on the engine
+/// side, keyed by `TransformationId`") (sem: SEM-gx-canon-053) is broken in two different ways and only one of them is a constructor:
 ///
 /// * a **field** whose declared type mentions `Lifecycle` — the CLI keeping its own state table;
 /// * a `Lifecycle::<Variant>` on the **right of an `=`** or inside a struct literal — the CLI
@@ -302,7 +304,7 @@ fn lifecycle_writes(code: &str) -> Vec<String> {
 
 /// Whether a `[dependencies]` body declares `crate`, **under any name**.
 ///
-/// # 🔴 **M6H8-1 採(a), attack A1** — `package =` is the quietest door
+/// # 🔴 **M6H8-1, adopted (a), attack A1** (sem: SEM-gx-canon-054) — `package =` is the quietest door
 ///
 /// The first spelling asked whether a dependency line **started with** `gx-canon`, and cargo's
 /// rename form does not:
@@ -311,9 +313,9 @@ fn lifecycle_writes(code: &str) -> Vec<String> {
 /// canon = { package = "gx-canon", path = "../gx-canon", version = "0.1.0" }
 /// ```
 ///
-/// That single line takes out **both halves** of 則 1 (i) at once — the manifest half stops seeing a
+/// That single line takes out **both halves** of Rule 1 (i) at once — the manifest half stops seeing a
 /// declaration, and the source half never saw `canon::cid::compute(t)` because it hunts the literal
-/// `gx_canon::`. req/88 called the manifest half 「the stronger statement」 on the grounds that a
+/// `gx_canon::`. req/88 called the manifest half "the stronger statement" (sem: SEM-gx-canon-055) on the grounds that a
 /// crate which cannot name gx-canon cannot call it; under a rename the crate names it by another
 /// word, and the argument stops holding. So both spellings are read: the key, and `package =`.
 fn declares(deps: &str, crate_name: &str) -> bool {
@@ -330,12 +332,12 @@ fn declares(deps: &str, crate_name: &str) -> bool {
 
 /// The `[dependencies]` body of a manifest, up to the next section header.
 ///
-/// # 🔴 The three spellings this reader does not read (**M7 fix批 ③, 起票 A-5**)
+/// # 🔴 The three spellings this reader does not read (**M7 fix batch ③, filed A-5**) (sem: SEM-gx-canon-056)
 ///
 /// `req/105` §4-2 measured the reader rather than its answer: it finds the **first** `\n[dependencies]`
 /// and stops at the next `[`, so a `gx-engine` dependency written any of these three ways is
 /// **absent** as far as [`derived_secondary_surfaces`] is concerned, and a surface carrying one
-/// would not be walked by 則 1's three counters:
+/// would not be walked by Rule 1's (sem: SEM-gx-canon-057) three counters:
 ///
 /// | spelling | count on this tree (M7) |
 /// |---|---|
@@ -344,7 +346,8 @@ fn declares(deps: &str, crate_name: &str) -> bool {
 /// | a **second** `[dependencies]` section | **0** |
 ///
 /// The counts are today's, and they are why this is a disclosure rather than a defect: the reader is
-/// correct about every manifest in this workspace. It is written down because 「A6 が塞いだ穴の再来」
+/// correct about every manifest in this workspace. It is written down because "a recurrence of
+/// the hole A6 plugged" (sem: SEM-gx-canon-058)
 /// is what a fourth spelling would be — a secondary surface gaining the engine without the counters
 /// noticing — and because the alternative (a full TOML parse in a suite whose whole premise is that
 /// it runs on a tree that does **not** build) buys the coverage at the cost of the property that
@@ -366,11 +369,11 @@ fn shipping_deps(manifest: &str) -> String {
 // The three counters
 // ---------------------------------------------------------------------------
 
-/// 🔴 **則 1 (i)** — neither secondary surface reaches into gx-canon, in source or in manifest.
+/// 🔴 **Rule 1 (i)** (sem: SEM-gx-canon-059) — neither secondary surface reaches into gx-canon, in source or in manifest.
 ///
 /// Two halves and both are needed. The manifest half is the stronger statement (a crate that cannot
 /// name gx-canon cannot call it) and the source half is the one that catches the intermediate state
-/// where the dependency is declared 「for later」 — 41 §6's monopoly is about calls, and a call is
+/// where the dependency is declared "for later" — 41 §6's monopoly is about calls, and a call is
 /// written before it is reviewed.
 #[test]
 fn no_secondary_surface_encodes_canonically() {
@@ -404,17 +407,17 @@ fn no_secondary_surface_encodes_canonically() {
     );
     assert!(
         offences.is_empty(),
-        "則 1 (i): a secondary surface reaches into gx-canon ({offences:?}). 41 §6 gives the \
+        "Rule 1 (i): a secondary surface reaches into gx-canon ({offences:?}). 41 §6 gives the \
          canonical encode one door; a CLI that mints a `Cid` is a CLI that can name a \
-         transformation the engine never saw"
+         transformation the engine never saw (sem: SEM-gx-canon-060)"
     );
     assert!(
         declaring.is_empty(),
-        "則 1 (i): {declaring:?} declare gx-canon as a shipping dependency"
+        "Rule 1 (i): {declaring:?} declare gx-canon as a shipping dependency"
     );
 }
 
-/// 🔴 **則 1 (ii)** — neither secondary surface constructs a `Verdict`.
+/// 🔴 **Rule 1 (ii)** (sem: SEM-gx-canon-061) — neither secondary surface constructs a `Verdict`.
 #[test]
 fn no_secondary_surface_constructs_a_verdict() {
     let files = sources();
@@ -428,13 +431,13 @@ fn no_secondary_surface_constructs_a_verdict() {
     println!("VERDICT_CONSTRUCTIONS={}", offences.len());
     assert!(
         offences.is_empty(),
-        "則 1 (ii): a secondary surface builds a `Verdict` ({offences:?}). 41 §4 puts the one \
+        "Rule 1 (ii): a secondary surface builds a `Verdict` ({offences:?}). 41 §4 puts the one \
          judgement in `Gate::verify`; an API handler that answers `Admit` is a second gate with no \
-         policy behind it"
+         policy behind it (sem: SEM-gx-canon-062)"
     );
 }
 
-/// 🔴 **則 1 (iii)** — neither secondary surface writes a `Lifecycle`.
+/// 🔴 **Rule 1 (iii)** (sem: SEM-gx-canon-063) — neither secondary surface writes a `Lifecycle`.
 #[test]
 fn no_secondary_surface_writes_a_lifecycle() {
     let files = sources();
@@ -447,9 +450,9 @@ fn no_secondary_surface_writes_a_lifecycle() {
     println!("LIFECYCLE_WRITES={}", offences.len());
     assert!(
         offences.is_empty(),
-        "則 1 (iii): a secondary surface holds or mints a lifecycle ({offences:?}). 42 §1.3-3 puts \
-         the state table on the engine side; a CLI that keeps one has a second answer to 「what \
-         state is this in」 and req/88 Λ2's observational equivalence stops holding"
+        "Rule 1 (iii): a secondary surface holds or mints a lifecycle ({offences:?}). 42 §1.3-3 puts \
+         the state table on the engine side; a CLI that keeps one has a second answer to \"what \
+         state is this in\" and req/88 Λ2's observational equivalence stops holding (sem: SEM-gx-canon-064)"
     );
 }
 
@@ -546,7 +549,7 @@ fn a_comment_marker_inside_a_string_is_not_a_comment() {
     );
 
     // The lines 44's own error-type URIs put in the shipped surfaces. Their content has nothing to
-    // do with 則 1 — what matters is that they exist (so this probe has a subject) and that the
+    // do with Rule 1 (sem: SEM-gx-canon-065) — what matters is that they exist (so this probe has a subject) and that the
     // scanner now reads past them. Comment lines are excluded because a comment *should* be cut at
     // its first `//`, which is the whole of §30's rule.
     let root = repo_root();
@@ -584,7 +587,7 @@ fn a_renamed_dependency_is_seen() {
             "canon = { package = \"gx-canon\", path = \"../gx-canon\", version = \"0.1.0\" }",
             "gx-canon"
         ),
-        "M6H8-1 A1: cargo's rename form took out both halves of 則 1 (i) at once"
+        "M6H8-1 A1: cargo's rename form took out both halves of Rule 1 (i) at once (sem: SEM-gx-canon-066)"
     );
     assert!(declares(
         "gx-canon = { path = \"../gx-canon\" }",
@@ -606,19 +609,20 @@ fn a_renamed_dependency_is_seen() {
 /// 🔴 **A6 closed**: the set of secondary surfaces is measured, and the written list has to agree.
 ///
 /// Hand 8 added a third surface and the instrument did not exist as far as it was concerned. The
-/// derivation is 「a workspace member under `crates/` that declares `gx-engine`」, which is what a
-/// surface over the engine is; the literal list stays because 「a third secondary surface should be a
-/// decision somebody writes down」 stays true. What changed is that failing to write it down is now
+/// derivation is "a workspace member under `crates/` that declares `gx-engine`", which is what a
+/// surface over the engine is; the literal list stays because "a third secondary surface should be a
+/// decision somebody writes down" (sem: SEM-gx-canon-067) stays true. What changed is that failing to write it down is now
 /// **red** rather than silent, and the counters walk the union either way.
 ///
-/// # 🔴 And the denominator, which A6 did not have (**M7 fix批 ③, 起票 A-5**)
+/// # 🔴 And the denominator, which A6 did not have (**M7 fix batch ③, filed A-5**)
 ///
-/// `req/105` §4-2: 「歩いた数を印字する行が導出の側に無いので、飛ばされた事は log に残らない」. A6 made
+/// `req/105` §4-2: "there is no line on the derivation side that prints the count walked, so
+/// being skipped leaves no trace in the log" (sem: SEM-gx-canon-068). A6 made
 /// the *set* derived and left the *walk* unmeasured, so a member whose `Cargo.toml` cannot be opened
 /// was skipped by `else { continue; }` and arrived at this assertion looking exactly like a member
 /// that declares nothing. The audit hand measured the walk from outside, in
-/// `tools/verify_m7audit.sh`, and then refused to leave it there — 「それは監査手の計器であって repo の
-/// gate ではない」 — because an instrument that lives in a lane's script stops running when the lane
+/// `tools/verify_m7audit.sh`, and then refused to leave it there — "that is the audit hand's
+/// instrument, not the repo's gate" (sem: SEM-gx-canon-069) — because an instrument that lives in a lane's script stops running when the lane
 /// ends. So the count is asserted here, where `cargo test` reaches it: the members the derivation
 /// read have to be **every** member the ledger declares under `crates/`.
 #[test]
@@ -636,7 +640,7 @@ fn the_declared_surfaces_are_the_surfaces_this_workspace_has() {
         "the derivation walked {} of the {} members `Cargo.toml` declares under `crates/`. The \
          missing ones were skipped because their manifest would not open, and a skipped member is \
          indistinguishable from a member that declares no engine — which is the shape that let a \
-         third secondary surface exist unseen in the first place (M6H8-1 攻撃 A6)",
+         third secondary surface exist unseen in the first place (M6H8-1 attack A6) (sem: SEM-gx-canon-070)",
         walked.len(),
         ledger.len()
     );
@@ -664,13 +668,13 @@ fn the_declared_surfaces_are_the_surfaces_this_workspace_has() {
 
 /// 🔴 **A3 / A4 are not closed, and this is where that is written down.**
 ///
-/// req/38 §55 (M6H8-1 採(a)) rules the alias attacks **out of scope on purpose**: `use gx_core::
+/// req/38 §55 (M6H8-1, adopted (a)) (sem: SEM-gx-canon-071) rules the alias attacks **out of scope on purpose**: `use gx_core::
 /// Verdict as V; let _v = V::Deny(vec![]);` and `type H8St = gx_core::Lifecycle; state: H8St,` are
 /// invisible to any counter that reads text, because resolving an alias needs the type information
-/// a compiler has and a scanner does not. 「閉じたふりをする lexer より安全」 — a scanner that appeared
+/// a compiler has and a scanner does not. "Safer than a lexer that pretends to be closed" (sem: SEM-gx-canon-072) — a scanner that appeared
 /// to handle aliases would be the more dangerous instrument, since a reader would stop looking.
 ///
-/// What holds the line instead is review and the compiler-side facts 則 1 rests on: gx-canon is not
+/// What holds the line instead is review and the compiler-side facts Rule 1 (sem: SEM-gx-canon-073) rests on: gx-canon is not
 /// a dependency of either surface at all (so no alias can reach it), and `Verdict`/`Lifecycle`
 /// aliases are visible in a diff as new `type` items. This probe asserts the **first** of those,
 /// which is mechanical, and states the second as the limit it is.
@@ -682,7 +686,7 @@ fn the_text_gate_declares_its_own_limits() {
     ];
     println!("TEXT_GATE_UNCLOSED_ATTACKS={LIMITS:?}");
 
-    // The compiler-side half of 則 1 (i): no alias can call a crate the manifest does not name.
+    // The compiler-side half of Rule 1 (i) (sem: SEM-gx-canon-073): no alias can call a crate the manifest does not name.
     let root = repo_root();
     for surface in scanned_surfaces() {
         let manifest = std::fs::read_to_string(root.join(&surface).join("Cargo.toml"))

@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The wire form of a `Tile`, pinned to bytes — the mechanical half of **E-M2-27(b)**.
 //!
-//! `req/38_ERRATA_2026-08-07.md` §15 逐語: 「(b)gx の `subtree_span(level)=2^level` の「level」は
-//! **木の高さ**であり、一次の tile level（1 level=高さ 8 段=256 倍）と 8 倍 scale で別物——
-//! **doc 化+field 名 `height` への rename を検討**（wire 不変なら rename 採用）」.
+//! `req/38_ERRATA_2026-08-07.md` §15 verbatim: "(b) gx's `subtree_span(level)=2^level` 'level' is
+//! **the tree's height**, and it is a different thing at an 8x scale from a primary tile level (1
+//! level = 8 steps of height = 256x) -- **document it, and consider renaming the field to `height`**
+//! (adopt the rename if the wire stays unchanged)" (sem: SEM-gx-log-171).
 //!
 //! # What this file decides
 //!
@@ -17,8 +20,8 @@
 //!
 //! Every expected byte string below was written out from 42 §2.1's rules — canonical DAG-CBOR, map
 //! keys sorted by their **encoded** form (length first, then bytewise: `index`, `level`, `width`,
-//! then `hashes`), integers in shortest form, a `Cid` as a 32-byte byte string (42 §1.1: 「32byte
-//! byte-string（major type 2）として直接格納」, so `0x58 0x20` and the digest). None was produced by
+//! then `hashes`), integers in shortest form, a `Cid` as a 32-byte byte string (42 §1.1: "stored
+//! directly as a 32-byte byte-string (major type 2)" (sem: SEM-gx-log-172), so `0x58 0x20` and the digest). None was produced by
 //! running the encoder. `pae_golden.rs` gives the reason at length: a golden captured from the code
 //! it tests records what the code does, and can never disagree with it.
 //!

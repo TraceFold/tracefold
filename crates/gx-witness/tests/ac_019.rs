@@ -1,12 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-019 (FR-019) — one flipped bit, and the receipt stops verifying. Always.
+//! (sem: SEM-gx-witness-179, SEM-gx-witness-180, SEM-gx-witness-181, SEM-gx-witness-182,
+//! SEM-gx-witness-183, SEM-gx-witness-184, SEM-gx-witness-185, SEM-gx-witness-186)
 //!
-//! AC-019 逐語: 「Given: Ed25519鍵で署名済みReceipt r。When: rのバイト列表現からランダムな1bitを
-//! 反転したr'を検証。Then: `Err(SignatureInvalid)`。未改変rは`Ok`。」判定方法 `property（ランダム
-//! bit位置×複数回）`, M2.
+//! AC-019 verbatim: "Given: a Receipt r signed with an Ed25519 key. When: verify r', with one
+//! random bit flipped in r's byte-string representation. Then: `Err(SignatureInvalid)`. An
+//! unmodified r is `Ok`." Judgement method: `property (random bit position × multiple runs)`, M2.
 //!
 //! # Three faces, and then every bit
 //!
-//! The hand's brief asks the three faces the AC's 「バイト列表現」 decomposes into -- the payload,
+//! The hand's brief asks the three faces the AC's "byte-string representation" decomposes into -- the payload,
 //! the signature, and the `keyid` -- and each has its own test below. They are the faces because
 //! they fail for three different reasons: the first changes the signed message, the second changes
 //! the signature over it, and the third changes *which* signature is asked for. A verifier could
@@ -52,7 +56,7 @@ fn a_receipt() -> (gx_witness::KeyPair, Receipt) {
 }
 
 // ---------------------------------------------------------------------------
-// 「未改変rは`Ok`」
+// "an unmodified r is `Ok`"
 // ---------------------------------------------------------------------------
 
 /// The other half of AC-019, and the half that makes the rest mean anything: an untouched receipt
@@ -180,8 +184,8 @@ fn ac_019_an_envelope_with_no_signature_is_refused() {
 
 /// Every bit of the `keyid`. The failure here has a different mechanism -- the signature under the
 /// caller's key id is no longer present -- and the AC's vocabulary is the same, which is the point:
-/// a verifier that reported 「no such key」 as a distinct outcome would let a forger separate 「wrong
-/// key」 from 「wrong bytes」.
+/// a verifier that reported "no such key" as a distinct outcome would let a forger separate "wrong
+/// key" from "wrong bytes".
 #[test]
 fn ac_019_every_bit_of_the_keyid_is_caught() {
     let (key, receipt) = a_receipt();
@@ -224,12 +228,12 @@ fn ac_019_a_signature_under_another_id_does_not_stand_in() {
 }
 
 // ---------------------------------------------------------------------------
-// 「rのバイト列表現」, exhaustively
+// "r's byte-string representation", exhaustively
 // ---------------------------------------------------------------------------
 
 /// Every bit of the serialised envelope, with the outcomes counted.
 ///
-/// This is the AC's own subject -- 「rのバイト列表現からランダムな1bitを反転」 -- taken totally
+/// This is the AC's own subject -- "flip one random bit in r's byte-string representation" -- taken totally
 /// instead of at random. The envelope is encoded canonically, each bit is flipped, and the bytes are
 /// decoded and verified. Three outcomes are possible and all three are counted:
 ///
@@ -239,7 +243,7 @@ fn ac_019_a_signature_under_another_id_does_not_stand_in() {
 ///   signature;
 /// * `Ok` -- **which must not happen**, and is asserted at zero.
 ///
-/// Reporting the split is the point. A test that only asserted 「not Ok」 would be satisfied by an
+/// Reporting the split is the point. A test that only asserted "not Ok" would be satisfied by an
 /// implementation where every flip broke the decoder and none reached the signature, and the
 /// numbers are what show that both roads are live.
 #[test]
@@ -281,11 +285,11 @@ fn ac_019_every_single_bit_of_the_serialised_receipt_is_caught() {
 }
 
 // ---------------------------------------------------------------------------
-// 「property（ランダムbit位置×複数回）」
+// "property (random bit position × multiple runs)"
 // ---------------------------------------------------------------------------
 
 proptest! {
-    /// AC-019's stated 判定方法, over random positions and random receipts.
+    /// AC-019's stated judgement method, over random positions and random receipts.
     ///
     /// The exhaustive sweep above is stronger for one receipt; this is broader across receipts --
     /// different key seeds, different verdicts, different transformations, so the property is not a

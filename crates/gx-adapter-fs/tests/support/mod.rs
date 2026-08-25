@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! A sandbox on a real tmpfs, the measurement M4-24 fixes, and the [`Fixture`] the 51 §7 harness is
 //! run against.
 //!
@@ -8,17 +10,17 @@
 //! `apply` -- is **not** guaranteed by it. `research_bus/glovrex_m4/SURVIVORS.md` §A-4 raised that as
 //! a design gotcha, and hand 5 fetched the primaries in full (`Desktop/GitRepo/REFERENCES.md`,
 //! 2026-08-09) -- hand 4 had confirmed the same three through search snippets, and its paraphrase of
-//! the Open Group's sentence is corrected here to the words the page actually carries: 「a directory
+//! the Open Group's sentence is corrected here to the words the page actually carries: "a directory
 //! entry named new shall remain visible to other threads throughout the renaming operation and refer
-//! either to the file referred to by new or old before the operation began」, **within one
+//! either to the file referred to by new or old before the operation began", **within one (sem: SEM-gx-adapter-fs-263)
 //! filesystem** (across one, `EXDEV`). Rust's `std::fs::rename` documents replacement without
 //! documenting atomicity at all, because the guarantee is the filesystem's.
 //!
 //! So every byte these tests write goes to a **tmpfs** (`/dev/shm` by default), and
 //! [`filesystem_of`] proves it from `/proc/self/mountinfo` rather than from the path's spelling. A
 //! test that measured atomicity on DrvFs would be measuring the wrong filesystem while printing the
-//! right words. AC-049 (hand 5) asks for tmpfs 逐語; hand 4 puts the requirement in place one hand
-//! early because AC-047's 「substrate 状態が変化しない」 is a claim about a filesystem too.
+//! right words. AC-049 (hand 5) asks for tmpfs verbatim; hand 4 puts the requirement in place one hand
+//! early because AC-047's "the substrate state does not change" is a claim about a filesystem too. (sem: SEM-gx-adapter-fs-264)
 //!
 //! What tmpfs does **not** give is durability: `fsync` there is effectively a no-op, so nothing in
 //! this crate's tests is evidence about crash recovery. That is said here rather than left for a
@@ -192,10 +194,10 @@ impl Drop for Sandbox {
     }
 }
 
-/// What **M4-24** fixes as the measurement of 「substrate 状態が変化しない」.
+/// What **M4-24** fixes as the measurement of "the substrate state does not change".
 ///
-/// req/38 §28 逐語: 「AC-047 の「変化しない」の測定=**内容 digest+mtime+size**・atime は測らない(fs 依存
-/// で不安定=測れない物を測ったふりにしない)・理由 doc 化」.
+/// req/38 §28, verbatim: "AC-047's measurement of 'does not change' = **content digest + mtime + size**; atime is not measured (it is fs-dependent
+/// and unstable -- do not pretend to measure what cannot be measured); the reason is documented". (sem: SEM-gx-adapter-fs-265)
 ///
 /// The digest is gx-canon's, over the bytes, which is the same road the adapter's own `precondition`
 /// takes -- so a `plan` that rewrote the file would move this whether or not it also moved the
@@ -245,7 +247,7 @@ pub fn intent_for(locator: &str, goal: &[u8]) -> Intent {
 
 /// The 51 §7 harness's view of this adapter.
 ///
-/// 51 §7 逐語: 「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」, so
+/// 51 §7, verbatim: "each adapter crate only calls this harness from one `#[test]` to inherit the contract tests", so (sem: SEM-gx-adapter-fs-266)
 /// what an adapter author writes is this type and nothing else. Its length is the first measurement
 /// of whether the eleven-method `Fixture` of hand 3 is a reasonable ask (**M4H3-9**), and the number
 /// is printed by `tests/conformance.rs`.
@@ -304,18 +306,18 @@ impl Fixture for FsFixture {
         Some(gx_adapter_fs::normalize(locator))
     }
 
-    /// **L5's first route** (**M4H3-3 採(a)**): the digest a plan of this intent promises, derived
+    /// **L5's first route** (**M4H3-3, adopted (a)**): the digest a plan of this intent promises, derived
     /// from the goal and from nothing else.
     ///
-    /// §31 逐語: 「手5 DoD に「fs adapter は goal から導出した target と apply の観測値を**別経路で作り**
-    /// 一致を測る」」. The two routes are:
+    /// §31, verbatim: "hand 5's DoD **builds the fs adapter's target derived from the goal and apply's observed value by separate routes**
+    /// and measures their agreement". The two routes are: (sem: SEM-gx-adapter-fs-267)
     ///
     /// 1. **here** -- the intent's [`GOAL`] bytes, digested without the filesystem being touched at
     ///    all. This is what `Transformation.target` (41 §3) would carry, which is why 51 §7's harness
     ///    takes it from the fixture: the prophecy is the engine's value and not the adapter's.
     /// 2. **`apply`** -- the bytes the adapter reads back off the substrate after its `rename`, which
-    ///    is why `AppliedDelta.resulting_digest` is an observation (req/69 §3.1: 「post は返り値でなく
-    ///    観測値である」) rather than the buffer that was written.
+    ///    is why `AppliedDelta.resulting_digest` is an observation (req/69 §3.1: "post is an observation, not
+    ///    a return value") rather than the buffer that was written. (sem: SEM-gx-adapter-fs-268)
     ///
     /// What the comparison cannot catch is said in `tests/ac_049.rs`: both routes end in the one
     /// digest function 41 §6 admits, so a bug **inside** `cid::mint` is invisible to it. What it does
@@ -328,7 +330,7 @@ impl Fixture for FsFixture {
     /// A delta whose inverse exceeds [`gx_adapter_fs::MAX_INVERSE_PAYLOAD_BYTES`] (**M4-21**).
     ///
     /// 51 §7 contract 5 needs a subject only the adapter's author can produce, and this is the one
-    /// **M4-21 採(a)** named: 「超過は `invert`=`Ok(None)`(**AC-048 の None の実在する第 1 の理由**)」.
+    /// **M4-21, adopted (a)** named: "over the ceiling, `invert`=`Ok(None)` (**the 1st reason AC-048's `None` actually occurs**)". (sem: SEM-gx-adapter-fs-269)
     /// The old content is what an inverse has to carry (42 §5), so the subject is a file one byte over
     /// the ceiling and a plan that would replace it.
     fn uninvertible(&self) -> Option<(PlannedDelta, ObjectSnapshot)> {
@@ -340,7 +342,7 @@ impl Fixture for FsFixture {
         Some((delta, pre))
     }
 
-    /// 51 §7's 可換 case, and AC-052's own example: 「別ファイルへの書き込み」.
+    /// 51 §7's commuting case, and AC-052's own example: "writes to different files". (sem: SEM-gx-adapter-fs-270)
     ///
     /// Planned rather than hand-written, so that the pair the harness compares is the pair an engine
     /// would carry. Both positions exist after [`Fixture::reset`], which is what lets `plan` answer.
@@ -363,7 +365,7 @@ impl Fixture for FsFixture {
         ))
     }
 
-    /// 51 §7's 非可換 case: AC-052's 「同一ファイルへの競合書き込み」.
+    /// 51 §7's non-commuting case: AC-052's "a conflicting write to the same file". (sem: SEM-gx-adapter-fs-271)
     ///
     /// Two whole-file replacements of one file. Nothing of the second is independent of the first --
     /// which is why the residual this adapter mints is the whole of it (see `src/commutation.rs`).
@@ -428,12 +430,12 @@ pub fn planned(adapter: &FsAdapter, locator: &str, goal: &[u8]) -> PlannedDelta 
         .expect("the adapter plans a whole-file replacement")
 }
 
-/// A removal, written in the grammar rather than planned (**M4H4-5 採(a)**).
+/// A removal, written in the grammar rather than planned (**M4H4-5, adopted (a)**).
 ///
-/// 42 §3.3 gives an [`Intent`] a `goal` and no spelling for 「remove this」, so `plan` produces
-/// replacements only and 「削除」 -- one of AC-049's three -- has to be constructed here. §32 M4H4-5
-/// 追認 fixed exactly that division: 「削除の綴り(`content: null`)の文法席は **AC-049(M4 の AC)の前提**
-/// であって先行実装でない。produce/consume は手5」.
+/// 42 §3.3 gives an [`Intent`] a `goal` and no spelling for "remove this", so `plan` produces
+/// replacements only and "deletion" -- one of AC-049's three -- has to be constructed here. §32 M4H4-5
+/// confirmed fixed exactly that division: "the deletion spelling (`content: null`)'s grammar seat is **AC-049's (M4's AC) premise**
+/// and not an implementation-ahead; produce/consume is hand 5". (sem: SEM-gx-adapter-fs-272)
 ///
 /// # Panics
 /// If the sequence has no canonical form, which a one-element array of two fields always has.
@@ -483,12 +485,12 @@ pub fn spelled(locator: &str, content: &[u8]) -> PlannedDelta {
 /// The `pre` of a creation: an [`ObjectSnapshot`] naming a position that holds nothing.
 ///
 /// 🔴 **Constructed here because the adapter will not produce one.** `FsAdapter::snapshot` reads the
-/// file and answers [`Error::Unreadable`] when there is none, so v0.1 has no way to describe 「this
-/// position is empty」 as a snapshot -- and AC-049's 「作成」 case is quantified at exactly that state.
+/// file and answers [`Error::Unreadable`] when there is none, so v0.1 has no way to describe "this
+/// position is empty" as a snapshot -- and AC-049's "creation" case is quantified at exactly that state. (sem: SEM-gx-adapter-fs-273)
 /// The digest is the digest of no content, which is the same value `apply` observes after a removal
 /// and the same value an **empty file** would have: ASM-69-1 puts only content under the fingerprint,
-/// so 「nothing here」 and 「a file with no bytes」 are one state to this adapter. Both halves are raised
-/// as起票 in `req/74` §2 rather than decided here.
+/// so "nothing here" and "a file with no bytes" are one state to this adapter. Both halves are raised
+/// as **filed** in `req/74` §2 rather than decided here. (sem: SEM-gx-adapter-fs-274)
 ///
 /// # Panics
 /// Never: the projection of a snapshot always has a canonical form, and the caller has just named a

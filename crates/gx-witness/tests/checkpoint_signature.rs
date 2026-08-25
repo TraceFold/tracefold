@@ -1,16 +1,20 @@
-//! H3-7 — `Checkpoint.signature` finally holds a signature.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! H3-7 — `Checkpoint.signature` finally holds a signature. (sem: SEM-gx-witness-187,
+//! SEM-gx-witness-188, SEM-gx-witness-189, SEM-gx-witness-190, SEM-gx-witness-191, SEM-gx-witness-192)
 //!
-//! `req/38_ERRATA_2026-08-07.md` §12 逐語: 「**H3-6/H3-7**… H3-7（`Checkpoint.signature` が
-//! non-Option）→ 手 5 で解消: 署名装着は手 5 の scope。手 5 lane に「unsigned 生成の interim 形を
-//! 確認し、署名装着後に H3-7 を close」と載荷」. Both halves are here: `the_interim_form_is_what_
+//! `req/38_ERRATA_2026-08-07.md` §12 verbatim: "**H3-6/H3-7**... H3-7 (`Checkpoint.signature` is
+//! non-Option) → resolved in hand 5: attaching the signature is hand 5's scope. Loaded onto the
+//! hand 5 lane as "confirm the interim unsigned-generation shape, and close H3-7 once the signature
+//! is attached"." Both halves are here: `the_interim_form_is_what_
 //! hand_3_left` reads the unsigned checkpoint hand 3 produces and states what is wrong with it, and
 //! everything after that is the signature being attached and checked.
 //!
 //! # What is signed: E-M2-19's three fields
 //!
-//! `req/38_ERRATA_2026-08-07.md` §9: 「`Checkpoint` の**署名 core={origin, tree_size, root_hash}**
-//! とし `timestamp` は署名 core の外（unsigned advisory field）へ——E-M2-6 と完全同型（CM-5:
-//! clock-free signed payload）」. `gx_log::proof::checkpoint_signing_bytes` is that byte string,
+//! `req/38_ERRATA_2026-08-07.md` §9: "`Checkpoint`'s **signed core = {origin, tree_size, root_hash}**,
+//! and `timestamp` goes outside the signed core (an unsigned advisory field) — exactly the same
+//! shape as E-M2-6 (CM-5: a clock-free signed payload)". `gx_log::proof::checkpoint_signing_bytes` is that byte string,
 //! built by hand 2 and signed by nobody until now.
 //!
 //! The consequence is stated rather than hidden: a verified checkpoint says *this key stated this
@@ -27,7 +31,7 @@
 //! it as H5-4.
 //!
 //! `req/38_ERRATA_2026-08-07.md` §15 decided it: the checkpoint gets a `payload_type` (minted by the
-//! erratum, since no 正本 has one) and its core rides inside a pre-authentication encoding like a
+//! erratum, since no canonical source has one) and its core rides inside a pre-authentication encoding like a
 //! receipt's payload. The separation is now the length-prefixed type inside the signed bytes. Three
 //! tests below hold the new state -- `a_signature_over_the_bare_core_is_refused` (written red, before
 //! the change), `the_checkpoint_signature_is_taken_over_a_pae`, and
@@ -290,15 +294,16 @@ fn the_two_signing_roads_do_not_share_a_message() {
 
 /// A signature over the **bare** core -- the road hand 5 took -- does not verify.
 ///
-/// `req/38_ERRATA_2026-08-07.md` §15 逐語: 「**E-M2-26**（H5-4 の決着・fix 批へ）: checkpoint 署名は
-/// **payload_type を与えて PAE に載せる**（42 §3.11 erratum）。根拠: ①署名規律を DSSE 一本に統一
-/// （2 つの byte 形式に同鍵で直接署名する現状は「偶然の非衝突」で設計でない=H5-4）」.
+/// `req/38_ERRATA_2026-08-07.md` §15 verbatim: "**E-M2-26** (H5-4's resolution, to the fix batch): a
+/// checkpoint signature **is given a payload_type and carried in a PAE** (a 42 §3.11 erratum).
+/// Grounds: ① unify signing discipline onto DSSE alone (the current state, where the same key
+/// signs two byte formats directly, is "accidental non-collision", not a design = H5-4)".
 ///
 /// This is the measurement of that ruling, and it is written before the change it describes: until
 /// `sign_checkpoint` wraps the core in a pre-authentication encoding, the signature produced here by
 /// hand -- Ed25519 over `checkpoint_signing_bytes` and nothing else -- is exactly what hand 5's
 /// `sign_checkpoint` produced, and `verify_checkpoint` accepts it. Afterwards the two roads sign two
-/// different messages and this one is refused, which is what 「偶然の非衝突」 becoming a design means.
+/// different messages and this one is refused, which is what "accidental non-collision" becoming a design means.
 #[test]
 fn a_signature_over_the_bare_core_is_refused() {
     use ed25519_dalek::{Signature, Signer};
@@ -375,8 +380,9 @@ fn the_two_roads_are_separated_by_payload_type() {
 
 /// gx does **not** claim wire compatibility with the C2SP checkpoint / signed-note form.
 ///
-/// `req/38_ERRATA_2026-08-07.md` §15 逐語: 「②C2SP text 形（newline+signed-note）は一次照合で構造無関係
-/// と確定——gx は C2SP checkpoint の wire 互換を主張しない（するなら変換層=将来課題）」. A non-claim
+/// `req/38_ERRATA_2026-08-07.md` §15 verbatim: "② the C2SP text form (newline+signed-note) is
+/// confirmed structurally unrelated by primary comparison — gx does not claim wire compatibility
+/// with a C2SP checkpoint (a conversion layer, if any, is future work)". A non-claim
 /// cannot be proved, but its opposite can be refused: the C2SP form is text that opens with the
 /// origin line and separates fields with newlines, and gx's message opens with `DSSEv1` and carries
 /// binary CBOR. This asserts the difference in the shape `ac_024` uses for the hash algorithm -- a

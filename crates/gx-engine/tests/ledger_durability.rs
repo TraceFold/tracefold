@@ -1,12 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **K-9** — the `sync_parent_directory` survivor, killed from the crate that first depends on it.
 //!
-//! req/38 §35 K-9 and §37 **M5-28 採(a)**: 「K-9 の EACCES 注入は手 4(engine が ledger durability の
-//! 初消費者)・前提条件行つき・L-1 の実形(fault 3 種の可能性)を書く」. req/76 §2.2 measured the gap:
+//! req/38 §35 K-9 and §37 **M5-28 adopted (a)** (sem: SEM-gx-engine-798): "K-9's EACCES
+//! injection is hand 4 (the engine is ledger durability's first consumer), with a precondition
+//! line, writing L-1's concrete form (the possibility of three fault kinds)". req/76 §2.2
+//! measured the gap:
 //! gx-log's `sync_parent_directory` had two `mutants` survivors because **the durability call was
 //! never measured by a behaviour** — every probe in the workspace checked what was written, and none
 //! checked that the write reached the device's idea of the directory.
 //!
-//! # 🔴 前提条件 (規律45), because this probe depends on the machine
+//! # 🔴 preconditions (discipline 45, sem: SEM-gx-engine-799), because this probe depends on the machine
 //!
 //! 1. **Unix.** `sync_parent_directory` is `#[cfg(unix)]` in both crates; on other platforms it is a
 //!    declared gap (req/52 §5) and there is nothing to measure. The suite is compiled out there.
@@ -25,7 +29,7 @@
 //! refuses with `EACCES`. `0o000` would fail earlier, at the create, and would measure the create
 //! rather than the sync. The window is one bit wide and it is the whole of the test.
 //!
-//! # What this does **not** measure (L-1's 実形)
+//! # What this does **not** measure (L-1's concrete form, sem: SEM-gx-engine-800)
 //!
 //! req/38 §36 L-1 recorded that a durability claim wants three kinds of fault: a refusal (this), a
 //! partial write, and a power loss. Only the first is constructible without a fault-injecting
@@ -50,7 +54,8 @@ const AT: Timestamp = Timestamp(1_754_000_000_000_000_000);
 
 /// A directory that may be written and entered but not read, on a filesystem that means it.
 ///
-/// Returns `None` when 前提 2 or 3 does not hold, and the callers turn that into a **failure** with
+/// Returns `None` when precondition 2 or 3 (sem: SEM-gx-engine-801) does not hold, and the
+/// callers turn that into a **failure** with
 /// the reason printed rather than into a skip.
 fn write_only_dir(name: &str) -> Option<PathBuf> {
     let dir = std::env::temp_dir().join(format!("gx_m5h4_{name}_{}", std::process::id()));
@@ -81,7 +86,7 @@ fn cleanup(dir: &PathBuf) {
 fn a_ledger_whose_directory_cannot_be_fsynced_is_refused() {
     let Some(dir) = write_only_dir("ledger") else {
         panic!(
-            "前提 2 not met: `chmod 0o300` did not take on this filesystem, so the EACCES this \
+            "precondition 2 not met (sem: SEM-gx-engine-802): `chmod 0o300` did not take on this filesystem, so the EACCES this \
              probe injects cannot happen. On drvfs/9p mode bits are advisory -- run on ext4 (A-5)."
         );
     };
@@ -96,7 +101,7 @@ fn a_ledger_whose_directory_cannot_be_fsynced_is_refused() {
 
     let refusal = refusal.unwrap_or_else(|| {
         panic!(
-            "前提 3 may not hold: the ledger opened in a directory that cannot be fsynced. A \
+            "precondition 3 may not hold (sem: SEM-gx-engine-803): the ledger opened in a directory that cannot be fsynced. A \
              process that may override mode bits (root) sees no EACCES."
         )
     });
@@ -115,7 +120,7 @@ fn a_ledger_whose_directory_cannot_be_fsynced_is_refused() {
 #[test]
 fn an_engine_whose_directory_cannot_be_fsynced_is_refused() {
     let Some(dir) = write_only_dir("engine") else {
-        panic!("前提 2 not met -- see the sibling probe for what that means");
+        panic!("precondition 2 not met (sem: SEM-gx-engine-804) -- see the sibling probe for what that means");
     };
 
     let opened = Engine::open(
@@ -131,7 +136,7 @@ fn an_engine_whose_directory_cannot_be_fsynced_is_refused() {
     // Which layer refuses depends on the order `Engine::open` builds its three files in, and that
     // order is not this probe's claim: `Io` is the engine's own journal directory and `Ledger` is
     // gx-log's. What is asserted is that one of them refused and said which.
-    let kind = kind.expect("前提 3 may not hold: the engine opened where nothing can be fsynced");
+    let kind = kind.expect("precondition 3 may not hold (sem: SEM-gx-engine-805): the engine opened where nothing can be fsynced");
     assert!(
         kind == "Ledger" || kind == "Io",
         "the engine refuses, and says which layer refused: {kind} {detail:?}"

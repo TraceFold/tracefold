@@ -1,15 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-010 — the JCS compatibility layer is deterministic.
 //!
-//! 34 AC-010 verbatim: 「Given: 同一論理内容のTransformation x。When: `jcs::encode(x)`を3回連続
-//! 実行。Then: 3回とも完全同一バイト列（決定性）」. FR-010 places it as a SHOULD, for
+//! 34 AC-010 verbatim: "Given: a Transformation x of identical logical content. When:
+//! `jcs::encode(x)` run three times in a row. Then: all three are exactly identical byte
+//! sequences (determinism)" (sem: SEM-gx-canon-025). FR-010 places it as a SHOULD, for
 //! interoperability with in-toto / SCITT / Sigstore, and 42 §2.2 fixes what it operates on:
-//! 「**同一の論理値**（構造体の全フィールド、IdentityView限定ではなくAPI公開ビュー）」.
+//! "**the same logical value**" (all fields of the struct, not limited to IdentityView but the API-exposed view).
 //!
 //! # The two faces must not be confused
 //!
 //! This is the *second* route, not a second identity. 42 §2.2 says so twice over -- the JCS
-//! digest would be SHA-256, it is called `JcsDigest` rather than `Cid`, and 「`JcsDigest`は
-//! identityを構成しない」. Accordingly the whole struct goes through here, `id` and `created_at`
+//! digest would be SHA-256, it is called `JcsDigest` rather than `Cid`, and "`JcsDigest`
+//! does not constitute identity" (sem: SEM-gx-canon-026). Accordingly the whole struct goes through here, `id` and `created_at`
 //! included, which is the visible difference from `cid::compute`: the identity face drops two
 //! fields and this one drops none. A test below pins that difference so the two faces cannot
 //! quietly converge.
@@ -214,7 +217,7 @@ fn ac_010_a_respelled_input_canonicalises_to_the_same_bytes() {
 }
 
 /// B-08, as a check rather than a promise: M1 produces no `JcsDigest` and depends on no SHA-256
-/// implementation. 52 contract 2 -- 「32-functional.md にないものは実装しない」 -- is the rule, and
+/// implementation. 52 contract 2 -- "what is not in 32-functional.md is not implemented" (sem: SEM-gx-canon-027) -- is the rule, and
 /// a grep is the enforcement.
 #[test]
 fn ac_010_no_sha256_and_no_jcs_digest_were_added() {

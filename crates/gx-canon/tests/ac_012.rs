@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-012 (FR-012) — canon is idempotent, and the encoder is what decides.
 //!
-//! AC-012 逐語: 「Given: ランダム生成されたTransformation x。When: `canon(canon(x))`と`canon(x)`を
-//! それぞれ計算。Then: 両者がbit-equal（Lean T3-aに対応、12 F0 T3）。」property（proptest,
-//! ≥1000ケース/PR）。
+//! AC-012 verbatim: "Given: a randomly generated Transformation x. When: compute
+//! `canon(canon(x))` and `canon(x)` respectively. Then: the two are bit-equal (corresponds to
+//! Lean T3-a, 12 F0 T3)." property (proptest, ≥1000 cases/PR) (sem: SEM-gx-canon-032).
 //!
 //! 42 §2.3 spells `canon` out for implementers:
 //! `encode_canonical(decode(encode_canonical(x))) == encode_canonical(x)`. That is the first

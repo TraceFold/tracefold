@@ -1,16 +1,18 @@
-//! 🔴 **E-M6-20** — 44 §2.2's `[DR-2感度]` paragraph, made reachable from an HTTP request.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **E-M6-20** (sem: SEM-gx-api-340) — 44 §2.2's `[DR-2 sensitivity]` paragraph, made reachable from an HTTP request.
 //!
-//! 44 §2.2's commit section says: 「record-onlyモードではこのケースでも`200`＋`enforced:false`の
-//! Receiptを返す」. Hand 5 implemented the thirteen synchronous endpoints and found that **no HTTP
+//! 44 §2.2's commit section says: "even in this case, record-only mode returns `200` + a Receipt with
+//! `enforced:false`" (sem: SEM-gx-api-341). Hand 5 implemented the thirteen synchronous endpoints and found that **no HTTP
 //! request could produce that answer** — the mode reached T-8r only through the posture the engine
 //! was opened in — and raised it as M6H5-8. §52 ruled it:
 //!
-//! > **E-M6-20(M6H5-8 採(a))**: 44 §2.2 の commit body に `record_only: bool` を足して読む
-//! > (E-M6-10 の HTTP 版・[DR-2感度] 段落の実行可能化)。実装窓=手6 以降の最初に触る手
+//! > **E-M6-20 (M6H5-8, adopted (a))**: read 44 §2.2's commit body as having `record_only: bool` added
+//! > (the HTTP version of E-M6-10; making the [DR-2 sensitivity] paragraph executable). Implementation window = the first hand from hand 6 onward that touches it (sem: SEM-gx-api-342).
 //!
 //! This is that hand, and this file is the paragraph as a measurement: a change the gate **denied**,
-//! committed, applied to the substrate, with `enforced:false` in the receipt — P-7's 「適用は通ったが、
-//! ポリシー上は拒否されていた」 through the wire rather than through a process's start-up flags.
+//! committed, applied to the substrate, with `enforced:false` in the receipt — P-7's "the apply went through, but
+//! it was refused under policy" (sem: SEM-gx-api-343) through the wire rather than through a process's start-up flags.
 
 mod support;
 
@@ -37,7 +39,7 @@ async fn denied_candidate(server: &Server) -> String {
 /// 1. the gate **denied** it (so this is the case 44's paragraph is about, not a happy path);
 /// 2. a commit with **no** body is refused `403 NOT_ADMITTED` — the enforcing answer;
 /// 3. a commit with `{"record_only": true}` answers `200`;
-/// 4. the substrate **moved** and the answer carries `enforced: false`. 「適用は通すが `enforced=false`」
+/// 4. the substrate **moved** and the answer carries `enforced: false`. "the apply goes through, but `enforced=false`" (sem: SEM-gx-api-344)
 ///    is one sentence with two halves and a probe that checked only the flag would pass for an
 ///    implementation that recorded the exception and applied nothing.
 #[tokio::test(flavor = "multi_thread")]
@@ -86,32 +88,32 @@ async fn record_only_on_the_commit_body_applies_a_denied_change_and_marks_it() {
     );
     assert_eq!(
         recorded.status, 200,
-        "44 §2.2: 「record-onlyモードではこのケースでも`200`…を返す」: {:?}",
+        "44 §2.2: \"even in this case, record-only mode returns `200`…\" (sem: SEM-gx-api-345): {:?}",
         recorded.json
     );
     assert_eq!(recorded.json["state"], serde_json::json!("Committed"));
     assert_eq!(
         recorded.json["enforced"],
         serde_json::json!(false),
-        "44 §2.2: 「`enforced:false`のReceiptを返す」 — INV-S5's visibility on the wire"
+        "44 §2.2: \"returns a Receipt with `enforced:false`\" (sem: SEM-gx-api-346) — INV-S5's visibility on the wire"
     );
     assert_eq!(
         server.target_contents(),
         "after\n",
-        "🔴 「適用は通すが `enforced=false`」 — the apply is the other half of the sentence"
+        "🔴 \"the apply goes through, but `enforced=false`\" (sem: SEM-gx-api-347) — the apply is the other half of the sentence"
     );
 }
 
 /// 🔴 The field's **absence** is not `false`, and `false` is not absence.
 ///
 /// Every client written against 44 before E-M6-20 sends no body at all, and its commits have to keep
-/// meaning 「whatever posture this server runs in」. `{"record_only": false}` is a different request:
-/// it **overrides** a `RecordOnly` server for one call. `Option<bool>` is how 「未指定」 and 「no」 stay
+/// meaning "whatever posture this server runs in" (sem: SEM-gx-api-348). `{"record_only": false}` is a different request:
+/// it **overrides** a `RecordOnly` server for one call. `Option<bool>` is how "unspecified" and "no" stay
 /// two answers instead of one — and the shape M6H5-11 already settled for extractors, one field on.
 #[tokio::test(flavor = "multi_thread")]
 async fn an_absent_flag_and_an_explicit_false_are_different_requests() {
     // A server whose **process** posture is record-only, so that an explicit `false` has something
-    // to override. This is DR-2's 「substrate単位または全体設定」 side, and the request-level flag is
+    // to override. This is DR-2's "per-substrate or whole-configuration" (sem: SEM-gx-api-349) side, and the request-level flag is
     // M6-08's per-call axis on top of it.
     let server = Server::denying_in(
         "m6h6_dr2_absent_vs_false",
@@ -152,7 +154,7 @@ async fn an_absent_flag_and_an_explicit_false_are_different_requests() {
     );
     assert_eq!(
         absent.status, 200,
-        "no body means 「this server's posture」, which here is RecordOnly: {:?}",
+        "no body means \"this server's posture\" (sem: SEM-gx-api-350), which here is RecordOnly: {:?}",
         absent.json
     );
     assert_eq!(absent.json["enforced"], serde_json::json!(false));
@@ -160,7 +162,7 @@ async fn an_absent_flag_and_an_explicit_false_are_different_requests() {
 
 /// 🔴 44 §2.4's conflict sees the posture: two postures are two requests.
 ///
-/// 「同一キーで異なるリクエスト本文が来た場合は`409 IDEMPOTENCY_CONFLICT`」. A cache keyed on the
+/// "a different request body with the same key gets `409 IDEMPOTENCY_CONFLICT`" (sem: SEM-gx-api-351). A cache keyed on the
 /// transformation alone would answer a **record-only** retry with the response of an **enforcing**
 /// attempt, or the reverse — the two differ in whether the change was applied, which is the single
 /// most consequential thing a commit can differ in.
@@ -212,7 +214,7 @@ async fn two_postures_under_one_idempotency_key_are_a_conflict() {
 
 /// 🔴 **M6H8-14 ④** — `/undo` says which DR-2 axis it ran on, the way `/commit` does.
 ///
-/// 44 §2.1 marks `POST /transformations/{id}/undo` with the same `[DR-2感度]` ✓ as `/commit`, and
+/// 44 §2.1 marks `POST /transformations/{id}/undo` with the same `[DR-2 sensitivity]` ✓ (sem: SEM-gx-api-352) as `/commit`, and
 /// until this batch the two answered differently: `committed_answer` carried `enforced` and the undo
 /// body carried `transformation`/`undone`/`superseded_state`/`at` and nothing about enforcement. An
 /// undo drives canonicalize→commit with `mode: None`, so on a `RecordOnly` server the undo's own
@@ -276,27 +278,27 @@ async fn the_undo_answer_carries_the_enforcement_axis() {
 ///
 /// **It answers at all.** `undo_transformation` built its refusal by calling `halted_undo`, which
 /// reads the state back through a lock of its own, **while still holding the engine guard** — and
-/// `std::sync::Mutex` is not re-entrant. Under M6-06 採(a) there is exactly one
+/// `std::sync::Mutex` is not re-entrant. Under M6-06, adopted (a) (sem: SEM-gx-api-353), there is exactly one
 /// `Arc<Mutex<Engine>>`, so that deadlock does not fail a request: it stops the server. No suite had
 /// ever driven an undo through a **denying** gate, so the branch had never been taken. This probe
 /// takes it, with a timeout so that a regression is a failure rather than a hung run. That half is
 /// unchanged and the timeout stays: M6FIX-1 is still the thing it guards.
 ///
 /// 🔴 **The reversal.** Until M7 this probe asserted `403 NOT_ADMITTED` and `enforced: null`, and
-/// said in the same breath that it was measuring a **gap**: 44 §2.1 marks `/undo` `[DR-2感度]` ✓ like
+/// said in the same breath that it was measuring a **gap**: 44 §2.1 marks `/undo` `[DR-2 sensitivity]` ✓ (sem: SEM-gx-api-354) like
 /// `/commit`, `/commit` in this posture answers `200`+`enforced:false`, and `/undo` had no
 /// record-only road at all. The fix batch refused to patch it because changing it gives `undo` a new
-/// semantics, 「which is a ruling」 (req/97 §6 M6FIX-2). The ruling arrived — **裁定 #4**, carried into
+/// semantics, "which is a ruling" (sem: SEM-gx-api-355) (req/97 §6 M6FIX-2). The ruling arrived — **ruling #4**, carried into
 /// `req/98` §3-2 as **FR-M7-1** and confirmed by `req/38` §57:
 ///
-/// > record-only posture の `/undo` は、undo 要求を record し `enforced:false` で応答する(commit と
-/// > 対称・44 §2.1 の DR-2 ✓ の実装)
+/// > a `/undo` in record-only posture records the undo request and answers with `enforced:false` (symmetric with commit;
+/// > the implementation of 44 §2.1's DR-2 ✓) (sem: SEM-gx-api-356)
 ///
 /// — so the old assertion is now the wrong answer and this probe is the one that says so, exactly as
-/// its previous version predicted (「the day somebody implements it, this probe is the one that says
-/// so」). The reversal is committed **red first**: this file changed with no line of `src/` beside it.
+/// its previous version predicted ("the day somebody implements it, this probe is the one that says
+/// so" (sem: SEM-gx-api-357)). The reversal is committed **red first**: this file changed with no line of `src/` beside it.
 ///
-/// Four assertions, because 「record し `enforced:false` で応答する」 is one sentence with four halves:
+/// Four assertions, because "records and answers with `enforced:false`" (sem: SEM-gx-api-358) is one sentence with four halves:
 /// the status is the one `/commit` gives (`200`, not `403`), the axis is on the wire (`enforced:
 /// false`, the same field name and the same shape `committed_answer` writes), the substrate **moved
 /// back** (a record-only undo applies — it is recorded, not skipped), and the original is
@@ -336,7 +338,7 @@ async fn an_undo_of_a_denied_inverse_is_recorded_rather_than_refused_under_recor
     .expect(
         "🔴 the undo did not answer in 20 s. `halted_undo` takes the engine lock and was being \
          called with the handler's own guard still alive; with one `Arc<Mutex<Engine>>` (M6-06 \
-         採(a)) that deadlock stops every later request too",
+         adopted (a); sem: SEM-gx-api-359) that deadlock stops every later request too",
     );
     println!(
         "UNDO_DENIED_INVERSE status={} code={} enforced={} body={}",
@@ -347,7 +349,7 @@ async fn an_undo_of_a_denied_inverse_is_recorded_rather_than_refused_under_recor
     );
     assert_eq!(
         undone.status, 200,
-        "🔴 FR-M7-1: 「record-only posture の `/undo` は…`enforced:false` で応答する」 — the same \
+        "🔴 FR-M7-1: \"a `/undo` in record-only posture … answers with `enforced:false`\" (sem: SEM-gx-api-360) — the same \
          status `/commit` answers in this posture, on the row 44 §2.1 gives the same DR-2 mark: {:?}",
         undone.json
     );
@@ -360,7 +362,7 @@ async fn an_undo_of_a_denied_inverse_is_recorded_rather_than_refused_under_recor
     assert_eq!(
         server.target_contents(),
         "before\n",
-        "🔴 「適用は通すが `enforced=false`」 — a record-only undo **applies**. A probe that checked \
+        "🔴 \"the apply goes through, but `enforced=false`\" (sem: SEM-gx-api-361) — a record-only undo **applies**. A probe that checked \
          only the flag would pass for an implementation that recorded the exception and undid nothing"
     );
     assert_eq!(

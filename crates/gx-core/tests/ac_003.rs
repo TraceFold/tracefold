@@ -1,23 +1,29 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-003 (FR-003) — the order ceiling is checked at run time, not by the type.
 //!
-//! AC-003 逐語: 「Given: order生成API `Transformation::with_order(n: u8)`。When: `n=0,1,2`で
-//! 呼び出す。Then: すべて`Ok(_)`。When: `n=3`および`n=255`で呼び出す。Then: すべて
-//! `Err(OrderExceeded)`が返る（コンパイルは通るがランタイムエラー）。」
+//! AC-003, verbatim (quoted in SEM-gx-core-105): "Given: the order-producing API
+//! `Transformation::with_order(n: u8)`. When: called with `n=0,1,2`. Then: all `Ok(_)`. When: called
+//! with `n=3` and `n=255`. Then: all return `Err(OrderExceeded)` (it compiles, but is a runtime
+//! error)."
 //!
 //! Two spec facts pin the signature between them. The AC shows one parameter and no `self`, so
 //! it is an associated function; 41 §3 keeps `Transformation.order` a bare `u8`, so it cannot
 //! return a validated newtype that the struct would then have to hold. What is left is a
 //! validating constructor for the order value itself, which is exactly how req/31 §7 uses it --
-//! composition sets `order := max(f.order, g.order)` and「`with_order` の `≤2` 検査を必ず通す」.
+//! composition sets `order := max(f.order, g.order)` and "always passes through `with_order`'s
+//! `<= 2` check" (sem: SEM-gx-core-106).
 //!
-//! FR-003 adds the reason the check is not a type: 「order>2の生成試行はコンパイル時型検査を
-//! 通過してもランタイムでErrorを返す」. ASM-6 and DR-7 (DEFAULT: <=2) set the ceiling at 2 for
+//! FR-003 adds the reason the check is not a type: "an attempt to produce order > 2 passes the
+//! compile-time type check and still returns an Error at runtime" (sem: SEM-gx-core-107). ASM-6
+//! and DR-7 (DEFAULT: <=2) set the ceiling at 2 for
 //! v0.1, and a ceiling that may move with a later DR belongs in a value check, not in a type.
 //!
 //! # What the AC does not say, and F-2 does
 //!
-//! `with_order`'s own doc claims 「every place that sets an order is required to come through
-//! here」. `req/46C_AUDIT_PRACTICAL_2026-08-07.md` §3 W-2 measured that claim and found it was
+//! `with_order`'s own doc claims "every place that sets an order is required to come through
+//! here" (sem: SEM-gx-core-108). `req/46C_AUDIT_PRACTICAL_2026-08-07.md` §3 W-2 measured that
+//! claim and found it was
 //! discipline rather than a fact: `order` was a plain `pub` field, so a struct literal wrote
 //! `order: 250` with no compile error and no panic. `req/46D_AUDIT_RULING_2026-08-07.md` §1 F-2
 //! rules the field private with a getter, which leaves `Transformation::new` as the only way in

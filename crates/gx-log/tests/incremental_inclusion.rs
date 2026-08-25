@@ -1,20 +1,24 @@
-//! 🔴 **FR-M7-2** — `prove_inclusion` は tile の cached hash で incremental になった。**答えは 1 bit も
-//! 動いていない**、を独立な oracle と wire の両側から測る。
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **FR-M7-2** — `prove_inclusion` became incremental via the tile's cached hash. Measures,
+//! from both an independent oracle and the wire, that **the answer has not moved by a single bit**. (sem: SEM-gx-log-155)
 //!
-//! req/98 §3-2 の AC 逐語: 「同一 bucket 計器で**前/後の median+回数+分母**を対照実験(req/95 §1 の 2 arm
-//! 形)で示し、`verify_inclusion_of` と第三者検証器を **1 行も変えずに** 通る」。
+//! req/98 §3-2's AC verbatim: "show the **before/after median + count + denominator** with the same
+//! bucket instrument, as a controlled experiment (req/95 §1's 2-arm shape), and pass
+//! `verify_inclusion_of` and a third-party verifier **without changing a single line**". (sem: SEM-gx-log-156)
 //!
-//! 2 arm の**時間**は `benches/inclusion_proof.rs` が測る(2 build・同一計器 file・commit を記録)。この
-//! file が測るのは残りの半分——**同じ木について同じ proof が出る**事であり、それは 1 つの build の中で
-//! 決着できる。
+//! The 2 arms' **time** is measured by `benches/inclusion_proof.rs` (2 builds, the same
+//! instrument file, commits recorded). What this file measures is the other half -- that **the same
+//! tree produces the same proof** -- and that settles inside one build. (sem: SEM-gx-log-157)
 //!
-//! # なぜ oracle をここに書き直すのか
+//! # Why the oracle is rewritten here (sem: SEM-gx-log-158)
 //!
-//! `proof.rs` の module doc が既に理由を書いている: 「[`prove_inclusion`] walks the tree;
+//! `proof.rs`'s module docs already state the reason: "[`prove_inclusion`] walks the tree;
 //! [`verify_inclusion`] walks the *index* … A verifier expressed in terms of the prover would pass
-//! whenever the prover was self-consistent」。同じ規律が最適化にも効く——新しい実装を、それが置き換えた
-//! 実装の**再輸入**で検査すれば、両方が同じ間違いをした時に緑になる。∴ ここの [`reference_path`] は
-//! **RFC 6962 §2.1.1 の `PATH(m, D[n])` を、この crate の code を 1 行も見ずに書き写した物**である:
+//! whenever the prover was self-consistent". The same discipline holds for an optimisation too --
+//! testing a new implementation by **re-importing** the implementation it replaced turns green
+//! whenever both made the same mistake. ∴ [`reference_path`] here is
+//! **RFC 6962 §2.1.1's `PATH(m, D[n])`, transcribed without looking at a single line of this crate's code**: (sem: SEM-gx-log-159)
 //!
 //! ```text
 //! PATH(0, {d(0)}) = {}
@@ -22,15 +26,17 @@
 //!                 = PATH(m-k, D[k..n]) : MTH(D[0..k])     otherwise
 //! ```
 //!
-//! `MTH` も同じ節から書き写す(1 枚なら葉そのもの、それ以外は `k` で割って `0x01 || left || right`)。
-//! 唯一 crate から借りるのは **葉の hash** と **node hash** で、それは 42 §3.11 の domain byte が
-//! gx-canon の mint に在る (E-M2-12) からである——ここで blake3 を直に呼べば 41 §6 の「全 canonical
-//! encode は gx-canon 経由のみ」を test 側で破る事になる。
+//! `MTH` is transcribed from the same section too (the leaf itself for one, otherwise split at
+//! `k` and `0x01 || left || right`). The only thing borrowed from the crate is the **leaf hash** and
+//! the **node hash**, because 42 §3.11's domain byte lives in gx-canon's mint (E-M2-12) -- calling
+//! blake3 directly here would break 41 §6's "all canonical encoding goes through gx-canon alone"
+//! on the test side. (sem: SEM-gx-log-160)
 //!
-//! # 分母
+//! # Denominator (sem: SEM-gx-log-161)
 //!
-//! 木の形は size で決まるので、**tile 境界の両側**(255/256/257・511/512/513)と、ragged が最も効く小さい
-//! 側を全 index 歩く。1,000 と 4,096 は index を間引く(全部歩くと probe が bench になる)。
+//! A tree's shape is fixed by its size, so this walks every index on **both sides of a tile
+//! boundary** (255/256/257, 511/512/513) and on the small side where ragged-ness bites hardest.
+//! 1,000 and 4,096 thin the indices out (walking every one would turn the probe into a bench). (sem: SEM-gx-log-162)
 
 use gx_canon::cid;
 use gx_core::{Cid, InclusionProof, Timestamp, TransformationId};
@@ -193,7 +199,7 @@ fn a_proof_against_an_older_tree_size_is_the_same_proof() {
 
 /// 🔴 **The wire form is `{leaf_index, tree_size, audit_path}` and nothing else.**
 ///
-/// 追加裁定 a 逐語: 「`InclusionProof` の wire 形は変えない」. A cache that leaked into the proof — a
+/// additional ruling a verbatim: "`InclusionProof`'s wire shape does not change" (sem: SEM-gx-log-163). A cache that leaked into the proof — a
 /// tile index, a hint, a version — would be a change every third-party verifier had to be told
 /// about, so the field set is read off the encoded value rather than off the struct definition.
 #[test]
@@ -256,8 +262,8 @@ fn the_completed_tiles_are_cached_and_the_partial_tail_is_not() {
 
 /// Appending does not disturb a proof already issued, and the log keeps answering for the old head.
 ///
-/// The property the whole tile layout rests on (「appending never rewrites a hash that was already
-/// published」), now with a cache in the way of it.
+/// The property the whole tile layout rests on ("appending never rewrites a hash that was already
+/// published" (sem: SEM-gx-log-164)), now with a cache in the way of it.
 #[test]
 fn an_append_leaves_an_issued_proof_standing() {
     let mut log = log_of(300);

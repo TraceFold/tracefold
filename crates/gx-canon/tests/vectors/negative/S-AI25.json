@@ -1,18 +1,18 @@
 {
   "id": "S-AI25",
   "kind": "codec-deviation",
-  "statement": "additional-info 25(2 byte 引数)で 1 byte に収まる 255 を書いた byte 列は decode されない",
+  "statement": "A byte string writing 255 -- a value that fits in 1 byte -- with additional-info 25 (a 2-byte argument) is not decoded",
   "vector": "1900ff",
   "expected": "REJECT",
   "expected_error": "NonMinimal",
   "normative_basis": "IPLD-SHOULD+gx-policy",
   "tier": "Tier2",
-  "deviation": "255 は ai=24 形式 `18 ff` が最短。ai=25 形式 `19 00 ff` は 1 byte 長い。scanner の判定は `v > u8::MAX`——255 は偽側の最大値で 256 は真側の最小値。`>` を `>=` に替えるとこの vector が受理に変わり、`<` に替えると control が拒否に変わる。",
+  "deviation": "255's shortest form is the ai=24 form `18 ff`. The ai=25 form `19 00 ff` is 1 byte longer. The scanner's judgement is `v > u8::MAX` -- 255 is the largest value on the false side and 256 is the smallest on the true side. Swapping `>` for `>=` turns this vector into an accept, and swapping for `<` turns the control into a reject.",
   "spec_anchor": "ipld/ipld@a65340b specs/codecs/dag-cbor/spec.md L55 / RFC 8949 §3 Table 1 / 42 §2.1-1",
   "origin": "gx self-authored for the fix hand (req/38 §16 H6-4)",
   "control": {
     "vector": "190100",
     "expected": "ACCEPT",
-    "note": "256 は 1 byte に収まらない最小値なので ai=25 形式が最短=受理"
+    "note": "256 is the smallest value that does not fit in 1 byte, so the ai=25 form is shortest = accepted"
   }
 }

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The JSON compatibility route: RFC 8785 canonicalisation (42 §2.2).
 //!
 //! Spec: FR-010 (a SHOULD, for in-toto / SCITT / Sigstore interoperability), 42 §2.2 for the
@@ -6,10 +8,10 @@
 //! # This is a second route, not a second identity
 //!
 //! 42 §2.2 is explicit: the digest of this route would be SHA-256, would be typed `JcsDigest`
-//! rather than `Cid`, and 「`JcsDigest`はidentityを構成しない」. DR-3 keeps BLAKE3 + DAG-CBOR as
+//! rather than `Cid`, and "`JcsDigest` does not constitute identity" (sem: SEM-gx-canon-020). DR-3 keeps BLAKE3 + DAG-CBOR as
 //! the primary and this as a compatibility layer. Two consequences follow, and both are visible
-//! in the code: everything the struct has goes through here -- 42 §2.2 asks for 「構造体の全
-//! フィールド、IdentityView限定ではなく」, which is the opposite of what [`crate::cid::compute`]
+//! in the code: everything the struct has goes through here -- 42 §2.2 asks for "all fields
+//! of the struct, not limited to `IdentityView`" (sem: SEM-gx-canon-021), which is the opposite of what [`crate::cid::compute`]
 //! does -- and no digest is taken at all. B-08 (req/10 §6) keeps `JcsDigest` out of M1 because
 //! none of the seventeen M1 criteria asks for it, and 52 contract 2 forbids the convenience.
 //!
@@ -22,8 +24,8 @@
 //!
 //! # 42 §1.2 and this route: settled by E-JCS-1
 //!
-//! 42 §1.2 says the readable form 「CLI/API/ログの人間可読表示・JSON埋め込みはすべてこの形式を正と
-//! する」 -- including JSON embedding. Until E-JCS-1 this module could not honour that: `Cid`
+//! 42 §1.2 says the readable form "CLI/API/log human-readable display and JSON embedding all
+//! take this form as canonical" (sem: SEM-gx-canon-022) -- including JSON embedding. Until E-JCS-1 this module could not honour that: `Cid`
 //! serialised unconditionally with `serialize_bytes` (42 §1.1 wants a byte string in the binary
 //! form), JSON has no byte type, and `serde_json` therefore wrote an array of numbers. req/31 §11
 //! had settled that only gx-canon may mint `gx1:`, so gx-core could not spell it and the gap

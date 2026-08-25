@@ -1,0 +1,197 @@
+{
+  "$server": {
+    "name": "github-mcp-server",
+    "version": "v1.9.0",
+    "features": ["issues_granular", "pull_requests_granular"],
+    "toolsets": ["context", "repos", "issues", "pull_requests", "users"]
+  },
+
+  "update_issue_body": {
+    "restored_by": "update_issue_body",
+    "read_by": {
+      "by_tool": "issue_read",
+      "arguments": {
+        "method": { "const": "get" },
+        "owner": { "forward": "owner" },
+        "repo": { "forward": "repo" },
+        "issue_number": { "forward": "issue_number" }
+      },
+      "identity": [
+        "github://",
+        { "forward": "owner" },
+        "/",
+        { "forward": "repo" },
+        "/issues/",
+        { "answer": "/number" }
+      ]
+    },
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "issue_number": { "forward": "issue_number" },
+      "body": { "prior_json": "/body" }
+    }
+  },
+
+  "update_issue_title": {
+    "restored_by": "update_issue_title",
+    "read_by": {
+      "by_tool": "issue_read",
+      "arguments": {
+        "method": { "const": "get" },
+        "owner": { "forward": "owner" },
+        "repo": { "forward": "repo" },
+        "issue_number": { "forward": "issue_number" }
+      },
+      "identity": [
+        "github://",
+        { "forward": "owner" },
+        "/",
+        { "forward": "repo" },
+        "/issues/",
+        { "answer": "/number" }
+      ]
+    },
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "issue_number": { "forward": "issue_number" },
+      "title": { "prior_json": "/title" }
+    }
+  },
+
+  "update_issue_type": {
+    "restored_by": "update_issue_type",
+    "read_by": {
+      "by_tool": "issue_read",
+      "arguments": {
+        "method": { "const": "get" },
+        "owner": { "forward": "owner" },
+        "repo": { "forward": "repo" },
+        "issue_number": { "forward": "issue_number" }
+      },
+      "identity": [
+        "github://",
+        { "forward": "owner" },
+        "/",
+        { "forward": "repo" },
+        "/issues/",
+        { "answer": "/number" }
+      ]
+    },
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "issue_number": { "forward": "issue_number" },
+      "issue_type": { "prior_json": "/type/name" }
+    }
+  },
+
+  "update_issue_milestone": {
+    "restored_by": "update_issue_milestone",
+    "read_by": {
+      "by_tool": "issue_read",
+      "arguments": {
+        "method": { "const": "get" },
+        "owner": { "forward": "owner" },
+        "repo": { "forward": "repo" },
+        "issue_number": { "forward": "issue_number" }
+      },
+      "identity": [
+        "github://",
+        { "forward": "owner" },
+        "/",
+        { "forward": "repo" },
+        "/issues/",
+        { "answer": "/number" }
+      ]
+    },
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "issue_number": { "forward": "issue_number" },
+      "milestone": { "prior_json": "/milestone/number" }
+    }
+  },
+
+  "update_pull_request_body": {
+    "restored_by": "update_pull_request_body",
+    "read_by": {
+      "by_tool": "pull_request_read",
+      "arguments": {
+        "method": { "const": "get" },
+        "owner": { "forward": "owner" },
+        "repo": { "forward": "repo" },
+        "pullNumber": { "forward": "pullNumber" }
+      },
+      "identity": [
+        "github://",
+        { "forward": "owner" },
+        "/",
+        { "forward": "repo" },
+        "/pulls/",
+        { "answer": "/number" }
+      ]
+    },
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "pullNumber": { "forward": "pullNumber" },
+      "body": { "prior_json": "/body" }
+    }
+  },
+
+  "update_pull_request_title": {
+    "restored_by": "update_pull_request_title",
+    "read_by": {
+      "by_tool": "pull_request_read",
+      "arguments": {
+        "method": { "const": "get" },
+        "owner": { "forward": "owner" },
+        "repo": { "forward": "repo" },
+        "pullNumber": { "forward": "pullNumber" }
+      },
+      "identity": [
+        "github://",
+        { "forward": "owner" },
+        "/",
+        { "forward": "repo" },
+        "/pulls/",
+        { "answer": "/number" }
+      ]
+    },
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "pullNumber": { "forward": "pullNumber" },
+      "title": { "prior_json": "/title" }
+    }
+  },
+
+  "update_pull_request_state": {
+    "restored_by": "update_pull_request_state",
+    "read_by": {
+      "by_tool": "pull_request_read",
+      "arguments": {
+        "method": { "const": "get" },
+        "owner": { "forward": "owner" },
+        "repo": { "forward": "repo" },
+        "pullNumber": { "forward": "pullNumber" }
+      },
+      "identity": [
+        "github://",
+        { "forward": "owner" },
+        "/",
+        { "forward": "repo" },
+        "/pulls/",
+        { "answer": "/number" }
+      ]
+    },
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "pullNumber": { "forward": "pullNumber" },
+      "state": { "prior_json": "/state" }
+    }
+  }
+}

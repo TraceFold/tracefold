@@ -1,15 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 51 §8.1's real process: a commit that can be stopped dead at three points, and the restart that
 //! recovers it.
 //!
-//! 51 §8.1 逐語: 「以下3つのinjection pointそれぞれで`kill -9`を**実プロセス**に送信する」…
-//! 「プロセスを再起動し、43 §7リカバリ手順が自動実行されることを確認する」. `gx-cli` is M6's
-//! (req/78 N-01), so the 「実バイナリ」 is this one — gated behind `probe-bin` exactly the way
+//! 51 §8.1 verbatim (sem: SEM-gx-engine-609): "send `kill -9` to a **real process** at each of
+//! the following three injection points" ... "restart the process and confirm that 43 §7's
+//! recovery procedure runs automatically". `gx-cli` is M6's
+//! (req/78 N-01), so the "real binary" is this one — gated behind `probe-bin` exactly the way
 //! `engine_id_probe` is, so `cargo build`, `cargo install` and `cargo package` never see it
-//! (**M5-13 採(a)**).
+//! (**M5-13, adopted (a)**).
 //!
 //! # The injection points are in the adapter, and the report says what that costs
 //!
-//! 51 §8.1 allows 「テスト専用フックまたはinjection point環境変数」. This binary uses neither in the
+//! 51 §8.1 allows "test-only hooks or injection-point environment variables" (sem: SEM-gx-engine-610). This binary uses neither in the
 //! engine: the seam is the **adapter**, because the alternative is an env-var read inside shipping
 //! code, and a `commit` that consults the environment is a `commit` whose behaviour depends on
 //! something no journal records. The four adapter calls inside the critical section are `snapshot`,
@@ -21,7 +24,7 @@
 //! | `escrow` | `apply`, before the write | …, `InverseEscrowed`, `ApplyStarted` | untouched |
 //! | `applied` | `apply`, after the write and its fsync | …, `InverseEscrowed`, `ApplyStarted` | **changed** |
 //!
-//! 🔴 The middle row is 51 §8.1's second point 「T-10b `InverseEscrowed`直後（apply前）」 **plus one
+//! 🔴 The middle row is 51 §8.1's second point "T-10b, right after `InverseEscrowed` (before apply)" (sem: SEM-gx-engine-611) **plus one
 //! record**: with **E-M5-1** in force there is no adapter call between `InverseEscrowed` and
 //! `ApplyStarted`, so a seam in the adapter cannot land between them. The fact the point exists to
 //! measure — the inverse is escrowed and the world has not moved — is measured exactly; the tail is
@@ -31,7 +34,7 @@
 //!
 //! The child writes `<dir>/ready` (with an fsync) and then sleeps forever; the parent polls for that
 //! file and calls `Child::kill`, which is `SIGKILL` on Unix. Two properties follow, and both matter
-//! for 「各injection point 10回試行」: the kill lands **after** everything the point promises has
+//! for "10 attempts at each injection point" (sem: SEM-gx-engine-612): the kill lands **after** everything the point promises has
 //! reached the disk, and it lands there every time rather than in a race the test would have to
 //! retry (51 §13-4).
 //!
@@ -153,8 +156,7 @@ impl SubstrateAdapter for FileAdapter {
         if self.armed_at(Point::T9) {
             self.stop_here("t9");
         }
-        // 34 AC-034 逐語: 「テストハーネスが`gx commit <T.id>`呼び出し**直前**に**別プロセス**で対象
-        // ファイルへ書き込みを行い`Fingerprint₁≠Fingerprint₀`となる状況を注入」. Hand 4 could only
+        // 34 AC-034 verbatim (sem: SEM-gx-engine-613): "the test harness injects a situation, via a **separate process**, writing to the target file **immediately before** the `gx commit <T.id>` call, that makes `Fingerprint₁≠Fingerprint₀`". Hand 4 could only
         // spawn a thread against an in-memory world; this is the sentence as written.
         if self.armed_at(Point::Race) && !self.fired.swap(true, Ordering::SeqCst) {
             let status = std::process::Command::new(
@@ -220,9 +222,12 @@ impl SubstrateAdapter for FileAdapter {
         &self,
         _delta: &PlannedDelta,
         _pre: &ObjectSnapshot,
-    ) -> gx_substrate::Result<Option<PlannedDelta>> {
+    ) -> gx_substrate::Result<gx_substrate::InvertOutcome> {
         let world = std::fs::read(&self.world).unwrap_or_default();
-        Ok(Some(PlannedDelta::new(SubstrateKind::Fs, world)?))
+        Ok(gx_substrate::InvertOutcome::inverted(
+            PlannedDelta::new(SubstrateKind::Fs, world)?,
+            Vec::new(),
+        ))
     }
 
     fn commutation(
@@ -356,7 +361,7 @@ fn run(dir: &Path, args: &[String]) {
 
 /// Restart: open, register, and run 43 §7 immediately.
 ///
-/// 43 §7 says 「起動時に必ず実行」 and this is that moment — with one thing between it and `open`,
+/// 43 §7 says "always run at startup" (sem: SEM-gx-engine-614) and this is that moment — with one thing between it and `open`,
 /// which is the registration of the adapter and the signing key. 41 §6 injects both from outside,
 /// so an `Engine::open` that recovered would have to do it before either arrived. Raised as
 /// **M5H5-1**.
@@ -416,7 +421,7 @@ fn recover(dir: &Path) {
     report(&engine, dir);
 }
 
-/// 🔴 AC-034's 「別プロセスで対象ファイルへ書き込みを行い」, as a separate process.
+/// 🔴 AC-034's "writing to the target file via a separate process" (sem: SEM-gx-engine-615), as a separate process.
 ///
 /// Hand 4 could only spawn a thread: its substrate was an `Arc<Mutex<Vec<u8>>>`, which no second
 /// process can reach. This binary's substrate is a file, so the injection is a real one — and what

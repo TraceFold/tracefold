@@ -1,4 +1,6 @@
-//! **M6-01 採(a)** and **M6-02 採(b)** — the draft store and the id-resolution cache, round-tripped.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! **M6-01 adopted (a)** and **M6-02 adopted (b)** (sem: SEM-gx-cli-1006) — the draft store and the id-resolution cache, round-tripped.
 //!
 //! The draft store is the load-bearing half. req/88 §4 M6-01 declared it a **hand 1 blocker**: `gx
 //! submit` and `gx plan` are two processes, `Engine::plan` takes an `&Intent`, and the journal keeps
@@ -7,8 +9,8 @@
 //! must not silently drift through it: the five fields of 42 §3.3, and the identity they determine.
 //!
 //! 🔴 **The identity check is the one that matters and this suite cannot do it alone.** `IntentId` is
-//! the CID of the canonical form (ASM-11) and this crate may not compute one (則 1 (i)), so 「the
-//! reloaded intent has the same id」 is asserted in gx-engine's suite, where an engine exists to mint
+//! the CID of the canonical form (ASM-11) and this crate may not compute one (Rule 1 (i); sem: SEM-gx-cli-1007), so "the
+//! reloaded intent has the same id" (sem: SEM-gx-cli-1007) is asserted in gx-engine's suite, where an engine exists to mint
 //! it. Here the claim is the weaker, checkable one: the reloaded `Intent` is `==` the original, field
 //! for field. Stating which half lives where is the point — an equality that *looked* like an
 //! identity check would be this suite claiming a guarantee it cannot give.
@@ -46,7 +48,7 @@ fn intent(locator: &str, goal: &[u8]) -> Intent {
 
 /// A draft written by one call and read by another is the same intent.
 ///
-/// The id is handed in rather than computed — 則 1 (i) in the signature of `DraftStore::put` — so the
+/// The id is handed in rather than computed — Rule 1 (i; sem: SEM-gx-cli-1008) in the signature of `DraftStore::put` — so the
 /// fixture uses an arbitrary one. That is honest about what this layer knows: the CLI files a body
 /// under a name the engine gave it and never checks the name against the body, because checking
 /// would mean computing.
@@ -68,7 +70,7 @@ fn a_draft_survives_being_written_and_read_back() {
     assert_eq!(store.len().expect("len"), 1);
 }
 
-/// An absent draft is `Ok(None)`; a corrupt one is `Err`. E-M4-35: 「読めない」を「無い」と読まない.
+/// An absent draft is `Ok(None)`; a corrupt one is `Err`. E-M4-35: does not read "unreadable" as "absent" (sem: SEM-gx-cli-1009).
 #[test]
 fn an_absent_draft_and_a_corrupt_draft_are_different_answers() {
     let project = scratch("draft_absent");
@@ -156,7 +158,7 @@ fn the_draft_filename_is_derived_from_the_id_and_is_portable() {
 }
 
 // ---------------------------------------------------------------------------
-// M6-02 採(b): the id-resolution cache
+// M6-02 adopted (b) (sem: SEM-gx-cli-1010): the id-resolution cache
 // ---------------------------------------------------------------------------
 
 /// The cache round-trips and the later learning wins, which is the engine's rule (Λ3(ii)).
@@ -187,7 +189,7 @@ fn the_resolution_cache_round_trips_and_the_later_learning_wins() {
 
 /// 🔴 An absent or corrupt cache is an empty cache, **and the caller is told which**.
 ///
-/// req/56 §2 declares this directory 「derived・消して良いと宣言」, so both cases have the same correct
+/// req/56 §2 declares this directory "derived, declared safe to delete" (sem: SEM-gx-cli-1011), so both cases have the same correct
 /// repair and refusing on one of them would invent a failure mode on a path the specification
 /// promises is disposable. What must not be lost is the distinction in the *report* — hence
 /// [`Freshness`], and hence three separate assertions rather than one on emptiness.
@@ -206,7 +208,7 @@ fn a_missing_or_corrupt_cache_is_empty_and_says_which() {
     assert!(empty.is_empty() && freshness == Freshness::Unreadable);
 
     // A well-formed file whose entries are not ids: the readable ones are kept and the count of the
-    // dropped ones is reported, because 「some of it was junk」 and 「none of it was there」 are
+    // dropped ones is reported, because "some of it was junk" and "none of it was there" (sem: SEM-gx-cli-1012) are
     // different facts about a cache somebody may be debugging.
     let good = Cid([1u8; 32]).to_text();
     let body = format!("{{\"resolutions\":{{\"{good}\":\"{good}\",\"not-an-id\":\"{good}\"}}}}");
@@ -220,10 +222,10 @@ fn a_missing_or_corrupt_cache_is_empty_and_says_which() {
     assert_eq!(freshness, Freshness::PartiallyUnreadable { skipped: 1 });
 }
 
-/// 🔴 則 1 (i) in the parser: a `gx1:` id is **parsed**, never computed.
+/// 🔴 Rule 1 (i; sem: SEM-gx-cli-1013) in the parser: a `gx1:` id is **parsed**, never computed.
 ///
 /// 44 §0 asks the CLI to accept either kind of id, and 42 §1.1 says the bytes cannot tell you which
-/// (「自己記述タグは付与しない」). So the two readings are produced as a pair and the store decides —
+/// (no self-describing tag is attached; sem: SEM-gx-cli-1014). So the two readings are produced as a pair and the store decides —
 /// which is resolution against a store, exactly what 44 §0 describes, and not inspection.
 #[test]
 fn a_gx1_identifier_is_parsed_and_reads_two_ways() {

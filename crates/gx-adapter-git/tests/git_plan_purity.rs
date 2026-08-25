@@ -1,12 +1,14 @@
-//! 「`plan` は object store を読んでよいが **substrate への書き込み 0**」 — measured twice.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! "`plan` may read the object store but **zero writes to the substrate**" -- measured twice. (sem: SEM-gx-adapter-git-134)
 //!
-//! `req/98` §3-4 予約 5 and §6-7 carry the M7 form of **E-M4-29** (§30 M4H2-3 採(b)):
+//! `req/98` §3-4's reserved item 5 and §6-7 carry the M7 form of **E-M4-29** (§30 M4H2-3, adopted (b)): (sem: SEM-gx-adapter-git-135)
 //!
-//! > 「(intent, pre) の対に対する決定性+substrate への**書き込み** 0…読み込みは禁じない——**M7 の git
-//! > adapter が object store を読む道を閉じない**」
+//! > "determinism over the (intent, pre) pair + zero **writes** to the substrate... reading is not forbidden -- **M7's git
+//! > adapter does not close the road to reading the object store**" (sem: SEM-gx-adapter-git-136)
 //!
-//! and §6-7 adds the sentence this file exists to make true rather than assert: 「則 1 の M7 版…「I/O 0」
-//! ではない事を doc に 1 行」.
+//! and §6-7 adds the sentence this file exists to make true rather than assert: "the M7 version of rule 1... one doc line saying it
+//! is not 'zero I/O'". (sem: SEM-gx-adapter-git-137)
 //!
 //! # Two measurements, because one of them is text
 //!
@@ -15,7 +17,7 @@
 //!    wrote two of them down for gx-canon's scanner); its limit here is stated below.
 //! 2. **The repository does not move.** Every byte under `.git` is digested before and after a
 //!    `plan`, and the two digests are compared. This is the measurement text cannot make, and it is
-//!    stronger than 「no write call」 — it would catch a write through a path the scanner does not know
+//!    stronger than "no write call" -- it would catch a write through a path the scanner does not know (sem: SEM-gx-adapter-git-138)
 //!    about, including one inside gitoxide.
 //!
 //! 🔴 The pair is the point. `gx-adapter-fs` has only the first (its `plan` builds a payload from the
@@ -23,7 +25,7 @@
 //! construction** — L1 forces the branch tip out of the payload, so there is nothing left to read. The
 //! second measurement is therefore checking a stronger property than the contract requires, and 51 §7
 //! contract 2 gets its own weaker check from the harness (`precondition` before and after). Both are
-//! kept: 「a strong implementation fixed by a machine」 is what §30 asked of the fs adapter's `plan`,
+//! kept: "a strong implementation fixed by a machine" is what §30 asked of the fs adapter's `plan`, (sem: SEM-gx-adapter-git-139)
 //! and it is cheaper here than the argument for skipping it.
 
 mod support;
@@ -92,7 +94,7 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
 fn the_plan_module_names_no_gitoxide_call() {
     let source = std::fs::read_to_string(crate_root().join("src/plan.rs")).expect("readable");
     // Comments are where the module *argues* about gitoxide, at length and on purpose. What must not
-    // appear is a call, so comment lines are dropped the way M6's 則 1 counters drop them.
+    // appear is a call, so comment lines are dropped the way M6's rule 1 counters drop them. (sem: SEM-gx-adapter-git-140)
     let code: String = source
         .lines()
         .filter(|l| {
@@ -126,7 +128,7 @@ fn the_plan_module_names_no_gitoxide_call() {
 
 /// Measurement 2: the repository is byte-identical across a `plan`.
 ///
-/// Stronger than the contract (51 §7 契約 2 compares a `precondition` before and after, which sees the
+/// Stronger than the contract (51 §7 contract 2 compares a `precondition` before and after, which sees the (sem: SEM-gx-adapter-git-141)
 /// branch tip and nothing else) and stronger than the scan (which sees text and not behaviour). A
 /// `plan` that wrote a loose object nobody referenced would pass both of those and fail this.
 #[test]
@@ -148,8 +150,8 @@ fn planning_leaves_the_repository_byte_identical() {
     println!("PLAN_REPO_DIGEST before={before:?} after={after:?}");
     assert_eq!(
         before, after,
-        "`plan` moved the repository. E-M4-29 reads 41 §4's 「純関数」 as 「substrate への書き込み 0」, \
-         and a loose object written by a plan is a write whether or not anything points at it"
+        "`plan` moved the repository. E-M4-29 reads 41 §4's 'pure function' as 'zero writes to the substrate', \
+         and a loose object written by a plan is a write whether or not anything points at it (sem: SEM-gx-adapter-git-142)"
     );
 
     // And the same plan again, with a commit landing in between: L1's quantifier, asserted here on

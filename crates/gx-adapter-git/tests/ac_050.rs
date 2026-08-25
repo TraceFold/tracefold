@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-050**, both cases, measured through gitoxide rather than through the adapter.
 //!
-//! 34 逐語: 「Given: git-adapterで**commit操作delta**・**branch操作delta**。When: `apply`→`invert`→
-//! `apply(inverse)`。Then: repoの**HEADおよびtree hash**が操作前と**bit-equal**に戻る（2ケース）。」
-//! 判定方法: 「integration（gixで一時repo生成）」.
+//! 34, verbatim: "Given: git-adapter with a **commit-operation delta** and a **branch-operation delta**. When: `apply`->`invert`->
+//! `apply(inverse)`. Then: the repo's **HEAD and tree hash** return to before the operation, **bit-equal** (2 cases)."
+//! Judgment method: "integration (a temporary repo generated with gix)". (sem: SEM-gx-adapter-git-092)
 //!
 //! # 🔴 Why `bit-equal` decides the design of `invert`
 //!
@@ -31,7 +33,7 @@ mod support;
 use gx_substrate::SubstrateAdapter;
 use support::{planned, reset_to, GitFixture, BRANCH, GOAL, SUBJECT};
 
-/// **AC-050 case 1** — 「commit操作delta」: an entry change, undone.
+/// **AC-050 case 1** -- "commit-operation delta": an entry change, undone. (sem: SEM-gx-adapter-git-093)
 #[test]
 fn a_commit_operation_returns_head_and_the_tree_hash_bit_equal() {
     let fixture = GitFixture::new();
@@ -47,6 +49,7 @@ fn a_commit_operation_returns_head_and_the_tree_hash_bit_equal() {
     let inverse = adapter
         .invert(&delta, &pre)
         .expect("invert answers")
+        .into_inverse()
         .expect("a branch with a commit on it has an inverse");
 
     adapter.apply(&delta).expect("the entry change applies");
@@ -68,10 +71,10 @@ fn a_commit_operation_returns_head_and_the_tree_hash_bit_equal() {
     assert_eq!(tree_back, tree_before, "AC-050: the tree hash is bit-equal");
 }
 
-/// **AC-050 case 2** — 「branch操作delta」: a reference reset, undone.
+/// **AC-050 case 2** -- "branch-operation delta": a reference reset, undone. (sem: SEM-gx-adapter-git-094)
 ///
-/// The delta is written in the grammar rather than planned, for the division §32 M4H4-5 追認 fixed:
-/// 42 §3.3 gives an [`gx_core::Intent`] a goal and no spelling for 「put this branch there」, so a
+/// The delta is written in the grammar rather than planned, for the division §32 M4H4-5 confirmed fixed:
+/// 42 §3.3 gives an [`gx_core::Intent`] a goal and no spelling for "put this branch there", so a (sem: SEM-gx-adapter-git-095)
 /// branch operation is a payload a caller constructs. The fixture's second branch supplies a commit
 /// that is not on `main`'s history, so the reset moves both numbers.
 #[test]
@@ -88,6 +91,7 @@ fn a_branch_operation_returns_head_and_the_tree_hash_bit_equal() {
     let inverse = adapter
         .invert(&delta, &pre)
         .expect("invert answers")
+        .into_inverse()
         .expect("a branch with a commit on it has an inverse");
 
     adapter.apply(&delta).expect("the reset applies");
@@ -130,8 +134,8 @@ fn the_retry_moves_neither_number() {
     println!("AC050_RETRY head {head_once} -> {head_twice}  tree {tree_once} -> {tree_twice}");
     assert_eq!(
         head_twice, head_once,
-        "the retry minted a second commit: the quantifier is 「同一 delta の再入」 (E-M4-3), and a \
-         branch that moves twice for one delta has not been applied idempotently"
+        "the retry minted a second commit: the quantifier is 'the same delta re-entering' (E-M4-3), and a \
+         branch that moves twice for one delta has not been applied idempotently (sem: SEM-gx-adapter-git-096)"
     );
     assert_eq!(tree_twice, tree_once);
 }

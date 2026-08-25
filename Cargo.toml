@@ -1,6 +1,18 @@
 [workspace]
 resolver = "2"
+# 🔴 **S③ (`req/493` §4 item 1)** adds `crates/gx-confine`, the eighteenth member: the
+# kernel-ruleset derivation `gx confine` stands on. It sits above `crates/gx-cli` because `gx-cli`
+# depends on it and this list reads bottom-up.
+#
+# 🔴 **Nothing may be written between the brackets below except a member path.** The note above is
+# here and not there because `workspace_members` — the hand parser three doubt tests share
+# (`probes/doubt/tests/workspace_doubt.rs`, `m6h7_delivery.rs`) — takes every line inside the array
+# as a member. A two-line comment placed among the paths was read as two members and
+# `the_member_count_is_declared_four_times_and_the_four_agree` reported 20 against 18, naming a
+# fragment of the prose as a crate. Measured, not assumed: that is what this lane's first attempt
+# did.
 members = [
+    "probes/doubt",
     "crates/gx-core",
     "crates/gx-canon",
     "crates/gx-witness",
@@ -11,25 +23,36 @@ members = [
     "crates/gx-adapter-fs",
     "crates/gx-adapter-git",
     "crates/gx-adapter-mcp",
+    "crates/gx-adapter-postgres",
+    "crates/gx-adapter-mysql",
+    "crates/gx-mcp-wire",
     "crates/gx-engine",
+    "crates/gx-confine",
     "crates/gx-cli",
     "crates/gx-api",
+    "sdk/wasm-verify",
 ]
 
-# `probes/doubt` is not a member of this workspace. It is a path-dependency test crate that
-# depends on the private development tree (`Glovrex_Alpha`), which is not part of this
-# repository. Test probes against that tree are maintained in the development tree, not here.
-
-# 🔴 卓-1 採 (req/38 §47, 規律51 形): 「MSRV=1.89 宣言採。根拠=cedar 4.12 の実測要求(M3 手 1)+
-# rust-toolchain.toml 1.97.1 pin 済/時期=M6 手 1 で `rust-version` を Cargo.toml へ/可逆=1 行」.
+# 🔴 **blocker item 1, adopted** (req/38 §47, discipline 51 shape): "MSRV=1.89 declaration adopted.
+# Grounds = cedar 4.12's measured requirement (M3 hand 1) + rust-toolchain.toml pinned to 1.97.1 / timing = M6 hand 1 moves `rust-version` into Cargo.toml / reversible = 1 line." (sem: SEM-Cargo.toml-001)
 #
-# 41 §2 と 33 NFR-023 は 1.85+ と書き、M3 手 1 が cedar-policy 4.12 の実要求を 1.89 と実測した。
-# 二つの数字のうち **build が通る方**が真であって、宣言だけが 1.85 のままだった間は、1.85 の runner
-# で build できると言いながら実際は落ちる状態だった——NFR-023 の CI job (`cargo msrv verify` 相当)が
-# まだ無いので、その嘘を捕まえる gate も無かった。
+# 41 §2 and 33 NFR-023 say 1.85+, and M3 hand 1 measured cedar-policy 4.12's real requirement as 1.89.
+# Of the two numbers, the one that is **true is whichever the build actually passes with** -- while the
+# declaration stayed at 1.85, it claimed to build on a 1.85 runner while actually failing there --
+# NFR-023's CI job (the `cargo msrv verify` equivalent) did not exist yet, so nothing caught that lie either. (sem: SEM-Cargo.toml-002)
 #
-# `[workspace.package]` に 1 度だけ書き、12 member は `rust-version.workspace = true` で継承する。
-# 12 箇所に同じ数字を書くのは 3 宣言 1 実測(M5H1-7)が防いだ形そのもの——数字が複数箇所に在って何とも
-# 比較されていなければ、それは複数の数字である。
+# Declared once in `[workspace.package]`, and the 12 members inherit it with `rust-version.workspace = true`.
+# Writing the same number in 12 places is exactly the shape 3-declarations-1-measurement (M5H1-7)
+# exists to prevent -- a number sitting in more than one place, never compared against the others, is, in effect, more than one number. (sem: SEM-Cargo.toml-003)
 [workspace.package]
 rust-version = "1.89"
+# P5 (req/134 §1 item 6): `dist generate` (cargo-dist) reads this for the installer scripts'
+# download URLs. Declared once here and referenced with `repository.workspace = true` by the
+# members `dist generate` names, the same pattern `rust-version.workspace = true` already uses
+# (blocker item 1, adopted; req/38 §47) rather than repeating the URL in each manifest. (sem: SEM-Cargo.toml-004)
+repository = "https://github.com/TraceFold/tracefold"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

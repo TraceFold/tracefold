@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Lexical locator normalisation for MCP: the `≈` of 42 §2.3, as a function (**E-M4-12**).
 //!
 //! The four clauses are in the crate root, where 42 §2.3 requires them and where an implementor reads
@@ -7,9 +9,9 @@
 //!
 //! # Why the clauses are RFC 3986's and not this hand's
 //!
-//! M3-10 fixes a policy pack's effective range at 「locator 級」. Two spellings that this function
+//! M3-10 fixes a policy pack's effective range at "the locator level". Two spellings that this function (sem: SEM-gx-adapter-mcp-053)
 //! leaves apart are therefore two policy subjects, and a rule written on one is not in force on the
-//! other -- which, for the adapter whose acceptance criterion is 「バイパス手段が技術的に存在しない」
+//! other -- which, for the adapter whose acceptance criterion is "no bypass route technically exists" (sem: SEM-gx-adapter-mcp-054)
 //! (AC-051), is a road around a policy rather than a cosmetic difference. So the definition of `≈` is
 //! taken from the document that defines when two URIs are the same URI, and its section numbers are
 //! quoted at each clause below.
@@ -73,7 +75,7 @@ impl Position {
 /// The representative spelling of a locator (crate root, clauses 1-4).
 ///
 /// Total: every string has a normal form, including one this adapter would refuse to act on. That is
-/// L7's shape -- 「normalising twice changes nothing」 over *every* string -- and the refusal of a
+/// L7's shape -- "normalising twice changes nothing" over *every* string -- and the refusal of a (sem: SEM-gx-adapter-mcp-055)
 /// locator that is not a position happens where the locator is **used** ([`parse`]), not where it is
 /// spelled. A normaliser that refused would make L7 a property with exceptions.
 #[must_use]
@@ -95,8 +97,8 @@ pub fn normalize(locator: &str) -> String {
 /// # Errors
 /// [`Error::NotAPosition`] when the spelling names fewer than two parts, when the server endpoint
 /// carries no scheme (crate root, ASM-69-3's argument), when either part is empty, or when the
-/// resource carries a `#` of its own. All four are 「引数が位置でない」 and not 「適用に失敗した」
-/// (**M4H5-5 採(b)**): 43 T-11 turns `ApplyFailed` into `AbortReason::ApplyFailed`, which would record
+/// resource carries a `#` of its own. All four are "the argument is not a position" and not "the apply failed" (sem: SEM-gx-adapter-mcp-056)
+/// (**M4H5-5, adopted (b)**): 43 T-11 turns `ApplyFailed` into `AbortReason::ApplyFailed`, which would record (sem: SEM-gx-adapter-mcp-057)
 /// a change that failed where no change was ever describable.
 pub fn parse(locator: &str) -> Result<Position> {
     let normalised = normalize(locator);
@@ -122,8 +124,8 @@ pub fn parse(locator: &str) -> Result<Position> {
     }
     if !server.contains(SCHEME_SEPARATOR) {
         return Err(refuse(
-            "the server endpoint carries no scheme: a bare name is 「whichever server that name \
-             pointed at when this ran」, and ASM-69-3 is the rule that a signed record may not \
+            "the server endpoint carries no scheme: a bare name is 'whichever server that name (sem: SEM-gx-adapter-mcp-058) \
+             pointed at when this ran', and ASM-69-3 is the rule that a signed record may not (sem: SEM-gx-adapter-mcp-059) \
              depend on that",
         ));
     }
@@ -199,7 +201,7 @@ fn normalize_authority(authority: &str) -> String {
 /// Clause 3 (§6.2.2.2): a percent triplet is spelled in upper case, and a triplet that encodes an
 /// **unreserved** character is decoded.
 ///
-/// 「unreserved」 is §2.3's set: `ALPHA / DIGIT / "-" / "." / "_" / "~"`. Decoding anything outside it
+/// "unreserved" is §2.3's set: `ALPHA / DIGIT / "-" / "." / "_" / "~"`. Decoding anything outside it (sem: SEM-gx-adapter-mcp-060)
 /// would change what the URI means -- a `%2F` is not a `/` -- which is why the two halves of this
 /// clause are not one.
 ///
@@ -275,7 +277,7 @@ fn remove_dot_segments(path: &str) -> String {
         return format!("{path}{tail}");
     }
 
-    // A path ending in a dot segment ends in a separator once that segment is gone (「/a/.」 is 「/a/」),
+    // A path ending in a dot segment ends in a separator once that segment is gone ("/a/." is "/a/"), (sem: SEM-gx-adapter-mcp-061)
     // so the trailing empty segment is written in before the split rather than patched in after.
     let body = if body == "." || body == ".." || body.ends_with("/.") || body.ends_with("/..") {
         format!("{body}/")
@@ -288,7 +290,7 @@ fn remove_dot_segments(path: &str) -> String {
         match segment {
             "." => {}
             ".." => {
-                // 「there is nothing above the root to name」: a `..` that would climb out is dropped,
+                // "there is nothing above the root to name": a `..` that would climb out is dropped, (sem: SEM-gx-adapter-mcp-062)
                 // which is §5.2.4's C step for a path already at its base.
                 segments.pop();
             }

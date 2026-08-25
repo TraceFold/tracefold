@@ -1,17 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The seven methods of 41 §4, all seven of them as of hand 6.
 //!
 //! Four arrived in hand 4 (`kind`, `snapshot`, `plan`, `precondition`), two in hand 5 (`apply`,
 //! `invert`) and `commutation` here. There is no [`Error::Unimplemented`] left in this file, which is
-//! the fact 51 §7's completion condition turns on -- the harness reports 「無い」 for that variant and
+//! the fact 51 §7's completion condition turns on -- the harness reports "none" for that variant and
 //! for nothing else, so an adapter with none of them is an adapter every obligation was **run**
-//! against (**§31 M4H3-4 (b)**). The word stays in the vocabulary regardless: §32 M4H4-2 追認 made it
+//! against (**§31 M4H3-4 (b)**). The word stays in the vocabulary regardless: §32 M4H4-2 confirmed it, making it (sem: SEM-gx-adapter-fs-007)
 //! permanent, because M7's git and mcp adapters will stand up one hand at a time as this one did.
 
 use gx_canon::cid::{self, Domain};
 use gx_core::{
     Cid, Commutation, Fingerprint, Intent, ObjectId, ObjectSnapshot, ReprKind, SubstrateKind,
 };
-use gx_substrate::{elide_scope, AppliedDelta, Error, PlannedDelta, Result, SubstrateAdapter};
+use gx_substrate::{
+    elide_scope, AppliedDelta, Error, InvertOutcome, PlannedDelta, Result, SubstrateAdapter,
+};
 
 use crate::locator;
 
@@ -105,7 +109,7 @@ impl SubstrateAdapter for FsAdapter {
 
     /// Name the state a commit is conditional on (**ASM-69-1**).
     ///
-    /// `scope` is the normalised absolute path and `digest` is the file's content -- 「metadata 除外」,
+    /// `scope` is the normalised absolute path and `digest` is the file's content -- "metadata excluded", (sem: SEM-gx-adapter-fs-008)
     /// for the reason the crate root gives at length: hand 5's `apply` renames, a rename always
     /// writes a new mtime, and a digest covering metadata would make the second `apply` of one delta
     /// observe a state the first never saw (L2).
@@ -132,12 +136,20 @@ impl SubstrateAdapter for FsAdapter {
     /// Delegates to [`crate::invert`]. **E-M4-30**: the escrowed inverse is constructed **before**
     /// `apply` (43 T-10b), because the inverse of an overwrite carries the old content and after the
     /// apply there is none.
-    fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<Option<PlannedDelta>> {
-        crate::invert::invert(delta, pre)
+    /// 🔴 **E-DR4626-1 (DR-46-26)** -- the free function is untouched and the outcome is derived
+    /// here, in one line, by [`InvertOutcome::from_option`].
+    ///
+    /// This adapter builds its inverse out of the snapshot it was handed. There is no *declared*
+    /// read that could fail on its own, so C-25's `Unknown` -- "the prior could not be read, and
+    /// this deployment said it would rather have the effect" -- has no preimage on this road:
+    /// `Some` is `True` and `None` is `False`, and `reads` is empty because the escrow read nothing
+    /// through a transport. `tests/` holds that as an assertion rather than as this sentence.
+    fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcome> {
+        crate::invert::invert(delta, pre).map(InvertOutcome::from_option)
     }
 
     /// Delegates to [`crate::commutation`], which decides independence from the two payloads and
-    /// touches no substrate (**M4-25 採(a)**, AC-052, AC-053).
+    /// touches no substrate (**M4-25, adopted (a)**, AC-052, AC-053). (sem: SEM-gx-adapter-fs-009)
     fn commutation(&self, a: &PlannedDelta, b: &PlannedDelta) -> Result<Commutation> {
         crate::commutation::commutation(a, b)
     }

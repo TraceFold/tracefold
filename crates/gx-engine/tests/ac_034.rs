@@ -1,18 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-034 (FR-034) — the commit-time CAS, and the `apply` that is never reached.
 //!
-//! 34 AC-034 逐語: 「Given: Canonicalized状態のT（対象`/tmp/target.txt`、Fingerprint₀記録済み）。
-//! When: テストハーネスが`gx commit <T.id>`呼び出し**直前**に別プロセスで対象ファイルへ書き込みを行い
-//! `Fingerprint₁≠Fingerprint₀`となる状況を注入したうえでcommitを実行。Then:
-//! `Aborted(PreconditionChanged)`が返り、モックadapterの`apply`呼び出し回数=0（一切呼ばれない）。」
+//! 34 AC-034, verbatim (sem: SEM-gx-engine-439): "Given: T in the `Canonicalized` state (target
+//! `/tmp/target.txt`, Fingerprint₀ already recorded). When: **immediately before** the test
+//! harness calls `gx commit <T.id>`, a separate process writes to the target file, injecting a
+//! situation where `Fingerprint₁≠Fingerprint₀`, and then commit runs. Then: `Aborted
+//! (PreconditionChanged)` is returned, and the mock adapter's `apply` call count = 0 (never
+//! called at all)."
 //!
-//! 32 FR-034: 「commit直前に `adapter.precondition(now)` でFingerprint₁を取得し、Fingerprint₀と不一致
-//! なら `Aborted(PreconditionChanged)` を返さなければならない（MUST）」. 43 INV-S7 states the same
-//! thing as a safety invariant: 「`Fingerprint₁≠Fingerprint₀`のとき、いかなる場合も`adapter.apply`は
-//! 呼ばれない（CAS優先）」.
+//! 32 FR-034: "immediately before commit, gx-engine must obtain Fingerprint₁ via
+//! `adapter.precondition(now)`, and if it disagrees with Fingerprint₀ it must return
+//! `Aborted(PreconditionChanged)` (MUST)". 43 INV-S7 states the same
+//! thing as a safety invariant: "when `Fingerprint₁≠Fingerprint₀`, `adapter.apply` is never
+//! called under any circumstance (the CAS takes priority)" (sem: SEM-gx-engine-439).
 //!
 //! # 🔴 What was injected, said plainly
 //!
-//! The criterion says 「別プロセスで対象ファイルへ書き込み」. This crate ships no adapter and takes
+//! The criterion says "a separate process writes to the target file" (sem: SEM-gx-engine-440). This crate ships no adapter and takes
 //! none as a dev-dependency (N-13, `ENGINE_ADAPTER_DECLARATIONS=0`), so there is no file and no
 //! process to write to it. The substrate here is [`support::CommitAdapter`]'s in-memory world, and
 //! the injection is a **separate thread** holding the same handle, joined before `commit` is called.
@@ -25,8 +30,8 @@
 //!
 //! # The two halves, and why the second one needs a counter
 //!
-//! 「`Aborted(PreconditionChanged)`が返り」 is a value, and any implementation that returns it looks
-//! right. 「apply呼び出し回数=0」 is what says the abort happened **before** the world moved rather
+//! "`Aborted(PreconditionChanged)` is returned" (sem: SEM-gx-engine-441) is a value, and any implementation that returns it looks
+//! right. "apply call count = 0" is what says the abort happened **before** the world moved rather
 //! than after, and only a counting adapter can answer it: an engine that applied and then noticed
 //! would return the same value with the same journal record and a substrate that had changed.
 
@@ -78,7 +83,8 @@ fn ac_034_a_concurrent_mutation_aborts_the_commit_without_applying() {
     let (mut engine, id, counts, world) = canonicalised("ac034_cas");
     let before = counts.totals();
 
-    // 「commit呼び出し直前に別プロセスで対象ファイルへ書き込み」 -- a writer the engine does not
+    // "a separate process writes to the target file immediately before the commit call"
+    // (sem: SEM-gx-engine-442) -- a writer the engine does not
     // know about, running on its own thread and finished before the call.
     let handle = Arc::clone(&world);
     std::thread::spawn(move || {
@@ -99,11 +105,12 @@ fn ac_034_a_concurrent_mutation_aborts_the_commit_without_applying() {
     assert_eq!(
         state,
         Lifecycle::Aborted(AbortReason::PreconditionChanged),
-        "43 T-10a: 「`Fingerprint₁` ≠ `Fingerprint₀`」 is PreconditionChanged"
+        "43 T-10a: \"`Fingerprint₁` ≠ `Fingerprint₀`\" is PreconditionChanged (sem: SEM-gx-engine-443)"
     );
     assert_eq!(
         after[4], 0,
-        "INV-S7: 「いかなる場合も`adapter.apply`は呼ばれない」 -- the counter says it was"
+        "INV-S7: \"in no case is `adapter.apply` called\" -- the counter says it was (sem: \
+         SEM-gx-engine-444)"
     );
     assert_eq!(
         engine.ledger().log().len(),
@@ -120,7 +127,8 @@ fn ac_034_a_concurrent_mutation_aborts_the_commit_without_applying() {
 ///
 /// `CommittingStarted` is on the device **before** the CAS runs, which is what makes the abort a
 /// recoverable state rather than a silence: 43 §7-3 reads a `CommittingStarted` with no terminal
-/// record after it as 「the crash was inside the critical section」, and a T-10a abort that had
+/// record after it as "the crash was inside the critical section" (sem: SEM-gx-engine-445), and
+/// a T-10a abort that had
 /// written nothing first would be indistinguishable from a commit that never started.
 #[test]
 fn ac_034_the_journal_records_the_section_it_opened_and_then_the_abort() {
@@ -192,7 +200,8 @@ fn ac_034_an_untouched_world_commits_and_applies_once() {
 
 /// 🔴 The CAS compares against `Fingerprint₀` and not against a value it just computed.
 ///
-/// The single defect AC-031's 「後段commit時に再取得できる」 exists to prevent, measured from the
+/// The single defect AC-031's "can be refetched at a later commit" (sem: SEM-gx-engine-446)
+/// exists to prevent, measured from the
 /// other side: after a commit, `Fingerprint₀` is still the fingerprint T-2 recorded, and the world
 /// has moved past it. An engine that had refreshed the stored fingerprint before comparing would
 /// pass AC-034's control case and fail this one — and would never abort, because it would always be

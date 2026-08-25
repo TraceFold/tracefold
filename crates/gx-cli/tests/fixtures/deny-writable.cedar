@@ -1,7 +1,7 @@
-// 🔴 **The test-only pack of M6H3-9 採(a)** — a pack that denies a path a suite may actually write.
+// 🔴 **The test-only pack of M6H3-9 adopted (a); sem: SEM-gx-cli-1902** — a pack that denies a path a suite may actually write.
 //
-// req/38 §50: 「書込可能 path を deny する **test 用 policy pack fixture**+`gx verify --policy <PATH>`
-// (44 拡張=E-M6-12 として手4 が実装時に確定)。record-only E2E の完成は手4 の DoD へ」.
+// req/38 §50: "deny a writable path — **a test-only policy pack fixture**, plus `gx verify --policy <PATH>`
+// (44's extension = E-M6-12, settled by hand 4 at implementation time). Record-only E2E's completion goes to hand 4's DoD" (sem: SEM-gx-cli-1903).
 //
 // # Why it has to exist
 //
@@ -13,7 +13,7 @@
 // for an ordinary user and a broken machine for a suite run as root. So hand 3 measured T-8r inside
 // the engine and raised the gap (M6H3-9). This file closes it: the denied locator is a file in a
 // temporary directory, so the record-only commit can be allowed to do exactly what DR-2 says it
-// does — 「適用は通すが `Receipt.enforced=false` が刻まれ、exit code は 0」 — and the suite can then
+// does — "the apply goes through, but `Receipt.enforced=false` is recorded, and the exit code is 0" (sem: SEM-gx-cli-1904) — and the suite can then
 // read the file and see that it moved.
 //
 // # Why it is **not** under `policies/`
@@ -27,9 +27,9 @@
 //
 // # The two statements
 //
-// Cedar is default-deny (「no request is authorized … unless there is a specific permit policy that
-// grants it」), so the permit is what makes an fs transformation decidable at all, and 「forbid
-// overrides permit」 is what makes the second statement win where both apply. `@id` on both, because
+// Cedar is default-deny ("no request is authorized … unless there is a specific permit policy that
+// grants it") (sem: SEM-gx-cli-1905), so the permit is what makes an fs transformation decidable at all, and "forbid
+// overrides permit" (sem: SEM-gx-cli-1906) is what makes the second statement win where both apply. `@id` on both, because
 // `PolicyEngine::parse` refuses a set without it (ASM-62-1) and because the deciding policy's id
 // reaches `PolicyDecisionRecord` and from there a receipt's CID.
 //

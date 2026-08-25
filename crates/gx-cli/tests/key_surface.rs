@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **M6-29** — `gx key gen`'s output holds no secret, and `gx key list` reads a directory.
 //!
-//! req/88 §6.2 手 2's DoD: 「`gx key gen --json` の出力に秘密鍵 byte が現れない probe(M6-29)」, from
-//! 44 §1.2's own clause 「秘密鍵はファイル/OSキーストアへ、**標準出力に出さない**」.
+//! req/88 §6.2 hand 2's DoD: "no secret-key bytes appear in `gx key gen --json`'s output, probe(M6-29)" (sem: SEM-gx-cli-1611), from
+//! 44 §1.2's own clause "the secret key goes to a file/OS keystore, **never to stdout**".
 //!
 //! # 🔴 The probe looks for the bytes, not for a field name
 //!
@@ -55,7 +57,7 @@ fn the_generated_secret_never_reaches_stdout() {
     );
     assert!(
         leaked.is_empty(),
-        "44 §1.2: 「秘密鍵は…標準出力に出さない」 — the secret appeared in {leaked:?}"
+        "44 §1.2: \"the secret key ... never goes to stdout\" (sem: SEM-gx-cli-1612) — the secret appeared in {leaked:?}"
     );
 
     // The positive control §30 asks for: the scanner finds the secret when it *is* there. Without
@@ -126,7 +128,64 @@ fn out_names_the_file_and_alg_refuses_what_this_version_cannot_write() {
     let err = keys::gen(&store, "rsa", None).expect_err("one algorithm");
     println!("KEY_ALG_REFUSAL exit={} {err}", err.exit_code());
     assert!(matches!(err, gx_cli::Error::Usage { .. }));
-    assert_eq!(err.exit_code(), 1, "44 §1.2: 「1=鍵生成/アクセス失敗」");
+    assert_eq!(
+        err.exit_code(),
+        1,
+        "44 §1.2: \"1=key generation/access failure\" (sem: SEM-gx-cli-1613)"
+    );
+}
+
+/// 🔴 **NFR-011 close, C3** — the algorithm pin's substance is the *type of the key material*,
+/// and the one door where an algorithm is **named** refuses by equality against that pin.
+///
+/// `req/38` §109 (DR-46-5, option (b); sem: SEM-gx-cli-1614): agility is keyid→alg binding on the **verifier's side**, and
+/// the pin is not a table consulted at run time — it is `ed25519_dalek::VerifyingKey` itself.
+/// The verification choke point (`crates/gx-witness/src/dsse.rs::verify_raw`) takes
+/// `VerifyingKeyRef { key: &VerifyingKey, .. }`, so non-ed25519 key material cannot *reach* the
+/// one curve operation: there is no constructor from a wire-supplied algorithm name, and the wire
+/// `DsseSignature { keyid, sig }` carries no alg field to dispatch on (pinned by the two C2
+/// schema tests, `gx-core/tests/m2_types.rs` and `gx-canon/tests/golden_vectors.rs`). RFC 8725
+/// §3.1's "each key MUST be used with exactly one algorithm" (sem: SEM-gx-cli-1615) is satisfied by the type, which is
+/// a check no code path can skip.
+///
+/// What is left for a runtime test is the single place an algorithm **name** enters gx: `--alg`.
+/// The refusal itself is already fixed by
+/// [`out_names_the_file_and_alg_refuses_what_this_version_cannot_write`] above (Usage, exit 1)
+/// and by `exit_map.rs::a_usage_error_exits_one_and_never_two` (`key gen --alg rsa` → 1). What
+/// was not yet pinned: that the pin **value** is 41's `"ed25519"`, single-sourced from
+/// `gx_witness::keys::KEY_ALGORITHM`; that the refusal *names* the pin (an operator told only
+/// "no" (sem: SEM-gx-cli-1616) cannot tell a typo from an unsupported curve); and that near-miss spellings — `none`,
+/// the JWS `alg:none` shape, a case variant, a padded spelling — are refused rather than
+/// repaired (one algorithm, one spelling: `Cid::from_text`'s strictness argument).
+#[test]
+fn the_algorithm_pin_is_the_key_type_and_the_alg_door_refuses_by_name() {
+    assert_eq!(keys::ALGORITHM, "ed25519", "the pin value is 41's default");
+    assert_eq!(
+        keys::ALGORITHM,
+        gx_witness::keys::KEY_ALGORITHM,
+        "one pin, single-sourced from the crate that writes key files"
+    );
+
+    let dir = secure_scratch("key_gen_alg_pin");
+    let store = KeyStore::at(dir.join("keys"));
+    for near_miss in ["none", "Ed25519", "ED25519", "ed25519 "] {
+        let err =
+            keys::gen(&store, near_miss, None).expect_err("only the pinned algorithm generates");
+        let text = err.to_string();
+        println!(
+            "KEY_ALG_PIN_REFUSAL alg={near_miss:?} exit={} msg={text}",
+            err.exit_code()
+        );
+        assert!(matches!(err, gx_cli::Error::Usage { .. }));
+        assert!(
+            text.contains("\"ed25519\""),
+            "the refusal names the pin: {text}"
+        );
+    }
+    assert!(
+        !store.dir().exists(),
+        "a refused generation writes nothing — the refusal happens before any directory is made"
+    );
 }
 
 /// 🔴 **M6H2-10** — a key written where 0600 cannot be honoured is warned about **at generation**.
@@ -137,8 +196,8 @@ fn out_names_the_file_and_alg_refuses_what_this_version_cannot_write() {
 /// operator did not know they had made. The judgement is now taken where they can still choose a
 /// different `--out`.
 ///
-/// A warning and not a refusal: 44 §1.2 gives `gen` no exit code for 「wrote it, but somewhere
-/// unsafe」, and an operator exporting to a shared volume on purpose is a real case.
+/// A warning and not a refusal: 44 §1.2 gives `gen` no exit code for "wrote it, but somewhere
+/// unsafe" (sem: SEM-gx-cli-1617), and an operator exporting to a shared volume on purpose is a real case.
 #[test]
 #[cfg(unix)]
 fn a_key_written_where_0600_cannot_hold_is_warned_about_at_generation() {
@@ -170,7 +229,7 @@ fn a_key_written_where_0600_cannot_hold_is_warned_about_at_generation() {
 /// `read_public` takes both documents, and refuses a third thing with a reason.
 ///
 /// The two are 44 §1.2's `{key_id, public_key}` and a gx key file. A receipt handed to `--key` by
-/// mistake gets told what it is, rather than 「not a key」 — M4H5-5's 「引数が不正を適用失敗と綴るな」
+/// mistake gets told what it is, rather than "not a key" — M4H5-5's "don't spell invalid input as an apply failure" (sem: SEM-gx-cli-1618)
 /// in the small.
 #[test]
 fn the_key_argument_reads_both_documents_and_names_what_a_third_thing_is() {
@@ -216,7 +275,7 @@ fn the_key_argument_reads_both_documents_and_names_what_a_third_thing_is() {
 /// 🔴 `~/.gx/keys/` is resolved from the environment, and its absence is a refusal rather than a
 /// fallback to the working directory.
 ///
-/// req/56 §1: 「秘密は project に置かない」. A `gen` that wrote into whatever directory the operator
+/// req/56 §1: "secrets are not placed in the project" (sem: SEM-gx-cli-1619). A `gen` that wrote into whatever directory the operator
 /// happened to be in is exactly the failure that sentence forbids, so the missing-home case answers
 /// with a usage error naming `--out`.
 #[test]
@@ -232,7 +291,7 @@ fn the_key_store_is_the_users_home_and_never_the_working_directory() {
             .expect("a path")
             .replace('\\', "/")
             .ends_with("/.gx/keys"),
-        "req/56 §3: 「秘密鍵=`~/.gx/keys/`」 — got {}",
+        "req/56 §3: \"secret key = `~/.gx/keys/`\" (sem: SEM-gx-cli-1620) — got {}",
         json["dir"]
     );
 
@@ -242,7 +301,10 @@ fn the_key_store_is_the_users_home_and_never_the_working_directory() {
         .env_remove("HOME")
         .env_remove("USERPROFILE"));
     println!("KEY_NO_HOME exit={} stderr={}", out.code, out.stderr.trim());
-    assert_eq!(out.code, 1, "規律52: 「入力不正」 is 1");
+    assert_eq!(
+        out.code, 1,
+        "discipline 52: \"invalid input\" is 1 (sem: SEM-gx-cli-1621)"
+    );
     assert!(
         out.stderr.contains("VALIDATION_ERROR"),
         "44 §1.3's problem object on stderr: {}",
@@ -250,6 +312,6 @@ fn the_key_store_is_the_users_home_and_never_the_working_directory() {
     );
     assert!(
         out.stdout.trim().is_empty(),
-        "44 §1.3: 「stdoutは何も出さない」"
+        "44 §1.3: \"stdout emits nothing\" (sem: SEM-gx-cli-1622)"
     );
 }

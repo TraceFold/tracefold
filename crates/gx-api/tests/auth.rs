@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **M6-10** — 44 §2.5's Bearer, on every route but one, and the absence said out loud.
 //!
 //! Three claims, and the third is the one a reviewer should read first:
 //!
 //! 1. every route but `/healthz` refuses an unauthenticated request;
-//! 2. `/healthz` does not (44 §2.6: 「認証不要」);
+//! 2. `/healthz` does not (44 §2.6: "no authentication required"; sem: SEM-gx-api-465);
 //! 3. **what the check does not do** is written where an operator meets it.
 
 mod support;
@@ -11,12 +13,12 @@ mod support;
 use gx_api::auth::{bind_refusal, Bearer, ABSENCE_NOTICE, DEFAULT_BIND};
 use support::{Server, TOKEN};
 
-/// 🔴 The paths a request can reach, **derived from the router** (M6H8-9 採(a), req/38 §55).
+/// 🔴 The paths a request can reach, **derived from the router** (M6H8-9, adopted (a), req/38 §55; sem: SEM-gx-api-466).
 ///
 /// This used to be a hand-written list of twelve, and hand 8 measured what that cost: `/stream` and
 /// M6-05's four list endpoints were added to the guarded block in hand 6 and never walked here, so
-/// 44 §2.5's 「全エンドポイント（`/healthz`除く）」 was being checked over a **subset** — 「構成上そう
-/// なっている」 with no assertion behind it. A second table is also a second thing to forget: the one
+/// 44 §2.5's "every endpoint (except `/healthz`)" was being checked over a **subset** — "that is how
+/// it is structurally arranged" (sem: SEM-gx-api-467) with no assertion behind it. A second table is also a second thing to forget: the one
 /// that was forgotten is exactly the one this probe existed to cover.
 ///
 /// So the routes are read out of `crates/gx-api/src/lib.rs`'s `guarded` block, which is where they
@@ -28,8 +30,8 @@ fn paths(id: &str) -> Vec<(&'static str, String)> {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs"),
     )
     .expect("the router's source is readable");
-    // 🔴 The **whole** of `router`, not the `guarded` block. 44 §2.5's sentence is 「全エンドポイント
-    // （`/healthz`除く）」, so the set this walk has to cover is every route the function declares
+    // 🔴 The **whole** of `router`, not the `guarded` block. 44 §2.5's sentence is "every endpoint
+    // (except `/healthz`)" (sem: SEM-gx-api-468), so the set this walk has to cover is every route the function declares
     // minus one — and a route **moved out** of the guard is exactly the mutation that a walk over
     // the guarded block alone could not see (it would shrink and stay green).
     let body = source
@@ -76,7 +78,7 @@ const SOME_ID: &str = "gx1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 /// 🔴 Twelve routes refuse an anonymous request with 44 §2.3's `UNAUTHORIZED`, and `/healthz` does not.
 ///
-/// Walked rather than sampled. 44 §2.5's 「全エンドポイント（`/healthz`除く）」 is a statement about the
+/// Walked rather than sampled. 44 §2.5's "every endpoint (except `/healthz`)" (sem: SEM-gx-api-469) is a statement about the
 /// **set**, and a suite that checked two of twelve would be checking that the layer exists rather
 /// than that it covers — which is the difference between a middleware and a habit.
 ///
@@ -106,7 +108,7 @@ async fn every_route_but_healthz_requires_a_bearer_token() {
         assert_eq!(answer.gx_code(), "UNAUTHORIZED", "44 §2.3's code for it");
         assert_eq!(
             answer.content_type, "application/problem+json",
-            "44 §2.3: 「全エラー応答は`Content-Type: application/problem+json`」"
+            "44 §2.3: \"every error response is `Content-Type: application/problem+json`\" (sem: SEM-gx-api-470)"
         );
         refused += 1;
     }
@@ -142,7 +144,7 @@ async fn every_route_but_healthz_requires_a_bearer_token() {
     assert_eq!(
         health.status.as_u16(),
         200,
-        "44 §2.6: 「`GET /healthz` … 認証不要」"
+        "44 §2.6: \"`GET /healthz` … no authentication required\" (sem: SEM-gx-api-471)"
     );
     assert_eq!(health.json["status"], "ok");
     assert!(health.json["engine_version"].is_string());
@@ -189,6 +191,75 @@ async fn a_wrong_token_is_refused_like_a_missing_one() {
     assert_eq!(scheme.status.as_u16(), 401);
 }
 
+/// 🔴 **AC-P2-2** — an **equal-length** wrong token is refused exactly like every other wrong one.
+///
+/// `a_wrong_token_is_refused_like_a_missing_one` above sends a token one byte *longer* than the
+/// server's, which [`gx_api::auth::Bearer::matches`] rejects on the length check before the
+/// constant-time comparison loop ever runs. This is the case that actually exercises that loop: a
+/// token the **same** length as [`TOKEN`], differing in one byte, so the request this suite sends is
+/// exactly the shape `the_token_comparison_is_over_the_whole_string` proves the primitive handles
+/// without an early return.
+#[tokio::test]
+async fn an_equal_length_wrong_token_is_refused_the_same_way() {
+    let server = Server::new("auth_equal_length_wrong_token", "before\n");
+    assert_eq!(
+        TOKEN.len(),
+        15,
+        "this test's premise: the fixture token is 15 bytes"
+    );
+
+    let mut wrong: Vec<u8> = TOKEN.as_bytes().to_vec();
+    wrong[0] = if wrong[0] == b'X' { b'Y' } else { b'X' };
+    let wrong = String::from_utf8(wrong).expect("ASCII in, ASCII out");
+    assert_eq!(wrong.len(), TOKEN.len(), "equal length, one differing byte");
+    assert_ne!(wrong, TOKEN);
+
+    let answer = server
+        .anonymous()
+        .send_with(
+            "GET",
+            &format!("/v1/candidates/{SOME_ID}"),
+            None,
+            &[("authorization", &format!("Bearer {wrong}"))],
+        )
+        .await;
+    println!(
+        "EQUAL_LENGTH_WRONG_TOKEN={} gx_code={}",
+        answer.status.as_u16(),
+        answer.gx_code()
+    );
+    assert_eq!(
+        answer.status.as_u16(),
+        401,
+        "44 §2.5: a token mismatch is 401 (sem: SEM-gx-api-472)"
+    );
+    assert_eq!(answer.gx_code(), "UNAUTHORIZED", "44 §2.3's code for it");
+}
+
+/// 🔴 **AC-P2-2** — a **valid** token reaches a guarded route and answers `200`.
+///
+/// The suites above all exercise refusal; this is the positive control §30's ledger asks every
+/// absence probe to carry. `GET /v1/escalations` is `lists.rs`'s own minimal guarded route (200
+/// with an empty page on a server nothing has been submitted to yet), so this asserts the Bearer
+/// layer's success path on a route that is not `/healthz` — the one route 44 §2.6 exempts and that
+/// therefore proves nothing about the guard itself.
+#[tokio::test]
+async fn a_valid_token_reaches_a_guarded_route_and_answers_200() {
+    let server = Server::new("auth_valid_token_200", "before\n");
+    let answer = server.client().send("GET", "/v1/escalations", None).await;
+    println!(
+        "VALID_TOKEN={} body={}",
+        answer.status.as_u16(),
+        answer.json
+    );
+    assert_eq!(
+        answer.status.as_u16(),
+        200,
+        "44 §2.5: the correct token → 200 (sem: SEM-gx-api-473)"
+    );
+    assert_eq!(answer.json["items"].as_array().map(Vec::len), Some(0));
+}
+
 /// 🔴 The comparison does not return early on the first differing byte.
 ///
 /// v0.1's whole authentication is [`Bearer::matches`], so the one place being careful obviously pays
@@ -215,8 +286,8 @@ fn the_token_comparison_is_over_the_whole_string() {
 /// 🔴 A server started with **no** token answers `INTERNAL`, not `UNAUTHORIZED`.
 ///
 /// 44 §2.5 makes a token required, so an empty one is not a configuration — it is a server that
-/// cannot satisfy the specification. Answering 401 would tell an operator 「your token is wrong」
-/// about a server that has none, which is M4H4-2's 「未実装と失敗を同じ顔にするな」 at the deployment
+/// cannot satisfy the specification. Answering 401 would tell an operator "your token is wrong"
+/// about a server that has none, which is M4H4-2's "don't give not-implemented and failure the same face" (sem: SEM-gx-api-474) at the deployment
 /// layer; and accepting the empty string would be authentication switched off while reporting that
 /// it passed.
 #[test]
@@ -231,10 +302,10 @@ fn an_unset_token_is_a_deployment_fault_and_not_a_refusal() {
     );
 }
 
-/// 🔴 **M6-10 採(b)** — the default bind is loopback and a public address is refused by name.
+/// 🔴 **M6-10, adopted (b)** (sem: SEM-gx-api-475) — the default bind is loopback and a public address is refused by name.
 ///
-/// 44 §1.2 gives `gx serve --bind` **no** default, and req/88 M6-10 named the consequence: 「未定義の
-/// まま実装すると `0.0.0.0` が既定になりうる(authorization 無しで公開 network に出る)」. The runtime is
+/// 44 §1.2 gives `gx serve --bind` **no** default, and req/88 M6-10 named the consequence: "implemented
+/// while still undefined, `0.0.0.0` can become the default (going onto a public network with no authorization)" (sem: SEM-gx-api-476). The runtime is
 /// hand 6's and the policy is this hand's, so that the hand which writes the flag is not also the
 /// hand that decides what it defaults to.
 #[test]
@@ -242,7 +313,7 @@ fn the_default_bind_is_loopback_and_anything_else_is_refused() {
     println!("DEFAULT_BIND={DEFAULT_BIND}");
     assert!(
         DEFAULT_BIND.starts_with("127.0.0.1:"),
-        "M6-10 採(b): 「既定 bind=127.0.0.1 固定」"
+        "M6-10, adopted (b): \"default bind = 127.0.0.1, fixed\" (sem: SEM-gx-api-477)"
     );
     assert!(
         bind_refusal(DEFAULT_BIND).is_none(),
@@ -270,14 +341,14 @@ fn the_default_bind_is_loopback_and_anything_else_is_refused() {
         println!("BIND_REFUSED {public}: {} chars", refusal.len());
         assert!(
             refusal.contains("loopback"),
-            "the refusal says why, because 「検査の不在を隠さない」 means saying it where it bites"
+            "the refusal says why, because \"don't hide the check's absence\" (sem: SEM-gx-api-478) means saying it where it bites"
         );
     }
 }
 
 /// 🔴 The absence notice exists, says the three things it has to, and is 45 §4-safe.
 ///
-/// req/38 §47's brief: 「『認可の検査は Bearer 1 本だけ』を `--help` と doc に明記」. A constant rather
+/// req/38 §47's brief: "spell out in `--help` and the docs that 'the only authorization check is one Bearer'" (sem: SEM-gx-api-479). A constant rather
 /// than prose in a report, so that `gx serve --help` (hand 6, the hand with the flag) renders the
 /// same words this crate's documentation carries.
 ///
@@ -304,8 +375,8 @@ fn the_absence_of_authorization_is_written_down() {
 
 /// 🔴 **E-M6-7** — a server whose key disagrees with the project's recorded keyid does not start.
 ///
-/// req/38 §50 M6H3-4 採(a)+(b) = E-M6-7: 「`.gx/config.toml` に engine 署名 keyid 参照(req/56 §2 の
-/// 「公開 keyid の参照のみ」枠)」. The **reader** of that file is `gx serve` (hand 6, the hand with the
+/// req/38 §50 M6H3-4, adopted (a)+(b) = E-M6-7: "`.gx/config.toml` carries a reference to the engine's signing keyid (within req/56 §2's
+/// 'a reference to the public keyid only' frame)" (sem: SEM-gx-api-480). The **reader** of that file is `gx serve` (hand 6, the hand with the
 /// flag); the **check** is here, in [`gx_api::state::AppState::new`], where a mismatch can stop the
 /// surface from existing rather than be noticed in a log.
 ///

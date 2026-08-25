@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 Graceful shutdown's three stages, and the exit that may not be 0.
 //!
-//! req/88 §6.2 asks for 「shutdown 中の新規 request 拒否+in-flight commit 待ち+時間制限で (b) へ落ちる」
-//! and, in red, for 「crash 経路を正常終了と綴らない」. Four probes, one per stage plus the exit.
+//! req/88 §6.2 asks for "refuse new requests during shutdown + wait for in-flight commits + fall through to (b) on a time limit"
+//! and, in red, for "don't spell the crash path as normal termination" (sem: SEM-gx-api-332). Four probes, one per stage plus the exit.
 //!
 //! What is measured here and what is not: this file drives the **router and the state**, which is
 //! where stages 1 and 2 live. The runtime — the bind, the signal, the deadline actually elapsing — is
@@ -20,7 +22,7 @@ use support::Server;
 ///
 /// `/healthz` is outside the Bearer guard (44 §2.6) and **inside** this one, deliberately: a load
 /// balancer's health check is the first request that has to stop succeeding when a server is going
-/// away. A surface answering 「ok」 while refusing everything else would keep traffic arriving at a
+/// away. A surface answering "ok" (sem: SEM-gx-api-333) while refusing everything else would keep traffic arriving at a
 /// socket that refuses it.
 #[tokio::test(flavor = "multi_thread")]
 async fn stage_one_refuses_new_requests_including_the_health_check() {
@@ -51,12 +53,12 @@ async fn stage_one_refuses_new_requests_including_the_health_check() {
     assert_eq!(work.status.as_u16(), 503);
     assert!(
         work.content_type.starts_with("application/problem+json"),
-        "44 §2.3: 「全エラー応答は`Content-Type: application/problem+json`」"
+        "44 §2.3: \"every error response is `Content-Type: application/problem+json`\" (sem: SEM-gx-api-334)"
     );
     assert_eq!(
         work.gx_code(),
         gx_api::gx_code::UNAVAILABLE,
-        "🔴 **E-M6-22** (§53, M6H6-4 採(a)), implemented in hand 7. This assertion read `INTERNAL` \
+        "🔴 **E-M6-22** (§53, M6H6-4, adopted (a); sem: SEM-gx-api-335), implemented in hand 7. This assertion read `INTERNAL` \
          for the whole of hand 6 and named the fold rather than hiding it: 44 §2.3's twelve codes \
          are twelve words about a request and none is a word about a server. The ruling added the \
          row, and the code is now the thing it always meant. `crates/gx-api/tests/m6h7_api.rs` \
@@ -114,9 +116,9 @@ async fn stage_two_counts_a_request_in_and_out() {
 
 /// 🔴 **Stage 3's exit** — a deadline that expired is **not** a normal termination.
 ///
-/// 44 §1.2 gives `gx serve` two codes and glosses 1 as 「起動失敗」; E-M6-16 already settled that
-/// §1.2's columns are excerpts and §1.4's table governs, and §1.4's 1 is 「エラー（入力不正・内部
-/// エラー・adapterエラー）」. A shutdown that abandoned work inside 43 T-9's critical section is an
+/// 44 §1.2 gives `gx serve` two codes and glosses 1 as "start-up failure" (sem: SEM-gx-api-336); E-M6-16 already settled that
+/// §1.2's columns are excerpts and §1.4's table governs, and §1.4's 1 is "error (bad input, internal
+/// error, adapter error)" (sem: SEM-gx-api-337). A shutdown that abandoned work inside 43 T-9's critical section is an
 /// internal error, and answering 0 would tell an init system that a process which may have left a
 /// half-applied commit stopped cleanly — M4H4-2 at the deployment layer.
 #[test]
@@ -137,11 +139,15 @@ fn stage_three_never_exits_zero() {
         abandoned.exit_code(),
         abandoned.to_json()
     );
-    assert_eq!(clean.exit_code(), 0, "44 §1.2: 「0=正常終了（SIGTERM等）」");
+    assert_eq!(
+        clean.exit_code(),
+        0,
+        "44 §1.2: \"0 = normal termination (SIGTERM, etc.)\" (sem: SEM-gx-api-338)"
+    );
     assert_eq!(
         abandoned.exit_code(),
         1,
-        "🔴 「crash 経路を正常終了と綴らない」 (req/88 §6.2)"
+        "🔴 \"don't spell the crash path as normal termination\" (sem: SEM-gx-api-339) (req/88 §6.2)"
     );
     // The log line carries the same three facts, so that an operator reading stdout learns what the
     // status alone cannot say: **how many** requests were abandoned.

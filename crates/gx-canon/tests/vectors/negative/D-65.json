@@ -1,18 +1,18 @@
 {
   "id": "D-65",
   "kind": "policy-limit",
-  "statement": "入れ子の深さが gx の上限(64 段)を超える byte 列は decode されない",
+  "statement": "A byte string whose nesting depth exceeds gx's ceiling (64 levels) is not decoded",
   "vector": "81a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616100",
   "expected": "REJECT",
   "expected_error": "TooDeep",
   "normative_basis": "gx-policy",
   "tier": "gx",
-  "deviation": "`[ {\"a\": ...} ]` を 33 組 入れ子にし、最内側に整数 0 を置いた。scanner の depth は array 要素で 1・map の key と value で 1 ずつ増えるので、1 組=2 段。33 組目の map header が depth 65 に達し、`depth > MAX_DEPTH`(64)で TooDeep になる。**42 §2.1 のどの条項にも違反していない**——この byte 列は IPLD DAG-CBOR として完全に canonical である。拒む根拠は 41 §6 の panic=bug 系譜で、再帰 scanner が敵対的入力に stack を食い潰される事を型でなく上限で防いでいる(cbor.rs の MAX_DEPTH doc 逐語: 「shallow enough that a hostile input cannot exhaust the stack before scan_strict returns」)。したがって normative_basis は gx-policy であって IPLD-MUST でも IPLD-SHOULD でもない。",
-  "spec_anchor": "41 §6(panic=bug) / 42 §2.1(この条項には該当しない事を明記) / req/38 §17 F-2",
-  "origin": "gx self-authored for hand 7 (req/38 §17 F-2 の裁定)",
+  "deviation": "Nested `[ {\"a\": ...} ]` 33 times, placing the integer 0 at the innermost point. The scanner's depth increases by 1 for an array element and by 1 each for a map's key and value, so one nesting = 2 levels. The 33rd map header reaches depth 65, becoming TooDeep at `depth > MAX_DEPTH` (64). **It violates no clause of 42 §2.1 at all** -- this byte string is fully canonical as IPLD DAG-CBOR. The basis for refusing it is 41 §6's panic=bug lineage: the recursive scanner is protected from having its stack exhausted by hostile input, by a ceiling rather than by a type (`cbor.rs`'s `MAX_DEPTH` doc, verbatim: \"shallow enough that a hostile input cannot exhaust the stack before scan_strict returns\"). Hence `normative_basis` is gx-policy, neither IPLD-MUST nor IPLD-SHOULD.",
+  "spec_anchor": "41 §6(panic=bug) / 42 §2.1(explicitly stating this clause does not apply) / req/38 §17 F-2",
+  "origin": "gx self-authored for hand 7 (req/38 §17 F-2's ruling)",
   "control": {
     "vector": "81a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616181a1616100",
     "expected": "ACCEPT",
-    "note": "同じ形の 32 組=最内側が ちょうど depth 64。上限は「64 を超えたら拒む」であって「64 で拒む」ではないので、これは受理される。上限比較を `>` から `>=` へ動かすと **この対照が落ちる**——負例だけでは境界のどちら側に線が引かれているかを誰も測れない"
+    "note": "The same shape, 32 times -- the innermost point is exactly depth 64. The ceiling is \"refuse past 64\", not \"refuse at 64\", so this is accepted. Moving the ceiling comparison from `>` to `>=` **drops this control** -- the negative vector alone cannot tell anyone which side of the boundary the line is drawn on"
   }
 }

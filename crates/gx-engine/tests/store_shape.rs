@@ -1,16 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! What hand 3 is allowed to be, measured from the source: one blob store, one second ceiling, one
 //! reconstruction of Σ, and the two absences that make **E-M5-2** structural rather than promised.
 //!
-//! req/78 §6.2 手 3 is the load — 「store / escrow / replay(遷移では T-10b の器)+ AC-039」 — and
+//! req/78 §6.2's hand 3 is the load -- "store / escrow / replay (the vessel for T-10b in the
+//! transitions) + AC-039" (sem: SEM-gx-engine-888) -- and
 //! req/38 §37 settles the three rulings this file measures the shape of:
 //!
-//! > **M5-02 採(a)**=**E-M5-2**: replay は **Σ のみを再構成する read-only 操作**・AC-039 の「結果状態」
-//! > =Σ(状態表+ledger root+escrow index)と読む。adapter は呼ばない(機械検査つき)。
+//! > **M5-02, adopted (a)** = **E-M5-2**: replay is **a read-only operation that reconstructs only
+//! > Σ** -- AC-039's "resulting state" is read as Σ (the state table + ledger root + escrow index).
+//! > It does not call an adapter (with a machine check). (sem: SEM-gx-engine-889)
 //!
-//! > **M5-05 採(a)**: CID キーの blob store 1 本が `PlannedDelta` と `inverse_delta` の両方を持つ
-//! > (M4H6-3「既知 CID は参照のみ」を内包)。
+//! > **M5-05, adopted (a)**: one CID-keyed blob store holds both `PlannedDelta` and `inverse_delta`
+//! > (folding in M4H6-3's "a known CID is a reference only"). (sem: SEM-gx-engine-889)
 //!
-//! > **M5-20 採(a)+(c)**: engine 受取口の decode 前 byte 上限 1 箇所+契約行 1:1 probe(M4H2-8 形)。
+//! > **M5-20, adopted (a)+(c)**: one pre-decode byte ceiling per engine receiving mouth + a 1:1
+//! > probe against the contract row (M4H2-8's shape). (sem: SEM-gx-engine-889)
 //!
 //! # Why these are scans and not behaviour
 //!
@@ -28,7 +33,8 @@ mod support;
 
 use support::{read_repo, repo_root};
 
-/// The lines of a source file that are not comments (§30: 「invocation 行のみを対象にする」).
+/// The lines of a source file that are not comments (§30: "only invocation lines are the target")
+/// (sem: SEM-gx-engine-890).
 ///
 /// This crate's documentation discusses adapters, ceilings and journals at length, and a scan that
 /// read prose would report the discussion as the thing. The same filter `engine_shape.rs` uses.
@@ -59,8 +65,8 @@ fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 
 /// The body of a function, from its declaration to the line that closes it at the same indent.
 ///
-/// Written by indentation rather than by brace counting because the thing being asked is 「what does
-/// this one function reach for」, and a brace counter that swallowed a nested closure would answer a
+/// Written by indentation rather than by brace counting because the thing being asked is "what does
+/// this one function reach for" (sem: SEM-gx-engine-891), and a brace counter that swallowed a nested closure would answer a
 /// different question quietly. The declaration line is included so that a signature can be scanned
 /// with the same helper.
 fn function_body<'a>(text: &'a str, declaration: &str) -> Option<Vec<&'a str>> {
@@ -78,15 +84,18 @@ fn function_body<'a>(text: &'a str, declaration: &str) -> Option<Vec<&'a str>> {
 }
 
 // ---------------------------------------------------------------------------
-// M5-05 採(a): one blob store
+// M5-05, adopted (a): one blob store (sem: SEM-gx-engine-892)
 // ---------------------------------------------------------------------------
 
-/// **M5-05 採(a)**: there is **one** content-addressed store, and it is in `store.rs`.
+/// **M5-05, adopted (a)**: there is **one** content-addressed store, and it is in `store.rs`.
+/// (sem: SEM-gx-engine-893)
 ///
-/// The ruling's word is 「blob store **1 本**」, and 「1 本」 is what makes M4H6-3 (「residual CID が
-/// 既存 delta CID と一致するのは保管の一度性の裏返し」) an implementation rather than a coincidence:
+/// The ruling's word is "blob store, **one of it**", and "one of it" is what makes M4H6-3 ("a
+/// residual CID matching an existing delta CID is the mirror image of storage's one-ness") an
+/// implementation rather than a coincidence (sem: SEM-gx-engine-893):
 /// two stores holding the same CID would each think they were the one keeping it. 41 §2 fixes the
-/// module list, so 「in `store.rs`」 is not a preference — a blob store in `replay.rs` would make the
+/// module list, so "in `store.rs`" is not a preference -- a blob store in `replay.rs` would make the
+/// (sem: SEM-gx-engine-893)
 /// read-only side of **E-M5-2** own a writer.
 #[test]
 fn the_blob_store_is_declared_once_and_in_store_rs() {
@@ -109,7 +118,7 @@ fn the_blob_store_is_declared_once_and_in_store_rs() {
     assert_eq!(
         declarations.len(),
         1,
-        "M5-05 採(a) asks for one blob store and these exist: {declarations:?}"
+        "M5-05, adopted (a) asks for one blob store and these exist: {declarations:?} (sem: SEM-gx-engine-894)"
     );
     assert!(
         declarations[0].starts_with("store.rs:"),
@@ -118,14 +127,14 @@ fn the_blob_store_is_declared_once_and_in_store_rs() {
 }
 
 // ---------------------------------------------------------------------------
-// M5-20 採(a): the second ceiling, and the contract row that names it
+// M5-20, adopted (a): the second ceiling, and the contract row that names it (sem: SEM-gx-engine-895)
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5-20 採(a)**: each receiving mouth declares its ceiling **once**.
+/// 🔴 **M5-20, adopted (a)**: each receiving mouth declares its ceiling **once**. (sem: SEM-gx-engine-896)
 ///
 /// The engine has two places bytes it did not write come back in: the journal (hand 1's
-/// `MAX_RECORD_BYTES`) and the blob store (this hand's `MAX_BLOB_BYTES`). The ruling is 「decode 前
-/// byte 上限 1 箇所」 **per mouth**, and the reason two constants are right where one might look
+/// `MAX_RECORD_BYTES`) and the blob store (this hand's `MAX_BLOB_BYTES`). The ruling is "one
+/// pre-decode byte ceiling" **per mouth** (sem: SEM-gx-engine-897), and the reason two constants are right where one might look
 /// tidier is hand 1's: two files with different contents and different writers must be able to move
 /// independently, and sharing a constant would make one ceiling a statement about the other.
 ///
@@ -157,18 +166,19 @@ fn each_receiving_mouth_declares_one_ceiling() {
         assert_eq!(
             hits.len(),
             1,
-            "M5-20 採(a): `{name}` is declared once, and these exist: {hits:?}"
+            "M5-20, adopted (a): `{name}` is declared once, and these exist: {hits:?} (sem: SEM-gx-engine-898)"
         );
     }
 }
 
 /// **M4H2-8** form: the contract row and the one declaration name each other.
 ///
-/// 「契約表の行と定数宣言箇所の 1:1 probe」 (req/38 §30, and §37 asks for it again here). Neither end
+/// "a 1:1 probe between the contract table's row and the constant's declaration site" (req/38 §30,
+/// and §37 asks for it again here) (sem: SEM-gx-engine-899). Neither end
 /// is a contract on its own — a row naming a constant nobody declares is a promise with no
 /// mechanism, and a constant no row mentions is a mechanism with no promise. The row that has to
-/// name it is `get`'s, because `get` is the **decode 前** side: the ceiling is checked against the
-/// size on disk before the bytes are read, which is the whole content of 「decode 前」.
+/// name it is `get`'s, because `get` is the **pre-decode** side: the ceiling is checked against the
+/// size on disk before the bytes are read, which is the whole content of "pre-decode" (sem: SEM-gx-engine-900).
 #[test]
 fn the_blob_contract_row_names_the_ceiling() {
     let store = read_repo("crates/gx-engine/src/store.rs");
@@ -200,8 +210,9 @@ fn the_blob_contract_row_names_the_ceiling() {
 
 /// **M5H1-6's condition**: the store does not declare a third spelling of a recovery.
 ///
-/// §38 ruled 採(a) -- 「`gx_log::Recovery` の再輸出=1 綴り維持」 -- **conditionally**: 「手 3 の store が
-/// 3 つ目の失敗型を作らない事を条件に」. This is that condition, measured. It holds for a structural
+/// §38 ruled adopted (a) -- "re-exporting `gx_log::Recovery` keeps one spelling" -- **conditionally**:
+/// "on condition that hand 3's store does not create a third failure type" (sem: SEM-gx-engine-901).
+/// This is that condition, measured. It holds for a structural
 /// reason rather than by restraint: a directory of whole files has no torn tail, so a blob is either
 /// present and complete, absent, or the wrong size -- and the last two are refusals in
 /// [`gx_engine::Error`] rather than a report about a damaged file. One idea, one word.
@@ -234,7 +245,7 @@ fn the_store_declares_no_second_recovery() {
 /// **E-M5-2**: the reconstruction of Σ lives in `replay.rs`.
 ///
 /// 42 §1.3-3 keys the engine's state table on `TransformationId` and 43 §7-1 makes the journal the
-/// thing it is rebuilt from, so 「Σ を再構成する」 is the reading side of the same file that reads the
+/// thing it is rebuilt from, so "reconstructing Σ" (sem: SEM-gx-engine-902) is the reading side of the same file that reads the
 /// journal's bytes. A `Sigma` built in `pipeline.rs` would be Σ built by the code that also decides
 /// transitions, and the bit-equality AC-039 asks for would then be a value compared with itself.
 #[test]
@@ -253,7 +264,7 @@ fn sigma_is_reconstructed_in_replay_rs() {
 
 /// 🔴 **E-M5-2, first instrument**: the replay module cannot reach an adapter.
 ///
-/// 「adapter は呼ばない(機械検査つき)」. The check has two halves and this is the structural one: no
+/// "it does not call an adapter (with a machine check)" (sem: SEM-gx-engine-903). The check has two halves and this is the structural one: no
 /// code line in `replay.rs` names an adapter, and `reconstruct` takes journal records and nothing
 /// else. A function that is not handed a substrate cannot call one, which is why the signature is
 /// part of the claim rather than the call sites alone — a later hand that adds an
@@ -298,7 +309,7 @@ fn replay_names_no_adapter_and_reconstruct_is_handed_none() {
 
 /// 🔴 The one probe that keeps AC-039 from being a value compared with itself.
 ///
-/// AC-039 compares 「元の結果状態」 with 「再構成結果状態」. If the engine answered 「what is my state」
+/// AC-039 compares "the original resulting state" with "the reconstructed resulting state" (sem: SEM-gx-engine-904). If the engine answered "what is my state"
 /// by replaying its own journal, both sides of that comparison would come from the same bytes and
 /// the criterion would hold no matter what the reconstruction did. So the live Σ is built from the
 /// engine's own tables and this probe is what says so: `Engine::sigma` does not touch

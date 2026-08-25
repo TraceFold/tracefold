@@ -1,25 +1,31 @@
-//! `Evidence`: four variants (E-M2-3), and a CID that only gx-canon can mint (41 §6).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! `Evidence`: four variants (E-M2-3), and a CID that only gx-canon can mint (41 §6). (sem:
+//! SEM-gx-witness-230, SEM-gx-witness-231, SEM-gx-witness-232, SEM-gx-witness-233,
+//! SEM-gx-witness-234, SEM-gx-witness-235, SEM-gx-witness-236, SEM-gx-witness-237,
+//! SEM-gx-witness-238)
 //!
 //! No AC is claimed here. AC-016 is the type-check and lives in `ac_016.rs`; this file holds the
-//! other half of req/49 §5's hand-4 DoD — 「Evidence 全 variant の CID が canonical」 — plus the
+//! other half of req/49 §5's hand-4 DoD — "the CID of every Evidence variant is canonical" — plus the
 //! shape of the enum itself.
 //!
 //! # Four variants, and the ruling that fixed the number
 //!
-//! **E-M2-3** (`req/38_ERRATA_2026-08-07.md` §8) 逐語: 「Evidence=42 の 4 variant が正(43/44/34/35 の
-//! `HumanDecision` 参照は erratum・DR-03-1 の HumanApprovalToken が対応物)」. req/49 §3 M2-4 raised
+//! **E-M2-3** (`req/38_ERRATA_2026-08-07.md` §8) verbatim: "the four variants of Evidence=42 are
+//! correct (the `HumanDecision` references in 43/44/34/35 are an erratum; DR-03-1's
+//! `HumanApprovalToken` is the corresponding thing)". req/49 §3 M2-4 raised
 //! the count as a conflict and proposed five; the ruling went the other way and the ruling is what
-//! binds. So a human decision is **not** an `Evidence` in gx: 43 T-5's 「人間裁定receipt」 is a
-//! receipt, and DR-03-1's `HumanApprovalToken` is the type that carries the approval. Reading
-//! req/49 §3 M2-4's 「5 variant で実装し」 as the instruction would implement a proposal the Owner
+//! binds. So a human decision is **not** an `Evidence` in gx: 43 T-5's "a signed human-ruling
+//! receipt" is a receipt, and DR-03-1's `HumanApprovalToken` is the type that carries the approval. Reading
+//! req/49 §3 M2-4's "implement with 5 variants" as the instruction would implement a proposal the Owner
 //! declined.
 //!
 //! # 42 §1.3: every field is in the identity
 //!
-//! The IdentityView table gives `Evidence`（各variant）「全フィールド」 with 除外なし — an evidence
+//! The IdentityView table gives `Evidence` (each variant) "all fields", no exclusions — an evidence
 //! item is an independent piece of evidence, so nothing about it is metadata. The projection is
 //! therefore the value itself, and the CID is `gx_canon::cid::compute`'s: projection → canonical
-//! DAG-CBOR → BLAKE3, with no second road (AC-014's 迂回禁止 holds for this crate's types as it
+//! DAG-CBOR → BLAKE3, with no second road (AC-014's ban on a bypass road holds for this crate's types as it
 //! does for gx-core's).
 
 mod support;
@@ -71,8 +77,8 @@ fn evidence_has_the_four_variants_42_3_7_declares() {
     );
 }
 
-/// 42 §3.7 逐語: `TestOutcome` = `Pass | Fail | Skip | Error`, `PolicyDecision` = `Allow | Deny`
-/// （「`cedar_policy::Decision`と同一語彙」）.
+/// 42 §3.7 verbatim: `TestOutcome` = `Pass | Fail | Skip | Error`, `PolicyDecision` = `Allow | Deny`
+/// ("the same vocabulary as `cedar_policy::Decision`").
 #[test]
 fn the_two_auxiliary_enumerations_carry_42_3_7s_vocabularies() {
     let outcomes = [
@@ -101,8 +107,8 @@ fn the_two_auxiliary_enumerations_carry_42_3_7s_vocabularies() {
     );
 }
 
-/// 42 §3.7: 「**測定値自体（`f64`）はEvidence CIDに直接埋め込まない**…ここはそのdigestのみを保持
-/// する（P-10）」. The type is what enforces it: `Measurement` has a `value_digest: Cid` and no
+/// 42 §3.7: "**the measured value itself (`f64`) is not embedded directly in the Evidence CID** ...
+/// this only holds its digest (P-10)". The type is what enforces it: `Measurement` has a `value_digest: Cid` and no
 /// numeric field at all, so 42 §2.1-4's float ban has nothing to catch here.
 #[test]
 fn a_measurement_carries_a_digest_and_never_a_number() {
@@ -130,7 +136,7 @@ fn every_variant_has_a_cid_and_the_bytes_behind_it_are_canonical() {
             "the same value hashed to two digests"
         );
 
-        // 42 §1.3 gives this type 全フィールド with 除外なし, so the projection is the value and the
+        // 42 §1.3 gives this type "all fields" with no exclusions, so the projection is the value and the
         // bytes hashed are the bytes `encode` writes. Checking them canonical is checking that the
         // projection did not smuggle in a form the encoder would refuse.
         let bytes = cbor::encode(&e).expect("canonical form");
@@ -159,7 +165,7 @@ fn the_four_variants_do_not_collide() {
     assert_eq!(digests.len(), before, "two variants share a CID");
 }
 
-/// 「全フィールド・除外なし」 stated as something a machine can fail: change any one field of any
+/// "all fields, no exclusions" stated as something a machine can fail: change any one field of any
 /// variant and the identity moves. A field silently left out of the projection would show up here
 /// as two values sharing a digest.
 #[test]
@@ -334,11 +340,11 @@ fn every_field_of_every_variant_reaches_the_identity() {
 /// genuine in-toto Statement containing a number written with a decimal point therefore **has no
 /// CID**.
 ///
-/// This hand does not rule on it — the two 既定案 (fold `inline` to digest-only, or state the
+/// This hand does not rule on it — the two default proposals (fold `inline` to digest-only, or state the
 /// admitted numeric range) both change 42 §3.7's field table, which is not an implementation's to
-/// change (52 契約). What it does is make the refusal loud and measured rather than latent:
-/// `Error::NotCanonicalizable` naming `FloatNotAllowed`, which is req/26 §3's 「部分実装は範囲明示 +
-/// throw で正直に落ちる」. Raised as H4-4 in req/53 §4.
+/// change (52 contract). What it does is make the refusal loud and measured rather than latent:
+/// `Error::NotCanonicalizable` naming `FloatNotAllowed`, which is req/26 §3's "state the range
+/// explicitly + fail honestly via throw". Raised as H4-4 in req/53 §4.
 #[test]
 fn an_inline_statement_holding_a_float_has_no_identity_and_says_which_rule_refused_it() {
     let e = Evidence::ExternalAttestation {
@@ -385,7 +391,7 @@ fn an_inline_statement_of_integers_and_strings_does_have_an_identity() {
 // 41 §6 -- one road to a canonical form, and where that is checked
 // ---------------------------------------------------------------------------
 //
-// 41 §6 逐語: 「全 canonical encode は gx-canon 経由のみ」. There is **no test for it in this file**,
+// 41 §6 verbatim: "every canonical encode goes through gx-canon alone". There is **no test for it in this file**,
 // and the omission is deliberate rather than a gap: `gx-canon/tests/ac_014.rs` already scans every
 // `.rs` file under `crates/` and `probes/` outside gx-canon for a codec or a hash name, so a copy
 // here would be a second answer to one question, and the copy is weaker (this crate only, and only

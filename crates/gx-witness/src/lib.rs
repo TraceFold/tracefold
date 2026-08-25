@@ -1,4 +1,9 @@
-//! Provenance, evidence, and the signed receipt.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! Provenance, evidence, and the signed receipt. (sem: SEM-gx-witness-007, SEM-gx-witness-008,
+//! SEM-gx-witness-009, SEM-gx-witness-010, SEM-gx-witness-011, SEM-gx-witness-012,
+//! SEM-gx-witness-013, SEM-gx-witness-014, SEM-gx-witness-015, SEM-gx-witness-016,
+//! SEM-gx-witness-017)
 //!
 //! Spec: `req/spec/40-architecture/41-architecture.md` §2 for where this crate sits and what it
 //! may depend on, 42 §3.7 / §3.9 / §3.10 for the field tables it carries, 32 FR-015..FR-020 for
@@ -35,8 +40,8 @@
 //! do not have to rediscover them:
 //!
 //! * **E-M2-6** -- `ReceiptPayload.issued_at` leaves the signed core. 43 T-11 lists what a receipt
-//!   signature covers and no clock is in it; CM-5 states the rule (「signed payload から clock read
-//!   排除」). The timestamp becomes unsigned envelope metadata.
+//!   signature covers and no clock is in it; CM-5 states the rule ("exclude reading the clock from
+//!   the signed payload"). The timestamp becomes unsigned envelope metadata.
 //! * **E-M2-7** -- `fail_posture_engaged: bool` is **added** to `ReceiptPayload`. 35 ASM-13 and
 //!   43 T-4e require a verdict receipt to record that the fail-closed posture was engaged, and the
 //!   15 fields of 42 §3.10 have nowhere to put it. It is deterministic, so it belongs *inside* the
@@ -59,45 +64,62 @@
 //! Hand 5 adds the edge in the direction that remains: **gx-witness names gx-log**. Two obligations
 //! of this hand need the log's arithmetic and cannot be met without it.
 //!
-//! * AC-070 asks that a `CommitReceipt` be verified 「オフライン環境で署名検証＋inclusion proof検証
-//!   （既知checkpoint照合）」. The audit-path walk is `gx_log::proof`'s and repeating it here would be
+//! * AC-070 asks that a `CommitReceipt` be verified "verify the signature + verify the inclusion
+//!   proof (cross-check against a known checkpoint), in an offline environment". The audit-path walk
+//!   is `gx_log::proof`'s and repeating it here would be
 //!   a second verifier, which is exactly the drift E-M2-12 moved the `Proof` family down to avoid.
-//! * **H3-7** (`req/38_ERRATA_2026-08-07.md` §12) rules 「`Checkpoint.signature` … 手 5 で解消」 over
+//! * **H3-7** (`req/38_ERRATA_2026-08-07.md` §12) rules "`Checkpoint.signature` ... resolved in hand
+//!   5" over
 //!   the byte string hand 2 built for it, `gx_log::proof::checkpoint_signing_bytes`. The ruling
 //!   names a gx-witness function calling a gx-log one, so the edge was decided before this hand.
 //!
 //! E-M2-1 forbade the **cycle**, and cargo still refuses one: gx-log does not name gx-witness, and
 //! `tests/ac_018.rs` reads its manifest to keep it that way. 41 §2's informal dep line for this
-//! crate (「dep: ed25519-dalek」) lists neither gx-log nor the gx-canon hand 4 added; both are raised
+//! crate ("dep: ed25519-dalek") lists neither gx-log nor the gx-canon hand 4 added; both are raised
 //! in req/54 §4 rather than treated as licence.
 //!
 //! # Errors are typed here (**H4-7**)
 //!
-//! 41 §6: 「エラーは thiserror で型化」. Hand 4 left this crate with no `Error` at all, because its
-//! one public function was infallible, and req/53 §4 H4-7 recorded that AC-019's `Err(
-//! SignatureInvalid)` had 「どの正本にも定義が無い」. `req/38_ERRATA_2026-08-07.md` §13 gave the
+//! 41 §6: "errors are typed with thiserror". Hand 4 left this crate with no `Error` at all, because
+//! its one public function was infallible, and req/53 §4 H4-7 recorded that AC-019's `Err(
+//! SignatureInvalid)` had "no definition exists in any canonical source". `req/38_ERRATA_2026-08-07.md`
+//! §13 gave the
 //! vocabulary to this hand: [`Error`] is below, `SignatureInvalid` is its variant, and the fact
 //! that the word appears in 34 AC-019 and in no data model is raised in req/54 §4. 41 §2 fixes this
 //! crate's module list at six and none of them is `error.rs`, so the type lives in the crate root
 //! as gx-log's does.
 
 #![forbid(unsafe_code)]
+// NFR-022 (33): the receipt vocabulary is what an offline verifier reads, so every public item
+// documents what it attests and under which spec table. `deny` keeps that closed the way
+// gx-core's is (req/159 §B-2, req/166).
+#![deny(missing_docs)]
 
+pub mod coverage;
 pub mod dsse;
 pub mod evidence;
 pub mod keys;
 pub mod provenance;
 pub mod receipt;
 
-pub use dsse::{pae, DsseEnvelope, CHECKPOINT_PAYLOAD_TYPE, RECEIPT_PAYLOAD_TYPE};
+// 🔴 **P-1b** — the coverage table is a projection of `ReceiptPayload` and travels with it.
+pub use coverage::{
+    Answer, Declared, DeclaredAnswer, FacePosture, Measured, Question, ReceiptAnswer,
+    ReceiptCoverage, Unknown,
+};
+pub use dsse::{
+    pae, DsseEnvelope, CHECKPOINT_PAYLOAD_TYPE, RECEIPT_PAYLOAD_TYPE, STANDING_PAYLOAD_TYPE,
+};
 pub use evidence::{Evidence, InTotoStatementRef, PolicyDecision, TestOutcome};
 pub use keys::{
-    KeyPair, PublicKey, Retroaction, RevocationEntry, RevocationLedger, VerifyingKeyRef,
+    KeyPair, PublicKey, Retroaction, RevocationEntry, RevocationLedger, Standing, StandingEntry,
+    StandingLedger, VerifyingKeyRef,
 };
 pub use provenance::{Environment, Provenance, ProvenanceInputs};
 pub use receipt::{
-    revocation_status, verify_offline, verify_offline_consulting, Checks, InclusionCheck, Receipt,
-    ReceiptKind, ReceiptPayload, RevocationCheck, RevocationPolicy, VerdictSummary,
+    revocation_status, verify_offline, verify_offline_against, verify_offline_consulting,
+    Anchorage, Checks, InclusionCheck, Receipt, ReceiptKind, ReceiptPayload, RevocationCheck,
+    RevocationPolicy, VerdictSummary,
 };
 
 // FR-017's `Proof`, published rather than redefined (E-M2-12; see the crate note above).
@@ -110,12 +132,12 @@ pub use gx_core::{CheckerResultRef, Proof, ProofRef, TheoremId, VerdictKind};
 ///
 /// The two layers below are carried transparently rather than restated. gx-canon's `Error` already
 /// names which clause of 42 §2.1 caught a value and gx-log's names which shape of proof was
-/// malformed; flattening either into a string here would lose the thing req/38 §7's 「gx-canon Error
-/// の原因を不透明文字列に潰す」 backlog item complains about.
+/// malformed; flattening either into a string here would lose the thing req/38 §7's "crushing
+/// gx-canon Error's cause into an opaque string" backlog item complains about.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// AC-019 逐語: 「Then: `Err(SignatureInvalid)`」.
+    /// AC-019, verbatim: "Then: `Err(SignatureInvalid)`".
     ///
     /// # One variant for four failures, on purpose
     ///
@@ -128,13 +150,21 @@ pub enum Error {
     /// `key_id` is the key the check was made **against**, not a key from the receipt: naming a
     /// value the attacker controls in an error message is how a log line becomes an injection.
     #[error("no valid signature under key {key_id:?} (34 AC-019)")]
-    SignatureInvalid { key_id: String },
+    SignatureInvalid {
+        /// The key the check was made **against** -- the verifier's, never one named by the
+        /// (attacker-controlled) receipt. See the variant doc.
+        key_id: String,
+    },
 
     /// A receipt that is well-formed CBOR and not a legal receipt: ASM-14's kind-dependent fields
     /// (42 §3.10), a verdict kind outside the three, or a `key_id` disagreeing with the signature.
-    /// AC-070's 「スキーマ不正」.
+    /// AC-070's "schema invalid".
     #[error("the receipt is not a legal one: {detail}")]
-    Schema { detail: String },
+    Schema {
+        /// Which of ASM-14's rules the receipt broke, in words, for the human reading the
+        /// refusal.
+        detail: String,
+    },
 
     /// The canonical layer refused. Carried transparently (see the type's note).
     #[error(transparent)]
@@ -145,42 +175,83 @@ pub enum Error {
     Log(#[from] gx_log::Error),
 
     /// The filesystem refused, in [`keys`]. Same four fields as `gx_log::Error::Io` and for the
-    /// same reason: 「could not open the key」 and 「could not fsync it」 are one `ErrorKind` and two
+    /// same reason: "could not open the key" and "could not fsync it" are one `ErrorKind` and two
     /// completely different facts.
     #[error("{action} ({path}): {detail}")]
     Io {
+        /// What was being attempted when the filesystem refused, e.g. `"open"` or `"fsync"` --
+        /// the half a bare `ErrorKind` loses.
         action: &'static str,
+        /// The file involved.
         path: std::path::PathBuf,
+        /// The operating system's classification of the failure.
         kind: std::io::ErrorKind,
+        /// The operating system's message, verbatim.
         detail: String,
     },
 
     /// A key file that decoded but is not a key this version can use.
     #[error("the key file is not one this version reads: {detail}")]
-    KeyFormat { detail: String },
+    KeyFormat {
+        /// What about the file's shape this version could not read, in words.
+        detail: String,
+    },
 
     /// A key file somebody other than its owner can read (unix only; see [`keys`]).
     #[error("{path} is mode {mode:o}: a secret key must not be readable by group or other")]
-    KeyPermissions { path: std::path::PathBuf, mode: u32 },
+    KeyPermissions {
+        /// The offending key file.
+        path: std::path::PathBuf,
+        /// Its unix mode bits as found, so the message can show what to change.
+        mode: u32,
+    },
 
     /// The operating system would not supply randomness for [`KeyPair::generate`].
     #[error("the operating system supplied no entropy for a new key: {detail}")]
-    Entropy { detail: String },
+    Entropy {
+        /// The operating system's message, verbatim.
+        detail: String,
+    },
+
+    /// 🔴 **P2 item2** (`req/130` §1) — [`keys::KeyPair::load`] found a key
+    /// [`keys::KeyPair::save_encrypted`] wrote. Not [`Error::KeyFormat`]: the file is not corrupt,
+    /// it is a shape this function does not read at all — [`keys::KeyPair::load_encrypted`] is the
+    /// road, and the message names it rather than describing the bytes as broken.
+    #[error("{path} is encrypted (key_id {key_id:?}); use load_encrypted with its passphrase")]
+    KeyEncrypted {
+        /// The encrypted key file `load` refused to read.
+        path: std::path::PathBuf,
+        /// The key's id, readable from the unencrypted header -- named so the caller knows
+        /// *which* key wants its passphrase.
+        key_id: String,
+    },
+
+    /// 🔴 **P2 item2** — [`keys::KeyPair::load_encrypted`]'s AEAD authentication failed: the
+    /// passphrase was wrong, or the ciphertext was tampered with. The two are indistinguishable by
+    /// construction (that is what an authentication tag is for), and ruling 1 asks only that this face
+    /// be named apart from [`Error::KeyFormat`]'s -- a file whose *structure* this version cannot
+    /// read at all, decided before any passphrase is used.
+    #[error("{path}: the passphrase is wrong, or the file is corrupted (decryption did not authenticate)")]
+    WrongPassphrase {
+        /// The key file whose decryption did not authenticate.
+        path: std::path::PathBuf,
+    },
 }
 
 /// The vocabulary of [`Error`], declared once (**E-M2-23**).
 ///
 /// # 🔴 Why this arrives in M6 rather than in M2
 ///
-/// E-M2-23's rule is 「crate 毎 Error 語彙表(E-M2-23 起票の実体)を **1 箇所宣言**・宣言外は構成時
-/// 拒否」, and gx-core, gx-engine, gx-gate and gx-substrate each grew one. This crate and gx-log did
+/// E-M2-23's rule is "declare, per crate, **one place** for the Error vocabulary table (the
+/// substance of what E-M2-23 filed), and refuse anything outside the declaration at construction
+/// time", and gx-core, gx-engine, gx-gate and gx-substrate each grew one. This crate and gx-log did
 /// not, and nothing noticed until something had to **map** the vocabulary: M6-09 asks 44 §2.3's
 /// twelve `gx_code`s to cover every refusal the workspace can produce, and a map without a
 /// denominator is a map nobody can call complete. So the array is the denominator, and
 /// `crates/gx-api/src/gx_code.rs` const-asserts its length against its own table.
 ///
 /// In declaration order, which is also the order of the `match` in [`Error::kind`].
-pub const ERROR_KINDS: [&str; 8] = [
+pub const ERROR_KINDS: [&str; 10] = [
     "SignatureInvalid",
     "Schema",
     "Canon",
@@ -189,6 +260,8 @@ pub const ERROR_KINDS: [&str; 8] = [
     "KeyFormat",
     "KeyPermissions",
     "Entropy",
+    "KeyEncrypted",
+    "WrongPassphrase",
 ];
 
 impl Error {
@@ -209,6 +282,8 @@ impl Error {
             Error::KeyFormat { .. } => "KeyFormat",
             Error::KeyPermissions { .. } => "KeyPermissions",
             Error::Entropy { .. } => "Entropy",
+            Error::KeyEncrypted { .. } => "KeyEncrypted",
+            Error::WrongPassphrase { .. } => "WrongPassphrase",
         }
     }
 }

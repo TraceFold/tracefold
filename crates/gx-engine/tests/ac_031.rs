@@ -1,12 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-031 (FR-031) — `plan` records the delta and `Fingerprint₀`, and the fingerprint survives.
 //!
-//! 34 AC-031 逐語: 「Given: Draft状態のT。When: `snapshot+plan`ステップを実行。Then: `PlannedDelta`と
-//! Fingerprint₀が記録されCandidate状態へ遷移し、**ストアから`Fingerprint₀`を後段commit時に再取得
-//! できる**。」
+//! 34 AC-031, verbatim (sem: SEM-gx-engine-408): "Given: T in the `Draft` state. When: the
+//! `snapshot+plan` step runs. Then: `PlannedDelta` and Fingerprint₀ are recorded and it transitions
+//! to the `Candidate` state, and **`Fingerprint₀` can be retrieved back out of the store at the
+//! later commit stage**."
 //!
 //! # The last clause is the criterion
 //!
-//! The first two are shape. The one that matters is 「後段commit時に再取得できる」, because
+//! The first two are shape. The one that matters is "can be retrieved at the later commit stage"
+//! (sem: SEM-gx-engine-409), because
 //! `Fingerprint₀` is one half of CON-2's answer: 43 §7 compares it against `Fingerprint₁` at T-10a
 //! and 43 INV-S7 forbids `apply` when they differ. A fingerprint that were recomputed at commit
 //! time instead of retrieved would compare the substrate against itself and always agree, which is
@@ -15,13 +19,14 @@
 //! So this file measures **retrieval**, not recording: the value comes back out of the engine after
 //! other transitions have run, and it is the value the adapter gave at plan time.
 //!
-//! # M5-22 採(b): what 「不在」 answers
+//! # M5-22, adopted (b): what "absence" answers (sem: SEM-gx-engine-410)
 //!
 //! req/38 §37 rules that a missing object is not a state but a refusal the engine reads in context:
 //!
-//! > **M5-22 採(b)**: 不在は `snapshot` が `Err(NotFound)` で答え、engine が **creation intent の時
-//! > だけ**それを正常系として読む(E-M4-35 の engine 側の対・「Err を正常系に読む箇所が 1 つ増える」を
-//! > doc 明記)
+//! > **M5-22, adopted (b)**: absence is answered by `snapshot` with `Err(NotFound)`, and the engine
+//! > reads it as the normal case **only when it is a creation intent** (this hand's engine-side
+//! > counterpart to E-M4-35; document explicitly that "one more place reads `Err` as the normal
+//! > case") (sem: SEM-gx-engine-411)
 //!
 //! The doc line the ruling asks for is
 //! [`ac_031_an_absent_object_is_a_refusal_and_this_hand_reads_no_creation_intent`], and the honest
@@ -60,7 +65,7 @@ fn ac_031_plan_fixes_the_delta_the_fingerprint_and_the_state() {
 
     assert!(
         e.transformation_ids().is_empty(),
-        "M5-17 採(b): a draft is not in the table"
+        "M5-17, adopted (b): a draft is not in the table (sem: SEM-gx-engine-412)"
     );
     assert!(e.is_drafted(&gx_core::IntentId(
         gx_canon::cid::compute(&i).expect("canonical")
@@ -115,7 +120,8 @@ fn ac_031_the_fingerprint_is_retrievable_at_the_later_stage() {
 ///
 /// The row above is memory and hand 3's blob store is not built yet, so the journal is the only
 /// durable copy. `FingerprintRecord` is the mirror hand 1 introduced (**M5H1-4**) because
-/// `Fingerprint` has no serde face, and 「読み戻しは checked constructor 必須」 (E-6) is why the way
+/// `Fingerprint` has no serde face, and "reading it back requires the checked constructor"
+/// (E-6; sem: SEM-gx-engine-413) is why the way
 /// back is `Fingerprint::new` -- which is what this probe exercises.
 #[test]
 fn ac_031_the_journal_carries_the_fingerprint_and_hands_it_back_checked() {
@@ -153,17 +159,19 @@ fn ac_031_the_journal_carries_the_fingerprint_and_hands_it_back_checked() {
     );
 }
 
-/// 🔴 **M5-22 採(b)**'s doc line: this hand reads no `Err` as a normal case.
+/// 🔴 **M5-22, adopted (b)**'s doc line: this hand reads no `Err` as a normal case
+/// (sem: SEM-gx-engine-414).
 ///
 /// The ruling permits exactly one such place -- `snapshot` answering `Err(NotFound)` when the intent
 /// is a *creation* -- and requires the addition to be written down. Nothing is added: hand 2 has no
 /// creation intent to condition on (42 §3.3's `Intent` carries a `goal` an adapter interprets, and
-/// no field says 「this object does not exist yet」), so an adapter that cannot read the object is an
+/// no field says "this object does not exist yet" (sem: SEM-gx-engine-415)), so an adapter that cannot read the object is an
 /// `Error::Adapter` and the transformation does not exist. The count stays **zero**, and a hand that
 /// raises it owes this comment an edit.
 #[test]
 fn ac_031_an_absent_object_is_a_refusal_and_this_hand_reads_no_creation_intent() {
-    /// An adapter whose `snapshot` always refuses, the way E-M4-35 says an fs adapter reports 「無い」.
+    /// An adapter whose `snapshot` always refuses, the way E-M4-35 says an fs adapter reports
+    /// "does not exist" (sem: SEM-gx-engine-416).
     #[derive(Debug)]
     struct Absent;
 
@@ -200,7 +208,7 @@ fn ac_031_an_absent_object_is_a_refusal_and_this_hand_reads_no_creation_intent()
             &self,
             _d: &gx_substrate::PlannedDelta,
             _p: &gx_core::ObjectSnapshot,
-        ) -> gx_substrate::Result<Option<gx_substrate::PlannedDelta>> {
+        ) -> gx_substrate::Result<gx_substrate::InvertOutcome> {
             unreachable!("snapshot refuses first")
         }
         fn commutation(

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! A repository of one test's own, on a tmpfs, and the [`Fixture`] the 51 §7 harness runs against.
 //!
 //! # Why the tests do not write inside this repository
@@ -51,7 +53,7 @@ pub const BRANCH: &str = "refs/heads/main";
 /// A second branch, for changes that touch different things.
 pub const OTHER_BRANCH: &str = "refs/heads/side";
 
-/// A branch with no commits on it: git's 「unborn」 state, and this adapter's `Ok(None)`.
+/// A branch with no commits on it: git's "unborn" state, and this adapter's `Ok(None)`. (sem: SEM-gx-adapter-git-143)
 pub const UNBORN_BRANCH: &str = "refs/heads/fresh";
 
 /// The entry the harness's subject is.
@@ -146,7 +148,7 @@ pub struct Sandbox {
     dir: PathBuf,
     /// The commit `main` starts at, so that [`Sandbox::rewind`] can put it back.
     origin: ObjectId,
-    /// A commit on another branch, for the reset AC-050 calls 「branch操作delta」.
+    /// A commit on another branch, for the reset AC-050 calls "branch-operation delta". (sem: SEM-gx-adapter-git-144)
     elsewhere: ObjectId,
 }
 
@@ -181,7 +183,7 @@ impl Sandbox {
         );
         // HEAD is set explicitly rather than inherited: `gix::init` picks a default branch name from
         // configuration, and a fixture whose HEAD depended on whoever ran it would make AC-050's
-        // 「HEAD が bit-equal」 a statement about that machine.
+        // "HEAD is bit-equal" a statement about that machine. (sem: SEM-gx-adapter-git-145)
         set_reference(
             &repo,
             "HEAD",
@@ -246,7 +248,7 @@ impl Sandbox {
 
     /// Move `main` to a new commit, behind the adapter's back.
     ///
-    /// This is [`Fixture::disturb`]'s work and it stands for 「somebody else pushed」, which is the
+    /// This is [`Fixture::disturb`]'s work and it stands for "somebody else pushed", which is the (sem: SEM-gx-adapter-git-146)
     /// situation CON-2's CAS check exists for. It moves both things the harness watches: the object's
     /// digest (the entry's bytes change) and the scope's (the branch tip changes).
     pub fn commit_over(&self, content: &[u8]) -> ObjectId {
@@ -420,12 +422,12 @@ pub fn planned(adapter: &GitAdapter, locator: &str, goal: &[u8]) -> PlannedDelta
         .expect("the adapter plans an entry change")
 }
 
-/// A reset, written in the grammar rather than planned — **AC-050**'s 「branch操作delta」.
+/// A reset, written in the grammar rather than planned -- **AC-050**'s "branch-operation delta". (sem: SEM-gx-adapter-git-147)
 ///
-/// 42 §3.3 gives an [`Intent`] a `goal` and no spelling for 「put this branch there」, so `plan`
-/// produces entry changes only and a branch operation has to be constructed here. §32 M4H4-5 追認
-/// fixed exactly that division for the fs adapter's removal: 「文法席は AC の**前提**であって先行実装
-/// でない」.
+/// 42 §3.3 gives an [`Intent`] a `goal` and no spelling for "put this branch there", so `plan`
+/// produces entry changes only and a branch operation has to be constructed here. §32 M4H4-5 confirmed
+/// fixed exactly that division for the fs adapter's removal: "the grammar seat is the AC's **premise**
+/// and not an implementation-ahead". (sem: SEM-gx-adapter-git-148)
 ///
 /// # Panics
 /// If the sequence has no canonical form, which a one-element array of four fields always has.
@@ -455,8 +457,8 @@ pub fn spelled(locator: &str, content: &[u8]) -> PlannedDelta {
 /// The `pre` of a change to a position that holds nothing.
 ///
 /// 🔴 **Constructed here because the adapter will not produce one.** `GitAdapter::snapshot` reads the
-/// branch and answers `Unreadable` when it has no commits, so v0.1 has no way to describe 「this
-/// branch is unborn」 as a snapshot — and the `Ok(None)` of 51 §7 contract 5 is quantified at exactly
+/// branch and answers `Unreadable` when it has no commits, so v0.1 has no way to describe "this
+/// branch is unborn" as a snapshot -- and the `Ok(None)` of 51 §7 contract 5 is quantified at exactly (sem: SEM-gx-adapter-git-149)
 /// that state. The digest is the digest of no content, which is the same value an **empty** entry
 /// would have; `gx_adapter_git::repo::absent_digest` discloses the collision.
 ///
@@ -485,10 +487,10 @@ pub fn absent_snapshot(locator: &str) -> ObjectSnapshot {
 
 /// The 51 §7 harness's view of this adapter.
 ///
-/// 51 §7 逐語: 「各adapterクレートはこのハーネスを`#[test]`から呼び出すのみで契約テストを継承する」, so what
+/// 51 §7, verbatim: "each adapter crate only calls this harness from one `#[test]` to inherit the contract tests", so what (sem: SEM-gx-adapter-git-150)
 /// an adapter author writes is this type and nothing else. Its length is the **second** measurement of
-/// whether the eleven-method `Fixture` of M4 hand 3 is a reasonable ask (**M4H3-9**: 「M7 の git/mcp が
-/// 同じ形で継承できるかは**未検証**(実 adapter が 0 本のため)」), and `git_conformance.rs` prints it
+/// whether the eleven-method `Fixture` of M4 hand 3 is a reasonable ask (**M4H3-9**: "whether M7's git/mcp can
+/// inherit the same shape is **unverified** (because there are 0 real adapters)"), and `git_conformance.rs` prints it (sem: SEM-gx-adapter-git-151)
 /// beside the fs adapter's number.
 pub struct GitFixture {
     sandbox: Sandbox,
@@ -573,7 +575,7 @@ impl Fixture for GitFixture {
     ///
     /// 51 §7 contract 5 needs a subject only the adapter's author can produce, and the crate root
     /// argues why git's is not the fs adapter's escrow ceiling: a git inverse carries an object id, so
-    /// no input can make it too large. What it cannot carry is 「the branch was not there」 — undoing
+    /// no input can make it too large. What it cannot carry is "the branch was not there" -- undoing (sem: SEM-gx-adapter-git-152)
     /// the first commit on a branch means **deleting** the branch, and v0.1's grammar spells no
     /// deletion. `invert` answers `Ok(None)` and **E-M3-4** asks a person.
     fn uninvertible(&self) -> Option<(PlannedDelta, ObjectSnapshot)> {
@@ -583,9 +585,9 @@ impl Fixture for GitFixture {
         Some((delta, pre))
     }
 
-    /// 51 §7's 可換 case: two changes on **two branches**.
+    /// 51 §7's commuting case: two changes on **two branches**. (sem: SEM-gx-adapter-git-153)
     ///
-    /// Not 「two files」 — the crate root argues at length why a git change's footprint is its branch,
+    /// Not "two files" -- the crate root argues at length why a git change's footprint is its branch, (sem: SEM-gx-adapter-git-154)
     /// and `git_commutation.rs` measures the case that difference decides.
     fn commuting_pair(&self) -> Option<(PlannedDelta, PlannedDelta)> {
         Some((
@@ -598,7 +600,7 @@ impl Fixture for GitFixture {
         ))
     }
 
-    /// 51 §7's 非可換 case: two changes on one branch.
+    /// 51 §7's non-commuting case: two changes on one branch. (sem: SEM-gx-adapter-git-155)
     fn conflicting_pair(&self) -> Option<(PlannedDelta, PlannedDelta)> {
         let subject = self.locator();
         Some((

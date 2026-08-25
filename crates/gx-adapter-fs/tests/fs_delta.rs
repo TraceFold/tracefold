@@ -1,20 +1,22 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The fs delta grammar: canonical DAG-CBOR, a free monoid, and exactly one operation in v0.1.
 //!
 //! # Three rulings, one payload
 //!
-//! * **M4-13 採(a)** (req/38 §28): 「v0.1 の fs delta は **単一 file 全置換**・原子性は rename…
-//!   **v0.1 の `apply` は len==1 の列のみ受理**・len>1 は Err(未対応の明示・黙って非原子実行しない=
-//!   fail-closed)」.
-//! * **M4-07 採(c)**: the composite is a **free monoid** in the payload -- 「fs payload を「単一 file
-//!   操作の列」とし、列の連結が合成の witness」 -- so the shape is a sequence even while only one
+//! * **M4-13, adopted (a)** (req/38 §28): "v0.1's fs delta is a **single whole-file replacement** -- atomicity is from `rename`...
+//!   **v0.1's `apply` accepts only a sequence of `len==1`**; `len>1` is Err (unimplemented, stated explicitly -- it does not run non-atomically in silence, i.e.
+//!   fail-closed)". (sem: SEM-gx-adapter-fs-196)
+//! * **M4-07, adopted (c)**: the composite is a **free monoid** in the payload -- "the fs payload is a 'sequence of single-file
+//!   operations', and concatenating the sequence is the witness of composition" -- so the shape is a sequence even while only one (sem: SEM-gx-adapter-fs-197)
 //!   length is accepted. A grammar that admitted a single operation and nothing else would have no
 //!   room for the composition the ruling named.
-//! * **N-14** (req/69 §1): 「fs delta の payload は canonical DAG-CBOR(42 §3.4)なので既存
-//!   `fuzz_dagcbor_decode` の射程内——**adapter 固有の parser を作るなら話が変わる**」. So this adapter
+//! * **N-14** (req/69 §1): "the fs delta's payload is canonical DAG-CBOR (42 §3.4), so it is within existing
+//!   `fuzz_dagcbor_decode`'s reach -- **it would be a different matter if the adapter wrote its own parser**". So this adapter (sem: SEM-gx-adapter-fs-198)
 //!   writes no parser: it derives `Serialize`/`Deserialize` and hands the bytes to gx-canon, which is
-//!   also what keeps 41 §6's 「canonical encode は gx-canon を通る」 true of an adapter's own grammar.
+//!   also what keeps 41 §6's "canonical encoding goes through gx-canon" true of an adapter's own grammar. (sem: SEM-gx-adapter-fs-199)
 //!
-//! # What 「連結が witness」 means for a CBOR array
+//! # What "concatenation is the witness" means for a CBOR array (sem: SEM-gx-adapter-fs-200)
 //!
 //! The mock of hand 3 used a framed byte format, where concatenating two payloads concatenated two
 //! sequences. Canonical DAG-CBOR cannot do that -- an array carries its length in the head -- so the
@@ -58,9 +60,9 @@ fn the_grammar_round_trips_through_gx_canon() {
 
 /// A removal is a distinct operation and survives the round trip.
 ///
-/// AC-049 (hand 5) asks for 「作成/変更/削除の 3 種」, so the grammar has to be able to say all three
+/// AC-049 (hand 5) asks for "creation / change / deletion, the three kinds", so the grammar has to be able to say all three (sem: SEM-gx-adapter-fs-201)
 /// before hand 5 can plan them. Hand 4 plans only the replacement -- an intent carries a goal, and a
-/// goal of 「nothing」 has no spelling in 42 §3.3 -- which is recorded here rather than left as a
+/// goal of "nothing" has no spelling in 42 §3.3 -- which is recorded here rather than left as a (sem: SEM-gx-adapter-fs-202)
 /// silence.
 #[test]
 fn a_removal_has_a_spelling_of_its_own() {
@@ -74,7 +76,7 @@ fn a_removal_has_a_spelling_of_its_own() {
         FsDelta::one(op("/tmp/x", b""))
             .encode()
             .expect("an encoding"),
-        "「remove the file」 and 「make the file empty」 are two changes and must not be one payload"
+        "'remove the file' and 'make the file empty' are two changes and must not be one payload (sem: SEM-gx-adapter-fs-203)"
     );
 }
 
@@ -89,8 +91,8 @@ fn a_longer_sequence_is_refused_rather_than_run() {
     assert_eq!(
         refusal.kind(),
         "Unimplemented",
-        "a two-operation sequence is not malformed, it is unsupported: 「黙って非原子実行しない=\
-         fail-closed」 (M4-13(a)), and 45 §3 names a multi-file `apply` as TH-3's residual condition"
+        "a two-operation sequence is not malformed, it is unsupported: 'it does not run non-atomically in silence, i.e. \
+         fail-closed' (M4-13(a)), and 45 §3 names a multi-file `apply` as TH-3's residual condition (sem: SEM-gx-adapter-fs-204)"
     );
     assert_eq!(MAX_OPS, 1, "the bound v0.1 declares, in one place");
 }
@@ -110,10 +112,10 @@ fn the_empty_sequence_is_not_a_v0_1_payload() {
 
 /// The monoid: concatenating sequences is associative, and the empty sequence is its unit.
 ///
-/// **M4-07 採(c)** is the ruling this measures -- 「形は **free monoid**…結合律だけ」 -- and it is
+/// **M4-07, adopted (c)** is the ruling this measures -- "the shape is a **free monoid**... just the associativity law" -- and it is (sem: SEM-gx-adapter-fs-205)
 /// measured on the sequences rather than on the bytes, for the reason the module documentation
-/// gives. Nothing here claims the general law the crate root explicitly refuses (「一般法則(合成
-/// arrow の delta=部分の合成)は主張しない」): this is associativity of concatenation, which is the
+/// gives. Nothing here claims the general law the crate root explicitly refuses ("the general law (a composite
+/// arrow's delta = the composition of its parts) is not claimed"): this is associativity of concatenation, which is the (sem: SEM-gx-adapter-fs-206)
 /// whole of what a free monoid promises.
 #[test]
 fn concatenation_is_the_composition() {
@@ -145,10 +147,10 @@ fn foreign_bytes_are_refused() {
 }
 
 /// A relative locator is refused as **not a position**, and not as a failed application
-/// (**M4H5-5 採(b)**).
+/// (**M4H5-5, adopted (b)**). (sem: SEM-gx-adapter-fs-207)
 ///
-/// req/38 §33 逐語: 「**`NotAPosition`** variant を追加(相対 locator の拒否は「適用失敗」でなく「引数が
-/// 位置でない」——ApplyFailed の流用は事実の誤記=Unimplemented と同じ三悪論法)」. Hand 5 spelled this
+/// req/38 §33, verbatim: "**adding the `NotAPosition` variant** (refusing a relative locator is not 'application failure' but 'the argument is not a
+/// position' -- reusing ApplyFailed would misstate the fact, the same three-evils fallacy as Unimplemented)". Hand 5 spelled this (sem: SEM-gx-adapter-fs-208)
 /// [`gx_substrate::Error::ApplyFailed`] and raised it against itself (req/74 §2 M4H5-5); the word
 /// exists now, and this is the probe that keeps the fact and its name together. A relative locator is
 /// a legal **value** of the grammar -- L7 is defined over every string -- and an illegal thing to act
@@ -165,8 +167,8 @@ fn a_relative_position_is_refused_as_not_a_position() {
     assert_eq!(
         refusal.kind(),
         "NotAPosition",
-        "「the argument is not a position」 and 「the delta could not be applied」 are different \
-         facts, and 43 T-11 turns the second into `AbortReason::ApplyFailed`"
+        "'the argument is not a position' and 'the delta could not be applied' are different \
+         facts, and 43 T-11 turns the second into `AbortReason::ApplyFailed` (sem: SEM-gx-adapter-fs-209)"
     );
     assert!(
         refusal.to_string().contains("relative/x"),

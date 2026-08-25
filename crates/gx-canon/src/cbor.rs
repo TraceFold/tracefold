@@ -1,4 +1,6 @@
-//! The wire face: canonical DAG-CBOR in, canonical DAG-CBOR out (A-4 面1).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The wire face: canonical DAG-CBOR in, canonical DAG-CBOR out (A-4 face 1) (sem: SEM-gx-canon-005).
 //!
 //! Spec: 42 §2.1 for the six rules that make a byte string canonical, 42 §2.3 for the
 //! idempotence requirement, 41 §6 for the rule that every canonical encode goes through this
@@ -36,6 +38,8 @@
 //! It is not the identity face. Everything is encoded here, `id` and `created_at` included,
 //! because AC-009 asks for a round trip over all fields. Dropping fields for CID purposes is
 //! the `IdentityView` projection of step 4.
+
+use core::ops::Range;
 
 use crate::{Error, Result};
 use ipld_core::ipld::Ipld;
@@ -256,10 +260,10 @@ impl<'a> Scan<'a> {
     ///
     /// Encoded, not decoded: the comparison includes the major-type-and-length header, so a
     /// two-byte key precedes a three-byte one whatever their letters are. That is IPLD's
-    /// spec.md L58 (「including their major type 3 and length」) and RFC 8949 §4.2.1's "bytewise
+    /// spec.md L58 ("including their major type 3 and length") and RFC 8949 §4.2.1's "bytewise
     /// lexicographic order of their deterministic encodings", and it is what the encoder named
-    /// by 42 §2.1-6 actually writes. The prose of 42 §2.1-2 says instead 「キーのUTF-8バイト列に
-    /// 対する」 order, which disagrees whenever two keys differ in length; the encoder's reading
+    /// by 42 §2.1-6 actually writes. The prose of 42 §2.1-2 says instead the order is over
+    /// "the key's UTF-8 byte sequence" (sem: SEM-gx-canon-006), which disagrees whenever two keys differ in length; the encoder's reading
     /// is the one implemented, and the disagreement is filed as an erratum candidate in req/41.
     fn map(&mut self, entries: usize, depth: usize) -> Result<()> {
         let all = self.b;
@@ -298,11 +302,120 @@ impl<'a> Scan<'a> {
             _ => Err(Error::SimpleValueNotAllowed { at, ai }),
         }
     }
+
+    /// The content bytes of an encoded definite-length text string, without its header.
+    ///
+    /// `None` for anything that is not one. The caller has already had these bytes through
+    /// [`Scan::item`], so the header is known-minimal and the content known-UTF-8; this only
+    /// has to say where the header stops.
+    fn text_content_of(encoded: &[u8]) -> Option<&[u8]> {
+        let first = *encoded.first()?;
+        if first >> 5 != 3 {
+            return None;
+        }
+        let header = match first & 0x1f {
+            0..=23 => 1,
+            24 => 2,
+            25 => 3,
+            26 => 5,
+            27 => 9,
+            _ => return None,
+        };
+        encoded.get(header..)
+    }
+
+    /// The byte span of the value stored at `key`, for a top-level map.
+    ///
+    /// Walks with the full strictness of [`Scan::map`] — the key-order rule included — because a
+    /// span taken out of bytes nobody audited is a span into whatever an attacker arranged.
+    fn value_span_of(&mut self, key: &str, depth: usize) -> Result<Option<Range<usize>>> {
+        let (major, arg, at) = self.head()?;
+        if major != 5 {
+            return Err(Error::NonTextMapKey { at, major });
+        }
+        let entries = usize::try_from(arg).map_err(|_| Error::Truncated {
+            at,
+            wanted: usize::MAX,
+            missing: usize::MAX,
+        })?;
+        let all = self.b;
+        let mut previous: Option<&[u8]> = None;
+        let mut found = None;
+        for _ in 0..entries {
+            let key_at = self.i;
+            let major = self.peek()? >> 5;
+            if major != 3 {
+                return Err(Error::NonTextMapKey { at: key_at, major });
+            }
+            self.item(depth + 1)?;
+            let encoded_key = &all[key_at..self.i];
+            if let Some(prev) = previous {
+                if encoded_key <= prev {
+                    return Err(Error::UnsortedOrDuplicateMapKey { at: key_at });
+                }
+            }
+            previous = Some(encoded_key);
+            let value_at = self.i;
+            self.item(depth + 1)?;
+            // 🔴 The key's *decoded* text, and an **exact** comparison.
+            //
+            // The first version of this line asked whether the encoded key *ended with* the name,
+            // which made `proof` a match for `inclusion_proof` — a span into the middle of a
+            // neighbouring value, and a digest over bytes that mean nothing.
+            // `tests/canonical_bytes_road.rs` was written with that case in it and caught it.
+            //
+            // The header is stripped by its own declared width rather than by subtracting the
+            // needle's length, so the comparison cannot be satisfied by a suffix: a key of a
+            // different length has a different header width and fails on the first branch.
+            if found.is_none() && Self::text_content_of(encoded_key) == Some(key.as_bytes()) {
+                found = Some(value_at..self.i);
+            }
+        }
+        Ok(found)
+    }
+}
+
+/// The byte span of the value stored at `key` in a canonical top-level map, or `None` when the map
+/// has no such key.
+///
+/// # 🔴 Why a **span** and not a decoded value (`req/38` §324 ruling 3)
+///
+/// A signed document's ledger leaf has to be derivable from the bytes that were signed, and not
+/// from a struct those bytes decode into. `req/519` §7-5 measured what the second road costs: the
+/// canonical form moves with the schema, so **every member ever added has already moved every
+/// historical leaf**, and a receipt nobody touched comes back `refuted` — the vocabulary's word
+/// for tampering. Three lanes in a row rebuilt that defect (`req/38` §294, §519 §7-5, §324).
+///
+/// A caller that wants to answer "what would these bytes digest to with one member cleared" needs
+/// to reach that member **without a type**, because the type it would reach for is this year's and
+/// the bytes are some earlier year's. That is what this returns.
+///
+/// The walk is [`scan_strict`]'s, so the bytes are audited to the whole of 42 §2.1 on the way past
+/// — including the key-order rule, which is what makes "the first entry whose key is `key`" the
+/// only entry whose key is `key`.
+///
+/// # Errors
+/// Every error [`scan_strict`] raises, plus [`Error::NonTextMapKey`] when the top-level item is not
+/// a map at all, and [`Error::TrailingBytes`] when something follows it.
+pub fn value_span(bytes: &[u8], key: &str) -> Result<Option<Range<usize>>> {
+    if bytes.is_empty() {
+        return Err(Error::Empty);
+    }
+    let mut scan = Scan { b: bytes, i: 0 };
+    let span = scan.value_span_of(key, 0)?;
+    if scan.i == bytes.len() {
+        Ok(span)
+    } else {
+        Err(Error::TrailingBytes {
+            at: scan.i,
+            extra: bytes.len() - scan.i,
+        })
+    }
 }
 
 /// Kani harness 1 of 3 (46 §4.2, row `gx-canon::cbor::encode/decode`).
 ///
-/// The two claims of that row are 「往復性・panic-freedom（不正入力を含む）」. Both are here:
+/// The two claims of that row are round-trip and panic-freedom (including invalid input) (sem: SEM-gx-canon-007). Both are here:
 /// a round trip over a symbolic value, and totality of [`scan_strict`] over symbolic *bytes* --
 /// the second being the one that matters, because [`scan_strict`] is gx's own hand-written parser
 /// and the only place in the workspace where hostile input is walked byte by byte.

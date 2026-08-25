@@ -1,7 +1,10 @@
-//! 🔴 **M6H3-10 採(b)** — measured first, and the measurement is the ruling's evidence.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6H3-10, adopted (b)** (sem: SEM-gx-engine-956) — measured first, and the measurement is the ruling's evidence.
 //!
-//! req/38 §50: 「**M6H3-10 採(b)・手4 が先に測る**: `EscalationTicket` が row から再構成できるかを
-//! 実測してから journal 語彙増(a)を判定。**手4 brief の必須項**」.
+//! req/38 §50: "**M6H3-10, adopted (b): hand 4 measures first** -- decide whether to grow the journal
+//! vocabulary (a) only after actually measuring whether `EscalationTicket` can be reconstructed from
+//! the row. **A required item of hand 4's brief**" (sem: SEM-gx-engine-956).
 //!
 //! Hand 3 found that a rehydrated row loses four things the journal does not hold — the escalation
 //! ticket, the verdict receipts, `blocked_by` and `since` — and named `gx escalation` as the verb
@@ -15,7 +18,7 @@
 //! it reads nothing but the id. ∴ a `TicketId` is a pure function of a `TransformationId`, and a
 //! process holding only Σ can rebuild the ticket a journalled `Verdict::Escalate` raised.
 //!
-//! The structural half of that claim — 「exactly one generator, and it reads nothing else」 — is
+//! The structural half of that claim -- "exactly one generator, and it reads nothing else" (sem: SEM-gx-engine-957) -- is
 //! `probes/doubt/tests/m6_surface_doubt.rs::exactly_one_road_builds_an_escalation_ticket`, because a
 //! property of the source is not something a test run can establish. This file measures the
 //! behaviour: what a second process loses, that it can get back, and that the value it gets back is
@@ -93,9 +96,9 @@ fn a_rehydrated_row_recovers_the_ticket_the_journal_never_held() {
     );
 }
 
-/// 🔴 The reverse map 44 §1.2's `<TICKET_ID>` needs (**M6-04 採(a)**), out of Σ alone.
+/// 🔴 The reverse map 44 §1.2's `<TICKET_ID>` needs (**M6-04, adopted (a)**), out of Σ alone (sem: SEM-gx-engine-958).
 ///
-/// 43 T-4c declares 「ticket idは`TransformationId`に1:1紐付け」 and until this hand the mapping ran
+/// 43 T-4c declares "the ticket id is bound 1:1 to `TransformationId`" (sem: SEM-gx-engine-958) and until this hand the mapping ran
 /// one way. The other direction is asserted here in the process that has planned nothing, because
 /// that is the process `gx escalation approve <TICKET_ID>` actually is.
 #[test]
@@ -133,7 +136,7 @@ fn a_ticket_id_resolves_to_its_transformation_in_a_process_that_planned_nothing(
     assert_eq!(
         resolved,
         Some(id),
-        "M6-04 採(a): the inverse of 43 T-4c's 1:1 declaration, computed from Σ"
+        "M6-04, adopted (a): the inverse of 43 T-4c's 1:1 declaration, computed from Σ (sem: SEM-gx-engine-959)"
     );
     assert!(
         engine.transformation(&id).is_none(),
@@ -141,8 +144,8 @@ fn a_ticket_id_resolves_to_its_transformation_in_a_process_that_planned_nothing(
          because a resume needs the id the resolution produces"
     );
 
-    // A name nothing raised resolves to nothing, which is 44 §1.2's 「6=未検出（チケット不明）」 and
-    // not an error: 「the ticket is unknown」 and 「the rebuild is broken」 are different facts.
+    // A name nothing raised resolves to nothing, which is 44 §1.2's "6 = not found (ticket unknown)"
+    // and not an error: "the ticket is unknown" and "the rebuild is broken" are different facts (sem: SEM-gx-engine-960).
     let absent = gx_gate::TicketId(gx_core::Cid([7u8; 32]));
     assert_eq!(
         engine

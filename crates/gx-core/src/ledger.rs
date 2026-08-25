@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The two ledger proofs a receipt refers to, as data.
 //!
 //! Spec: 42 §3.11 for both field tables, 41 §2 for the crate that computes them.
@@ -35,10 +37,15 @@ use serde::{Deserialize, Serialize};
 /// it, and the distinction is documented rather than encoded in a second type.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct InclusionProof {
+    /// Which leaf the proof speaks for, zero-based from the log's start (42 §3.11). Together
+    /// with `tree_size` it determines the shape of the whole audit path.
     pub leaf_index: u64,
     /// The tree size the proof was generated against. A proof is only meaningful against the root
     /// of a tree of exactly this size, which is why it travels with the path rather than beside it.
     pub tree_size: u64,
+    /// The sibling hashes from the leaf up to the root, in ascending level order. Empty is
+    /// legitimate, not malformed -- see the struct doc. Each entry is a node hash minted with
+    /// gx-canon's domain-byte API (E-M2-12), carried in the `Cid` container 42 §3.11 writes.
     pub audit_path: Vec<Cid>,
 }
 
@@ -46,8 +53,9 @@ pub struct InclusionProof {
 ///
 /// # The timestamp is kept
 ///
-/// E-M2-6 took `issued_at` out of the receipt's *signed core* -- CM-5, 「signed payload から clock
-/// read 排除」 -- because 43 T-11 lists what a receipt signature covers and no clock is in it.
+/// E-M2-6 took `issued_at` out of the receipt's *signed core* -- CM-5, "no clock read in the signed
+/// payload" (sem: SEM-gx-core-058) -- because 43 T-11 lists what a receipt signature covers and no
+/// clock is in it.
 /// That list is about receipts. A checkpoint's timestamp is a property of the tree head itself,
 /// nothing in 43 or 35 says otherwise, and removing it here would be a second erratum on a
 /// question nobody put. So the field stands as 42 §3.11 writes it and the question -- whether a
@@ -58,8 +66,14 @@ pub struct Checkpoint {
     /// The log's namespace, e.g. `glovrex-ledger/v1` (42 §3.11). It is what stops a checkpoint of
     /// one log from verifying against another's key.
     pub origin: String,
+    /// How many leaves the tree held when this head was signed (42 §3.11). The size is what an
+    /// inclusion proof is checked against, and what a later checkpoint must not shrink.
     pub tree_size: u64,
+    /// The Merkle root over those leaves -- the one value the signature makes tamper-evident,
+    /// and the anchor every [`InclusionProof`] audit path must reach.
     pub root_hash: Cid,
+    /// When the head was signed. A property of the tree head itself, kept for the reason the
+    /// struct doc gives (E-M2-6 is about receipts, not checkpoints).
     pub timestamp: Timestamp,
     /// Signed by the ledger key, which is not necessarily the receipt key (45 ASM-45-1 keeps v0.1
     /// to a single tier, so hand 3 may well use one key for both -- the type does not decide it).
@@ -67,7 +81,7 @@ pub struct Checkpoint {
 }
 
 // ---------------------------------------------------------------------------
-// FR-M04 -- the aggregate verdict checkpoint (M7 hand 6, 案 A)
+// FR-M04 -- the aggregate verdict checkpoint (M7 hand 6, option A; sem: SEM-gx-core-059)
 // ---------------------------------------------------------------------------
 
 /// How many verdicts of each kind a window held (**FR-M04**).
@@ -79,7 +93,8 @@ pub struct Checkpoint {
 /// transformation, and **no gate ran**. The journal records that row as `Verdict { kind: Admit,
 /// verdict_digest: None, fail_posture_engaged: true }` -- an admission with no verdict behind it --
 /// and folding it into `admit` would report a decision nobody made. M4H4-2 refused that shape
-/// twice ("「未実装」と「失敗」 wearing one face"), and a count published to an auditor is the last
+/// twice ("'not implemented' and 'failed' wearing one face"; sem: SEM-gx-core-060), and a count
+/// published to an auditor is the last
 /// place to start.
 ///
 /// So a reader of `admit` is reading gate answers, and a reader of `unverdicted` is reading the
@@ -88,8 +103,13 @@ pub struct Checkpoint {
     Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 pub struct VerdictTally {
+    /// How many transformations the gate refused in the window -- the number FR-M04 exists to
+    /// make expensive to hide.
     pub deny: u64,
+    /// How many the gate admitted. Gate answers only: the fail-posture admissions are counted
+    /// in `unverdicted`, not here (see the struct doc).
     pub admit: u64,
+    /// How many the gate raised to a human instead of answering (42 §3.8's third verdict).
     pub escalate: u64,
     /// 43 T-4e: admitted **because** the verifier was unreachable, by a gate that never ran.
     pub unverdicted: u64,
@@ -123,14 +143,16 @@ impl VerdictTally {
 ///
 /// # What it does not do -- two limits, and they are the AC's own words
 ///
-/// * 🔴 **裁定 #3**: it does not close **policy relaxation**. A gate widened until nothing is
-///   refused publishes `deny = 0`, honestly. The claim FR-M04 supports is 「**非開示**は検出でき
-///   る」 and no more; `crates/gx-engine/tests/ac_vc.rs::policy_relaxation_is_not_detected` is that
-///   sentence as a measurement.
-/// * 🔴 **裁定 #14**: it does not close a **split view**. What a signature attests is 「this key
-///   stated these counts」, never 「these are the only counts this key stated」, so one key can sign
+/// * 🔴 **ruling #3**: it does not close **policy relaxation**. A gate widened until nothing is
+///   refused publishes `deny = 0`, honestly. The claim FR-M04 supports is "**non-disclosure** can
+///   be detected" (sem: SEM-gx-core-061) and no more;
+///   `crates/gx-engine/tests/ac_vc.rs::policy_relaxation_is_not_detected` is that sentence as a
+///   measurement.
+/// * 🔴 **ruling #14**: it does not close a **split view**. What a signature attests is "this key
+///   stated these counts", never "these are the only counts this key stated", so one key can sign
 ///   two internally consistent chains for two verifiers. Detecting the fork needs the verifiers to
-///   compare, which is the consistency-proof window `req/98` §9 行 v-6 sends to v0.2.1.
+///   compare, which is the consistency-proof window `req/98` §9 row v-6 sends to v0.2.1 (sem:
+///   SEM-gx-core-062).
 ///
 /// # No hash chain, and why
 ///
@@ -146,6 +168,9 @@ pub struct VerdictCheckpoint {
     /// The log's namespace, as 42 §3.11 uses it on [`Checkpoint`]: what stops one deployment's
     /// counts from being read as another's.
     pub origin: String,
+    /// The counts themselves -- the signed claim. `tally.total()` must equal
+    /// `window_end - window_start`, and a verifier that finds otherwise has found a checkpoint
+    /// that does not describe its own window (AC-VC).
     pub tally: VerdictTally,
     /// The first verdict sequence number this checkpoint speaks for, inclusive. Zero for the
     /// first, and every later one opens where its predecessor closed.
@@ -171,5 +196,8 @@ pub struct VerdictCheckpoint {
     /// Outside the signed core, as [`Checkpoint`]'s is and for CM-5's reason: a verified
     /// checkpoint is a statement about counts, not about when they were written down.
     pub timestamp: Timestamp,
+    /// Over the signed core (everything above except `timestamp`), by the deployment's
+    /// checkpoint key. What turns the counts from a report into a commitment: retracting them
+    /// later means contradicting a signature (FR-M04).
     pub signature: DsseSignature,
 }

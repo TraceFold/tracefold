@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-002 (FR-002) — `Transformation` is built with every field, at both orders.
 //!
-//! AC-002 逐語: 「Given: order=0の`Transformation`（`subject=Subject::Object(oid)`）とorder=1の
-//! `Transformation`（`subject=Subject::Transformation(tid)`）を41 §3の全フィールド（id, order,
-//! subject, target, delta, context, actor, parents, created_at）で構築するコード。When: 両方を
-//! ビルドしフィールドへアクセスする。Then: `Subject`列挙が両orderで正しい variant を保持し、
-//! コンパイル・実行とも成功する。」
+//! AC-002, verbatim (quoted in SEM-gx-core-104): "Given: code that builds an order=0
+//! `Transformation` (`subject=Subject::Object(oid)`) and an order=1 `Transformation`
+//! (`subject=Subject::Transformation(tid)`) with every field of 41 §3 (id, order, subject, target,
+//! delta, context, actor, parents, created_at). When: both are built and their fields accessed.
+//! Then: the `Subject` enum holds the correct variant at both orders, and both compilation and
+//! execution succeed."
 //!
 //! The parenthesised list has nine names; the field count is **ten**. A-3
 //! (`req/38_ERRATA_2026-08-07.md` §1) rules 41 §3 correct and the AC-002 enumeration an erratum,

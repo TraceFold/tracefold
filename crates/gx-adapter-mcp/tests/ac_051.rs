@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-051**: there is no road to a tool call that does not pass a gate, and the road count is
 //! **derived**.
 //!
-//! 34 AC-051 逐語: 「Given: `gx-adapter-mcp`プロキシ配下のtool-call境界。When: プロキシを経由しない直接呼び
-//! 出し経路の有無を**構成レベルで検査**し、プロキシ経由呼び出しを実行する。Then: 全tool-callがsubmit→verify
-//! 経路を必ず通過し、バイパス手段が技術的に存在しない（direct呼び出し経路がブロックされる）ことを**結合テスト**
-//! で確認する。」
+//! 34 AC-051, verbatim: "Given: the tool-call boundary under the `gx-adapter-mcp` proxy. When: inspect at the **configuration level** whether a direct call path bypassing (sem: SEM-gx-adapter-mcp-380)
+//! the proxy exists, and carry out the call through the proxy. Then: every tool call always passes through the submit->verify (sem: SEM-gx-adapter-mcp-381)
+//! route, and no bypass route technically exists (the direct call path is blocked), by an **integration test** (sem: SEM-gx-adapter-mcp-382)
+//! is confirmed." (sem: SEM-gx-adapter-mcp-383)
 //!
-//! 裁定 #10 (`req/38` §56) fixes the **form**: 「AC-051 検査形式=**導出に格上げ**(宣言 list 禁)」, with
+//! Ruling #10 (`req/38` §56) fixes the **form**: "AC-051 inspection form = **upgraded to a derivation** (a declared list is forbidden)", with (sem: SEM-gx-adapter-mcp-384)
 //! M6H8-9's lesson behind it -- a hand-written route table missed five routes, and the fix was to derive
 //! the table from the router. Nothing below is a list of places somebody remembered.
 //!
@@ -17,7 +19,7 @@
 //! | **D-1** | `ToolCall` and `Admitted` cannot be built | **every crate that is not `gx-adapter-mcp`**, including ones that do not exist yet | the compiler (two `compile_fail` doctests in `src/transport.rs`, each with a control that compiles) |
 //! | **D-2** | inside the crate, both are minted in **one** place | every `.rs` file under this crate's `src/`, **enumerated by walking it** | a text scan, whose limit is printed beside it (M6H8-1's form) |
 //! | **D-3** | of the seven methods, **exactly one** reaches the transport | 41 §4's seven, **read out of the trait's source** rather than typed here | a counting transport |
-//! | **D-4** | above the adapter there is one road | every `.rs` file under `crates/*/src` | a scan for `SubstrateAdapter::apply` call sites (則 2, req/78 §3.3) |
+//! | **D-4** | above the adapter there is one road | every `.rs` file under `crates/*/src` | a scan for `SubstrateAdapter::apply` call sites (Rule 2, req/78 §3.3) | (sem: SEM-gx-adapter-mcp-385)
 //! | **D-5** | that road passes the gate | one denying engine, one admitting engine | **driving it**: 0 calls and 1 call |
 //!
 //! D-1 is the load-bearing one and D-5 is the one AC-051 asks for in as many words. D-2 and D-4 are
@@ -28,9 +30,9 @@
 //! # 🔴 What is **not** derived, and is not hidden
 //!
 //! * **A different process.** Nothing here stops one from speaking to the same MCP server directly.
-//!   AC-051's subject is 「プロキシ配下の tool-call 境界」 and making the proxy the only reachable endpoint
+//!   AC-051's subject is "the tool-call boundary under the proxy" and making the proxy the only reachable endpoint (sem: SEM-gx-adapter-mcp-386)
 //!   is a deployment's job — the same **N-05** disclosure the fs and git adapters carry, and 45 §2.2's
-//!   「adapter経由の完全性のみ」.
+//!   "completeness only via the adapter". (sem: SEM-gx-adapter-mcp-387)
 //! * **The transport's own conduct.** While a transport holds the `&ToolCall` and `&Admitted` it was
 //!   handed it can pass them on; it cannot build a different call, so the worst it can do is replay
 //!   one, and 51 §7 contract 7 makes a replay a no-op.
@@ -75,7 +77,7 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
-/// Source lines that are not comments. The same filter M6's 則 1 counters use.
+/// Source lines that are not comments. The same filter M6's Rule 1 counters use. (sem: SEM-gx-adapter-mcp-388)
 fn code_lines(source: &str) -> Vec<(usize, String)> {
     source
         .lines()
@@ -94,7 +96,7 @@ fn code_lines(source: &str) -> Vec<(usize, String)> {
 
 /// The two `compile_fail` doctests exist, each beside a control that compiles.
 ///
-/// **M4-20 採(b)**'s pair form, and the reason it is a pair: a `compile_fail` block on its own proves
+/// **M4-20, adopted (b)**'s pair form, and the reason it is a pair: a `compile_fail` block on its own proves (sem: SEM-gx-adapter-mcp-389)
 /// only that *something* is wrong with it — a typo would satisfy it just as well as a private field.
 /// The control is the same crate, the same trait and the same types, and it compiles.
 ///
@@ -218,7 +220,7 @@ fn inside_this_crate_the_two_values_are_minted_in_one_place() {
 
 /// **The seven methods are read out of the trait**, and exactly one of them reaches the transport.
 ///
-/// 🔴 This is where 裁定 #10's 「宣言 list 禁」 bites hardest. A probe that typed the six read-only method
+/// 🔴 This is where ruling #10's "a declared list is forbidden" bites hardest. A probe that typed the six read-only method (sem: SEM-gx-adapter-mcp-390)
 /// names into a `vec![]` would be asserting about the six somebody remembered; if 41 §4 grew an eighth,
 /// the list would go on passing while the new method did whatever it liked. So the names come from
 /// `crates/gx-substrate/src/adapter.rs` — the trait's own source — and the probe asserts it found seven,
@@ -261,7 +263,10 @@ fn exactly_one_of_the_sevens_methods_reaches_a_tool_call() {
     exercised.push("plan");
     let _ = adapter.precondition(&pre).expect("precondition");
     exercised.push("precondition");
-    let inverse = adapter.invert(&delta, &pre).expect("invert answers");
+    let inverse = adapter
+        .invert(&delta, &pre)
+        .expect("invert answers")
+        .into_inverse();
     exercised.push("invert");
     let _ = adapter.commutation(&delta, &delta).expect("commutation");
     exercised.push("commutation");
@@ -348,15 +353,15 @@ fn a_delta_from_another_substrate_never_reaches_a_server() {
 }
 
 // ---------------------------------------------------------------------------
-// D-4 — above the adapter, one road (則 2)
+// D-4 -- above the adapter, one road (Rule 2) (sem: SEM-gx-adapter-mcp-391)
 // ---------------------------------------------------------------------------
 
 /// The only call of `SubstrateAdapter::apply` in shipping code is the engine's, derived again from
 /// this side.
 ///
-/// req/78 §3.3 逐語: 「**則 2(`S` への道は 1 本)**: `adapter.apply` の呼び出し箇所は engine 全体で **1 箇所**
-/// でなければならない」, and `gx-engine/tests/ac_035.rs` measures it inside that crate. This derives the
-/// same fact over **every** shipping crate, because 則 2's own subject is the engine and what AC-051
+/// req/78 §3.3, verbatim: "**Rule 2 (there is one road to `S`)**: the call site of `adapter.apply` must be **exactly one** (sem: SEM-gx-adapter-mcp-392)
+/// place across the whole engine", and `gx-engine/tests/ac_035.rs` measures it inside that crate. This derives the (sem: SEM-gx-adapter-mcp-393)
+/// same fact over **every** shipping crate, because Rule 2's own subject is the engine and what AC-051 (sem: SEM-gx-adapter-mcp-394)
 /// needs is that nothing else calls one either.
 #[test]
 fn the_workspace_has_one_road_from_a_surface_to_a_substrate() {
@@ -370,11 +375,11 @@ fn the_workspace_has_one_road_from_a_surface_to_a_substrate() {
         if !src.is_dir() {
             continue;
         }
-        // 🔴 **則 2 is about shipping code**, and 「which crates ship」 is a fact the manifests carry:
-        // `publish = false` is what `gx-substrate-conformance` declares about itself (「conformance は
-        // publish 対象外」, §29 M4H1-6). It calls `apply` eleven times, because it is the harness that
+        // 🔴 **Rule 2 is about shipping code**, and "which crates ship" is a fact the manifests carry: (sem: SEM-gx-adapter-mcp-395)
+        // `publish = false` is what `gx-substrate-conformance` declares about itself ("conformance is (sem: SEM-gx-adapter-mcp-396)
+        // not for publishing", §29 M4H1-6). It calls `apply` eleven times, because it is the harness that (sem: SEM-gx-adapter-mcp-397)
         // runs the contracts -- and a probe that excluded it **by name** would be a declared list, which
-        // is the thing 裁定 #10 forbids. So the predicate is read from the manifest.
+        // is the thing ruling #10 forbids. So the predicate is read from the manifest. (sem: SEM-gx-adapter-mcp-398)
         let manifest = std::fs::read_to_string(dir.join("Cargo.toml")).expect("a manifest");
         if manifest.lines().any(|l| l.trim() == "publish = false") {
             skipped.push(
@@ -412,7 +417,7 @@ fn the_workspace_has_one_road_from_a_surface_to_a_substrate() {
     assert_eq!(
         sites.len(),
         1,
-        "則 2 puts one road to a substrate in shipping code and these are what exist: {sites:?}"
+        "Rule 2 puts one road to a substrate in shipping code and these are what exist: {sites:?} (sem: SEM-gx-adapter-mcp-399)"
     );
     assert!(
         sites[0].starts_with("gx-engine/src/pipeline.rs"),
@@ -421,7 +426,7 @@ fn the_workspace_has_one_road_from_a_surface_to_a_substrate() {
 }
 
 // ---------------------------------------------------------------------------
-// D-5 — and that road passes the gate (the 結合テスト AC-051 asks for)
+// D-5 -- and that road passes the gate (the **integration test** AC-051 asks for) (sem: SEM-gx-adapter-mcp-400)
 // ---------------------------------------------------------------------------
 
 /// A Cedar pack that admits everything, and one that refuses this locator.
@@ -467,8 +472,8 @@ fn signing_key() -> gx_witness::KeyPair {
 
 /// 🔴 **A gate that refuses leaves the server untouched.**
 ///
-/// This is the half of AC-051 that a scan cannot state: not 「there is one road」 but 「the road stops
-/// where the gate says no」. The transformation reaches `Denied` (43 T-4b) and the counter is zero —
+/// This is the half of AC-051 that a scan cannot state: not "there is one road" but "the road stops (sem: SEM-gx-adapter-mcp-401)
+/// where the gate says no". The transformation reaches `Denied` (43 T-4b) and the counter is zero -- (sem: SEM-gx-adapter-mcp-402)
 /// and the counter is on the **server**, so it counts arrivals rather than intentions.
 #[test]
 fn a_denied_change_makes_no_tool_call() {
@@ -564,5 +569,219 @@ fn an_admitted_change_makes_exactly_one_tool_call_after_the_gate() {
     assert!(
         wired.engine.receipt(&id).is_some(),
         "an admitted change that reached a server left no receipt"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// D-6 — the second road to the wire, declared and bounded
+// ---------------------------------------------------------------------------
+
+/// 🔴 **D-6 (DR-46-9 A-3, `req/38` §196)** — the read-by-tool road is **one** site, it is in
+/// `invert.rs`, and what it sends is the deployment's declaration rather than the agent's payload.
+///
+/// # Why this derivation had to be added rather than assumed
+///
+/// D-1 through D-5 close "no tool call happens outside `apply`" for `ToolTransport::call`, and
+/// `read_prior_by_tool` is a **different method** that also frames a `tools/call`. So the road
+/// count went from one to two, and `req/38` §196 made accounting for it an implementation
+/// condition of the ruling ("the attack surface for the eighteenth audit is calculated
+/// explicitly"). Leaving the old derivation to speak for a road it does not measure is exactly the
+/// hand-written route table M6H8-9 was about.
+///
+/// # What the two halves are
+///
+/// * a **text gate** with its limit printed, D-2's form: the call sites under `src/`, counted and
+///   named. Its blind spots are D-2's blind spots (an alias, a macro, a re-export);
+/// * a **behavioural bound**, which is the part that matters and the part a scan cannot do: what
+///   goes out is the tool named in the **catalogue** and arguments built from material the
+///   **declaration** names, so an agent that supplies a whole payload cannot widen the set of
+///   tools this road reaches. The transport below records what arrived and the assertions hold it
+///   to the declaration.
+///
+/// # 🔴 The count moved from one to two, and it moved with an argument (**DR-46-16**)
+///
+/// `req/38` §218 ruling 1 gave the **compare-and-set** half the same second road the escrow
+/// half got from DR-46-9 A-3: `snapshot`, `precondition` and the post-apply observation take a
+/// declared read tool when a `$cas_read` prefix matches the resource. That is three positions in
+/// two modules, and three call sites would have been three roads to bound. They are funnelled
+/// through **one** function in `src/cas.rs`, so the crate's road count is **2** and both are named
+/// below — `invert.rs` for the escrow half, `cas.rs` for the CAS half. The number is not the
+/// property; the property is that each road is derived rather than declared, and that each is
+/// bounded behaviourally by what its declaration may say.
+///
+/// 🔴 The CAS road's bound is **stronger** than the escrow road's, and for a structural
+/// reason rather than a careful one: at `snapshot` there is no agent payload in existence. 41 §4
+/// hands the method a locator, so every argument this road can send comes from the locator and
+/// from constants the operator wrote. The second half of the behavioural assertion below measures
+/// that rather than restating it.
+///
+/// 🔴 **What is still not derived**: an operator may declare a *writing* tool as a read face.
+/// Nothing in MCP marks a tool read-only in a way a server cannot misstate, so this is declaration
+/// soundness — the same burden the catalogue's "what undoes what" already carries (`req/38` §102
+/// ruling 2) — and `docs/LIMITS.md` v0.5-d says it on the page a buyer reads.
+#[test]
+fn d6_the_read_by_tool_road_is_one_site_and_carries_only_the_declaration() {
+    use std::sync::Mutex;
+
+    use gx_adapter_mcp::{
+        ArgSource, Catalogue, IdentityPart, McpAdapter, ObjectIdentity, PriorPointer, PriorRead,
+        RestoreTemplate, ToolTransport,
+    };
+    use gx_substrate::{Result as SubstrateResult, SubstrateAdapter};
+
+    // --- the text gate, D-2's form ---
+    let src = repo_root().join("crates/gx-adapter-mcp/src");
+    let files = walk(&src);
+    let mut sites: Vec<String> = Vec::new();
+    for file in &files {
+        let source = std::fs::read_to_string(file).expect("a source file is readable");
+        let name = file
+            .strip_prefix(&src)
+            .expect("under src/")
+            .display()
+            .to_string();
+        for (line, text) in code_lines(&source) {
+            if text.contains("read_prior_by_tool(") && !text.contains("fn read_prior_by_tool") {
+                sites.push(format!("{name}:{line}"));
+            }
+        }
+    }
+    sites.sort();
+    let modules: Vec<&str> = sites
+        .iter()
+        .map(|site| site.split(':').next().expect("file:line"))
+        .collect();
+    println!(
+        "AC051_D6 files={} read_by_tool_sites={sites:?}          LIMIT=text-gate(alias/macro/re-export invisible; the behavioural half below bounds what          these sites may send)",
+        files.len()
+    );
+    assert_eq!(
+        sites.len(),
+        2,
+        "🔴 the read-by-tool road is reached from a number of places this derivation does not          account for. Two are accounted for and bounded below: `invert.rs` (the escrow half,          DR-46-9 A-3) and `cas.rs` (the compare-and-set half, DR-46-16). A third is a road nothing          bounds, and raising this number without adding a behavioural bound for the new road is          the hand-written route table M6H8-9 was about: {sites:?}"
+    );
+    assert_eq!(
+        modules,
+        vec!["cas.rs", "invert.rs"],
+        "🔴 the two sites are not the two modules that own the two halves. `invert.rs` is where          E-M4-30 puts the escrow, and `cas.rs` is the single funnel `snapshot`, `precondition` and          `observe` share — a site anywhere else means one of those three positions grew a road          of its own: {sites:?}"
+    );
+
+    // --- the behavioural bound ---
+    #[derive(Debug, Default)]
+    struct Recording {
+        seen: Mutex<Vec<(String, String)>>,
+    }
+    impl ToolTransport for Recording {
+        fn read(&self, _server: &str, _resource: &str) -> SubstrateResult<Vec<u8>> {
+            Ok(Vec::new())
+        }
+        fn read_prior_by_tool(
+            &self,
+            _server: &str,
+            tool: &str,
+            arguments: &[u8],
+        ) -> SubstrateResult<Vec<u8>> {
+            self.seen.lock().expect("not poisoned").push((
+                tool.to_string(),
+                String::from_utf8_lossy(arguments).into_owned(),
+            ));
+            // 🔴 DR-46-15: the answer says which object it is about, and the declaration below
+            // says how to read that. A read that answered for another `uri` refuses.
+            Ok(format!(r#"{{"uri":"{}","body":"the prior"}}"#, support::SUBJECT).into_bytes())
+        }
+        fn call(
+            &self,
+            _call: &gx_adapter_mcp::ToolCall,
+            _admitted: &gx_adapter_mcp::Admitted,
+        ) -> SubstrateResult<Vec<u8>> {
+            Ok(Vec::new())
+        }
+    }
+
+    let transport = Arc::new(Recording::default());
+    let catalogue = Catalogue::new()
+        .with_restore_template(
+            "widget_write",
+            "widget_write",
+            RestoreTemplate::new()
+                .with("id", ArgSource::Forward("id".to_string()))
+                .with(
+                    "body",
+                    ArgSource::PriorJson(PriorPointer::Literal("/body".to_string())),
+                ),
+        )
+        .with_prior_read(
+            "widget_write",
+            PriorRead::new(
+                "widget_read",
+                RestoreTemplate::new().with("id", ArgSource::Forward("id".to_string())),
+                ObjectIdentity::new(vec![IdentityPart::Answer {
+                    answer: "/uri".to_string(),
+                }]),
+            ),
+        );
+    let adapter = McpAdapter::new(transport.clone()).with_catalogue(catalogue);
+
+    let locator = subject_locator();
+    let pre = support::absent_snapshot(&locator);
+    // The agent's payload names a tool of its own and carries a member nobody declared. Neither
+    // may reach the wire on this road.
+    let arguments = br#"{"id":"w-1","body":"new","tool":"admin_delete_everything"}"#;
+    let delta = adapter
+        .plan(&intent_for(&locator, "widget_write", arguments), &pre)
+        .expect("a well-formed call plans");
+    let inverse = adapter
+        .invert(&delta, &pre)
+        .expect("the recording transport answers")
+        .into_inverse()
+        .expect("an inverse was constructed");
+
+    let seen = transport.seen.lock().expect("not poisoned").clone();
+    println!(
+        "AC051_D6_SENT {seen:?} inverse_bytes={}",
+        inverse.payload().len()
+    );
+    assert_eq!(seen.len(), 1, "one escrow, one read: {seen:?}");
+    assert_eq!(
+        seen[0].0, "widget_read",
+        "the tool that went out is not the one the catalogue names: {seen:?}"
+    );
+    assert_eq!(
+        seen[0].1, r#"{"id":"w-1"}"#,
+        "the read carried something other than the declared members. The agent's `body` and its \
+         `tool` are in the forward payload and neither is declared, so neither may travel: {seen:?}"
+    );
+    // --- the CAS road's behavioural bound (DR-46-16) ---
+    //
+    // 🔴 The same question on the other road, asked on a **fresh** transport so that the escrow
+    // half's arrival above cannot be mistaken for this one. What is measured is that `snapshot`
+    // reaches the tool the `$cas_read` declaration names, with arguments built from the locator:
+    // at this position there is no forward payload for anything else to come from.
+    let cas_transport = Arc::new(Recording::default());
+    let cas_adapter = McpAdapter::new(cas_transport.clone()).with_catalogue(
+        Catalogue::new().with_cas_read(
+            "widget://",
+            gx_adapter_mcp::CasRead::new(
+                "widget_cas_read",
+                gx_adapter_mcp::CasTemplate::new()
+                    .with("id", gx_adapter_mcp::CasArgSource::ResourceSuffix),
+            ),
+        ),
+    );
+    let _ = cas_adapter.snapshot("stdio://widgets#widget://w-7");
+    let cas_seen = cas_transport.seen.lock().expect("not poisoned").clone();
+    println!("AC051_D6_CAS_SENT {cas_seen:?}");
+    assert_eq!(
+        cas_seen.len(),
+        1,
+        "🔴 one CAS read, one arrival: `snapshot` takes the declared road instead of          `resources/read`, never in addition to it: {cas_seen:?}"
+    );
+    assert_eq!(
+        cas_seen[0].0, "widget_cas_read",
+        "the tool that went out is not the one the catalogue names: {cas_seen:?}"
+    );
+    assert_eq!(
+        cas_seen[0].1, r#"{"id":"w-7"}"#,
+        "🔴 the read carried something other than what the locator and the declaration supply.          At `snapshot` there is no agent payload in existence, so this is the whole of what this          road can ever send: {cas_seen:?}"
     );
 }

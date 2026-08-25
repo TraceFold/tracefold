@@ -1,17 +1,17 @@
 {
   "id": "A-3",
   "kind": "codec-deviation",
-  "statement": "major type 2〜5 の長さを最短でない形で書いた byte 列は decode されない",
+  "statement": "A byte string writing the length of major type 2-5 in non-shortest form is not decoded",
   "vector": "780161",
   "expected": "REJECT",
   "normative_basis": "IPLD-SHOULD+gx-policy",
   "tier": "Tier2",
-  "deviation": "長さ 1 のテキスト文字列 \"a\" は major 3・ai 直値の `6161` が最短。ai=24 形式に冗長化した。",
+  "deviation": "The length-1 text string \"a\"'s shortest form is `6161`, major 3 with the ai value inline. Made redundant into the ai=24 form.",
   "spec_anchor": "ipld/ipld@a65340b spec.md L56 / RFC 8949 §4.2.1(a) / 42 §2.1-1 / req/33 §2 A-3",
   "origin": "gx self-authored from spec (req/33 §2)",
   "control": {
     "vector": "6161",
     "expected": "ACCEPT",
-    "note": "同じ文字列 \"a\" の最短形"
+    "note": "The same string \"a\"'s shortest form"
   }
 }

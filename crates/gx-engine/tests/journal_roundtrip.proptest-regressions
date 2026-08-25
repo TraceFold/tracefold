@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 673fb4cd10e042f2c45d73b3a5e0c89e5f050bb8e016581e716cc272112586e6 # shrinks to records = [Planned { transformation: TransformationId(Cid(opaque)), intent_id: IntentId(Cid(opaque)), locator: "/tmp/0", delta_cid: Cid(opaque), fp0: FingerprintRecord { substrate: Fs, scope: "/tmp/scope-0", digest: Cid(opaque) }, parents: [TransformationId(Cid(opaque))], at: Timestamp(828700) }, VerifyStarted { transformation: TransformationId(Cid(opaque)), at: Timestamp(433220) }]
+cc d6d187a531ad4f8cebc2c22a96fe540aff00fd2990c4270e2c44e5e9597a35e4 # shrinks to records = [Superseded { transformation: TransformationId(Cid(opaque)), by: TransformationId(Cid(opaque)), at: Timestamp(422228) }, Superseded { transformation: TransformationId(Cid(opaque)), by: TransformationId(Cid(opaque)), at: Timestamp(543626) }, InverseEscrowed { transformation: TransformationId(Cid(opaque)), inverse_cid: None, at: Timestamp(885620) }, ApplyStarted { transformation: TransformationId(Cid(opaque)), delta_cid: Cid(opaque), at: Timestamp(538585) }, Aborted { transformation: TransformationId(Cid(opaque)), reason: Expired, rollback: None, at: Timestamp(46208) }, InverseEscrowed { transformation: TransformationId(Cid(opaque)), inverse_cid: Some(Cid(opaque)), at: Timestamp(613659) }, Canonicalized { transformation: TransformationId(Cid(opaque)), canonical_cid: Cid(opaque), enforced: Some(false), at: Timestamp(852351) }]

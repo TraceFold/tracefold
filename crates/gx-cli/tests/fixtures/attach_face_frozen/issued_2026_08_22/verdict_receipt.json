@@ -1,0 +1,13 @@
+{
+  "envelope": {
+    "payload_type": "application/vnd.glovrex.receipt+dagcbor",
+    "payload": "r2ZrZXlfaWR4GGVkMjU1MTktNzAzNjQzNzUxZjE4YTY4OGd2ZXJkaWN0omRraW5kZUFkbWl0bHByb29mX2RpZ2VzdFggx1CxrdN0JR/Q05KNrmlXdCw8fY1EV1ARLg4939cgjcloZW5mb3JjZWT1aHJlYWRfc2V09mxyZWNlaXB0X2tpbmRuVmVyZGljdFJlY2VpcHRtY2Fub25pY2FsX2NpZFggYGmE1m2JoD4YYtGm2ZryGdQJ4Ez2RXJ2nGRAVqG4f6ltaW52ZXJzZV9kZWx0YfZtcmV2ZXJzaWJpbGl0efZudHJhbnNmb3JtYXRpb25YIGBphNZtiaA+GGLRptma8hnUCeBM9kVydpxkQFahuH+pb2luY2x1c2lvbl9wcm9vZvZxZmluZ2VycHJpbnRfc2NvcGV4Jy9ob21lL3Rlc3R1c2VyMi8uc2cvcDFiX21pbnQvdGFyZ2V0LnR4dHRkZXRlcm1pbmlzbV9ib3VuZGFyeaFlTWl4ZWSicGlucHV0X2dlbmVyYXRpb25nVW5rbm93bnJ2ZXJkaWN0X2Rlcml2YXRpb25zRGV0ZXJtaW5pc3RpY1JlcGxheXRmYWlsX3Bvc3R1cmVfZW5nYWdlZPR4GHByZWNvbmRpdGlvbl9maW5nZXJwcmludFggK8O7DHen4SIAQ//QulvRl2Y50AgRhwsAq/2gyXJOvk94GXBvc3Rjb25kaXRpb25fZmluZ2VycHJpbnT2",
+    "signatures": [
+      {
+        "keyid": "ed25519-703643751f18a688",
+        "sig": "+G0h/rWBLYZewdkrpwKrR81t1clKzEeMjFfYKsBluO5XZme1Qr9hZ/n3yR45RvnpVCkeKHRaC4o2zgcdeEwFBQ=="
+      }
+    ]
+  },
+  "issued_at": 1787382413261700168
+}

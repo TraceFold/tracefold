@@ -1,31 +1,33 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-048 (FR-043) — `Ok(None)` for a reason that exists, and the gate escalating on it.
 //!
-//! AC-048 逐語: 「Given: 逆delta構成不能なdelta（例: 上書きにより旧内容が破棄済み）。When:
-//! `adapter.invert(delta, pre)`を呼ぶ。Then: `Ok(None)`。gx-gateが`GateInput.invert_available=false`を
-//! 受け取った際に追加承認要求（Escalateへの昇格またはpolicy追加条件発火）を行うことを結合テストで確認する。」
-//! 判定方法: 「integration」, M4.
+//! AC-048, verbatim: "Given: a delta whose inverse cannot be constructed (e.g. one whose old content has already been discarded by an overwrite). When:
+//! `adapter.invert(delta, pre)` is called. Then: `Ok(None)`. Confirm via an integration test that when gx-gate receives `GateInput.invert_available=false`
+//! it requires additional approval (escalating to Escalate, or firing an additional policy condition)."
+//! Judgment method: "integration", M4. (sem: SEM-gx-adapter-fs-104)
 //!
 //! # The criterion's parenthetical is the one the errata replaced
 //!
-//! 「上書きにより旧内容が破棄済み」 describes an adapter asked to invert **after** the change. **E-M4-30**
+//! "already discarded by an overwrite" describes an adapter asked to invert **after** the change. **E-M4-30** (sem: SEM-gx-adapter-fs-105)
 //! ruled that order out for every adapter without a history of its own -- the escrow is built before
 //! `apply` (43 T-10b) -- so an fs adapter reached that way would never answer `Ok(None)`; it would
-//! answer 「the old content is right here」. req/69 §4 M4-21 saw the same seam from the other side and
-//! **M4-21 採(a)** supplied the reason that does exist:
+//! answer "the old content is right here". req/69 §4 M4-21 saw the same seam from the other side and
+//! **M4-21, adopted (a)** supplied the reason that does exist: (sem: SEM-gx-adapter-fs-106)
 //!
-//! > 「逆 delta payload の上限を**定数 1 箇所**で宣言・超過は `invert`=`Ok(None)`(**AC-048 の None の実在
-//! > する第 1 の理由**)」
+//! > "the ceiling on the inverse delta payload is declared **in exactly one constant**; exceeding it is
+//! > `invert`=`Ok(None)` (**the 1st reason AC-048's `None` actually occurs**)" (sem: SEM-gx-adapter-fs-107)
 //!
 //! So the Given here is a file one byte over [`gx_adapter_fs::MAX_INVERSE_PAYLOAD_BYTES`]: 42 §5
-//! requires the escrowed inverse to carry the body 「digest-onlyでは実際のundoが物理的に不可能なため」,
+//! requires the escrowed inverse to carry the body "because a digest-only inverse makes an actual undo physically impossible", (sem: SEM-gx-adapter-fs-108)
 //! and a body over the ceiling is one this adapter declines to escrow. **The refusal is not a
 //! refusal to act** -- it is a `false` on `GateInput.invert_available`, and **E-M3-4** makes that the
 //! one condition in v0.1 that turns an otherwise admissible change into an `Escalate`.
 //!
 //! # Why the gate is here rather than the gate's own suite
 //!
-//! **M4-18 採(a)**: 「AC-048 結合 test は gx-adapter-fs の tests に **gx-gate を dev-dependency** で
-//! (E-M3-2 先例・循環なし)」. The gate half was already built and measured in M3
+//! **M4-18, adopted (a)**: "AC-048's integration test goes in gx-adapter-fs's tests, with **gx-gate as a dev-dependency**
+//! (E-M3-2 precedent, no cycle)". The gate half was already built and measured in M3 (sem: SEM-gx-adapter-fs-109)
 //! (`crates/gx-gate/tests/verdict_meet.rs`, E-M3-4); what had never run is the **join** -- an adapter
 //! producing the `Ok(None)` and a gate reading the flag that came from it. A dev-dependency adds no
 //! edge to the shipped graph and no package to it either (gx-gate is a workspace member).
@@ -88,14 +90,17 @@ fn gate() -> Gate {
 
 /// Ask the gate about a change whose adapter answered `invert`, with the flag **E-M4-5** describes:
 ///
-/// > 「`invert_available` は **engine が verify 時に `invert(δ, pre)` を precondition と同一 snapshot で
-/// > 実行**し Some/None を畳んで作る」
+/// > "`invert_available` is **built by the engine folding Some/None, executing `invert(δ, pre)`
+/// > at verify time against the same snapshot as the precondition**" (sem: SEM-gx-adapter-fs-110)
 ///
 /// Which is what these three lines are: the engine's fold, written where the engine would write it.
 fn verdict_for(adapter: &FsAdapter, delta: &PlannedDelta, pre: &ObjectSnapshot) -> (bool, Verdict) {
     let invert_available = adapter
         .invert(delta, pre)
         .expect("invert answers")
+        // 🔴 **DR-46-26** — the engine's fold is `InvertOutcome::inverse`'s `is_some` now, and
+        // this test is "the engine's fold, written where the engine would write it".
+        .inverse()
         .is_some();
     let t = change(delta);
     let planned_bytes = PlannedDeltaBytes(delta.payload().to_vec());
@@ -106,6 +111,10 @@ fn verdict_for(adapter: &FsAdapter, delta: &PlannedDelta, pre: &ObjectSnapshot) 
             planned: &planned_bytes,
             evidence: &[],
             invert_available,
+            // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+            // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+            // varying this field alone moves no verdict) about the field and not about this fixture.
+            decided_at: Timestamp(0),
         })
         .expect("a gate holding a policy set can answer");
     (invert_available, verdict)
@@ -123,7 +132,10 @@ fn an_inverse_over_the_escrow_ceiling_is_ok_none_and_the_gate_escalates() {
     let pre = snapshot_of(&adapter, &locator);
     let delta = planned(&adapter, &locator, GOAL);
 
-    let answer = adapter.invert(&delta, &pre).expect("invert answers");
+    let answer = adapter
+        .invert(&delta, &pre)
+        .expect("invert answers")
+        .into_inverse();
     println!(
         "AC_048_GIVEN_BYTES={} CEILING={} INVERT={}",
         given.len(),
@@ -137,7 +149,7 @@ fn an_inverse_over_the_escrow_ceiling_is_ok_none_and_the_gate_escalates() {
     assert!(
         answer.is_none(),
         "the inverse of a whole-file replacement carries the old content (42 §5), and this one is \
-         one byte over the declared ceiling -- M4-21's 「実在する第 1 の理由」"
+         one byte over the declared ceiling -- M4-21's 'the 1st reason it actually occurs' (sem: SEM-gx-adapter-fs-111)"
     );
 
     let (invert_available, verdict) = verdict_for(&adapter, &delta, &pre);
@@ -162,7 +174,7 @@ fn an_inverse_over_the_escrow_ceiling_is_ok_none_and_the_gate_escalates() {
 /// The control: the same policy set, the same gate, a file the escrow can hold, and an `Admit`.
 ///
 /// Without this the escalation above would be satisfied by a gate that escalates unconditionally,
-/// which is the vacuity req/69 §8.2 asks 「無い事」 assertions to be defended against. The two runs
+/// which is the vacuity req/69 §8.2 asks "absence" assertions to be defended against. The two runs (sem: SEM-gx-adapter-fs-112)
 /// differ in one input.
 #[test]
 fn the_same_change_over_a_file_the_escrow_can_hold_is_admitted() {

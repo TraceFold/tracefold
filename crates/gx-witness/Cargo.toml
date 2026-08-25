@@ -6,8 +6,10 @@ name = "gx-witness"
 description = "Provenance, evidence and DSSE-signed receipts (41 §2 / 42 §3.9-§3.10)."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # 卓-1 採 (req/38 §47): 宣言は workspace に 1 度だけ
+rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the
+                                       # workspace (sem: SEM-gx-witness-001)
 license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
 # The edge that E-M2-1 made one-way (`req/38_ERRATA_2026-08-07.md` §8). This crate names gx-core
 # and gx-log names gx-core; neither names the other, so the cycle 42 §3.10 + §3.11 would have
@@ -19,7 +21,8 @@ license = "Apache-2.0"                # 35 DR-5, DEFAULT column
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
 
-# Hand 4. 42 §1.3 gives `Evidence` an IdentityView row (全フィールド・除外なし), so the type needs a
+# Hand 4. 42 §1.3 gives `Evidence` an IdentityView row (all fields, no exclusions) (sem:
+# SEM-gx-witness-002), so the type needs a
 # CID, and 41 §6 routes every canonical encode through gx-canon: `IdentityView` is declared there,
 # and `cid::compute` is the only road to a digest (AC-014). Declaring the edge here is what lets
 # `evidence.rs` implement the trait for a local type without gx-witness ever naming BLAKE3 or a CBOR
@@ -47,12 +50,14 @@ gx-log = { path = "../gx-log", version = "0.1.0" }
 # 1.81) is the fallback if that floor ever moves before ours does. Recorded in req/50 §5.
 ed25519-dalek = "3"                   # FR-018/FR-019/FR-020, DSSE signature and verification
 
-# base64 is NOT here. Hand 1 declared `base64 = "0.23"` for 44 §2.2's 「`payload`はbase64」 and
+# base64 is NOT here. Hand 1 declared `base64 = "0.23"` for 44 §2.2's "`payload` is base64" (sem:
+# SEM-gx-witness-003) and
 # req/50 §5 re-opened the version at first use rather than at declaration, because the release was
 # published three days earlier and had not soaked. Hand 5 is that first use and takes the other
 # branch: `gx_core::b64` writes RFC 4648 §4 out longhand, next to the base32 table 42 §1.2 already
 # made gx-core write for `Cid` -- one crate, one place where an alphabet lives, and 41 §2's
-# 「serde, thiserror 程度」 respected on the crate that would otherwise have taken the dependency.
+# "serde, thiserror and not much more" (sem: SEM-gx-witness-004) respected on the crate that would
+# otherwise have taken the dependency.
 # `gx-core/tests/base64_vectors.rs` checks the table against RFC 4648 §10's own vectors, and the
 # package leaves the dependency tree with the declaration.
 
@@ -61,7 +66,8 @@ ed25519-dalek = "3"                   # FR-018/FR-019/FR-020, DSSE signature and
 # thirty-two bytes and this fills them. Already in the tree (0.3.4).
 getrandom = "0.3"                     # FR-020, key generation
 
-# 41 §6: 「エラーは thiserror で型化」. serde carries every field table in 42.
+# 41 §6: "errors are typed with thiserror" (sem: SEM-gx-witness-005). serde carries every field
+# table in 42.
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 
@@ -69,6 +75,20 @@ thiserror = "2"
 # this crate in the dependency rather than the dev-dependency column. Already in the graph: gx-canon
 # carries it for `Intent.goal` (42 §3.3) under A-6, so hand 4 adds no package to the tree.
 serde_json = "1"
+
+# 🔴 **P2 item2** (`req/130` §1, ruling 1 = adopted (b): RustCrypto pure-Rust, gh primary-source +
+# recorded in REFERENCES.md `Desktop/GitRepo/REFERENCES.md` 2026-08-14) (sem: SEM-gx-witness-006).
+# Key-at-rest encryption (NFR-010, opt-in — ruling 2)
+# for [`keys::KeyPair::save_encrypted`]/[`keys::KeyPair::load_encrypted`]. `default-features =
+# false` on both: argon2's default set pulls in the `password-hash` crate (a PHC-string API this
+# module does not use — the low-level `hash_password_into_with_memory` is called directly, so the
+# crate this workspace adds is one narrower than the crate's own quick-start example asks for) and
+# chacha20poly1305's default set pulls in its own `getrandom` feature, which would be a second road
+# to entropy beside the one [`KeyPair::generate`] already uses (`getrandom::fill`, above). `alloc`
+# is the one feature each needs: argon2's memory-block buffer and chacha20poly1305's `Vec`-returning
+# `Aead::encrypt`/`decrypt`.
+argon2 = { version = "0.5.3", default-features = false, features = ["alloc"] }
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
 
 # 🔴 **M6H7-5 (b)** (req/38 §54; implemented by the M6 fix batch's confirmed item 2). Since 0.3,
 # getrandom refuses to guess a backend on `wasm32-unknown-unknown` and fails the build with the

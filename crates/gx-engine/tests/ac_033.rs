@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-033 (FR-033) — `canonicalize` checks T3 first, and refuses when it does not hold.
 //!
-//! 34 AC-033 逐語: 「Given: Admitted状態のT。When: `canonicalize`ステップを実行。Then: canon冪等性
-//! （T3）確認後Canonicalized状態へ遷移。**冪等性違反を返す壊れたcanon実装を注入した異常系ではエラーを
-//! 返しCanonicalizedへ遷移しない**。」 unit（正常系+異常系注入）
+//! 34 AC-033, verbatim (sem: SEM-gx-engine-427): "Given: T in the `Admitted` state. When: the
+//! `canonicalize` step runs. Then: it checks canon idempotency (T3) and then transitions to the
+//! `Canonicalized` state. **In the abnormal case where a broken canon implementation that returns
+//! an idempotency violation is injected, it returns an error and does not transition to
+//! `Canonicalized`**." unit (normal case + abnormal-case injection)
 //!
 //! # The abnormal case is what makes the normal one mean anything
 //!
@@ -13,7 +17,8 @@
 //!
 //! # 🔴 What is injectable, and what is not (41 §6)
 //!
-//! 41 §6: 「全canonical encodeはgx-canon経由のみ（迂回禁止）」. That and 「壊れたcanon実装を注入」
+//! 41 §6: "every canonical encode goes through gx-canon only (no bypass allowed)" (sem:
+//! SEM-gx-engine-428). That and "inject a broken canon implementation"
 //! cannot both be about the same road, so they are not: the `canonical_cid` this engine journals
 //! always comes from `gx_canon::cid::compute`, whatever the injected [`Canonicalizer`] says, and
 //! what is injected is the **bytes T-8's guard runs over**. A broken canonicalizer can make the
@@ -98,7 +103,8 @@ fn ac_033_an_admitted_transformation_canonicalises() {
     );
 }
 
-/// 43 T-8's idempotency column: 「再計算しても同一canon_cid」, and no second record.
+/// 43 T-8's idempotency column: "recomputing gives the same canon_cid" (sem: SEM-gx-engine-429),
+/// and no second record.
 #[test]
 fn ac_033_canonicalising_twice_is_the_same_cid_and_one_record() {
     let mut e = engine("ac033_idempotent", PERMIT_ALL);
@@ -118,7 +124,7 @@ fn ac_033_canonicalising_twice_is_the_same_cid_and_one_record() {
 }
 
 // ---------------------------------------------------------------------------
-// 🔴 The abnormal case (「壊れたcanon実装を注入」)
+// 🔴 The abnormal case ("inject a broken canon implementation"; sem: SEM-gx-engine-430)
 // ---------------------------------------------------------------------------
 
 /// A canonicalizer whose output is not a fixed point is refused, and nothing moves.
@@ -154,7 +160,7 @@ fn ac_033_a_broken_canon_is_refused_and_nothing_transitions() {
     assert_eq!(
         e.state(&id),
         Some(Lifecycle::Admitted),
-        "「Canonicalizedへ遷移しない」"
+        "\"does not transition to Canonicalized\" (sem: SEM-gx-engine-431)"
     );
     assert_eq!(e.canonical_cid(&id), None, "nothing was fixed");
     assert_eq!(
@@ -210,9 +216,10 @@ fn ac_033_a_broken_canon_cannot_change_a_canonical_cid() {
 
 /// **T-8r**: a `Denied` transformation canonicalises under `RecordOnly`, carrying `enforced=false`.
 ///
-/// 43 T-8r: 「T-8と同一処理＋`enforced=false`フラグをTransformation付随メタデータに刻印；journal:
-/// `Canonicalized{id, canon_cid, enforced=false}`」. This is what DR-2's record-only mode is for --
-/// 「適用は通ったが、ポリシー上は拒否されていた」 stays third-party checkable (43 §4, P-7).
+/// 43 T-8r: "the same processing as T-8, plus stamping the `enforced=false` flag into the
+/// Transformation's accompanying metadata; journal: `Canonicalized{id, canon_cid,
+/// enforced=false}`" (sem: SEM-gx-engine-432). This is what DR-2's record-only mode is for --
+/// "it was applied, but policy had denied it" stays third-party checkable (43 §4, P-7).
 #[test]
 fn t_8r_a_denied_transformation_canonicalises_under_record_only() {
     let dir = scratch("ac033_t8r");
@@ -245,10 +252,14 @@ fn t_8r_a_denied_transformation_canonicalises_under_record_only() {
             _ => None,
         })
         .expect("T-8r wrote a Canonicalized record");
-    assert_eq!(recorded, Some(false), "「enforced=false」, in the journal");
+    assert_eq!(
+        recorded,
+        Some(false),
+        "\"enforced=false\", in the journal (sem: SEM-gx-engine-433)"
+    );
 }
 
-/// Under `Enforce`, 43 §1's 「`Denied` は終端」 stands and T-8r does not fire.
+/// Under `Enforce`, 43 §1's "`Denied` is terminal" (sem: SEM-gx-engine-434) stands and T-8r does not fire.
 #[test]
 fn t_8r_does_not_fire_when_the_mode_is_enforce() {
     let mut e = engine("ac033_denied_terminal", FORBID_ETC);
@@ -265,8 +276,9 @@ fn t_8r_does_not_fire_when_the_mode_is_enforce() {
 
 /// 🔴 **M5H2-3**: `enforced = Some(false)` is reachable from **T-8**, not only from T-8r.
 ///
-/// 42 §3.13 annotates the record 「T-8rのみenforced=Some(false)」. 43 §4 disagrees by construction: a
-/// **T-4e** transformation is `Admitted` and degraded to 「record-onlyモード相当」, so it reaches
+/// 42 §3.13 annotates the record "only T-8r has enforced=Some(false)" (sem: SEM-gx-engine-435).
+/// 43 §4 disagrees by construction: a
+/// **T-4e** transformation is `Admitted` and degraded to "the record-only-mode equivalent", so it reaches
 /// canonicalisation through T-8 while carrying `enforced=false`. Writing `None` there to satisfy
 /// 42's parenthetical would erase the fact INV-S5 requires to be visible.
 ///
@@ -314,12 +326,13 @@ fn m5h2_3_a_degraded_admission_canonicalises_through_t_8_with_enforced_false() {
 // M5H8-11 — the return value, not just the road
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5H8-11 採(b)** (`req/38_ERRATA_2026-08-07.md` §45), verbatim:
+/// 🔴 **M5H8-11, adopted (b)** (`req/38_ERRATA_2026-08-07.md` §45), verbatim (sem: SEM-gx-engine-436):
 ///
-/// > **M5H8-11 採(b)**: engine 側に「`canonical_cid` が `gx_canon::cid::compute` の出力と一致する」
-/// > 返り値検査=**fix 批**。41 §6「全 canonical encode は gx-canon 経由のみ」の逐語に、経路検査
-/// > (§39 M5H2-4)へ**返り値**の面を足す。「定数関数は冪等」が T-8 guard の盲点である事の実測
-/// > (survivor 4,5)が根拠。
+/// > **M5H8-11, adopted (b)**: on the engine side, a return-value check that "`canonical_cid`
+/// > matches `gx_canon::cid::compute`'s output" is added as a **fix batch**. To 41 §6's verbatim
+/// > "every canonical encode goes through gx-canon only", this adds the **return-value** face to
+/// > the road check (§39 M5H2-4). The grounds are the measured fact that "a constant function is
+/// > idempotent" is the T-8 guard's blind spot (survivors 4, 5). (sem: SEM-gx-engine-436)
 ///
 /// # The blind spot, stated exactly
 ///
@@ -335,9 +348,9 @@ fn m5h2_3_a_degraded_admission_canonicalises_through_t_8_with_enforced_false() {
 /// # What is checked here, in three links
 ///
 /// 1. the shipping encoder returns exactly `gx_canon::cbor::encode(t.identity_view())` — the bytes
-///    `gx_canon::cid::compute` hashes, so this is 「gx-canon の答えを使った」 as a byte string;
+///    `gx_canon::cid::compute` hashes, so this is "gx-canon's answer was used" (sem: SEM-gx-engine-437) as a byte string;
 /// 2. the CID the engine journalled equals `gx_canon::cid::compute(&t)` — the road check §39
-///    M5H2-4 追認 already implied, now stated as an equality rather than as an absence of a second
+///    M5H2-4 already confirmed and implied (sem: SEM-gx-engine-437), now stated as an equality rather than as an absence of a second
 ///    call site;
 /// 3. both against **literals taken from the tree**, hand 6's golden-vector shape: a golden that is
 ///    regenerated records what the code does, a golden carried in the source records what a change
@@ -346,7 +359,7 @@ fn m5h2_3_a_degraded_admission_canonicalises_through_t_8_with_enforced_false() {
 ///
 /// # No src change was needed and none was made
 ///
-/// The ruling's 「返り値検査」 is satisfiable from outside: the probe calls gx-canon independently
+/// The ruling's "return-value check" (sem: SEM-gx-engine-438) is satisfiable from outside: the probe calls gx-canon independently
 /// and compares. Putting the same comparison **inside** `canonicalize` would have made the engine
 /// re-encode every transformation twice on the commit path, and would have made AC-033's injected
 /// broken canon fail with a different error than the one 34 asks for.

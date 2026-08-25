@@ -1,0 +1,16 @@
+{
+  "$cas_read": {
+    "notion://page/": {
+      "by_tool": "API-retrieve-a-page",
+      "arguments": {
+        "page_id": "resource_suffix"
+      }
+    }
+  },
+  "API-post-page": {
+    "restored_by": "API-delete-a-block",
+    "arguments": {
+      "block_id": { "do_result": "/id" }
+    }
+  }
+}

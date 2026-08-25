@@ -1,26 +1,28 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-047**: two consecutive plans agree, and the substrate does not move.
 //!
-//! 34 逐語: 「Given: intent I。When: 同一adapterインスタンスに対し`adapter.plan(I)`を2回連続呼び出す。
-//! Then: 同一`PlannedDelta`が返り、呼び出し前後でsubstrate状態（ファイルmtime/内容等）が変化しない。」
-//! (判定方法: `unit + property`.) FR-042 is what it measures: 「`plan`は純関数（副作用なし）でなければ
-//! ならない（MUST）」.
+//! 34, verbatim: "Given: intent I. When: `adapter.plan(I)` is called twice in a row against one adapter instance.
+//! Then: the same `PlannedDelta` is returned, and the substrate state (file mtime/content etc.) does not change before and after the call."
+//! (judgment method: `unit + property`.) FR-042 is what it measures: "`plan` MUST be a pure function
+//! (no side effects)". (sem: SEM-gx-adapter-fs-098)
 //!
 //! # Three rulings decide how this is written
 //!
 //! * **E-M4-4** put the pre-state in the signature -- `plan(&self, intent, pre)` -- because 32
-//!   FR-042 says 「同一intentから同一`PlannedDelta`」 without saying against what and 43 T-2 says
-//!   「**同一snapshotに対し**」. So 「同一intent」 here means the pair.
-//! * **M4-24** fixes what 「変化しない」 is measured with: 「内容 digest+mtime+size・atime は測らない
-//!   (fs 依存で不安定=測れない物を測ったふりにしない)」. `support::state_of` is that measurement and
+//!   FR-042 says "the same `PlannedDelta` from the same intent" without saying against what and 43 T-2 says
+//!   "**against the same snapshot**". So "the same intent" here means the pair. (sem: SEM-gx-adapter-fs-099)
+//! * **M4-24** fixes what "does not change" is measured with: "content digest + mtime + size; atime
+//!   is not measured (it is fs-dependent and unstable -- do not pretend to measure what cannot be measured)". `support::state_of` is that measurement and (sem: SEM-gx-adapter-fs-100)
 //!   its documentation carries the reason atime is absent.
-//! * **E-M4-29** adds the fs-specific half: 「fs adapter v0.1 の `plan` は I/O 0 が成立する」, which is
-//!   stronger than 「副作用なし」 and is measured separately in `tests/plan_purity.rs`.
+//! * **E-M4-29** adds the fs-specific half: "for the fs adapter v0.1, `plan` achieving zero I/O holds", which is
+//!   stronger than "no side effects" and is measured separately in `tests/plan_purity.rs`. (sem: SEM-gx-adapter-fs-101)
 //!
 //! # The control
 //!
-//! req/69 §8.2: 「AC-047 の「変化しない」は、変化を注入したら RED になる対照を持って初めて主張になる」.
+//! req/69 §8.2: "AC-047's 'does not change' only becomes a claim once it has a control that goes RED when a change is injected".
 //! [`the_measurement_moves_when_the_substrate_moves`] is that control: the same three numbers, taken
-//! either side of a write, disagree. Without it 「the state did not change」 could be said by a
+//! either side of a write, disagree. Without it "the state did not change" could be said by a (sem: SEM-gx-adapter-fs-102)
 //! measurement that cannot see change at all.
 //!
 //! Everything here writes to a tmpfs; `support` says why and proves the filesystem type.
@@ -64,8 +66,8 @@ fn ac_047_two_consecutive_plans_agree_and_the_substrate_does_not_move() {
     );
     assert_eq!(
         before, after,
-        "planning moved the substrate: 34 AC-047 asks that 「呼び出し前後でsubstrate状態（ファイル\
-         mtime/内容等）が変化しない」, measured as M4-24 fixed it (content digest + mtime + size)"
+        "planning moved the substrate: 34 AC-047 asks that the substrate state (file\
+         mtime/content etc.) not change before and after the call, measured as M4-24 fixed it (content digest + mtime + size) (sem: SEM-gx-adapter-fs-103)"
     );
     println!(
         "AC_047_DELTA_REFERENCE={:?} PAYLOAD_BYTES={}",

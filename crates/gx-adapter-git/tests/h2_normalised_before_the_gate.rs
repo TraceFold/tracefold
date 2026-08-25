@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **H-2** — the locator this adapter hands a gate is the **normalised** one (**M7 hand 4**).
 //!
-//! req/98 §3-4 row 3 is what M7 owes on `req/38` §25's H-2: 「git/mcp adapter が locator を正規化して
-//! から gate に渡す事を **adapter 側の probe** で固定(gate 内正規化は不採)」. This file is the git half
+//! req/98 §3-4 row 3 is what M7 owes on `req/38` §25's H-2: "the git/mcp adapter normalises the locator
+//! before handing it to the gate, fixed by an **adapter-side probe** (in-gate normalisation is not adopted)". This file is the git half (sem: SEM-gx-adapter-git-102)
 //! and `crates/gx-adapter-mcp/tests/h2_normalised_before_the_gate.rs` is the mcp one; they are the
 //! same three probes over two grammars, because H-2 is a claim about a **road** and both adapters
 //! stand on the same one:
@@ -14,7 +16,7 @@
 //! unqualified reference name is a branch, and `tags/v1` and `remotes/origin/main` name their
 //! namespaces already. So `tags/v1.0.0` and `refs/tags/v1.0.0` are one position spelled two ways —
 //! and the shipped git pack's forbid is written on the second spelling. Without normalisation the
-//! first would be a road around it, which is precisely M3-10's 「locator 級」 turning two spellings
+//! first would be a road around it, which is precisely M3-10's "locator level" turning two spellings (sem: SEM-gx-adapter-git-103)
 //! into two policy subjects.
 
 mod support;
@@ -137,6 +139,10 @@ fn verdict_for(gate: &Gate, pre: &ObjectSnapshot) -> VerdictKind {
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+        // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+        // varying this field alone moves no verdict) about the field and not about this fixture.
+        decided_at: Timestamp(0),
     })
     .expect("the shipped pack evaluates this request")
     .kind()
@@ -227,7 +233,7 @@ fn the_shipped_pack_refuses_a_spelling_that_would_have_evaded_it() {
 
 /// 🔴 The gate normalises nothing, and that is why the probe above is in **this** crate.
 ///
-/// 「gate 内正規化は不採」 (req/38 §25 H-2, req/98 §3-4). A gate that resolved `tags/v1.0.0` would need
+/// "in-gate normalisation is not adopted" (req/38 §25 H-2, req/98 §3-4). A gate that resolved `tags/v1.0.0` would need (sem: SEM-gx-adapter-git-104)
 /// git's own namespace-resolution order, which is a repository read inside a policy evaluation — and
 /// two reads a moment apart could disagree about one locator, which is the argument
 /// `crates/gx-adapter-git/src/locator.rs` makes about why even *this* adapter's version is purely

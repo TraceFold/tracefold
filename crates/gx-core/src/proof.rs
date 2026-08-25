@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! References to why a transformation was admitted: a Lean theorem, or a checker's result.
 //!
 //! Spec: 32 FR-017 for the requirement, 34 AC-017 for its test, 42 §3.8 for `ProofRef`, 46 §2.5
@@ -22,14 +24,15 @@
 use crate::Cid;
 use serde::{Deserialize, Serialize};
 
-/// One of the five theorems of F0 (46 §2.5: 「5本固定」).
+/// One of the five theorems of F0 (46 §2.5: "fixed at five"; sem: SEM-gx-core-077).
 ///
 /// # Why an enum where 42 §3.8 writes `Vec<String>`
 ///
-/// A `String` admits `"T6"`, and F0 has five theorems. AC-017 asks that all five be 「個別に表現・
-/// 復元可能」, which a free string satisfies only in the sense that it also represents theorems
-/// that do not exist. This is E-FR055-1's move (`req/38_ERRATA_2026-08-07.md` §6) applied to an
-/// identifier: 「flag が実装と乖離できる」 was the reason a bool registry lost to a marker trait,
+/// A `String` admits `"T6"`, and F0 has five theorems. AC-017 asks that all five be "individually
+/// representable and recoverable" (sem: SEM-gx-core-078), which a free string satisfies only in the
+/// sense that it also represents theorems that do not exist. This is E-FR055-1's move
+/// (`req/38_ERRATA_2026-08-07.md` §6) applied to an identifier: "a flag can diverge from the
+/// implementation" (sem: SEM-gx-core-079) was the reason a bool registry lost to a marker trait,
 /// and a string identifier can diverge from the theorem list the same way.
 ///
 /// The wire form does not change: each variant serializes as `"T1"`..`"T5"`, exactly what a
@@ -37,16 +40,16 @@ use serde::{Deserialize, Serialize};
 /// erratum this raises against 42 §3.8 (req/50 §4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum TheoremId {
-    /// 合成保存: `A(f) ∧ A(g) → A(g∘f)` (46 §2.2). Proved.
+    /// Composition preservation: `A(f) ∧ A(g) → A(g∘f)` (46 §2.2). Proved. (sem: SEM-gx-core-080)
     T1,
-    /// 不変条件合成: `{I}f{J} ∧ {J}g{K} → {I}(g∘f){K}` (46 §2.3). **Unproven** -- what Lean holds
-    /// is a different composition model (`req/38_ERRATA_2026-08-07.md` §7).
+    /// Invariant composition: `{I}f{J} ∧ {J}g{K} → {I}(g∘f){K}` (46 §2.3). **Unproven** -- what Lean
+    /// holds is a different composition model (`req/38_ERRATA_2026-08-07.md` §7). (sem: SEM-gx-core-081)
     T2,
-    /// 正準化冪等 + 表現非依存 (46 §2.4). Proved.
+    /// Canonicalisation idempotence + representation independence (46 §2.4). Proved. (sem: SEM-gx-core-082)
     T3,
-    /// receipt 健全性 (46 §2.5). **Unproven** -- `Receipt.lean` does not exist.
+    /// Receipt soundness (46 §2.5). **Unproven** -- `Receipt.lean` does not exist. (sem: SEM-gx-core-083)
     T4,
-    /// witness lax 合成 (46 §2.5). **Unproven** -- same file.
+    /// Witness lax composition (46 §2.5). **Unproven** -- same file. (sem: SEM-gx-core-084)
     T5,
 }
 
@@ -70,13 +73,18 @@ impl TheoremId {
 /// An empty `theorem_ids` is legal and is the honest value today -- see this module's header.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ProofRef {
+    /// Which `GxSpec` text the cited theorems were proved against (46 §3) -- the field that
+    /// makes the citation checkable rather than a bare name.
     pub lean_spec_version: String,
+    /// The theorems cited. Empty is legal and is the honest value today (see the module doc:
+    /// three of the five are unproven).
     pub theorem_ids: Vec<TheoremId>,
 }
 
 /// A reference to a checker's verification result.
 ///
-/// FR-017 逐語 names two forms -- 「Lean定理参照または検証器の検証結果への参照構造」 -- and gives a
+/// FR-017's text names two forms -- "a reference structure to a Lean theorem or to a checker's
+/// verification result" (sem: SEM-gx-core-085) -- and gives a
 /// field table for neither. This one is derived rather than quoted, and req/50 §4 raises it: the
 /// shape follows 42 §1.3's standing principle that a witness carries a digest and not a body (the
 /// same reason `AdmitProof.evidence_digests` is `Vec<Cid>` and `verdict.proof_digest` is a `Cid`),
@@ -98,6 +106,8 @@ pub struct CheckerResultRef {
 /// the reference an `AdmitProof.proof_ref` and a receipt both point through.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Proof {
+    /// FR-017's first form: a citation of the Lean formalisation.
     Lean(ProofRef),
+    /// FR-017's second form: a reference to a checker's verification result.
     Checked(CheckerResultRef),
 }

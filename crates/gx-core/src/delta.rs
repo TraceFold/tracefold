@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The lightweight delta reference.
 //!
 //! Spec: 41 §3 for the type, 42 §0 and 42 §3.4 for the field table.
@@ -18,6 +20,10 @@ use serde::{Deserialize, Serialize};
 /// holding only the reference still has to know whose grammar the payload is written in (P-6).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DeltaRef {
+    /// Whose grammar the referenced payload is written in (P-6). Duplicated from the delta it
+    /// names so a holder of the reference alone can still route it to the right adapter.
     pub substrate: SubstrateKind,
+    /// The CID of the `PlannedDelta`'s `IdentityView`, minted in gx-canon (42 §3.4). The core
+    /// carries it and never dereferences it (ASM-16).
     pub cid: Cid,
 }

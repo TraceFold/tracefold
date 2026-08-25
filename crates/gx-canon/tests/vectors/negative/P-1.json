@@ -1,18 +1,18 @@
 {
   "id": "P-1",
   "kind": "codec-deviation",
-  "statement": "浮動小数点を含む byte 列は、IPLD の canonical 形であっても decode されない",
+  "statement": "A byte string containing a float is not decoded, even in IPLD's canonical form",
   "vector": "fb3ff0000000000000",
   "expected": "REJECT",
   "expected_error": "FloatNotAllowed",
   "normative_basis": "gx-policy",
   "tier": "gx",
-  "deviation": "1.0 の 64 bit 形。IPLD DAG-CBOR はこれを canonical と認めるが、42 §2.1-4 は canonical 構造体に float を置く事自体を禁じている。req/33 の表は IPLD の MUST から引いたため、この行は表に無い。",
-  "spec_anchor": "42 §2.1-4 / req/10 T-30「42 §2.1 の 6 規則それぞれに違反入力を最低 1 本」",
-  "origin": "gx self-authored for this hand (req/33 表外・起票候補)",
+  "deviation": "1.0's 64-bit form. IPLD DAG-CBOR recognizes this as canonical, but 42 §2.1-4 forbids placing a float in a canonical structure at all. req/33's table was drawn from IPLD's MUST tokens, so this row is not in that table.",
+  "spec_anchor": "42 §2.1-4 / req/10 T-30 \"at least one violating input for each of 42 §2.1's six rules\"",
+  "origin": "gx self-authored for this hand (outside req/33's table; a filing candidate)",
   "control": {
     "vector": "01",
     "expected": "ACCEPT",
-    "note": "gx が 1 を載せる形=整数"
+    "note": "The form gx carries 1 in = an integer"
   }
 }

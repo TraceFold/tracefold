@@ -1,4 +1,12 @@
-//! The DSSE envelope, its pre-authentication encoding, and the two things gx signs.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The DSSE envelope, its pre-authentication encoding, and the two things gx signs. (sem:
+//! SEM-gx-witness-038, SEM-gx-witness-039, SEM-gx-witness-040, SEM-gx-witness-041,
+//! SEM-gx-witness-042, SEM-gx-witness-043, SEM-gx-witness-044, SEM-gx-witness-045,
+//! SEM-gx-witness-046, SEM-gx-witness-047, SEM-gx-witness-048, SEM-gx-witness-049,
+//! SEM-gx-witness-050, SEM-gx-witness-051, SEM-gx-witness-052, SEM-gx-witness-053,
+//! SEM-gx-witness-054, SEM-gx-witness-055, SEM-gx-witness-056, SEM-gx-witness-057,
+//! SEM-gx-witness-058, SEM-gx-witness-059)
 //!
 //! Spec: 42 §3.10 for the envelope's three fields and for the sentence that sends the signed bytes
 //! to the DSSE standard, 42 §1.3-4 for what a signature is *outside* of, 44 §2.2 for the JSON face,
@@ -6,14 +14,16 @@
 //!
 //! # The pre-authentication encoding is written here, from the standard's own words
 //!
-//! 42 §3.10 逐語: 「DSSE署名対象（PAE: Pre-Authentication Encoding）はDSSE標準に従い `payload_type`
-//! と `payload` を連結した既定形式を用いる（in-toto/Sigstore標準実装と互換、research/02）」. That
+//! 42 §3.10, verbatim: "the DSSE signing target (PAE: Pre-Authentication Encoding) uses the default
+//! form that concatenates `payload_type` and `payload`, following the DSSE standard (compatible
+//! with the in-toto/Sigstore standard implementations, research/02)". That
 //! sentence names the algorithm and does not state it, so the byte formula below is **derived from
 //! the DSSE specification** (`secure-systems-lab/dsse`, `protocol.md`) rather than transcribed from
-//! a gx 正本 -- raised as a ticket in req/54 §4 rather than settled here. It is a specification, in
+//! a gx canonical source -- raised as a ticket in req/54 §4 rather than settled here. It is a
+//! specification, in
 //! the same standing as RFC 6962 §2.1 in `gx-log/src/tile.rs` and RFC 4648 in [`gx_core::Cid`]: no
 //! line of any implementation was read or copied (52 / 05 §4 R-4), and req/49 §3 M2-17 already
-//! recorded 「DSSE PAE の実装元は…自作が既定線」.
+//! recorded "the implementation source of DSSE PAE is ... in-house authoring is the default line".
 //!
 //! ```text
 //! PAE(type, body) = "DSSEv1" ‖ SP ‖ LEN(type) ‖ SP ‖ type ‖ SP ‖ LEN(body) ‖ SP ‖ body
@@ -23,7 +33,8 @@
 //!
 //! # Why a plain concatenation would not do
 //!
-//! The lengths are the whole point, and they are why 42 §3.10's own wording -- 「連結した既定形式」 --
+//! The lengths are the whole point, and they are why 42 §3.10's own wording -- "the concatenated
+//! default form" --
 //! is not enough on its own. `payload_type` and `payload` concatenated without them are ambiguous:
 //! a type ending in one byte and a payload beginning one byte later produce the same buffer as a
 //! type one byte longer, so one signature would authenticate two different (type, payload) pairs.
@@ -43,10 +54,11 @@
 //!
 //! Hand 5 signed the checkpoint core **directly**, because 42 §3.11 gives a checkpoint no
 //! `payload_type` to put in a PAE, and recorded the asymmetry as H5-4 rather than resolving it. The
-//! ruling that resolved it is `req/38_ERRATA_2026-08-07.md` §15 逐語: 「**E-M2-26**（H5-4 の決着・
-//! fix 批へ）: checkpoint 署名は **payload_type を与えて PAE に載せる**（42 §3.11 erratum）。根拠:
-//! ①署名規律を DSSE 一本に統一（2 つの byte 形式に同鍵で直接署名する現状は「偶然の非衝突」で設計で
-//! ない=H5-4）」. The type is minted here as that erratum: 42 §3.11's field table has no row for it.
+//! ruling that resolved it is `req/38_ERRATA_2026-08-07.md` §15, verbatim: "**E-M2-26** (H5-4's
+//! settlement, into the fix batch): the checkpoint signature **is given a payload_type and put on
+//! the PAE** (a 42 §3.11 erratum). Grounds: ① unify the signing discipline into DSSE alone (the
+//! current state, where one key signs two byte formats directly, is 'accidental non-collision', not
+//! a design = H5-4)". The type is minted here as that erratum: 42 §3.11's field table has no row for it.
 //!
 //! What changes is what one key can be talked into signing. Before, the separation between the two
 //! roads was that a PAE opens with `DSSEv1` and a canonical CBOR map opens with a major-type-5
@@ -58,22 +70,24 @@
 //! The C2SP `tlog-checkpoint` / `signed-note` form is a **text** format -- an origin line, a decimal
 //! tree size, a base64 root, a blank line, then `— <name> <base64 signature>` -- and a signature over
 //! that text. gx's checkpoint is canonical DAG-CBOR inside a DSSE pre-authentication encoding.
-//! `req/38_ERRATA_2026-08-07.md` §15 逐語: 「②C2SP text 形（newline+signed-note）は一次照合で構造無関係
-//! と確定——gx は C2SP checkpoint の wire 互換を主張しない（するなら変換層=将来課題）と **doc に明示**
-//! する」. So: **a C2SP witness cannot verify a gx checkpoint and gx cannot verify a C2SP one.** The
+//! `req/38_ERRATA_2026-08-07.md` §15, verbatim: "② the C2SP text form (newline+signed-note) is
+//! confirmed structurally unrelated by primary-source cross-check -- gx does not claim wire
+//! compatibility with the C2SP checkpoint (if it did, a conversion layer would be future work), and
+//! **states so explicitly in the doc**". So: **a C2SP witness cannot verify a gx checkpoint and gx
+//! cannot verify a C2SP one.** The
 //! two agree on what a signed tree head is *for* and on nothing about its bytes. Making them
 //! interoperate means a conversion layer, and F-5 (`req/38_ERRATA_2026-08-07.md` §17) has since
 //! given it an address: **M8, the conformance window**, beside the `tlog-cosignature` v1 clash with
 //! CM-5.
 //!
-//! **Who the incompatible party is, by name.** 「互換でない」 is worth nothing as an abstraction, so
+//! **Who the incompatible party is, by name.** "not compatible" is worth nothing as an abstraction, so
 //! here is the deployment it is about: **Rekor v2 (`sigstore/rekor-tiles`)**, whose `CLIENTS.md`
-//! states 「The checkpoints the log provides will conform to the C2SP checkpoint spec」 and computes
-//! its key IDs 「per the signed note spec」. Hand 7 fetched that file from the repository itself
+//! states "The checkpoints the log provides will conform to the C2SP checkpoint spec" and computes
+//! its key IDs "per the signed note spec". Hand 7 fetched that file from the repository itself
 //! rather than taking it from a transcription (`Desktop/GitRepo/REFERENCES.md`, 2026-08-08). Three
 //! measured differences, not one: the note body is text where gx's is canonical DAG-CBOR; the
 //! signature is over that text where gx's is over a DSSE pre-authentication encoding; and the tree
-//! is hashed with SHA-256 (`tlog-tiles.md`: 「The hashing algorithm is defined to be SHA-256」)
+//! is hashed with SHA-256 (`tlog-tiles.md`: "The hashing algorithm is defined to be SHA-256")
 //! where gx uses BLAKE3 (35 DR-3). The third is already asserted as a declared difference by
 //! `gx-log/tests/ac_024.rs`; the first two by
 //! `the_checkpoint_message_is_not_a_c2sp_signed_note` in `tests/checkpoint_signature.rs`.
@@ -89,7 +103,7 @@ use serde::{Deserialize, Serialize};
 use crate::keys::VerifyingKeyRef;
 use crate::{Error, Result};
 
-/// 42 §3.10, 固定値: 「`application/vnd.glovrex.receipt+dagcbor`」.
+/// 42 §3.10, fixed value: "`application/vnd.glovrex.receipt+dagcbor`".
 ///
 /// A constant rather than a literal at each use, because it is inside the signed bytes: a caller
 /// that spelled it differently would produce a signature no verifier here accepts, and the failure
@@ -99,7 +113,8 @@ pub const RECEIPT_PAYLOAD_TYPE: &str = "application/vnd.glovrex.receipt+dagcbor"
 /// The payload type of a checkpoint's signed core (**E-M2-26**).
 ///
 /// 42 §3.11's `Checkpoint` table has no `payload_type` row -- the field does not exist there and no
-/// 正本 names this string. It is minted by the E-M2-26 erratum (`req/38_ERRATA_2026-08-07.md` §15),
+/// canonical source names this string. It is minted by the E-M2-26 erratum
+/// (`req/38_ERRATA_2026-08-07.md` §15),
 /// spelled after 42 §3.10's receipt type so that the two differ in one word and agree everywhere
 /// else, and it is load-bearing rather than decorative: it is inside the signed bytes, so it is what
 /// stops a signature over a checkpoint from being read as a signature over a receipt.
@@ -120,6 +135,14 @@ pub const CHECKPOINT_PAYLOAD_TYPE: &str = "application/vnd.glovrex.checkpoint+da
 /// A revocation whose producer spelled it differently produces a signature no verifier here accepts,
 /// which is the failure mode this constant exists to make impossible for gx's own producer.
 pub const REVOCATION_PAYLOAD_TYPE: &str = "application/vnd.glovrex.revocation+dagcbor";
+
+/// The payload type of a claim-standing close-statement's signed core (DR-46-40, `req/730`).
+///
+/// Same reasoning as [`REVOCATION_PAYLOAD_TYPE`], one type over: a close-statement has to be
+/// inside the signed bytes and distinct from every other payload type this workspace signs, so a
+/// signature over one cannot be replayed as a signature over a receipt, a checkpoint, or a
+/// revocation.
+pub const STANDING_PAYLOAD_TYPE: &str = "application/vnd.glovrex.standing+dagcbor";
 
 /// The payload type of an aggregate verdict checkpoint's signed core (**FR-M04**, M7 hand 6).
 ///
@@ -179,18 +202,22 @@ pub fn pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
 ///
 /// # The JSON face
 ///
-/// 44 §2.2: 「`Receipt`（42 §3.10のJSON表現、`payload`はbase64）」. `payload` therefore serialises as
+/// 44 §2.2: "`Receipt` (the JSON representation of 42 §3.10; `payload` is base64)". `payload`
+/// therefore serialises as
 /// a base64 string in a human-readable format and as a byte string in DAG-CBOR, which is the same
 /// pair `DsseSignature.sig` takes under M2H1-4 (`req/38_ERRATA_2026-08-07.md` §9) and the same
 /// table, [`gx_core`]'s.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DsseEnvelope {
-    /// 42 §3.10 固定値 [`RECEIPT_PAYLOAD_TYPE`] for a receipt. Carried rather than assumed, because
+    /// 42 §3.10 fixed value [`RECEIPT_PAYLOAD_TYPE`] for a receipt. Carried rather than assumed, because
     /// it is inside the signed bytes and a verifier that assumed it could not detect a change to it.
     pub payload_type: String,
     /// `canonical_dagcbor(ReceiptPayload)` (42 §3.10).
     #[serde(with = "raw_bytes")]
     pub payload: Vec<u8>,
+    /// The signatures over `pae(payload_type, payload)`. A `Vec` because 42 §3.10 types it so:
+    /// one envelope may be signed under several keys, and [`DsseEnvelope::signature_for`] is how
+    /// a verifier picks the one offered under its key.
     pub signatures: Vec<DsseSignature>,
 }
 
@@ -216,7 +243,7 @@ impl DsseEnvelope {
     ///
     /// Additive: an envelope already carrying another key's signature keeps it, which is what a
     /// `Vec<DsseSignature>` is for. A second signature under the *same* key id replaces nothing and
-    /// is not prevented here -- [`verify`] takes the first match, and a producer that signs twice
+    /// is not prevented here -- [`DsseEnvelope::verify`] takes the first match, and a producer that signs twice
     /// under one id has a bug this type cannot see.
     pub fn sign(&mut self, key: &SigningKey, key_id: &KeyId) {
         let signature: Signature = key.sign(&self.signing_bytes());
@@ -230,11 +257,11 @@ impl DsseEnvelope {
     ///
     /// # Every refusal is [`Error::SignatureInvalid`]
     ///
-    /// AC-019 逐語 asks that a receipt with one bit flipped verify to `Err(SignatureInvalid)`, and
+    /// AC-019, verbatim, asks that a receipt with one bit flipped verify to `Err(SignatureInvalid)`, and
     /// a bit lands in one of four places on this road: the payload, the payload type, the signature
     /// bytes, or the `keyid`. The first two change the pre-authentication encoding, the third
     /// changes the signature, and the fourth changes which signature is asked for -- and all four
-    /// are 「this key did not sign this」. Reporting them apart would tell a forger which part of the
+    /// are "this key did not sign this". Reporting them apart would tell a forger which part of the
     /// forgery to fix, which is the same argument `gx_log::proof::verify_inclusion` makes for
     /// answering a bad proof with one `false`. A signature of the wrong length is refused here too,
     /// for the reason [`gx_core::DsseSignature`]'s own documentation gives.
@@ -270,8 +297,9 @@ pub fn checkpoint_signing_message(checkpoint: &Checkpoint) -> Result<Vec<u8>> {
 
 /// Sign a checkpoint and return it with the signature attached (**H3-7**, **E-M2-26**).
 ///
-/// `req/38_ERRATA_2026-08-07.md` §12: 「H3-7（`Checkpoint.signature` が non-Option）→ 手 5 で解消:
-/// 署名装着は手 5 の scope」, and §9's E-M2-19 fixes the signed core as `{origin, tree_size,
+/// `req/38_ERRATA_2026-08-07.md` §12: "H3-7 (`Checkpoint.signature` being non-Option) -> resolved
+/// in hand 5: attaching the signature is hand 5's scope", and §9's E-M2-19 fixes the signed core as
+/// `{origin, tree_size,
 /// root_hash}` with `timestamp` outside it (CM-5). `gx_log::proof::checkpoint_signing_bytes` is
 /// that byte string; hand 2 built it and declined to sign it, and this is the caller it named.
 ///
@@ -351,8 +379,8 @@ pub fn verdict_checkpoint_signing_message(checkpoint: &VerdictCheckpoint) -> Res
 /// [`sign_checkpoint`] takes for the tree head.
 ///
 /// 🔴 **What signing this does not establish.** The key that signs is the deployment's own, and the
-/// deployment is the party the count is evidence *against*. So a valid signature here says 「this
-/// key stated these numbers」 and nothing about whether the numbers are true; the check that can
+/// deployment is the party the count is evidence *against*. So a valid signature here says "this
+/// key stated these numbers" and nothing about whether the numbers are true; the check that can
 /// contradict them is `gx_log::proof::audit_verdict_chain`, which takes what a verifier counted for
 /// itself. Kept in two functions on purpose: one road that a key can satisfy, one road that it
 /// cannot.
@@ -402,7 +430,7 @@ pub fn verify_verdict_checkpoint(
 ///
 /// `verify_strict` rather than `verify`: ed25519-dalek's strict form refuses small-order public
 /// keys and non-canonical `s` scalars, which are the shapes under which one signature can verify
-/// under two keys. gx uses a signature to say 「*this* key attested this」, so a check that admits a
+/// under two keys. gx uses a signature to say "*this* key attested this", so a check that admits a
 /// second answer is the wrong check.
 fn verify_raw(key: &VerifyingKeyRef<'_>, message: &[u8], offered: &DsseSignature) -> Result<()> {
     let invalid = || Error::SignatureInvalid {
@@ -476,10 +504,10 @@ pub(crate) mod raw_bytes {
 // M5H8-9 — the three roads into `raw_bytes`, each pinned to its own visitor method
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5H8-9 採(a)** (`req/38_ERRATA_2026-08-07.md` §45), verbatim:
+/// 🔴 **M5H8-9, adopted (a)** (`req/38_ERRATA_2026-08-07.md` §45), verbatim:
 ///
-/// > **M5H8-9 採(a)**: dsse `raw_bytes` Visitor の 3 経路(visit_str/visit_byte_buf/visit_seq)を
-/// > 直接叩く probe=**fix 批**。
+/// > **M5H8-9, adopted (a)**: a probe that directly exercises dsse `raw_bytes`'s Visitor 3 roads
+/// > (visit_str/visit_byte_buf/visit_seq) = **the fix batch**.
 ///
 /// # What was measured, and why the probes are here rather than in `tests/`
 ///
@@ -494,7 +522,7 @@ pub(crate) mod raw_bytes {
 /// [`raw_bytes`] is `pub(crate)`, so an integration test cannot name it and the road it would have
 /// to travel instead — a whole [`DsseEnvelope`] through a real codec — is the road that already
 /// exists and already only reaches `visit_bytes`. Unit tests beside the module are the only place
-/// the *method* can be chosen, which is what 「経路を固定した decode」 means. The pattern is the
+/// the *method* can be chosen, which is what "a decode with the road pinned" means. The pattern is the
 /// workspace's: `gx-log/src/proof.rs`, `gx-log/src/tile.rs`, `gx-core/src/error.rs` and four others
 /// carry `#[cfg(test)] mod tests` for the same reason.
 ///
@@ -551,7 +579,7 @@ mod tests {
         raw_bytes::deserialize(Fixed(road))
     }
 
-    /// JSON's road (44 §2.2: 「`payload`はbase64」). The bytes come back, and they are *these* bytes.
+    /// JSON's road (44 §2.2: "`payload` is base64"). The bytes come back, and they are *these* bytes.
     #[test]
     fn visit_str_decodes_the_base64_it_was_given() {
         let text = gx_core::b64::encode(&PAYLOAD);
@@ -596,7 +624,7 @@ mod tests {
         );
 
         // Length is part of the claim: a `visit_seq` that stopped after one element would still
-        // return 「real bytes」 by the loose reading.
+        // return "real bytes" by the loose reading.
         let long: Vec<u8> = (0u8..=255).collect();
         assert_eq!(
             decode(Road::Seq(long.clone())).expect("long sequence"),

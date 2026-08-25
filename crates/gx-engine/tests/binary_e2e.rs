@@ -1,16 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 51 §8.1's E2E, in real binaries and real processes.
 //!
-//! 51 §8.1 逐語: 「integration層でも同等テストを持つが、E2Eでは**実バイナリ・実プロセスで検証する点
-//! が異なる**」. `tests/ac_043.rs` runs the criterion's thirty trials; this suite is the narrative —
+//! 51 §8.1 verbatim (sem: SEM-gx-engine-617): "there is an equivalent test at the integration layer too, but what differs in the E2E is that **it verifies with a real binary and a real process**". `tests/ac_043.rs` runs the criterion's thirty trials; this suite is the narrative —
 //! the whole of a commit's life across **three processes**, and the one AC hand 4 could only measure
 //! from inside one.
 //!
 //! # What hand 4 could not do, and why it matters
 //!
-//! AC-034 asks for 「別プロセスで対象ファイルへ書き込みを行い」 and hand 4's report says plainly what
-//! it did instead: 「🔴 **注入は「別プロセス」ではない**——本 crate は adapter を 1 本も持たない
-//! (N-13)ので file も process も無く、in-memory の世界を engine が知らない handle 経由で書き換える
-//! thread にした…**失われているのは process 境界**(51 §8.1 の E2E=手 5)」. The substrate here is a
+//! AC-034 asks for "writing to the target file via a separate process" (sem: SEM-gx-engine-618) and hand 4's report says plainly what
+//! it did instead: "🔴 **the injection is not a "separate process"** -- this crate has not one single adapter
+//! (N-13), so there is neither a file nor a process; the in-memory world was rewritten by a
+//! thread through a handle the engine does not know about ... **what is lost is the process boundary** (51 §8.1's E2E = hand 5)". The substrate here is a
 //! **file**, so a second process can reach it, and the injection is the sentence as written.
 //!
 //! An in-memory world plus a thread is the same *claim* with a weaker *witness*: a thread shares the
@@ -66,17 +67,17 @@ fn ac_034_across_a_real_process_boundary_aborts_without_applying() {
 ///
 /// 51 §8.1's four steps, each in its own process:
 ///
-/// 1. 「`gx submit`→`gx verify`→`gx commit --async`でCommitting区間に入る」 — `crash_probe run`, armed
+/// 1. "enter the Committing interval via `gx submit`->`gx verify`->`gx commit --async`" (sem: SEM-gx-engine-619) — `crash_probe run`, armed
 ///    at the third injection point.
-/// 2. 「`kill -9`を実プロセスに送信する」 — the parent's `SIGKILL`, after the child says it is there.
-/// 3. 「プロセスを再起動し、43 §7リカバリ手順が自動実行されることを確認する」 — `crash_probe recover`,
+/// 2. "send `kill -9` to the real process" (sem: SEM-gx-engine-619) — the parent's `SIGKILL`, after the child says it is there.
+/// 3. "restart the process and confirm that 43 §7's recovery procedure runs automatically" (sem: SEM-gx-engine-619) — `crash_probe recover`,
 ///    which runs 43 §7 as the first thing it does.
-/// 4. 「`ledger`entry重複0件・`gx log`出力の整合性・receiptの再構成成功を確認」 — one leaf, a journal
+/// 4. "confirm zero duplicate `ledger` entries, `gx log` output consistency, and successful receipt reconstruction" (sem: SEM-gx-engine-619) — one leaf, a journal
 ///    that agrees with it, and a **re-issued receipt that verifies offline** against the ledger's
 ///    own root.
 ///
 /// The fourth process is the audit: a `recover` that finds nothing left to do (43 §7-2) and reports
-/// the same ledger. 「recovery が冪等である」 is what makes a restart safe to run twice, which is the
+/// the same ledger. "recovery is idempotent" (sem: SEM-gx-engine-620) is what makes a restart safe to run twice, which is the
 /// only way an operator can use it.
 #[test]
 fn the_51_8_1_scenario_runs_across_four_processes() {
@@ -113,7 +114,7 @@ fn the_51_8_1_scenario_runs_across_four_processes() {
     assert!(recovered.contains("state=Committed"));
     assert_eq!(need(&recovered, "LEDGER_LEAVES"), "1");
     assert_eq!(need(&recovered, "LEDGER_AGREES"), "true");
-    // 「receiptの再構成成功」 -- and not merely that a receipt exists.
+    // "successful receipt reconstruction" (sem: SEM-gx-engine-621) -- and not merely that a receipt exists.
     let checks = need(&recovered, "REISSUED_CHECKS");
     assert!(
         checks.contains("inclusion: Verified") && checks.contains("canonical_cid: true"),
@@ -129,7 +130,7 @@ fn the_51_8_1_scenario_runs_across_four_processes() {
     assert_eq!(
         need(&audit, "LEDGER_LEAVES"),
         "1",
-        "「ledger entry重複0件」"
+        "\"zero duplicate ledger entries\" (sem: SEM-gx-engine-622)"
     );
     assert_eq!(need(&audit, "LEDGER_AGREES"), "true");
     assert_eq!(

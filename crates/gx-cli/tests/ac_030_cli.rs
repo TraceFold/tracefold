@@ -1,21 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-030 / AC-011, re-confirmed through the CLI** — the same intent names the same id in two
 //! processes, and the same plan names the same transformation.
 //!
-//! 34 AC-030 逐語 ends with the instruction this file carries out:
+//! 34 AC-030, quoted verbatim, ends with the instruction this file carries out: (sem: SEM-gx-cli-1309)
 //!
-//! > CLIレベル（`gx submit`/`gx plan`）での再確認はM6のE2E AC（AC-054）で行う。
+//! > Re-confirmation at the CLI level (`gx submit`/`gx plan`) is done by M6's E2E AC (AC-054). (sem: SEM-gx-cli-1310)
 //!
-//! and AC-011 says the same thing about `gx_canon::cid::compute` (「CLIレベル…での同一ID再確認は
-//! AC-030およびM6のE2E AC（AC-054）で行う」). M5 measured the library API in two operating-system
+//! and AC-011 says the same thing about `gx_canon::cid::compute` ("re-confirmation of the same ID at
+//! the CLI level…is done by AC-030 and M6's E2E AC (AC-054)"; sem: SEM-gx-cli-1311). M5 measured the library API in two operating-system
 //! processes; this measures the **binary**, which is the thing an operator runs.
 //!
 //! # 🔴 Two projects, not one
 //!
-//! Running `gx submit` twice against one `.gx/` would measure T-1's create-if-absent — 「同一canonical
-//! encodeのintent再送は同一`IntentId`を返す（副作用なし）」 — which is a fact about a **map lookup**.
+//! Running `gx submit` twice against one `.gx/` would measure T-1's create-if-absent — "resending an intent with the same canonical
+//! encode returns the same `IntentId` (no side effects)" (sem: SEM-gx-cli-1312) — which is a fact about a **map lookup**.
 //! ASM-11 is a stronger claim: the id is a function of the value and of nothing else, so two
 //! directories that have never seen each other have to arrive at the same name. That is the shape
-//! AC-011 uses for its two processes (「別バイナリ・キャッシュ非共有・別ワーキングディレクトリ」) and
+//! AC-011 uses for its two processes ("separate binary, no shared cache, separate working directory"; sem: SEM-gx-cli-1313) and
 //! it is the shape here.
 //!
 //! The `plan` half needs one more thing to be honest: the two projects must plan against the **same
@@ -60,7 +62,7 @@ fn ac_030_cli_the_same_intent_is_the_same_intent_id_in_two_processes() {
     println!("AC030_CLI_INTENT a={id_a} b={id_b}");
     assert_eq!(
         id_a, id_b,
-        "ASM-11: 「同一intent→同一IntentId」, across two `.gx/` directories that share nothing"
+        "ASM-11: \"same intent -> same IntentId\" (sem: SEM-gx-cli-1314), across two `.gx/` directories that share nothing"
     );
 
     // The negative half, without which the assertion above is satisfied by a constant. One
@@ -118,7 +120,7 @@ fn ac_030_cli_the_same_plan_is_the_same_transformation_id_in_two_processes() {
     );
     assert_eq!(
         tid_a, tid_b,
-        "ASM-11: 「plan()完了後は同一`TransformationId`」, in two processes with separate journals"
+        "ASM-11: \"the same `TransformationId` after plan() completes\" (sem: SEM-gx-cli-1315), in two processes with separate journals"
     );
     assert_eq!(
         planned_a.json()["transformation"]["subject"],
@@ -134,8 +136,8 @@ fn ac_030_cli_the_same_plan_is_the_same_transformation_id_in_two_processes() {
 
 /// 🔴 The **third** process: `gx plan` reached by the `TransformationId` rather than the `IntentId`.
 ///
-/// 44 §0's id-resolution rule is 「`IntentId`と`TransformationId`のいずれの`gx1:...`値も受理し…
-/// `plan()`完了後は正準の`TransformationId`へ解決する」, and a rule that accepts two spellings has to
+/// 44 §0's id-resolution rule is "it accepts either an `IntentId`'s or a `TransformationId`'s `gx1:...` value…
+/// and resolves to the canonical `TransformationId` after `plan()` completes" (sem: SEM-gx-cli-1316), and a rule that accepts two spellings has to
 /// be measured with both. The second spelling reaches a transformation the process it is running in
 /// has never seen in memory, which is the whole of `session::Session::resume`.
 #[test]
@@ -168,7 +170,7 @@ fn ac_030_cli_both_spellings_of_the_id_resolve_to_one_transformation() {
         "44 §0: both spellings resolve to the canonical `TransformationId`"
     );
 
-    // 🔴 And the resolution wrote **nothing**: 43 T-2's idempotency is 「安全に再試行可」 and req/88
+    // 🔴 And the resolution wrote **nothing**: 43 T-2's idempotency is "safe to retry" (sem: SEM-gx-cli-1317) and req/88
     // §3 Λ2 needs it to be silent. Two `Planned` records for one plan would be a single-shot CLI
     // and a long-lived engine disagreeing about how many times T-2 fired.
     println!(

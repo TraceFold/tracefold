@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `apply`: the three steps around a `rename`, and the observation that comes back.
 //!
-//! Spec: 41 §4 for the method (「commit承認後にのみ呼ばれる」・「適用は冪等に設計する」), 42 §3.4 for
+//! Spec: 41 §4 for the method ("only called after commit approval" / "apply is designed to be idempotent"), 42 §3.4 for
 //! [`AppliedDelta`]'s fields, 45 §3 for the residual condition this shape closes. The rulings are
-//! **M4-13 採(a)** (single-file whole replacement, atomicity from `rename`, `len==1` only),
+//! **M4-13, adopted (a)** (single-file whole replacement, atomicity from `rename`, `len==1` only),
 //! **E-M4-3** (idempotence is quantified over the retry), **E-M4-31** (the `Timestamp(0)`
-//! placeholder) and **M4-06 採(b)** (the observed digest is what L5 compares with a promise).
+//! placeholder) and **M4-06, adopted (b)** (the observed digest is what L5 compares with a promise). (sem: SEM-gx-adapter-fs-010)
 //!
 //! # The three steps, and which of them is the primary's
 //!
@@ -12,11 +14,11 @@
 //! entry records that hand 4's confirmation of the same three was a WebSearch snippet). What LWN
 //! 457667 gives, verbatim, is an ordered list of five:
 //!
-//! > 「The following steps are required to perform this type of update: create a new temp file (on the
+//! > "The following steps are required to perform this type of update: create a new temp file (on the
 //! > same file system!) / write data to the temp file / fsync() the temp file / rename the temp file
-//! > to the appropriate name / fsync() the containing directory」
+//! > to the appropriate name / fsync() the containing directory"
 //!
-//! [`write_whole_file`] is that list. `SURVIVORS.md` §A-2 calls the last three 「3 手」, which is the
+//! `write_whole_file` (private) is that list. `SURVIVORS.md` §A-2 calls the last three "3 moves", which is the (sem: SEM-gx-adapter-fs-011)
 //! same sequence counted from the first thing an implementation can get wrong.
 //!
 //! 🔴 **What the primary does not say.** `SURVIVORS.md` §A-2 and `req/73` both write that omitting
@@ -28,21 +30,21 @@
 //!
 //! # Why `rename` and not a write in place
 //!
-//! POSIX's normative sentence is about **other observers**: 「a directory entry named new shall remain
+//! POSIX's normative sentence is about **other observers**: "a directory entry named new shall remain
 //! visible to other threads throughout the renaming operation and refer either to the file referred
-//! to by new or old before the operation began」 (the word 「atomic」 itself is in the RATIONALE). A
+//! to by new or old before the operation began" (the word "atomic" itself is in the RATIONALE). A (sem: SEM-gx-adapter-fs-012)
 //! writer that truncated and rewrote would expose a half-written file to any reader in between, and
-//! 45 §3's TH-3 residual condition is 「`adapter.apply`が単一syscallでない場合」 -- one `rename` is one
+//! 45 §3's TH-3 residual condition is "`adapter.apply` is not a single syscall" -- one `rename` is one (sem: SEM-gx-adapter-fs-013)
 //! syscall, and that is the whole reason [`crate::delta::MAX_OPS`] is one.
 //!
-//! `std::fs::rename` documents the replacement (「replacing the original file if `to` already exists」)
+//! `std::fs::rename` documents the replacement ("replacing the original file if `to` already exists") (sem: SEM-gx-adapter-fs-014)
 //! and documents **no atomicity at all**, because the guarantee belongs to the filesystem underneath.
 //! That is why `tests/support/mod.rs` proves the filesystem from `/proc/self/mountinfo` before a byte
 //! is written, and why nothing here may be read as a claim about `/mnt/c`.
 //!
 //! # What comes back is an observation
 //!
-//! req/69 §3.1: 「post は返り値でなく観測値である」. So [`observe`] **reads the position back** after the
+//! req/69 §3.1: "post is an observation, not a return value". So `observe` (private) **reads the position back** after the (sem: SEM-gx-adapter-fs-015)
 //! rename instead of digesting the buffer that was written: the buffer is what this process intended
 //! and the read is what the substrate holds. It is also what gives L5 two roads to compare -- the
 //! fixture derives its promise from the goal, and this derives the observation from the disk.
@@ -69,7 +71,7 @@ static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 /// # Errors
 /// [`Error::ForeignDelta`] for another adapter's delta, [`Error::PayloadUnreadable`] for bytes this
 /// grammar did not write, [`Error::Unimplemented`] for a sequence longer than v0.1 runs
-/// (**M4-13 採(a)**'s fail-closed refusal, raised by [`FsDelta::decode`]), and
+/// (**M4-13, adopted (a)**'s fail-closed refusal, raised by [`FsDelta::decode`]), and (sem: SEM-gx-adapter-fs-016)
 /// [`Error::ApplyFailed`] when the filesystem refused a step.
 pub(crate) fn apply(delta: &PlannedDelta) -> Result<AppliedDelta> {
     if delta.substrate() != &SubstrateKind::Fs {
@@ -96,8 +98,8 @@ pub(crate) fn apply(delta: &PlannedDelta) -> Result<AppliedDelta> {
         delta.reference().clone(),
         postcondition,
         digest,
-        // **E-M4-31** (req/38 §31): 「`applied_at` は engine が commit 時に上書きする…adapter は
-        // `Timestamp(0)` placeholder」. 41 §4 gives `apply` no parameter an engine could inject a
+        // **E-M4-31** (req/38 §31): "`applied_at` is overwritten by the engine at commit time... the adapter writes a
+        // `Timestamp(0)` placeholder". 41 §4 gives `apply` no parameter an engine could inject a (sem: SEM-gx-adapter-fs-017)
         // moment through, and 41 §6 keeps clocks out of this layer, so the honest value is the one
         // an engine is expected to overwrite. A `Timestamp(0)` that reached a journal is an engine
         // that skipped the step, not a filesystem with no clock.
@@ -184,9 +186,9 @@ fn remove_whole_file(position: &str) -> Result<()> {
 ///
 /// A removal leaves nothing to read, and `AppliedDelta` still needs a `resulting_digest` and a
 /// postcondition. The value written is the digest of no content -- which is the same digest a file
-/// with no bytes has, because 「digest=**内容のみ**(metadata 除外)」 leaves an adapter nothing else to
+/// with no bytes has, because "digest = **content only** (metadata excluded)" leaves an adapter nothing else to
 /// tell the two apart. It is the narrow scope's cost, of the same family as the metadata residue the
-/// crate root already discloses, and it is raised as a起票 in `req/74` §2 rather than papered over
+/// crate root already discloses, and it is raised as **filed** in `req/74` §2 rather than papered over (sem: SEM-gx-adapter-fs-018)
 /// with an invented marker: any marker byte string is also a file's possible content.
 ///
 /// # Errors

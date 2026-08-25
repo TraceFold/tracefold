@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The registry's own properties: the order it is built in cannot reach the answer, and a check
 //! that cannot decide is not a refusal.
 //!
-//! req/60 §5.2 asks this hand for one statement in particular -- 「registry の**順序が結果に効かない**
-//! 事(または効く事)を明示」 -- and the answer is that it does not. This file is where that is
+//! req/60 §5.2 asks this hand for one statement in particular -- "state explicitly whether the
+//! registry's **order affects the result** (or does not)" -- and the answer is that it does not. This file is where that is (sem: SEM-gx-gate-279)
 //! measured rather than asserted in prose, because it is not free: it holds only while three
 //! separate things are true, and each of them is one test below.
 //!
@@ -86,7 +88,7 @@ impl InvariantCheck for Undecidable {
     }
 }
 
-/// Answers under somebody else's id. 42 §3.8 says `invariant_id` 「= `InvariantCheck::id()`」, and
+/// Answers under somebody else's id. 42 §3.8 says `invariant_id` "= `InvariantCheck::id()`" (sem: SEM-gx-gate-280), and
 /// this is what breaking that looks like from the registry's side.
 struct Misattributing;
 
@@ -166,6 +168,10 @@ fn verdict_of(order: &[usize], checks: &[fn() -> Box<dyn InvariantCheck>]) -> Re
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+        // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+        // varying this field alone moves no verdict) about the field and not about this fixture.
+        decided_at: Timestamp(0),
     })
 }
 
@@ -244,6 +250,7 @@ fn the_answers_come_back_in_invariant_id_order() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect("three holding invariants");
 
@@ -313,7 +320,7 @@ fn registration_order_does_not_reach_the_admit_proof() {
 
 /// An invariant that returns `Err` makes the verdict unreachable, not negative.
 ///
-/// **E-M3-3** 逐語: 「評価不能(⊥)は Deny でも Escalate でもない」. The other invariants still ran --
+/// **E-M3-3** verbatim: "unevaluable (⊥) is neither Deny nor Escalate" (sem: SEM-gx-gate-281). The other invariants still ran --
 /// FR-026 is unconditional -- and the error names who could not answer.
 #[test]
 fn an_invariant_that_cannot_decide_is_not_a_deny() {
@@ -343,6 +350,7 @@ fn an_invariant_that_cannot_decide_is_not_a_deny() {
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        decided_at: Timestamp(0),
     });
 
     match outcome {
@@ -397,6 +405,7 @@ fn two_failing_invariants_report_the_same_way_in_either_order() {
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect_err("neither can decide")
     };
@@ -424,6 +433,7 @@ fn a_result_that_misnames_its_invariant_is_refused() {
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        decided_at: Timestamp(0),
     });
 
     match outcome {

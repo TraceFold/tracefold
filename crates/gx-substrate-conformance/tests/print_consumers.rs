@@ -1,24 +1,32 @@
-//! 🔴 **L-5 / 裁定 #17** — does `Report::print` have a consumer? Answered once, here (**M7 hand 4**).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **L-5 / ruling #17** — does `Report::print` have a consumer? Answered once, here (**M7 hand
+//! 4**). (sem: SEM-gx-substrate-conformance-134, SEM-gx-substrate-conformance-135,
+//! SEM-gx-substrate-conformance-136, SEM-gx-substrate-conformance-137, SEM-gx-substrate-conformance-138,
+//! SEM-gx-substrate-conformance-139, SEM-gx-substrate-conformance-140, SEM-gx-substrate-conformance-141,
+//! SEM-gx-substrate-conformance-142, SEM-gx-substrate-conformance-143, SEM-gx-substrate-conformance-144,
+//! SEM-gx-substrate-conformance-145, SEM-gx-substrate-conformance-146)
 //!
 //! The ticket is four hands old and its shape is this project's standard one: an item exists,
-//! nothing outside a test calls it, and 「a later hand will use it」 is not an answer anybody is
+//! nothing outside a test calls it, and "a later hand will use it" is not an answer anybody is
 //! allowed to give twice.
 //!
 //! | window | what it said | source |
 //! |---|---|---|
 //! | M4 fix | the mutation `Report::print → ()` survives, because nobody asserts stdout | req/77 §L-5 |
-//! | M4 fix | two ways out: (a) classify it a permanent survivor, (b) add `to_lines()` so printing becomes measurable — 「(b) は M5 の CLI/HTTP 面が print を要求した時に一緒に決めるのが安い」 | req/77 §L-5 |
+//! | M4 fix | two ways out: (a) classify it a permanent survivor, (b) add `to_lines()` so printing becomes measurable — "(b) is cheap to decide together, whenever M5's CLI/HTTP surface demands print" | req/77 §L-5 |
 //! | M5 | not decided: M5 builds no CLI (N-01) | req/78 §5 row 23 |
-//! | M6 | **measured**: no consumer grew. Two options raised — retirement mark, or 「M7 の adapter 2 本が conformance harness を実走する時が最後の窓」. Recommended (b), 「M7 に実消費者候補が実在するため。M6 で殺すのは早い」 | req/88 §5 row 35 |
-//! | M6 检收 | 採(b): 「`Report::print` は M7(adapter 2 本が conformance harness を実走する時)が最後の窓。M6 で殺すのは早い」 | req/38 §46 (§5 行 35) |
-//! | M7 reqdef | 「消費者が生えたか否かを **1 度だけ**判定し、生えなければ退役印(E-7 の形)を打つ」 | req/98 §3-4 row 8 / 裁定 #17 |
+//! | M6 | **measured**: no consumer grew. Two options raised — retirement mark, or "when two of M7's adapters actually run the conformance harness is the last window". Recommended (b), "because a real consumer candidate exists in M7. Killing it in M6 is too early" | req/88 §5 row 35 |
+//! | M6 acceptance | adopted (b): "`Report::print`'s last window is M7 (when two adapters actually run the conformance harness). Killing it in M6 is too early" | req/38 §46 (§5 row 35) |
+//! | M7 reqdef | "judge, exactly once, whether a consumer grew, and if none did, strike a retirement mark (E-7's form)" | req/98 §3-4 row 8 / ruling #17 |
 //!
 //! # The answer, and the number it rests on
 //!
 //! **The consumer grew, so no retirement mark.** The candidate M6 named — the adapters running the
 //! harness for real — is no longer a candidate: `gx-adapter-fs` (M4 hand 6), `gx-adapter-git` (M7
 //! hand 1) and `gx-adapter-mcp` (M7 hand 3) each call it, and every conformance number quoted in
-//! req/99, req/100 and req/101 (`CHECKS=16 PASS=16 FAIL=0 無い=0 …`) is a line this function printed.
+//! req/99, req/100 and req/101 (`CHECKS=16 PASS=16 FAIL=0 NOT_SUPPLIED=0 …`) is a line this function
+//! printed.
 //! An instrument whose output is the evidence three reports are written from is not an unused item.
 //!
 //! [`the_consumers_of_report_print_are_counted_rather_than_remembered`] is that judgement as a
@@ -29,11 +37,12 @@
 //! # What is **not** resolved, and is not being re-decided here
 //!
 //! L-5's *other* half: the mutation `Report::print → ()` is still a survivor, because asserting
-//! stdout needs a capture that collides with libtest's. req/38 §36 already classified it — 「L-5 記録:
-//! `Report::print` survivor=印字は assert 対象外(等価変異扱い)」 — and this hand leaves that
+//! stdout needs a capture that collides with libtest's. req/38 §36 already classified it — "L-5
+//! record: `Report::print`'s survivor = printing is out of scope for assertion (treated as an
+//! equivalent mutant)" — and this hand leaves that
 //! classification exactly where it is. The two questions were fused in the ticket and they are
-//! different: 「is anybody calling it」 is answered above with a number, and 「can a mutation of it be
-//! caught」 is answered by the equivalence class it was put in. Option (b) of req/77 (a `to_lines()`
+//! different: "is anybody calling it" is answered above with a number, and "can a mutation of it be
+//! caught" is answered by the equivalence class it was put in. Option (b) of req/77 (a `to_lines()`
 //! the suites assert on) would move the measurable content out of `print` without making `print`
 //! itself measurable — the survivor would still be there, one function along — so it buys a new
 //! published API and no property. Not taken; recorded so the next reader does not re-derive it.
@@ -82,7 +91,7 @@ fn rust_sources() -> Vec<(String, String)> {
 
 /// Call sites of `Report::print`, as (file, line), on code lines only.
 ///
-/// Derived by walking the tree rather than by naming the files, 裁定 #10's reason one crate over: a
+/// Derived by walking the tree rather than by naming the files, ruling #10's reason one crate over: a
 /// declared list of consumers is a list that agrees with itself.
 ///
 /// 🔴 **The instrument's limit, printed rather than implied**: it matches `report.print(`, the
@@ -113,7 +122,7 @@ fn call_sites() -> Vec<(String, usize)> {
     sites
 }
 
-/// 🔴 **裁定 #17, answered once**: the consumers are counted, and every adapter is among them.
+/// 🔴 **ruling #17, answered once**: the consumers are counted, and every adapter is among them.
 #[test]
 fn the_consumers_of_report_print_are_counted_rather_than_remembered() {
     let sites = call_sites();
@@ -128,8 +137,9 @@ fn the_consumers_of_report_print_are_counted_rather_than_remembered() {
     );
     assert!(
         !sites.is_empty(),
-        "裁定 #17: M7 is the last window. Zero call sites is the answer that fires the retirement \
-         mark (E-7's form: the item stays, carrying a 退役 doc that says what it was), and it has to \
+        "ruling #17: M7 is the last window. Zero call sites is the answer that fires the retirement \
+         mark (E-7's form: the item stays, carrying a retirement doc that says what it was), and it \
+         has to \
          be taken deliberately rather than by this test being deleted"
     );
     for adapter in [
@@ -140,7 +150,7 @@ fn the_consumers_of_report_print_are_counted_rather_than_remembered() {
         assert!(
             files.iter().any(|f| f.starts_with(adapter)),
             "{adapter} runs the harness of 51 §7 and does not print its report. That is the exact \
-             condition req/88 §5 row 35 measured in M6 (「消費者は生えない」) and req/38 §46 deferred \
+             condition req/88 §5 row 35 measured in M6 (\"no consumer grows\") and req/38 §46 deferred \
              to M7 — if it is true again, the question is open again"
         );
     }
@@ -154,6 +164,10 @@ fn the_consumers_of_report_print_are_counted_rather_than_remembered() {
 fn the_decision_is_recorded_beside_the_function() {
     let text = fs::read_to_string(repo_root().join("crates/gx-substrate-conformance/src/lib.rs"))
         .expect("the crate this test is about");
+    // "裁定 #17" (sem: SEM-gx-substrate-conformance-152) / "退役印" (sem:
+    // SEM-gx-substrate-conformance-052) are kept in Japanese, declared beside `src/lib.rs`'s
+    // matching text: `src/lib.rs` keeps its heading and the "退役印" token in Japanese for exactly
+    // this check.
     for clause in ["裁定 #17", "L-5", "退役印", "M7 hand 4"] {
         assert!(
             text.contains(clause),

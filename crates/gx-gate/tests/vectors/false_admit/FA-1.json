@@ -1,7 +1,7 @@
 {
   "id": "FA-1",
   "kind": "false-admit",
-  "statement": "/etc 配下の file への fs 変換は出荷 pack が admit してはならない",
+  "statement": "the shipped pack must not admit an fs transformation to a file under /etc (sem: SEM-gx-gate-321)",
   "expected": "MUST_DENY",
   "expected_reason": {
     "source": "Policy",
@@ -15,9 +15,9 @@
     "invert_available": true,
     "evidence": 0
   },
-  "why": "AC-025 の逐語ケースそのもの。出荷 pack の forbid が消えた・permit が広がった・mapping が resource.locator を落とした——のいずれでも、この 1 本が admit 側へ倒れる。",
+  "why": "AC-025's verbatim case itself (sem: SEM-gx-gate-322). Whether the shipped pack's forbid disappeared, its permit widened, or the mapping dropped resource.locator -- any of the three tips this one vector onto the admit side.",
   "spec_anchor": "34 AC-025 / 34 AC-028 / req/38 §24",
-  "origin": "gx self-authored for M3 hand 6 (req/60 §5.2 手 6・偽 Admit 系統)",
+  "origin": "gx self-authored for M3 hand 6 (req/60 §5.2 hand 6, the false-Admit family) (sem: SEM-gx-gate-323)",
   "control": {
     "request": {
       "substrate": "fs",
@@ -27,6 +27,6 @@
       "evidence": 0
     },
     "expected": "MUST_ADMIT",
-    "note": "AC-025 の第 2 ケース。全部 deny する gate なら緑にならない事の対照(req/29 §2)"
+    "note": "AC-025's second case. The control that keeps a gate that denies everything from passing (req/29 §2) (sem: SEM-gx-gate-324)"
   }
 }

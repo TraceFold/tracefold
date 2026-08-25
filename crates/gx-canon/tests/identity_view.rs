@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! T-22 — the IdentityView projection: what reaches a CID and what does not.
 //!
 //! Spec: 42 §1.3, whose table is the whole of this file's expectation —— `Transformation` keeps

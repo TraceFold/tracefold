@@ -1,24 +1,26 @@
-//! 🔴 **M6-11 採(b)** — `Idempotency-Key`, written by hand, persisted under `.gx/index/`.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-11, adopted (b)** (sem: SEM-gx-api-157) — `Idempotency-Key`, written by hand, persisted under `.gx/index/`.
 //!
 //! 44 §2.4, verbatim:
 //!
-//! > `POST /candidates/{id}/commit` および `POST /transformations/{id}/undo` は `Idempotency-Key`
-//! > ヘッダを受理する。サーバは`(transformation_id, idempotency_key)`をキーとしてレスポンスを一定
-//! > 期間（既定24時間、値は運用設定）キャッシュし、同一キーでの再送に対して**副作用を再実行せず**
-//! > 同一レスポンスを返す。同一キーで異なるリクエスト本文が来た場合は`409 IDEMPOTENCY_CONFLICT`。
+//! > `POST /candidates/{id}/commit` and `POST /transformations/{id}/undo` accept the `Idempotency-Key`
+//! > header. The server caches the response, keyed on `(transformation_id, idempotency_key)`, for a fixed
+//! > period (default 24 hours, the value is an operational setting), and **does not re-run the side effect** on a
+//! > resend with the same key — it returns the identical response. A different request body with the same key gets `409 IDEMPOTENCY_CONFLICT` (sem: SEM-gx-api-158).
 //!
 //! # 🔴 The one line M6-11 requires, and it is a correction
 //!
-//! > engine の commit は既に冪等なので、cache が守るのは**応答の同一性**であって副作用ではない。
-//! > この区別を書かないと「Idempotency-Key が二重適用を防いでいる」という誤った主張が生まれる
-//! > (実際に防いでいるのは T-11 の鍵冪等=ASM-43-1)
+//! > the engine's commit is already idempotent, so what the cache protects is **response identity**, not the side effect.
+//! > Without writing down this distinction, the false claim "Idempotency-Key prevents double application" arises
+//! > (what actually prevents it is T-11's key-idempotency = ASM-43-1) (sem: SEM-gx-api-159)
 //!
 //! So: **this cache prevents no double application.** 43 T-11's `ledger.append` is keyed on the
 //! `TransformationId` and is idempotent (ASM-43-1), `Engine::commit` answers `Committed` for a row
 //! that already reached it, and 43 T-9's critical section is what makes a second `apply` impossible.
 //! What the cache adds is that the *second response is byte-identical to the first* — which matters
-//! because 44 §2.4's stated purpose is 「ネットワーク断による『apply成功・応答喪失』時の二重適用を
-//! 防ぐ」 and a client that retries after losing a response needs the same `Receipt` back rather than
+//! because 44 §2.4's stated purpose is "preventing double application when a network break causes
+//! 'apply succeeded, but the response was lost'" (sem: SEM-gx-api-160) and a client that retries after losing a response needs the same `Receipt` back rather than
 //! a second document describing the same commit differently.
 //!
 //! Deleting this whole module would therefore not make a double apply possible. That is the sentence
@@ -27,19 +29,19 @@
 //!
 //! # 🔴 Why it is on disk and not in a map
 //!
-//! §47 adopted (b) over (a) with the reason in the ruling: 「44 の存在理由が『ネットワーク断による
-//! 「apply成功・応答喪失」時の二重適用を防ぐ』であり、**その断は process 再起動を伴いうる**」. A
+//! §47 adopted (b) over (a) with the reason in the ruling: "44's reason for existing is 'preventing double application
+//! when a network break causes apply-succeeded-response-lost', and **that break can involve a process restart**" (sem: SEM-gx-api-161). A
 //! process-memory cache is a cache that is empty exactly when the failure it exists for has
 //! happened.
 //!
-//! `.gx/index/` is the right directory and req/56 §2 says why: 「derived・**消して良いと宣言**・
-//! 消えたら再生成」. A lost record costs a client one duplicated *response*, never a duplicated
+//! `.gx/index/` is the right directory and req/56 §2 says why: "derived — **declared safe to delete** —
+//! regenerates if lost" (sem: SEM-gx-api-162). A lost record costs a client one duplicated *response*, never a duplicated
 //! *effect* — which is only true because of the paragraph above, and is the second reason that
 //! paragraph has to be written down.
 //!
 //! # Not a crate
 //!
-//! §47 M6-11: 「**自作**(SURVIVORS の dead 判定=既製 crate 2 件は実在未確認・使うな)」.
+//! §47 M6-11: "**write it ourselves** (SURVIVORS' dead verdict: the two off-the-shelf crates' existence is unconfirmed, do not use them)" (sem: SEM-gx-api-163).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -49,9 +51,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::problem::ApiError;
 
-/// 44 §2.4's 「既定24時間」, in nanoseconds.
+/// 44 §2.4's "default 24 hours" (sem: SEM-gx-api-164), in nanoseconds.
 ///
-/// 「値は運用設定」 and there is no operations surface in v0.1, so the default is the value. A
+/// "the value is an operational setting" (sem: SEM-gx-api-165) and there is no operations surface in v0.1, so the default is the value. A
 /// constant rather than a field: a knob nothing turns is a knob that misleads a reader about what is
 /// configurable (M4H5-5's shape).
 pub const TTL_NANOS: i64 = 24 * 60 * 60 * 1_000_000_000;
@@ -59,16 +61,16 @@ pub const TTL_NANOS: i64 = 24 * 60 * 60 * 1_000_000_000;
 /// One remembered response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Entry {
-    /// 🔴 The request body, verbatim, for 44 §2.4's 「同一キーで異なるリクエスト本文」 check.
+    /// 🔴 The request body, verbatim, for 44 §2.4's "a different request body with the same key" check (sem: SEM-gx-api-166).
     ///
     /// The **request** and not the response: the conflict 44 defines is about what was asked, and a
     /// server comparing what it answered could not tell a second question from a repeated one.
     ///
-    /// Kept whole rather than digested. A digest would be shorter and would answer only 「these
-    /// differ」; the bodies 44 gives these two endpoints are a missing body and `{actor}`, so the
+    /// Kept whole rather than digested. A digest would be shorter and would answer only "these
+    /// differ" (sem: SEM-gx-api-167); the bodies 44 gives these two endpoints are a missing body and `{actor}`, so the
     /// cost is a few dozen bytes and what it buys is that an operator looking at a
     /// `IDEMPOTENCY_CONFLICT` can see **which two requests** disagreed. Nothing secret is in either:
-    /// 42 §3.2's `Actor` carries a key **id**, and req/56 §1's 「秘密は project に置かない」 is about
+    /// 42 §3.2's `Actor` carries a key **id**, and req/56 §1's "don't put secrets in the project" (sem: SEM-gx-api-168) is about
     /// key material.
     pub request: serde_json::Value,
     /// The response body that was sent, verbatim.
@@ -90,7 +92,7 @@ struct Wire {
 /// 🔴 **One file per transformation, keyed inside** rather than one file per `(id, key)` pair. The
 /// reason is that 44 §2.4 lets the **client** choose the key, and a client-chosen string in a path
 /// component is a traversal waiting for a `../`. Hashing the key would fix that and would put a
-/// content-address-shaped thing in a crate 則 1 (i) forbids to mint one; a map key inside a JSON
+/// content-address-shaped thing in a crate Rule 1 (i) forbids to mint one (sem: SEM-gx-api-169); a map key inside a JSON
 /// document needs no name at all.
 #[derive(Debug, Clone)]
 pub struct IdempotencyStore {
@@ -125,8 +127,8 @@ impl IdempotencyStore {
     /// # Errors
     /// [`ApiError`] `INTERNAL` if the file exists and cannot be read. **Not** if it does not parse:
     /// req/56 §2 declares this directory disposable, so an unreadable entry is a cache miss and the
-    /// caller does the work again. That is the one place this directory's nature makes 「読めない」
-    /// and 「無い」 the same answer, and `crates/gx-cli/src/index.rs` documents the same exception
+    /// caller does the work again. That is the one place this directory's nature makes "unreadable"
+    /// and "absent" (sem: SEM-gx-api-170) the same answer, and `crates/gx-cli/src/index.rs` documents the same exception
     /// for the same directory.
     pub fn get(
         &self,
@@ -142,7 +144,7 @@ impl IdempotencyStore {
         };
         if now.0.saturating_sub(entry.at_unix_nanos) > TTL_NANOS {
             // Expired. Reported as a miss and **not** deleted: deleting on read would make a
-            // read mutate a directory, and 44 §2.4's 「一定期間」 is about what may be answered from
+            // read mutate a directory, and 44 §2.4's "a fixed period" (sem: SEM-gx-api-171) is about what may be answered from
             // the cache rather than about when bytes leave a disk.
             return Ok(None);
         }
@@ -202,7 +204,7 @@ impl IdempotencyStore {
     }
 }
 
-/// 44 §2.4's 「同一キーで異なるリクエスト本文」 — the remembered answer, or the conflict.
+/// 44 §2.4's "a different request body with the same key" (sem: SEM-gx-api-172) — the remembered answer, or the conflict.
 ///
 /// # Errors
 /// [`ApiError`] `IDEMPOTENCY_CONFLICT` (409) when the key was used for a different body.
@@ -216,7 +218,7 @@ pub fn replay_or_conflict(
             "IDEMPOTENCY_CONFLICT",
             "this idempotency key was used for a different request",
             format!(
-                "44 §2.4: 「同一キーで異なるリクエスト本文が来た場合は`409 IDEMPOTENCY_CONFLICT`」. \
+                "44 §2.4: \"a different request body with the same key gets `409 IDEMPOTENCY_CONFLICT`\" (sem: SEM-gx-api-173). \
                  The key {key:?} is recorded against {} and this request is {request}",
                 entry.request
             ),

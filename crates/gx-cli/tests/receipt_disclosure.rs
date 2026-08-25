@@ -1,11 +1,13 @@
-//! 🔴 **M6-16 採(a)** — `gx receipt show --level 1..4`, and **M6-22 採(b)** at level 4.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-16 adopted (a)** (sem: SEM-gx-cli-1035) — `gx receipt show --level 1..4`, and **M6-22 adopted (b)** at level 4.
 //!
-//! req/88 §6.2 手 2's DoD names both: 「段階開示 `--level 1..4`(M6-16)」 and, through §47's ruling on
-//! M6-22, 「L4(生署名)出力が `signature_for` の消費者」. What has to be measured is not that four
+//! req/88 §6.2 hand 2's DoD names both: "staged disclosure `--level 1..4` (M6-16)" and, through §47's ruling on
+//! M6-22, "the L4 (raw signature) output is `signature_for`'s consumer" (sem: SEM-gx-cli-1036). What has to be measured is not that four
 //! levels exist but that they are **nested and different**: a `--level` that returned the same
 //! object four times would satisfy a test that only asked for `Ok`.
 //!
-//! The fourth probe is `checks.inclusion`'s four values (§5 行 4 / H5-9), which is a claim about the
+//! The fourth probe is `checks.inclusion`'s four values (§5 row 4 / H5-9; sem: SEM-gx-cli-1037), which is a claim about the
 //! *vocabulary* rather than about a run.
 
 mod support;
@@ -17,8 +19,8 @@ use support::{commit_receipt, issue, keypair, project, tid, verdict_payload};
 
 /// 🔴 The four levels are nested: every field of level `n-1` is in level `n`, and each adds.
 ///
-/// Nesting is what makes 「段階開示」 a disclosure rather than four unrelated reports. 48 §3.1's
-/// layers are a ladder — 「L1=verdict バッジ / L2=Receipt 要約 / L3=全展開 / L4=独立検証結果」 — and a
+/// Nesting is what makes "staged disclosure" (sem: SEM-gx-cli-1038) a disclosure rather than four unrelated reports. 48 §3.1's
+/// layers are a ladder — "L1=verdict badge / L2=Receipt summary / L3=full expansion / L4=independent verification result" (sem: SEM-gx-cli-1039) — and a
 /// reader who climbed one rung should not have to re-read what they already had.
 #[test]
 fn the_four_levels_are_nested_and_each_one_adds_something() {
@@ -54,7 +56,7 @@ fn the_four_levels_are_nested_and_each_one_adds_something() {
 
 /// Level 1 is the badge, and it says the two things a badge is for.
 ///
-/// 「verdict バッジ」 answers 「was this admitted, and was it enforced」. `verdict` is an `Option`
+/// "the verdict badge" (sem: SEM-gx-cli-1040) answers "was this admitted, and was it enforced". `verdict` is an `Option`
 /// because of **E-M5-11**: under 43 T-4e the gate was never called, so `null` is the true answer and
 /// an empty proof would have been an invention (M4H4-2).
 #[test]
@@ -77,12 +79,12 @@ fn level_one_is_the_verdict_badge() {
     }
 }
 
-/// 🔴 **M6-22 採(b)** — level 4 carries the raw signature, and it is `signature_for`'s answer.
+/// 🔴 **M6-22 adopted (b)** (sem: SEM-gx-cli-1041) — level 4 carries the raw signature, and it is `signature_for`'s answer.
 ///
 /// The accessor §46 M5FIX-3 left as gx-witness's one survivor. What makes this the *consumer* and
 /// not merely a place the bytes appear is that the signature is fetched **by the id the payload
 /// declares** — 42 §3.10 requires the payload's `key_id` and the envelope's `keyid` to agree, so
-/// 「the signature this receipt says signed it」 is a lookup and not a position in a `Vec`.
+/// "the signature this receipt says signed it" (sem: SEM-gx-cli-1042) is a lookup and not a position in a `Vec`.
 #[test]
 fn level_four_is_the_raw_signature_the_payload_names() {
     let key = keypair(3);
@@ -119,22 +121,26 @@ fn level_four_is_the_raw_signature_the_payload_names() {
     assert_eq!(json["signatures_in_envelope"], serde_json::json!(1));
 }
 
-/// 🔴 `checks.inclusion` has **four** values where 44 §1.2 writes two (§5 行 4 / H5-9, M6H2-3).
+/// 🔴 `checks.inclusion` has **four** values where 44 §1.2 writes two (§5 row 4 / H5-9, M6H2-3; sem: SEM-gx-cli-1043).
 ///
-/// H5-9's clause is 「**Unanchored を pass にしない**」, and folding four into 44's `bool|"skipped"`
-/// would put 「the ledger claim was not checked」 under the same face as 「it was checked and held」.
+/// H5-9's clause is "**do not let Unanchored pass**" (sem: SEM-gx-cli-1044), and folding four into 44's `bool|"skipped"`
+/// would put "the ledger claim was not checked" under the same face as "it was checked and held".
 /// Distinctness is asserted, not merely the count: four names that collided would be the fold with
 /// extra steps.
+/// 🔴 **v0.4 · H-09 — four became five.** `req/222` measured `refuted` being returned for every
+/// receipt older than the anchor, which is a false accusation produced by the log growing. The
+/// fifth word (`unbridged`) took that case; the heading above is left as it was written, because
+/// what changed is the count and not the argument, and the argument is what H5-9 turns on.
 #[test]
-fn the_inclusion_vocabulary_is_four_distinct_values() {
+fn the_inclusion_vocabulary_is_five_distinct_values() {
     let mut spellings: Vec<&str> = INCLUSION_JSON.iter().map(|(s, _)| *s).collect();
     spellings.sort_unstable();
     spellings.dedup();
     println!("INCLUSION_VALUES={INCLUSION_JSON:?}");
     assert_eq!(
         spellings.len(),
-        4,
-        "four distinct spellings for `InclusionCheck`'s four variants"
+        5,
+        "five distinct spellings for `InclusionCheck`'s five variants"
     );
     assert_eq!(
         receipt::inclusion_json(InclusionCheck::NotApplicable),
@@ -149,6 +155,10 @@ fn the_inclusion_vocabulary_is_four_distinct_values() {
         receipt::inclusion_json(InclusionCheck::Unanchored),
         "unanchored"
     );
+    assert_eq!(
+        receipt::inclusion_json(InclusionCheck::Unbridged),
+        "unbridged"
+    );
     // 🔴 The two 44 §1.2 has no word for. The table carries that fact so M6H2-3 is readable from
     // the source rather than only from the report.
     let unnamed = INCLUSION_JSON
@@ -156,13 +166,13 @@ fn the_inclusion_vocabulary_is_four_distinct_values() {
         .filter(|(_, spec)| spec.starts_with("no word"))
         .count();
     println!("INCLUSION_VALUES_44_CANNOT_SPELL={unnamed}");
-    assert_eq!(unnamed, 2, "`refuted` and `unanchored`");
+    assert_eq!(unnamed, 3, "`refuted`, `unanchored` and (H-09) `unbridged`");
 }
 
-/// 🔴 The store round-trips, and a missing receipt is 44 §1.2's `6=未検出` rather than a failure.
+/// 🔴 The store round-trips, and a missing receipt is 44 §1.2's `6=not-found` (sem: SEM-gx-cli-1045) rather than a failure.
 ///
 /// `.gx/receipts/` is **M6H2-1**, this hand's own addition, and the two answers it has to keep apart
-/// are 「there is no receipt」 and 「there is a file and it is not one」 (E-M4-35).
+/// are "there is no receipt" and "there is a file and it is not one" (sem: SEM-gx-cli-1046) (E-M4-35).
 #[test]
 fn the_receipt_store_round_trips_and_a_missing_one_is_not_found() {
     let (_dir, layout) = project("receipt_store");
@@ -171,10 +181,10 @@ fn the_receipt_store_round_trips_and_a_missing_one_is_not_found() {
     let (receipt, _head, _log) = commit_receipt(&key, 8, 3);
     let id = tid(8);
 
-    // 🔴 **M6H4-7** (req/38 §51 採(a)): the key is `(TransformationId, kind)` and no longer the
+    // 🔴 **M6H4-7** (req/38 §51 adopted (a); sem: SEM-gx-cli-1047): the key is `(TransformationId, kind)` and no longer the
     // transformation alone. One transformation issues up to three receipts — ASM-14's verdict
     // receipt, 43 T-5's ruling and 43 T-11's commit — and under the old name they shared one slot,
-    // so the last writer won and 「who allowed this」 could erase 「what was decided」.
+    // so the last writer won and "who allowed this" could erase "what was decided" (sem: SEM-gx-cli-1048).
     let path = store.put(&id, StoredKind::Commit, &receipt).expect("put");
     println!("RECEIPT_STORED_AT={}", path.display());
     assert!(
@@ -203,10 +213,13 @@ fn the_receipt_store_round_trips_and_a_missing_one_is_not_found() {
 
     let outcome = receipt::show(&store, &tid(999), 1).expect("show answers");
     println!("SHOW_MISSING_CODE={} JSON={}", outcome.code, outcome.json);
-    assert_eq!(outcome.code, 6, "44 §1.2: 「exit: 0=存在, 6=未検出」");
+    assert_eq!(
+        outcome.code, 6,
+        "44 §1.2: \"exit: 0=exists, 6=not-found\" (sem: SEM-gx-cli-1049)"
+    );
     assert_eq!(outcome.json["found"], serde_json::json!(false));
 
-    // 「在るが壊れている」 is a third answer.
+    // "it exists but is corrupt" (sem: SEM-gx-cli-1050) is a third answer.
     std::fs::write(store.path_of(&tid(1234), StoredKind::Commit), b"{not json").expect("write");
     let err = store
         .get(&tid(1234), StoredKind::Commit)
@@ -215,7 +228,7 @@ fn the_receipt_store_round_trips_and_a_missing_one_is_not_found() {
     assert!(matches!(err, gx_cli::Error::Malformed { .. }));
 }
 
-/// `--level 0` and `--level 5` are 「入力不正」, and 規律52 sends that to 1 rather than to 2.
+/// `--level 0` and `--level 5` are "invalid input", and discipline 52 (sem: SEM-gx-cli-1051) sends that to 1 rather than to 2.
 #[test]
 fn a_level_outside_the_ladder_is_a_usage_error() {
     let (_dir, layout) = project("receipt_level_range");
@@ -227,7 +240,7 @@ fn a_level_outside_the_ladder_is_a_usage_error() {
         assert_eq!(
             err.exit_code(),
             1,
-            "規律52: 「入力不正」 is 1; 2 is the state machine's 「拒否」"
+            "discipline 52 (sem: SEM-gx-cli-1052): \"invalid input\" is 1; 2 is the state machine's \"refused\""
         );
     }
 }

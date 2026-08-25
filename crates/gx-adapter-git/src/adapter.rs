@@ -1,16 +1,20 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The seven methods of 41 §4, all seven in one hand.
 //!
 //! There is no [`Error::Unimplemented`] in this file, which is the fact 51 §7's completion condition
-//! turns on: the harness reports 「無い」 for that variant and for nothing else, so an adapter with none
+//! turns on: the harness reports "none" for that variant and for nothing else, so an adapter with none
 //! of them is an adapter every obligation was **run** against (**§31 M4H3-4 (b)**). The word stays in
 //! the vocabulary regardless — `gx-adapter-mcp` is M7 hand 3 and may stand up one method at a time,
-//! which is what §32 M4H4-2 追認 made the word permanent for.
+//! which is what §32 M4H4-2 confirmed made the word permanent for. (sem: SEM-gx-adapter-git-010)
 
 use gx_canon::cid;
 use gx_core::{
     Cid, Commutation, Fingerprint, Intent, ObjectId, ObjectSnapshot, ReprKind, SubstrateKind,
 };
-use gx_substrate::{elide_scope, AppliedDelta, Error, PlannedDelta, Result, SubstrateAdapter};
+use gx_substrate::{
+    elide_scope, AppliedDelta, Error, InvertOutcome, PlannedDelta, Result, SubstrateAdapter,
+};
 
 use crate::locator::{self, Position};
 use crate::repo;
@@ -36,16 +40,16 @@ impl GitAdapter {
     ///
     /// A position whose branch is unborn, or whose tree holds no such entry, answers
     /// [`Error::Unreadable`] — the same answer `gx-adapter-fs` gives for a file that is not there, and
-    /// for the same reason: `snapshot` **reads**, and v0.1 has no way to describe 「this position is
-    /// empty」 as an `ObjectSnapshot`. A creation is therefore planned against a snapshot the caller
+    /// for the same reason: `snapshot` **reads**, and v0.1 has no way to describe "this position is
+    /// empty" as an `ObjectSnapshot`. A creation is therefore planned against a snapshot the caller (sem: SEM-gx-adapter-git-011)
     /// builds (the fs adapter's `absent_snapshot`, and this crate's fixture does the same).
     fn read(position: &Position) -> Result<Vec<u8>> {
         let repository = repo::open(position)?;
         let tip = repo::tip(&repository, position)?.ok_or_else(|| Error::Unreadable {
             locator: position.locator(),
             detail: format!(
-                "{} has no commits on it (git calls the state 「unborn」), so there is no tree to \
-                 read an entry out of",
+                "{} has no commits on it (git calls the state 'unborn'), so there is no tree to \
+                 read an entry out of (sem: SEM-gx-adapter-git-012)",
                 position.scope()
             ),
         })?;
@@ -100,7 +104,7 @@ impl SubstrateAdapter for GitAdapter {
 
     /// Name the state a commit is conditional on — and for git that state is the **branch**.
     ///
-    /// 42 §3.5 lets a scope reach past the object itself to 「対象に干渉しうる周辺状態」, and a branch is
+    /// 42 §3.5 lets a scope reach past the object itself to "the surrounding state that could interfere with the target", and a branch is (sem: SEM-gx-adapter-git-013)
     /// exactly that for an entry in its tree: any change to any file on it moves the tip, so a CAS
     /// over the entry alone would admit a commit built on a tip that had already moved. The digest is
     /// over the tip's own object id, so the fingerprint changes when the branch does and not
@@ -108,7 +112,7 @@ impl SubstrateAdapter for GitAdapter {
     ///
     /// An over-long scope becomes a digest line before it reaches [`Fingerprint::new`]
     /// (**M4H1-2**, [`elide_scope`]); the bound itself is gx-core's and refuses anything that arrives
-    /// past it. That is the single road **req/98** §3-4 予約 6 asks the M7 adapters to take.
+    /// past it. That is the single road **req/98** §3-4's reserved item 6 asks the M7 adapters to take. (sem: SEM-gx-adapter-git-014)
     fn precondition(&self, snap: &ObjectSnapshot) -> Result<Fingerprint> {
         let position = locator::parse(snap.locator())?;
         let repository = repo::open(&position)?;
@@ -131,13 +135,21 @@ impl SubstrateAdapter for GitAdapter {
     }
 
     /// Delegates to [`crate::invert`]. **E-M4-30**: the escrowed inverse is constructed **before**
-    /// `apply` (43 T-10b), because the tip a reset names is 「where the branch is now」.
-    fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<Option<PlannedDelta>> {
-        crate::invert::invert(delta, pre)
+    /// `apply` (43 T-10b), because the tip a reset names is "where the branch is now". (sem: SEM-gx-adapter-git-015)
+    /// 🔴 **E-DR4626-1 (DR-46-26)** -- the free function is untouched and the outcome is derived
+    /// here, in one line, by [`InvertOutcome::from_option`].
+    ///
+    /// This adapter builds its inverse out of the snapshot it was handed. There is no *declared*
+    /// read that could fail on its own, so C-25's `Unknown` -- "the prior could not be read, and
+    /// this deployment said it would rather have the effect" -- has no preimage on this road:
+    /// `Some` is `True` and `None` is `False`, and `reads` is empty because the escrow read nothing
+    /// through a transport. `tests/` holds that as an assertion rather than as this sentence.
+    fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcome> {
+        crate::invert::invert(delta, pre).map(InvertOutcome::from_option)
     }
 
     /// Delegates to [`crate::commutation`], which compares **branches** and touches no repository
-    /// (**M4-25 採(a)**, AC-052, AC-053).
+    /// (**M4-25, adopted (a)**, AC-052, AC-053). (sem: SEM-gx-adapter-git-016)
     fn commutation(&self, a: &PlannedDelta, b: &PlannedDelta) -> Result<Commutation> {
         crate::commutation::commutation(a, b)
     }

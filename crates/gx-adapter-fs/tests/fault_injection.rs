@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **E-M4-35**: a position that will not answer is not a position that holds nothing.
 //!
-//! req/38 §35 K-4 採(a) 逐語:
+//! req/38 §35 K-4, adopted (a), verbatim: (sem: SEM-gx-adapter-fs-237)
 //!
-//! > 「fs の read/remove は **`NotFound` だけ**を「そこには何も無い」と読む——他の失敗(権限・I/O)は
-//! > `Err`。**「読めない」と「無い」の混同は fail-closed 原則の直撃**で、最悪の腕は escrow が「元は空
-//! > だった」と答えて **undo が復元でなく削除になる**(req/76 §2.2)。3 箇所(`apply.rs:197`/
-//! > `apply.rs:164`/`invert.rs:124`)を fix+**EACCES 注入 test 1 本**(red-first・root 実行時は skip を
-//! > 印字)」
+//! > "fs's read/remove reads **only `NotFound`** as 'there is nothing there' -- other failures (permission,
+//! > I/O) are `Err`. **Confusing 'cannot read' with 'is absent' is a direct hit on the fail-closed principle**, and the worst arm is the escrow answering 'it was originally
+//! > empty' and **turning the undo into a deletion instead of a restoration** (req/76 §2.2). Fix 3 sites (`apply.rs:197`/
+//! > `apply.rs:164`/`invert.rs:124`) with **one EACCES-injection test** (red-first; print a skip when running as
+//! > root)" (sem: SEM-gx-adapter-fs-238)
 //!
 //! # What was actually wrong, stated before anything is claimed
 //!
@@ -18,7 +20,7 @@
 //!
 //! # The ruling assumed one injection reaches all three; it reaches one
 //!
-//! 「1 test で 3 箇所に効く」 was measured here and is not true, because the three failures need three
+//! "one test covers all 3 sites" was measured here and is not true, because the three failures need three (sem: SEM-gx-adapter-fs-239)
 //! different faults:
 //!
 //! | place | what it does | the fault that reaches it |
@@ -28,8 +30,8 @@
 //! | `apply.rs:197` `observe` | reads back **after** the rename | the file it reads is the one `apply` just created, so no state set up beforehand can make that read fail -- only the **mode the process creates files with** can |
 //!
 //! So there are three injections and a fourth probe that reads the source. The source probe is the
-//! ruling's own option (b) -- 「3 箇所の guard を「`NotFound` **だけ**を吸収し他は `Unreadable`」と明示
-//! する probe を source 走査で置く」 -- and it is what makes the *rule* falsifiable rather than the
+//! ruling's own option (b) -- "put a probe in the source scan that makes explicit that the 3 guards absorb
+//! **only** `NotFound` and treat the rest as `Unreadable`" -- and it is what makes the *rule* falsifiable rather than the (sem: SEM-gx-adapter-fs-240)
 //! three instances of it: a fourth call site added tomorrow is caught by the count.
 //!
 //! # Running as root
@@ -73,12 +75,12 @@ fn chmod(path: &Path, mode: u32) {
         .expect("a tmpfs accepts a mode");
 }
 
-/// 🔴 `invert.rs:124` — the worst arm: an escrow that answers 「元は空だった」 about a file it could
+/// 🔴 `invert.rs:124` -- the worst arm: an escrow that answers "it was originally empty" about a file it could (sem: SEM-gx-adapter-fs-241)
 /// not read.
 ///
-/// The inverse of a whole-file replacement is 「put back what is here」, and 「what is here」 is read
-/// through [`read_if_present`](../src/invert.rs). Its two arms are 「bytes」 and 「nothing」, and
-/// 「nothing」 becomes `FsOp::remove` -- so a read failure counted as an absence produces an inverse
+/// The inverse of a whole-file replacement is "put back what is here", and "what is here" is read
+/// through [`read_if_present`](../src/invert.rs). Its two arms are "bytes" and "nothing", and
+/// "nothing" becomes `FsOp::remove` -- so a read failure counted as an absence produces an inverse (sem: SEM-gx-adapter-fs-242)
 /// that **deletes the file the undo was supposed to restore**. That is not a degraded undo, it is the
 /// opposite of one, and 43 T-10b escrows this delta before `apply` runs, so nothing downstream ever
 /// looks at the position again to notice.
@@ -104,7 +106,9 @@ fn an_unreadable_position_is_not_an_empty_one_when_the_escrow_is_built() {
     let delta = creation(&locator, b"after");
     let pre = absent_snapshot(&locator);
 
-    let answer = adapter.invert(&delta, &pre);
+    let answer = adapter
+        .invert(&delta, &pre)
+        .map(gx_substrate::InvertOutcome::into_inverse);
     println!(
         "FAULT_EACCES_INVERT KIND={} ",
         match &answer {
@@ -120,8 +124,8 @@ fn an_unreadable_position_is_not_an_empty_one_when_the_escrow_is_built() {
             assert_eq!(
                 e.kind(),
                 "Unreadable",
-                "a read that failed for a reason other than absence is 「the question cannot be \
-                 answered」 (41 §4), and this refusal calls it something else: {e}"
+                "a read that failed for a reason other than absence is 'the question cannot be
+                 answered' (41 §4), and this refusal calls it something else: {e} (sem: SEM-gx-adapter-fs-243)"
             );
             assert!(
                 e.to_string().contains(&locator),
@@ -147,8 +151,8 @@ fn an_unreadable_position_is_not_an_empty_one_when_the_escrow_is_built() {
         }
         Ok(None) => panic!(
             "`invert` answered `Ok(None)` for an unreadable position. E-M4-32 narrowed that answer \
-             to 「同一 object の正当な構成不能」 and E-M3-4 escalates it to a human as a business \
-             condition; a permission error is neither"
+             to 'a legitimate construction of the same object is not possible' and E-M3-4 escalates it to a human as a business \
+             condition; a permission error is neither (sem: SEM-gx-adapter-fs-244)"
         ),
     }
 }
@@ -158,8 +162,8 @@ fn an_unreadable_position_is_not_an_empty_one_when_the_escrow_is_built() {
 /// `unlink` is governed by the **directory's** mode and not the file's, so this is the fault that
 /// reaches the second guard. The retry reading of idempotence (**E-M4-3**, 43 T-10c) is what makes
 /// the guard right in the first place -- running a removal twice must not fail the second time --
-/// and it is exactly that reading a swallowed `EACCES` abuses: 「it was already gone」 and 「I was not
-/// allowed to take it away」 are opposite facts about the substrate, and only one of them means the
+/// and it is exactly that reading a swallowed `EACCES` abuses: "it was already gone" and "I was not
+/// allowed to take it away" are opposite facts about the substrate, and only one of them means the (sem: SEM-gx-adapter-fs-245)
 /// state the delta asked for was reached.
 #[test]
 fn a_removal_the_filesystem_refused_is_not_a_removal_that_happened() {
@@ -200,8 +204,8 @@ fn a_removal_the_filesystem_refused_is_not_a_removal_that_happened() {
     assert_eq!(
         refusal.kind(),
         "ApplyFailed",
-        "a step the filesystem refused is `ApplyFailed` (41 §4's word for 「the filesystem refused a \
-         step」): {refusal}"
+        "a step the filesystem refused is `ApplyFailed` (41 §4's word for 'the filesystem refused a \
+         step'): {refusal} (sem: SEM-gx-adapter-fs-246)"
     );
 }
 
@@ -215,7 +219,7 @@ fn a_removal_the_filesystem_refused_is_not_a_removal_that_happened() {
 /// to at all.
 ///
 /// What the guard protects: `observe`'s value becomes `AppliedDelta::resulting_digest` and the
-/// postcondition. A read failure counted as an absence therefore reports 「the file is now empty」 --
+/// postcondition. A read failure counted as an absence therefore reports "the file is now empty" -- (sem: SEM-gx-adapter-fs-247)
 /// L5 compares that against the target a plan promised and, for any non-empty goal, the two disagree;
 /// for a **removal** they agree, and the pipeline records a successful change to a state nobody
 /// observed. Either way the digest a receipt carries is one the substrate never held.
@@ -284,7 +288,7 @@ fn a_position_that_will_not_answer_after_the_write_is_not_an_empty_one() {
 /// `NotFound` and nothing else (the ruling's option (b)).
 ///
 /// Three behavioural probes hold three call sites. A fourth call site added tomorrow is held by
-/// nothing -- and 「読めない」と「無い」の混同 is a mistake that is made once per call site. So this
+/// nothing -- and confusing 'cannot read' with 'is absent' is a mistake that is made once per call site. So this (sem: SEM-gx-adapter-fs-248)
 /// reads the source: every `Err(e) if ...` arm in `src/` has to be guarded on `ErrorKind::NotFound`,
 /// and there have to be exactly the three the ruling names.
 ///
@@ -327,9 +331,9 @@ fn every_absence_arm_in_this_crate_tolerates_only_not_found() {
         .collect();
     assert!(
         stray.is_empty(),
-        "these arms treat something other than `NotFound` as 「there is nothing here」: {stray:?}. \
-         E-M4-35: 「fs の read/remove は `NotFound` だけを「そこには何も無い」と読む——他の失敗(権限・\
-         I/O)は Err」"
+        "these arms treat something other than `NotFound` as absent: {stray:?}. \
+         E-M4-35: fs's read/remove reads only `NotFound` as 'there is nothing there' -- other failures (permission, \
+          I/O) are Err (sem: SEM-gx-adapter-fs-249)"
     );
 
     let mut places: Vec<&String> = guards.iter().map(|(f, _)| f).collect();

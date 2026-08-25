@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The grammar, the locator, and the two constants — including the escrow ceiling `gx-adapter-git`
 //! argued it could not have.
 //!
 //! Spec: 42 §3.4 for the payload, 42 §2.1 for the canonical form, 42 §2.3 for `≈`. The rulings are
-//! **M4-13 採(a)** (`MAX_OPS`), **M4-07 採(c)** (the free monoid), **M4H5-4 採(b)** (the forward bound),
-//! **M4-21 採(a)** (the escrow bound), **M4H5-5 採(b)** (「引数が位置でない」 is not 「適用に失敗した」),
+//! **M4-13, adopted (a)** (`MAX_OPS`), **M4-07, adopted (c)** (the free monoid), **M4H5-4, adopted (b)** (the forward bound), (sem: SEM-gx-adapter-mcp-326)
+//! **M4-21, adopted (a)** (the escrow bound), **M4H5-5, adopted (b)** ("the argument is not a position" is not "the apply failed"), (sem: SEM-gx-adapter-mcp-327)
 //! **M4H4-1** (`ScopeTooLong` at construction) and **M4H4-2** (`Unimplemented` for what v0.1 does not
 //! run).
 
@@ -43,9 +45,9 @@ fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 // The locator
 // ---------------------------------------------------------------------------
 
-/// The four refusals of [`gx_adapter_mcp::locator`], each 「引数が位置でない」 rather than 「適用に失敗した」.
+/// The four refusals of [`gx_adapter_mcp::locator`], each "the argument is not a position" rather than "the apply failed". (sem: SEM-gx-adapter-mcp-328)
 ///
-/// **M4H5-5 採(b)** is the ruling and 43 T-11 is the reason: `ApplyFailed` becomes
+/// **M4H5-5, adopted (b)** is the ruling and 43 T-11 is the reason: `ApplyFailed` becomes (sem: SEM-gx-adapter-mcp-329)
 /// `AbortReason::ApplyFailed`, which would record a change that failed where no change was ever
 /// describable.
 #[test]
@@ -71,13 +73,13 @@ fn a_spelling_that_is_not_a_position_is_refused_as_one() {
     for (why, kind) in &refusals {
         assert_eq!(
             kind, "NotAPosition",
-            "「{why}」 answered {kind} rather than 「that is not a place」"
+            "\"{why}\" answered {kind} rather than \"that is not a place\" (sem: SEM-gx-adapter-mcp-330)"
         );
     }
     assert_eq!(refusals.len(), 4);
 }
 
-/// 🔴 **予約 6** (req/98 §3-4): an over-long scope is refused **at construction**, on the same one road
+/// 🔴 **Reservation 6** (req/98 §3-4): an over-long scope is refused **at construction**, on the same one road (sem: SEM-gx-adapter-mcp-331)
 /// the other two adapters take.
 ///
 /// `req/38` §32 M4H4-1: the locator reaches [`gx_core::Fingerprint::new`] through
@@ -121,10 +123,10 @@ fn an_over_long_position_takes_the_one_eliding_road() {
 // The grammar
 // ---------------------------------------------------------------------------
 
-/// `MAX_OPS` is 未対応 and the empty sequence is not a payload, and the two are spelled differently.
+/// `MAX_OPS` is unsupported and the empty sequence is not a payload, and the two are spelled differently. (sem: SEM-gx-adapter-mcp-332)
 ///
-/// **M4H4-2**: 「未実装」 and 「失敗」 are permanently different facts, and the shared harness reads
-/// [`gx_substrate::Error::Unimplemented`] as 「無い」 and nothing else. A grammar that answered
+/// **M4H4-2**: "not implemented" and "failed" are permanently different facts, and the shared harness reads (sem: SEM-gx-adapter-mcp-333)
+/// [`gx_substrate::Error::Unimplemented`] as "none" and nothing else. A grammar that answered (sem: SEM-gx-adapter-mcp-334)
 /// `PayloadUnreadable` for a two-operation sequence would tell a harness that the adapter is broken
 /// where the truth is that v0.1 does not run it.
 #[test]
@@ -167,7 +169,7 @@ fn the_two_refusals_of_decode_are_two_words() {
 
 /// The monoid is over the **sequences**, and concatenation is associative there.
 ///
-/// **M4-07 採(c)** with **N-14**: a CBOR array carries its length in its head, so two payloads do not
+/// **M4-07, adopted (c)** with **N-14**: a CBOR array carries its length in its head, so two payloads do not (sem: SEM-gx-adapter-mcp-335)
 /// concatenate as bytes. The operation is `decode`, concatenate, `encode`.
 #[test]
 fn concatenation_is_associative_over_the_sequences() {
@@ -188,7 +190,7 @@ fn concatenation_is_associative_over_the_sequences() {
     );
 }
 
-/// A goal that is not this adapter's grammar is 「no delta plans this intent」 and not a broken payload.
+/// A goal that is not this adapter's grammar is "no delta plans this intent" and not a broken payload. (sem: SEM-gx-adapter-mcp-336)
 #[test]
 fn a_goal_that_is_not_a_tool_call_is_not_plannable() {
     let fixture = McpFixture::new();
@@ -269,7 +271,7 @@ fn the_forward_ceiling_is_the_number_the_source_declares() {
 /// could not have.
 ///
 /// req/99 §3 **D-4**: a git inverse carries an object id, so **M4-21**'s ceiling could not be reached by
-/// any input and declaring it would have been 「a refusal nobody asked for」 (52 契約 2). An MCP server
+/// any input and declaring it would have been "a refusal nobody asked for" (52 contract 2). An MCP server (sem: SEM-gx-adapter-mcp-337)
 /// offers no content-addressed store, so the inverse carries the prior contents and the bound is real.
 /// Either side of it, measured.
 #[test]
@@ -288,6 +290,7 @@ fn the_escrow_ceiling_is_reachable_here_and_answers_ok_none() {
         adapter
             .invert(&delta, &pre)
             .expect("invert answers")
+            .into_inverse()
             .map(|d| d.payload().len())
     };
 
@@ -314,14 +317,14 @@ fn fixture_locator() -> String {
 /// 🔴 **R-3 of req/99, answered.** The escrow ceiling is declared **per adapter that carries a body**,
 /// and by no crate that is not an adapter.
 ///
-/// req/99 §7 read `MAX_FORWARD_PAYLOAD_BYTES`'s 「定数 1 箇所」 as **per adapter** when the git adapter
+/// req/99 §7 read `MAX_FORWARD_PAYLOAD_BYTES`'s "one constant, one place" as **per adapter** when the git adapter (sem: SEM-gx-adapter-mcp-338)
 /// declared a second one, and left the inverse bound alone because git declares none — raising R-3:
-/// 「手 3 が mcp で escrow 上限を宣言するなら同じ読み直しが要る」. It does, so this is that reading, and the
+/// "if hand 3 declares an escrow ceiling for mcp, the same re-reading is needed". It does, so this is that reading, and the (sem: SEM-gx-adapter-mcp-339)
 /// gate is **not** weakened: a non-adapter crate declaring one is still red, an adapter declaring two is
-/// still red, and 「no adapter declares one at all」 is red as well.
+/// still red, and "no adapter declares one at all" is red as well. (sem: SEM-gx-adapter-mcp-340)
 ///
-/// The one thing this cannot assert is 「every adapter whose inverse carries a body declares one」 —
-/// 「carries a body」 is not a fact in the source. What stands in for it is the pair of probes that name
+/// The one thing this cannot assert is "every adapter whose inverse carries a body declares one" -- (sem: SEM-gx-adapter-mcp-341)
+/// "carries a body" is not a fact in the source. What stands in for it is the pair of probes that name (sem: SEM-gx-adapter-mcp-342)
 /// the choice on both sides: git's `this_adapter_declares_no_escrow_ceiling` and the test above.
 #[test]
 fn the_escrow_ceiling_is_declared_once_per_adapter_that_needs_one() {
@@ -380,7 +383,7 @@ fn the_escrow_ceiling_is_declared_once_per_adapter_that_needs_one() {
         let limit = usize::from(name.starts_with("gx-adapter-"));
         assert!(
             found.len() <= limit,
-            "M4-21 fixes the ceiling at 「定数 1 箇所」 per adapter and no crate below the boundary \
+            "M4-21 fixes the ceiling at \"one constant, one place\" per adapter and no crate below the boundary (sem: SEM-gx-adapter-mcp-343) \
              declares one; `{name}` has {found:?}"
         );
     }
@@ -392,7 +395,7 @@ fn the_escrow_ceiling_is_declared_once_per_adapter_that_needs_one() {
 
 /// A tool with no declared restore has no inverse, and the answer is `Ok(None)` rather than an error.
 ///
-/// **E-M4-32**: `Ok(None)` is 「同一 object の正当な構成不能」, and this is the ordinary case for an MCP
+/// **E-M4-32**: `Ok(None)` is "a legitimate construction of the same object is impossible", and this is the ordinary case for an MCP (sem: SEM-gx-adapter-mcp-344)
 /// proxy — most tools cannot be undone and nothing in the protocol says which can. **E-M3-4** escalates.
 #[test]
 fn a_tool_with_no_declared_restore_has_no_inverse() {
@@ -408,8 +411,14 @@ fn a_tool_with_no_declared_restore_has_no_inverse() {
         .plan(&intent_for(&locator, NOTIFY_TOOL, b"{}"), &pre)
         .expect("plan");
 
-    let with = adapter.invert(&undoable, &pre).expect("invert answers");
-    let without = adapter.invert(&opaque, &pre).expect("invert answers");
+    let with = adapter
+        .invert(&undoable, &pre)
+        .expect("invert answers")
+        .into_inverse();
+    let without = adapter
+        .invert(&opaque, &pre)
+        .expect("invert answers")
+        .into_inverse();
     println!(
         "MCP_INVERT declared={} undoable={} opaque={}",
         adapter.catalogue().declared(),
@@ -464,6 +473,7 @@ fn the_inverse_carries_the_body_in_the_documented_shape() {
     let inverse = adapter
         .invert(&delta, &pre)
         .expect("invert answers")
+        .into_inverse()
         .expect("the catalogue declares a restore");
     let decoded = McpDelta::decode(inverse.payload()).expect("this adapter's own grammar");
     let op = decoded.ops().first().expect("one operation");

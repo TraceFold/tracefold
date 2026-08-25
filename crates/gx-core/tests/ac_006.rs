@@ -1,11 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-006 (FR-006) — every `Actor` variant carries the same public-key reference type.
 //!
-//! AC-006 逐語: 「Given: `Actor::Human{key}`, `Actor::Agent{key, model:"claude-x"}`,
-//! `Actor::Process{key}`の3variant。When: `key`フィールドの型を比較するジェネリック関数へ
-//! 全variantを渡す。Then: 3variantとも同一の公開鍵参照型（例: `PubKeyRef`）でコンパイルが
-//! 通過する。」
+//! AC-006, verbatim (quoted in SEM-gx-core-114): "Given: the three variants `Actor::Human{key}`,
+//! `Actor::Agent{key, model:"claude-x"}`, `Actor::Process{key}`. When: every variant is passed to a
+//! generic function that compares the type of the `key` field. Then: all three variants compile
+//! with the same public-key reference type (e.g. `PubKeyRef`)."
 //!
-//! The AC writes the type name as an example (「例: `PubKeyRef`」); 42 §3.2 fixes it as `KeyId`,
+//! The AC writes the type name as an example ("e.g. `PubKeyRef`"; sem: SEM-gx-core-115); 42 §3.2
+//! fixes it as `KeyId`,
 //! sharing a namespace with the DSSE `keyid` field, so this file uses that name. What the AC
 //! actually pins is the *sameness*, and `same_type` below is where that is enforced: a single
 //! type parameter over three arguments does not compile unless all three agree.

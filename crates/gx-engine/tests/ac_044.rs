@@ -1,19 +1,20 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-044** — INV-S2: a superseded transformation is bit-equal to what it was (FR-040).
 //!
-//! 34 AC-044 逐語:
+//! 34 AC-044, verbatim: "Given: a Committed T_o and the T_u that realizes its inverse. When:
+//! comparing the hashes of T_o's canonical record / Receipt before and after T_u reaches
+//! `Committed` and T_o transitions to `Superseded`. Then: completely bit-equal (`superseded_by` is
+//! append-only metadata; it does not rewrite the canonical structure or receipt body). | property"
+//! (sem: SEM-gx-engine-546)
 //!
-//! > Given: Committed T_oとそのinverseを成立させるT_u。When: T_uが`Committed`に到達しT_oが
-//! > `Superseded`へ遷移する前後で、T_oのcanonical record・Receiptのハッシュを比較する。Then: 完全に
-//! > bit-equal（`superseded_by`は追記メタデータのみでcanonical構造・receipt本体を書き換えない）。
-//! > | property
+//! # What "property" (sem: SEM-gx-engine-547) buys over `tests/ac_040.rs`'s single run
 //!
-//! # What 「property」 buys over `tests/ac_040.rs`'s single run
-//!
-//! AC-040 ③ compares one pair of digests. This generates the pair — different payloads, different
+//! AC-040 (3) compares one pair of digests. This generates the pair — different payloads, different
 //! seeds, different clocks, different locators — and compares **four** things each time: the
 //! canonical record, the receipt envelope, the ledger leaf, and the canonical bytes of the whole
-//! payload. Four, because 「書き換えない」 can fail in four places and only one of them is the
-//! record AC-044 names first.
+//! payload. Four, because "does not rewrite" (sem: SEM-gx-engine-548) can fail in four places
+//! and only one of them is the record AC-044 names first.
 //!
 //! # 🔴 The instrument has to be able to fail
 //!
@@ -37,8 +38,9 @@ use support::{gate, intent, scratch, signing_key, CommitAdapter, MaybeEvidence, 
 struct Snapshot {
     record: gx_core::Cid,
     /// The signed envelope's **bytes**, not a digest of them: 41 §6 gives this crate no hash of its
-    /// own (「全canonical encodeはgx-canon経由のみ」), and `DsseEnvelope` has no `IdentityView` to
-    /// hand `cid::compute`. Bytes are the stronger comparison anyway — 「bit-equal」 is what AC-044
+    /// own ("every canonical encode goes only through gx-canon"; sem: SEM-gx-engine-549), and
+    /// `DsseEnvelope` has no `IdentityView` to hand `cid::compute`. Bytes are the stronger
+    /// comparison anyway — "bit-equal" is what AC-044
     /// asks for, and a digest would be a proxy for it.
     receipt_envelope: Vec<u8>,
     receipt_payload: gx_core::Cid,
@@ -121,7 +123,14 @@ fn one_case(
     let before = snapshot(&engine, &t_o, 0);
 
     let undo_at = Timestamp(at.0 + 3_600_000_000_000);
-    let (_, t_u) = engine.undo(&t_o, seed + 1, undo_at).expect("the candidate");
+    let (_, t_u) = engine
+        .undo(
+            &t_o,
+            &engine.attested_postcondition(&t_o),
+            seed + 1,
+            undo_at,
+        )
+        .expect("the candidate");
     engine
         .verify(&t_u, undo_at, &signing_key(), None)
         .expect("T-4a");
@@ -154,11 +163,13 @@ fn ac_044_the_original_is_bit_equal_across_the_supersede() {
     assert!(by.is_some(), "and the metadata was appended");
     assert_eq!(
         before, after,
-        "43 §5-4 / INV-S2: 「`T_o`のcanonical record・receipt・ledger entryは一切書き換えられない」"
+        "43 §5-4 / INV-S2: \"`T_o`'s canonical record/receipt/ledger entry are never rewritten, at \
+         all\" (sem: SEM-gx-engine-550)"
     );
 }
 
-/// 🔴 The property AC-044 asks for, over generated cases (**M5-15 採(b)**: plain `proptest`).
+/// 🔴 The property AC-044 asks for, over generated cases (**M5-15, adopted (b)** (sem:
+/// SEM-gx-engine-551): plain `proptest`).
 #[test]
 fn ac_044_the_property_holds_for_every_generated_case() {
     let mut runner = proptest::test_runner::TestRunner::new(ProptestConfig {

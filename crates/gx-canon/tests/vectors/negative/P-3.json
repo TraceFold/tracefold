@@ -1,18 +1,18 @@
 {
   "id": "P-3",
   "kind": "codec-deviation",
-  "statement": "不定長エンコードを含む byte 列は decode されない",
+  "statement": "A byte string containing an indefinite-length encoding is not decoded",
   "vector": "7f6161ff",
   "expected": "REJECT",
   "expected_error": "IndefiniteLength",
   "normative_basis": "IPLD-SHOULD+gx-policy",
   "tier": "gx",
-  "deviation": "\"a\" を不定長テキスト文字列(break stop code 終端)で書いた。req/33 §1 はこの条項を MUST 圏外として vector 化しなかったが、42 §2.1-3 は禁と明記し RFC 8949 §4.2.1 は MUST NOT と書く。",
+  "deviation": "Wrote \"a\" as an indefinite-length text string (terminated with a break stop code). req/33 §1 did not turn this clause into a vector, treating it as outside the MUST scope, but 42 §2.1-3 explicitly forbids it and RFC 8949 §4.2.1 writes MUST NOT.",
   "spec_anchor": "42 §2.1-3 / RFC 8949 §4.2.1(b) / ipld/ipld@a65340b spec.md L59 / req/10 T-30",
-  "origin": "gx self-authored for this hand (req/33 表外・起票候補)",
+  "origin": "gx self-authored for this hand (outside req/33's table; a filing candidate)",
   "control": {
     "vector": "6161",
     "expected": "ACCEPT",
-    "note": "同じ文字列の既知長形"
+    "note": "The same string's known-length form"
   }
 }

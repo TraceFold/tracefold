@@ -1,11 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **I-1** applied to the first of the two projections M4 hand 3 creates: `PlannedDelta`
 //! (42 §1.3, row 4).
 //!
-//! req/69 §6.0-5 makes this a condition of the hand rather than a nicety: 「**新しい IdentityView
-//! 射影には I-1 形の防御を同 turn で置く**。M4 が作る射影は `PlannedDelta`(=`{substrate, payload}`・
-//! 42 §1.3)と `Fingerprint`(=全 field)の **2 つ**で、いずれも A-10 形(canonical encode の map key 数
-//! assert)+「1 field だけ違う 2 値の digest が異なる」を全 field 分。M3 は同じ穴を 3 箇所に開けたまま
-//! tag 窓へ来て、監査が拾った」.
+//! (sem: SEM-gx-substrate-114, SEM-gx-substrate-115, SEM-gx-substrate-116, SEM-gx-substrate-117,
+//! SEM-gx-substrate-118, SEM-gx-substrate-119, SEM-gx-substrate-120)
+//!
+//! req/69 §6.0-5 makes this a condition of the hand rather than a nicety: "**place I-1's defence in
+//! the same turn as any new `IdentityView` projection**. The projections M4 builds are **two**:
+//! `PlannedDelta` (= `{substrate, payload}`, 42 §1.3) and `Fingerprint` (= all fields), both in the
+//! A-10 shape (asserting the canonical encoding's map key count) + 'two values differing in only one
+//! field have different digests' for every field. M3 came into the tag window with the same hole
+//! open in three places, and the audit caught it."
 //!
 //! # The two halves, and why one is not enough
 //!
@@ -18,8 +24,9 @@
 //!
 //! # What this projection has that the others do not
 //!
-//! A **self-reference**. 42 §1.3 row 4 excludes `reference` with the reason 「自己参照」, and
-//! **M4H1-3** 採(a) then made [`PlannedDelta::new`] mint that very field from this projection. The
+//! A **self-reference**. 42 §1.3 row 4 excludes `reference` with the reason "self-reference", and
+//! **M4H1-3**, adopted (a), then made [`PlannedDelta::new`] mint that very field from this
+//! projection. The
 //! constructor therefore has to start from a placeholder, and the soundness of doing so is exactly
 //! the exclusion: if `reference` reached the digest, the minted CID would depend on the placeholder
 //! and two identical deltas would get different names. That is not an argument this file trusts --
@@ -109,7 +116,7 @@ fn the_planned_delta_projection_declares_the_two_keys_of_42_1_3() {
 /// The count above is a literal, and a literal is a claim a hand can keep true by editing it. This
 /// is the same claim held against `PlannedDelta` itself: a fourth field added to the struct and not
 /// to `PlannedDeltaView` would be part of a delta and outside its own name, and the only field 42
-/// §1.3 permits to be outside is `reference`, for the stated reason 「自己参照」.
+/// §1.3 permits to be outside is `reference`, for the stated reason "self-reference".
 #[test]
 fn the_projection_is_the_struct_minus_its_self_reference() {
     let delta = base();
@@ -119,7 +126,7 @@ fn the_projection_is_the_struct_minus_its_self_reference() {
         view_keys(&delta),
         expected,
         "`PlannedDelta` and `PlannedDeltaView` differ by something other than `reference` \
-         (42 §1.3 row 4: 除外=`reference`, 理由=自己参照)"
+         (42 §1.3 row 4: excluded = `reference`, reason = self-reference)"
     );
 }
 
@@ -174,7 +181,7 @@ fn two_payloads_of_the_same_length_are_two_deltas() {
 // 42 §3.4: the reference is the CID of the projection
 // ---------------------------------------------------------------------------
 
-/// `reference.cid` is the digest of this delta's own projection (42 §3.4, **M4H1-3** 採(a)).
+/// `reference.cid` is the digest of this delta's own projection (42 §3.4, **M4H1-3**, adopted (a)).
 ///
 /// The agreement hand 1 could only state. Both sides are computed here from the same value, which is
 /// the tautology `proof_digest.rs` was caught in (req/68 §2) unless the two roads differ -- and they
@@ -187,7 +194,7 @@ fn the_reference_is_the_cid_of_the_projection() {
     assert_eq!(
         delta.reference().cid,
         digest_of(&delta),
-        "42 §3.4 逐語: 「自身のcanonical参照(`DeltaRef.cid`と一致)」"
+        "42 §3.4, verbatim: \"its own canonical reference (matches `DeltaRef.cid`)\""
     );
     assert_eq!(
         &delta.reference().substrate,
@@ -201,7 +208,7 @@ fn the_reference_is_the_cid_of_the_projection() {
 /// The soundness argument of [`PlannedDelta::new`], measured rather than reasoned. Two deltas built
 /// through the constructor from the same substrate and payload get the same reference; if
 /// `reference` were in the projection, the first mint would feed the second and the two would
-/// diverge. This is also what makes 「同一 delta」 in E-M4-3's idempotence quantifier a decidable
+/// diverge. This is also what makes "the same delta" in E-M4-3's idempotence quantifier a decidable
 /// phrase.
 #[test]
 fn the_placeholder_the_constructor_starts_from_cannot_reach_the_digest() {

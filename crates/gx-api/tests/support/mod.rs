@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! A server, a project and a client, for the suites of M6 hand 5.
 //!
 //! # 🔴 The client is 51 §7's, and that is not an implementation detail
 //!
-//! > axum test client（`tower::ServiceExt`相当）でCLIと同一パイプラインを叩き、レスポンスを比較する
+//! > an axum test client (equivalent to `tower::ServiceExt`) hits the same pipeline as the CLI and compares the response (sem: SEM-gx-api-292)
 //!
 //! [`Client::send`] drives the router through `tower::ServiceExt::oneshot`, which is the whole
 //! service stack — routing, the Bearer layer, extractors, the handler — without a socket. What it
@@ -89,7 +91,8 @@ impl ServerKeys for Keys {
 ///
 /// The real one is `gx_cli::receipt::ReceiptStore` and the dependency cannot run that way (see the
 /// manifest), so what this measures is the **shape** of the contract: three slots, one per kind, and
-/// `load` preferring the commit receipt. `crates/gx-cli/tests/ac_055.rs` measures the real one.
+/// `load_commit` reading the commit receipt. `crates/gx-cli/tests/ac_055.rs` measures the real
+/// one.
 #[derive(Default)]
 pub struct MemoryArchive {
     slots: std::sync::Mutex<Vec<(TransformationId, ReceiptSlot, Receipt)>>,
@@ -108,18 +111,13 @@ impl gx_api::ReceiptArchive for MemoryArchive {
         Ok(())
     }
 
-    fn load(&self, id: &TransformationId) -> Option<Receipt> {
+    /// 🔴 **R3 / `req/222` H-02** — the commit slot alone, as the trait now asks.
+    fn load_commit(&self, id: &TransformationId) -> Option<Receipt> {
         let slots = self.slots.lock().ok()?;
-        for want in [
-            ReceiptSlot::Commit,
-            ReceiptSlot::Ruling,
-            ReceiptSlot::Verdict,
-        ] {
-            if let Some((_, _, r)) = slots.iter().find(|(i, s, _)| i == id && *s == want) {
-                return Some(r.clone());
-            }
-        }
-        None
+        slots
+            .iter()
+            .find(|(i, s, _)| i == id && *s == ReceiptSlot::Commit)
+            .map(|(_, _, r)| r.clone())
     }
 }
 
@@ -194,7 +192,7 @@ impl Server {
     /// The shipped pack's one forbid is `/etc`, so the only way to reach a `Verdict::Deny` through
     /// the shipped rules is to aim a transformation at a real path under `/etc` — and a record-only
     /// commit of a denied change **applies** it, which on that locator is a write to `/etc`. Hand 3
-    /// hit the same wall and §50 M6H3-9 採(a) answered it with a fixture pack that denies a writable
+    /// hit the same wall and §50 M6H3-9, adopted (a) (sem: SEM-gx-api-293), answered it with a fixture pack that denies a writable
     /// path.
     ///
     /// The pack is **gx-cli's file**, read across the crate boundary rather than copied. A copy
@@ -204,10 +202,10 @@ impl Server {
         Self::denying_in(name, before, None)
     }
 
-    /// The same, with the **process** posture DR-2 calls 「substrate単位または全体設定」 set.
+    /// The same, with the **process** posture DR-2 calls "per-substrate or whole-configuration" (sem: SEM-gx-api-294) set.
     ///
-    /// Needed by one probe and one only: 「an explicit `record_only: false` overrides a record-only
-    /// server」 has nothing to override unless the server is one. `Engine::with_mode` is a builder
+    /// Needed by one probe and one only: "an explicit `record_only: false` overrides a record-only
+    /// server" (sem: SEM-gx-api-295) has nothing to override unless the server is one. `Engine::with_mode` is a builder
     /// consumed at `open`, which is exactly why M6-08 ruled the per-call argument — so the posture is
     /// set **here**, where a fixture is being built, and never on a live `AppState`.
     pub fn denying_in(name: &str, before: &str, mode: Option<gx_core::EnforcementMode>) -> Self {
@@ -275,6 +273,26 @@ impl Server {
         }
     }
 
+    /// 🔴 Give this server the project's `.gx/LOCK`, and hand back a **second** handle on it.
+    ///
+    /// The fixture that makes `BUSY` reachable in-process. `req/213` §2-3 built the lock on
+    /// `std::fs::File::try_lock`, whose exclusion is per open file description — so a second
+    /// `ProcessLock::open` on the same path, in this same process, excludes the server's exactly as
+    /// a second `gx` would. That is what lets `crates/gx-api/tests/wire_census.rs` reach the one
+    /// refusal whose wire shape has a sixth member (DR-43-5 (3)'s `retry_after_ms`) without the two
+    /// real processes `crates/gx-cli/tests/serve_runtime_r2.rs` uses.
+    ///
+    /// What the caller must do with the returned handle: hold it. Dropping it releases the lock and
+    /// the next write succeeds.
+    #[must_use]
+    pub fn with_writer_lock(&mut self) -> Arc<gx_engine::store::ProcessLock> {
+        let path = self.project.join(".gx").join("LOCK");
+        let server_side =
+            Arc::new(gx_engine::store::ProcessLock::open(&path).expect("open the lock file"));
+        self.state = self.state.clone().with_writer_lock(server_side);
+        Arc::new(gx_engine::store::ProcessLock::open(&path).expect("open a second handle"))
+    }
+
     /// A client over this server's router.
     #[must_use]
     pub fn client(&self) -> Client {
@@ -322,6 +340,9 @@ pub struct Answer {
     pub content_type: String,
     /// The body, parsed. `Null` when it is not JSON.
     pub json: serde_json::Value,
+    /// 🔴 `Retry-After`, so that a suite can assert what DR-43-5 says about `BUSY`: the header is
+    /// RFC 9110's `delay-seconds` and the measured hold rides in the body's `retry_after_ms`.
+    pub retry_after: Option<String>,
 }
 
 impl Answer {
@@ -367,6 +388,29 @@ impl Client {
         self.send_with(method, path, body, &[]).await
     }
 
+    /// 🔴 A request with **raw** bytes and exactly the headers given — no `content-type` added,
+    /// no JSON serialisation (v0.4-l, `req/189`: H-10 needs "a body with no `Content-Type`" and
+    /// M-14 needs "a body over the limit", neither of which [`Client::send`] can produce because
+    /// it always declares JSON — the audit's own note that the test client was outside the
+    /// denominator for that reason, `req/182` H-10).
+    pub async fn send_raw(
+        &self,
+        method: &str,
+        path: &str,
+        headers: &[(&str, &str)],
+        body: Vec<u8>,
+    ) -> Answer {
+        let mut builder = Request::builder().method(method).uri(path);
+        if let Some(token) = &self.token {
+            builder = builder.header("authorization", format!("Bearer {token}"));
+        }
+        for (name, value) in headers {
+            builder = builder.header(*name, *value);
+        }
+        let request = builder.body(Body::from(body)).expect("a request");
+        self.answer(request).await
+    }
+
     /// The same, with extra headers — 44 §2.4's `Idempotency-Key`, for instance.
     pub async fn send_with(
         &self,
@@ -389,6 +433,11 @@ impl Client {
                 .expect("a request"),
             None => builder.body(Body::empty()).expect("a request"),
         };
+        self.answer(request).await
+    }
+
+    /// One request through the whole service stack, read into memory.
+    async fn answer(&self, request: Request<Body>) -> Answer {
         let response = self
             .router
             .clone()
@@ -402,6 +451,11 @@ impl Client {
             .and_then(|v| v.to_str().ok())
             .unwrap_or_default()
             .to_string();
+        let retry_after = response
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
         let bytes = axum::body::to_bytes(response.into_body(), 8 * 1024 * 1024)
             .await
             .expect("a readable body");
@@ -410,6 +464,7 @@ impl Client {
             status,
             content_type,
             json,
+            retry_after,
         }
     }
 }

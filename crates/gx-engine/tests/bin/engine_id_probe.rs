@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-030's second process: `submit` and `plan` in a program that shares nothing with the test.
 //!
-//! 34 AC-030 逐語: 「`gx_engine::submit(I)`をライブラリ関数として同一プロセス内で2回、および
-//! **完全に独立した別プロセスで1回**呼び出す。Then: 3回とも同一`IntentId`が返る」 — and the same for
-//! `plan` and `TransformationId`. 34's own AC-011 row is the precedent for what 「完全に独立した」
-//! means and how it is arranged (「別バイナリ・キャッシュ非共有・別ワーキングディレクトリ」), so this
+//! 34 AC-030, verbatim (sem: SEM-gx-engine-616): "call `gx_engine::submit(I)` as a library
+//! function twice within the same process, and **once in a completely independent separate
+//! process**. Then: all three calls return the same `IntentId`" -- and the same for
+//! `plan` and `TransformationId`. 34's own AC-011 row is the precedent for what "completely independent"
+//! means and how it is arranged ("separate binary, no shared cache, separate working directory"), so this
 //! file is `gx-canon/tests/bin/cid_probe.rs`'s shape one crate over.
 //!
 //! # Why a whole binary rather than a thread
@@ -88,8 +91,11 @@ impl SubstrateAdapter for StubAdapter {
         &self,
         delta: &PlannedDelta,
         _pre: &ObjectSnapshot,
-    ) -> gx_substrate::Result<Option<PlannedDelta>> {
-        Ok(Some(delta.clone()))
+    ) -> gx_substrate::Result<gx_substrate::InvertOutcome> {
+        Ok(gx_substrate::InvertOutcome::inverted(
+            delta.clone(),
+            Vec::new(),
+        ))
     }
 
     fn commutation(

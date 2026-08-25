@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Fixtures shared by M5 hand 7's three benches (AC-065, AC-066, AC-068).
 //!
 //! Not a test target and not a bench target: cargo compiles this file only as a module of a
@@ -13,8 +15,9 @@
 //!
 //! # 🔴 tmpfs, proved rather than spelled
 //!
-//! 34 AC-065 逐語: 「fs-adapter経由・**tmpfs上**のcommit pipeline」, and 33 NFR-002 says the same
-//! (「`gx-adapter-fs`をtmpfs上で使用し」). The repository itself lives on `/mnt/c`, which WSL mounts
+//! 34 AC-065, verbatim: "via the fs adapter, a commit pipeline **on tmpfs**" (quoted in
+//! SEM-gx-engine-057), and 33 NFR-002 says the same ("using `gx-adapter-fs` on tmpfs"). The
+//! repository itself lives on `/mnt/c`, which WSL mounts
 //! as **9p/DrvFs over NTFS** — a filesystem whose rename is not the POSIX one this pipeline's `apply`
 //! is built on (req/38 §32, `gx-adapter-fs/tests/support`). A number measured there would be a number
 //! about DrvFs printed under AC-065's name, so [`tmpfs_root`] reads `/proc/self/mountinfo` and
@@ -102,7 +105,7 @@ pub fn tmpfs_root() -> PathBuf {
     assert_eq!(
         fstype,
         "tmpfs",
-        "{} is a {fstype}. 34 AC-065's Given is 「tmpfs上のcommit pipeline」 and this repository \
+        "{} is a {fstype}. 34 AC-065's Given is \"a commit pipeline on tmpfs\" (quoted in SEM-gx-engine-058) and this repository \
          lives on 9p over NTFS; set {ROOT_ENV}.",
         root.display()
     );
@@ -215,8 +218,9 @@ pub fn cid(seed: u64) -> Cid {
 
 /// Print a sorted sample as `min / p50 / p90 / p99 / max` with its denominator.
 ///
-/// **M3-15** (req/38 §19) is the form and the whole gate: 「p99 を median+回数+分母つきで測って記録
-/// した」, and 「閾値比較は記録のみ」. Nothing here compares anything with 33's provisional value, and
+/// **M3-15** (req/38 §19) is the form and the whole gate: "p99, measured and recorded with median +
+/// count + denominator" (quoted in SEM-gx-engine-059), and "the threshold comparison is record-only".
+/// Nothing here compares anything with 33's provisional value, and
 /// the caller prints that value as a budget rather than as a pass mark.
 ///
 /// Nearest-rank, named because a percentile is a choice of rule and two rules disagree by one sample.
@@ -264,6 +268,7 @@ pub fn provenance(seed: u64, transformation: TransformationId) -> Provenance {
             correlation_id: None,
             engine_version: "0.1.0".to_string(),
             adapter_version: "bench".to_string(),
+            confinement: Some(gx_witness::receipt::ConfinementContext::unconfined()),
         },
         input_objects: vec![ObjectId(cid(seed))],
         intent_digest: Some(cid(seed + 1)),
@@ -275,7 +280,7 @@ pub fn provenance(seed: u64, transformation: TransformationId) -> Provenance {
 ///
 /// Ten records: T-1, T-2, T-3, T-4a, T-8, T-9, the provenance of **E-M5-10**, T-10b, the
 /// `ApplyStarted` of **E-M5-1**, and T-11. This is the happy path 33 NFR-002 names
-/// (「T-1→T-2→T-3→T-4a→T-8→T-9→T-10b→T-11」) with the two errata records that sit inside it.
+/// ("T-1→T-2→T-3→T-4a→T-8→T-9→T-10b→T-11", sem: SEM-gx-engine-060) with the two errata records that sit inside it.
 #[must_use]
 pub fn committed_records(seed: u64) -> Vec<EngineJournalRecord> {
     let t = TransformationId(cid(seed));
@@ -289,7 +294,7 @@ pub fn committed_records(seed: u64) -> Vec<EngineJournalRecord> {
         EngineJournalRecord::Planned {
             transformation: t,
             intent_id,
-            // **E-M5-13**: the two fields §47 M6-14 採(a) added. A bench fixture carries them for
+            // **E-M5-13**: the two fields §47 M6-14 adopted (a) added (sem: SEM-gx-engine-061). A bench fixture carries them for
             // the same reason it carries the rest -- the record it writes has to be the record the
             // engine writes, or the recovery it measures is a recovery of something else.
             locator: format!("/dev/shm/bench/{seed}"),
@@ -303,6 +308,7 @@ pub fn committed_records(seed: u64) -> Vec<EngineJournalRecord> {
                 .expect("the scope is inside MAX_SCOPE_BYTES"),
             ),
             parents: Vec::new(),
+            input_generation: gx_core::BoundaryStage::Unknown,
             at: AT,
         },
         EngineJournalRecord::VerifyStarted {
@@ -334,6 +340,11 @@ pub fn committed_records(seed: u64) -> Vec<EngineJournalRecord> {
         EngineJournalRecord::InverseEscrowed {
             transformation: t,
             inverse_cid: Some(cid(seed + 6_000_000)),
+            pending: false,
+            reads: Vec::new(),
+            undetermined: false,
+            // 🔴 **DR-46-34** — the adapter answered, so the list above is a reading.
+            reads_attested: true,
             at: AT,
         },
         EngineJournalRecord::ApplyStarted {
@@ -349,8 +360,8 @@ pub fn committed_records(seed: u64) -> Vec<EngineJournalRecord> {
     ]
 }
 
-/// The records of a transformation left **unresolved inside `Committing`** — AC-068's 「一部が
-/// `Committing`未解決状態」.
+/// The records of a transformation left **unresolved inside `Committing`** — AC-068's "some in the
+/// unresolved `Committing` state" (quoted in SEM-gx-engine-062).
 ///
 /// Nine records: the same prefix, stopped after `ApplyStarted`. That is the hardest of 51 §8.1's three
 /// injection points — the one where the adapter was asked and nothing said whether it answered — so a

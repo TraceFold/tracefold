@@ -1,16 +1,20 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-029 (FR-029) — an order-2 change takes the same road as every other change, and an invariant
 //! can stop it there.
 //!
-//! AC-029 逐語: 「Given: order=2のTransformation（既存policy P_beforeをP_afterへ緩める変換）。When:
-//! `Gate::verify`へ通常のorder-0/1と**同一の`verify`エントリポイント**から渡す。Then: order=2専用の
-//! バイパス経路（別関数呼び出し）が存在せず、Cedar評価+invariant registryを経由した通常のVerdictが
-//! 返る（呼び出しトレースで確認）。P_afterが全許可へ緩めるような極端なケースでも、gate自体のpolicy
-//! （order-2変換に対するinvariant）がDenyを返せる。」判定方法: 「integration + property」.
+//! AC-029 verbatim: "Given: an order=2 Transformation (a change loosening an existing policy
+//! P_before to P_after). When: passed to `Gate::verify` through the **same `verify` entry point** as
+//! ordinary order-0/1. Then: there is no order=2-only bypass path (a separate function call); the
+//! ordinary Verdict, having gone through Cedar evaluation + the invariant registry, comes back
+//! (confirmed via the call trace). Even in the extreme case where P_after loosens to allow
+//! everything, the gate's own policy (an invariant against an order-2 transformation) can return
+//! Deny." Judgment method: "integration + property". (sem: SEM-gx-gate-209)
 //!
 //! # Measuring something that is absent
 //!
-//! 「バイパス経路が存在せず」 is a claim about what is *not* there, and req/60 §7.2 says what such a
-//! claim costs: 「経路を 1 本足したら RED になる事を変異で実測しないと空虚になる」. So the criterion
+//! "There is no bypass path" is a claim about what is *not* there, and req/60 §7.2 says what such a
+//! claim costs: "it is empty unless a mutation measures that adding one road turns it RED" (sem: SEM-gx-gate-210). So the criterion
 //! is measured on three faces, and `tools/verify_m3h3.sh` §7 adds the missing path and shows that
 //! all three go red:
 //!
@@ -25,11 +29,11 @@
 //! a property is about the shape of the code rather than about a value, the source is the
 //! instrument, and it is written down as such rather than dressed up as a behavioural test.
 //!
-//! # What 「P_afterが全許可へ緩める」 is, here
+//! # What "P_after loosens to allow everything" is, here (sem: SEM-gx-gate-211)
 //!
 //! The extreme case the criterion names is a policy set that permits everything -- the state a
 //! successful attack on the policy layer would leave behind. [`PERMIT_EVERYTHING`] below *is* that
-//! state, and the invariant that refuses order-2 changes is 「gate自体のpolicy」. The refusal is
+//! state, and the invariant that refuses order-2 changes is "the gate's own policy" (sem: SEM-gx-gate-212). The refusal is
 //! demonstrated rather than shipped: which invariants a deployment runs is FR-028's pack (hand 5),
 //! and M3-10 already fixes what such a pack may reach.
 
@@ -93,7 +97,7 @@ impl InvariantCheck for Tracing {
     }
 }
 
-/// 「gate自体のpolicy（order-2変換に対するinvariant）」: a change to a policy is refused.
+/// "the gate's own policy (an invariant against an order-2 transformation)": a change to a policy is refused. (sem: SEM-gx-gate-213)
 ///
 /// This is the invariant E-M3-7 exists for. Under 41 §4's original signature -- `check(pre,
 /// planned)` -- it could not be written at all: `order` is a field of `Transformation` and neither
@@ -128,7 +132,7 @@ fn cid(seed: u64) -> Cid {
     Cid(raw)
 }
 
-/// A change at the given order. At order 2 it is 「既存policy P_beforeをP_afterへ緩める変換」: a
+/// A change at the given order. At order 2 it is "a change loosening an existing policy P_before to P_after" (sem: SEM-gx-gate-214): a
 /// change whose subject is another transformation and whose context is `Policy` (41 §3, P-3).
 fn change(order: u8) -> Transformation {
     let subject = if order == 0 {
@@ -208,6 +212,10 @@ fn ac_029_every_order_goes_through_the_same_entry_point_and_the_same_registry() 
                 planned: &planned,
                 evidence: &[],
                 invert_available: true,
+                // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+                // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+                // varying this field alone moves no verdict) about the field and not about this fixture.
+                decided_at: Timestamp(0),
             })
             .expect("a permissive set and two holding invariants reach a verdict");
 
@@ -229,14 +237,14 @@ fn ac_029_every_order_goes_through_the_same_entry_point_and_the_same_registry() 
         assert_eq!(
             proof.policy_decisions().len(),
             1,
-            "the Cedar evaluation happened for order {order} too -- 「Cedar評価+invariant registryを\
-             経由した通常のVerdict」"
+            "the Cedar evaluation happened for order {order} too -- \"the ordinary Verdict, having gone \
+             through Cedar evaluation + the invariant registry\"" // (sem: SEM-gx-gate-215)
         );
         assert_eq!(proof.invariant_results().len(), 2);
     }
 }
 
-/// 「P_afterが全許可へ緩めるような極端なケースでも、gate自体のpolicyがDenyを返せる」.
+/// "even in the extreme case where P_after loosens to allow everything, the gate's own policy can return Deny". (sem: SEM-gx-gate-216)
 ///
 /// The policy set permits everything, which is the state the criterion asks about, and the verdict
 /// is still `Deny` -- reached through the ordinary fold rather than through a check the gate makes
@@ -264,6 +272,7 @@ fn ac_029_an_invariant_refuses_an_order_2_change_a_permissive_policy_would_admit
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect("evaluable");
     assert_eq!(admitted.kind(), VerdictKind::Admit);
@@ -276,6 +285,7 @@ fn ac_029_an_invariant_refuses_an_order_2_change_a_permissive_policy_would_admit
             planned: &planned,
             evidence: &[],
             invert_available: true,
+            decided_at: Timestamp(0),
         })
         .expect("a refusal is a verdict, not an error (E-M3-3)");
 
@@ -393,7 +403,7 @@ fn ac_029_the_entry_point_is_the_only_road_and_it_cannot_see_an_order() {
 }
 
 // ---------------------------------------------------------------------------
-// The property half (34: 「integration + property」)
+// The property half (34: "integration + property") (sem: SEM-gx-gate-217)
 // ---------------------------------------------------------------------------
 
 fn any_locator() -> impl Strategy<Value = String> {
@@ -408,7 +418,7 @@ proptest! {
     /// Whatever else varies, the road does not: every registered invariant is called exactly once,
     /// and the answer at order 2 is the answer at order 0 when nothing reads the order.
     ///
-    /// The second half is the property form of 「order-2専用のバイパス経路が存在せず」. An early
+    /// The second half is the property form of "there is no order-2-only bypass path" (sem: SEM-gx-gate-218). An early
     /// return for order 2 would break it whichever way it decided: admitting would differ from the
     /// order-0 answer wherever the policy refuses, and refusing would differ wherever it permits.
     #[test]
@@ -438,6 +448,7 @@ proptest! {
                 planned: &planned,
                 evidence: &[],
                 invert_available,
+                decided_at: Timestamp(0),
             });
             let seen = trace.lock().expect("uncontended").clone();
             (verdict.map(|v| v.kind()), seen)

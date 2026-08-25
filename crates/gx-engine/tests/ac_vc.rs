@@ -1,22 +1,26 @@
-//! 🔴 **FR-M04** — the aggregate verdict checkpoint (M7 hand 6, `req/98` §3-3, 裁定 #2/#3/#14).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **FR-M04** -- the aggregate verdict checkpoint (M7 hand 6, `req/98` §3-3, ruling #2/#3/#14) (sem: SEM-gx-engine-593).
 //!
 //! # The defect this suite is about
 //!
-//! `V021_SYNC_MATERIAL_2026-08-11.md:35` 逐語: 「`VerdictReceipt`は`inclusion_proof=None`固定
-//! (42§3.10)でありledgerに一切現れないため、運用者がDeny/Escalateの発生した`VerdictReceipt`を
-//! 丸ごとエクスポートしない/破棄すれば、Admit率100%のクリーンな記録だけを外部監査人に提示できて
-//! しまう」. A `CommitReceipt` is anchored in a Merkle tree an auditor can re-derive; a
+//! `V021_SYNC_MATERIAL_2026-08-11.md:35` verbatim (sem: SEM-gx-engine-594): "since `VerdictReceipt`
+//! is fixed at `inclusion_proof=None` (42§3.10) and never appears in the ledger at all, an operator
+//! who simply does not export / discards whole `VerdictReceipt`s where a Deny/Escalate occurred can
+//! present an external auditor with nothing but a clean record showing a 100% Admit rate". A
+//! `CommitReceipt` is anchored in a Merkle tree an auditor can re-derive; a
 //! `VerdictReceipt` is a signed sheet of paper its issuer may simply not hand over.
 //!
 //! FR-M04's answer is **not** to put verdicts in the tree — ASM-14 forbids it (`check_schema`
 //! refuses a `VerdictReceipt` carrying an `inclusion_proof`) — but to publish a signed **count**
-//! and bind it to something the operator has already committed to. That is 案 A (`req/98` §3-3:
-//! 「新 payload_type で並走する VerdictCheckpoint」), and this file is what makes it a fact.
+//! and bind it to something the operator has already committed to. That is option A (`req/98` §3-3:
+//! "a VerdictCheckpoint that runs alongside on a new payload_type") (sem: SEM-gx-engine-595), and
+//! this file is what makes it a fact.
 //!
 //! # RED-first
 //!
 //! This file is committed **before** any of the API it names exists, so its first run is a
-//! compile-stage RED (規律47: a 101 that did not compile measured nothing, and this file says so
+//! compile-stage RED (discipline 47 (sem: SEM-gx-engine-596): a 101 that did not compile measured nothing, and this file says so
 //! rather than letting the two 101s look alike). The assertion-stage RED of the same hand is in
 //! `crates/gx-log/tests/ac_021.rs`, whose declaration lists the new public names before they are
 //! written.
@@ -37,7 +41,7 @@
 //!
 //! # What this suite deliberately shows FR-M04 **failing** to detect
 //!
-//! 裁定 #3 and 裁定 #14 ask for two limits to be written into the AC rather than discovered later.
+//! ruling #3 and ruling #14 ask for two limits to be written into the AC rather than discovered later. (sem: SEM-gx-engine-597)
 //! Written in a doc they are a claim; here they are two probes that pass **because** the detection
 //! does not fire (`policy_relaxation_is_not_detected`, `a_split_view_is_not_detected`). A limit
 //! nobody exercised is a limit nobody knows is still there.
@@ -77,8 +81,9 @@ const ALLOWED: &str = "a change nobody objects to";
 ///
 /// * T-4a / T-4b / T-4c — `Verdict { kind, verdict_digest: Some(_) }`, one per gate answer.
 /// * T-4e — `Verdict { kind: Admit, verdict_digest: None, fail_posture_engaged: true }`. **No gate
-///   ran.** Folding it into `admit` would report an admission nobody decided, which is 「未実装」と
-///   「失敗」 wearing one face (M4H4-2, refused twice). It gets its own bucket.
+///   ran.** Folding it into `admit` would report an admission nobody decided, which is "not
+///   implemented" and "failure" (sem: SEM-gx-engine-598) wearing one face (M4H4-2, refused
+///   twice). It gets its own bucket.
 /// * T-5 / T-5b — `HumanDecision { kind }`, where a person answered.
 ///
 /// Every other record is skipped, and the skip is not silent: `total` is asserted against the
@@ -164,7 +169,7 @@ fn one_verdict<E: EvidenceSource>(
 ///
 /// 🔴 The commit is not decoration. `ledger_tree_size` is the field AC-VC-5's second and third
 /// cases rest on, and a fixture that stopped at `Admitted` would leave the ledger empty — every
-/// chain would trivially be 「not behind」 a log of zero leaves, and two of the three absences
+/// chain would trivially be "not behind" (sem: SEM-gx-engine-599) a log of zero leaves, and two of the three absences
 /// would be measured against nothing.
 ///
 /// `round` keeps the locators distinct across calls: an intent's id is derived from its locator
@@ -549,7 +554,7 @@ fn ac_vc_5_a_missing_checkpoint_is_observable() {
          publishing: {found:?}"
     );
 
-    // 3. nothing at all -- 案 C's re-entrant defect (`FRM04_DESIGN_MATERIAL:118`), refused.
+    // 3. nothing at all -- option C's re-entrant defect (sem: SEM-gx-engine-600) (`FRM04_DESIGN_MATERIAL:118`), refused.
     let found = audit_verdict_chain(&[], &observed, ledger_size);
     println!("ACVC5_EMPTY {found:?}");
     assert!(
@@ -629,10 +634,10 @@ fn the_counter_survives_a_restart() {
 }
 
 // ---------------------------------------------------------------------------
-// The two limits, measured rather than described (裁定 #3, 裁定 #14)
+// The two limits, measured rather than described (ruling #3, ruling #14) (sem: SEM-gx-engine-601)
 // ---------------------------------------------------------------------------
 
-/// 🔴 **裁定 #3 の限界**: FR-M04 does **not** close policy relaxation, and here is the proof.
+/// 🔴 **the limit of ruling #3** (sem: SEM-gx-engine-602): FR-M04 does **not** close policy relaxation, and here is the proof.
 ///
 /// Two engines, the same eight transformations, one deployment that refuses five of them and one
 /// that refuses nothing. The second publishes `deny=0` and every check in this file is green about
@@ -674,7 +679,7 @@ fn policy_relaxation_is_not_detected() {
 
     println!(
         "ACVC_LIMIT_RELAXATION strict_deny={} loose_deny={} loose_findings={} \
-         (裁定 #3: policy 緩和は塞がない)",
+         (ruling #3: policy relaxation is not closed) (sem: SEM-gx-engine-603)",
         strict_cp.tally.deny,
         loose_cp.tally.deny,
         findings.len()
@@ -684,17 +689,17 @@ fn policy_relaxation_is_not_detected() {
     assert!(
         findings.is_empty(),
         "this assertion is the limit: the loose deployment's chain is clean, and FR-M04 cannot \
-         tell 「nothing was refused」 from 「the gate was widened until nothing was」"
+         tell \"nothing was refused\" from \"the gate was widened until nothing was\" (sem: SEM-gx-engine-604)"
     );
 }
 
-/// 🔴 **裁定 #14 の限界**: FR-M04 does **not** close a split view (TH-6 residue, v0.2.1).
+/// 🔴 **the limit of ruling #14** (sem: SEM-gx-engine-605): FR-M04 does **not** close a split view (TH-6 residue, v0.2.1).
 ///
 /// One key signs two internally consistent chains for two verifiers. Each verifier, auditing the
 /// chain it was handed against the receipts it was handed, finds nothing — because what the
-/// signature attests is 「this key stated these counts」 and never 「these are the only counts this
-/// key stated」. Detecting the fork needs the two verifiers to compare, which is the consistency
-/// proof window `req/98` §9 行 v-6 sends to v0.2.1.
+/// signature attests is "this key stated these counts" and never "these are the only counts this
+/// key stated" (sem: SEM-gx-engine-606). Detecting the fork needs the two verifiers to compare,
+/// which is the consistency proof window `req/98` §9 row v-6 sends to v0.2.1.
 #[test]
 fn a_split_view_is_not_detected() {
     let mut engine = mixed_engine("ac_vc_limit_split");
@@ -719,7 +724,7 @@ fn a_split_view_is_not_detected() {
     let b = audit_verdict_chain(std::slice::from_ref(&shrunk), &partial, ledger_size);
     println!(
         "ACVC_LIMIT_SPLIT a_findings={} b_findings={} a_deny={} b_deny={} \
-         (裁定 #14: split view は consistency proof 窓=v0.2.1)",
+         (ruling #14: a split view is the consistency-proof window = v0.2.1) (sem: SEM-gx-engine-607)",
         a.len(),
         b.len(),
         honest.tally.deny,
@@ -767,4 +772,291 @@ fn a_window_with_no_verdicts_in_it_is_empty_rather_than_a_repeat() {
     assert!(
         audit_verdict_chain(&[first, second], &observed, engine.ledger().log().len()).is_empty()
     );
+}
+
+// ---------------------------------------------------------------------------
+// K6 mutant-kill (req/38 §73, priority 9 items (sem: SEM-gx-engine-608), req/159 §B-1): the arms no other probe drives
+// ---------------------------------------------------------------------------
+
+/// An engine on which every verify lands in 43 T-4e (collector down, `FailOpen`).
+///
+/// The same fixture `ac_vc_1c` builds inline, named here because T-4e is the one road to
+/// `unverdicted` — and run e's surviving mutants sat in exactly the arithmetic no other suite
+/// pushes a nonzero `unverdicted` through. (The restart probe below builds its T-4e session
+/// inline instead: its three sessions must share one journal path.)
+fn t4e_engine(name: &str) -> Engine<UnreachableEvidence> {
+    let dir = scratch(name);
+    let (adapter, _counts, _world) = CommitAdapter::new("before");
+    let mut engine = Engine::open(
+        dir.join("journal.bin"),
+        gate(PERMIT_ALL),
+        UnreachableEvidence::new("the collector is down"),
+    )
+    .expect("a fresh journal opens")
+    .with_posture(FailPosture::FailOpen);
+    engine.register_adapter(Arc::new(adapter), "ac-vc-t4e-fixture");
+    engine
+}
+
+/// 🔴 K6 mutant-kill (`tally_from_the_journal`: the T-4e arm, `escalate += 1`,
+/// `unverdicted += 1`): the rebuilt counter recounts **all four** buckets across a restart.
+///
+/// `the_counter_survives_a_restart` crosses the restart with admissions and refusals only, so
+/// mutants run e (req/38 §73) left four survivors in the fold behind `Engine::open`: delete the
+/// `Verdict { verdict_digest: None }` arm (staging pipeline.rs:633), `escalate += 1 -> *= 1`
+/// (:642), and `unverdicted += 1 -> -= 1 / *= 1` (:643). Each of those is invisible until a
+/// nonzero escalation count and a nonzero T-4e count cross a restart; here both do, and each
+/// bucket is asserted **by value** — an arithmetic rewrite in any arm is a different number.
+///
+/// One journal, three sessions: the counter under test is rebuilt from the journal alone, so
+/// the fixture may change gate and evidence source between sessions — the journal is the truth
+/// the recount reads, not the engine configuration that happened to write it.
+#[test]
+fn the_rebuilt_counter_recounts_escalations_and_t4es() {
+    let dir = scratch("ac_vc_rebuild_all_buckets");
+    let journal = dir.join("journal.bin");
+
+    // Session 1: two escalations (E-M3-4: `invert() == None` at T-3).
+    {
+        let mut engine = Engine::open(journal.clone(), gate(PERMIT_ALL), InjectedEvidence::none())
+            .expect("a fresh journal opens");
+        engine.register_adapter(Arc::new(StubAdapter::without_inverse()), "k6-esc");
+        for n in 0..2 {
+            let (_, state) = one_verdict(&mut engine, &format!("/tmp/k6-esc-{n}.txt"), ALLOWED);
+            assert_eq!(state, Lifecycle::Escalated, "the adapter has no inverse");
+        }
+    }
+    // Session 2: three T-4e degraded admissions (collector down, `FailOpen`).
+    {
+        let (adapter, _counts, _world) = CommitAdapter::new("before");
+        let mut engine = Engine::open(
+            journal.clone(),
+            gate(PERMIT_ALL),
+            UnreachableEvidence::new("the collector is down"),
+        )
+        .expect("the journal reopens")
+        .with_posture(FailPosture::FailOpen);
+        engine.register_adapter(Arc::new(adapter), "k6-t4e");
+        for n in 0..3 {
+            let (_, state) = one_verdict(&mut engine, &format!("/tmp/k6-t4e-{n}.txt"), ALLOWED);
+            assert_eq!(state, Lifecycle::Admitted, "T-4e admits under FailOpen");
+        }
+    }
+    // Session 3: one admission and one refusal, so the two buckets the old restart probe
+    // already drives are nonzero too — a fold that latched on one kind would show here.
+    {
+        let (adapter, _counts, _world) = CommitAdapter::new("before");
+        let mut engine = Engine::open(
+            journal.clone(),
+            gate_refusing(PERMIT_ALL, "deployment-refuses-this", REFUSED),
+            InjectedEvidence::none(),
+        )
+        .expect("the journal reopens");
+        engine.register_adapter(Arc::new(adapter), "k6-mixed");
+        let (_, admitted) = one_verdict(&mut engine, "/tmp/k6-admit-0.txt", ALLOWED);
+        assert_eq!(admitted, Lifecycle::Admitted);
+        let (_, denied) = one_verdict(&mut engine, "/tmp/k6-deny-0.txt", REFUSED);
+        assert_eq!(denied, Lifecycle::Denied);
+    }
+
+    // The restart under measurement: `open` rebuilds the counter from the journal alone.
+    let reopened = Engine::open(journal, gate(PERMIT_ALL), InjectedEvidence::none())
+        .expect("the journal replays");
+    let tally = reopened.verdict_tally();
+    let oracle = recount_from_the_journal(reopened.journal().records());
+    println!(
+        "K6_REBUILD admit={} deny={} escalate={} unverdicted={} oracle_escalate={} \
+         oracle_unverdicted={}",
+        tally.admit,
+        tally.deny,
+        tally.escalate,
+        tally.unverdicted,
+        oracle.escalate,
+        oracle.unverdicted
+    );
+    assert_eq!(tally, oracle, "the rebuilt counter is the oracle's recount");
+    assert_eq!(tally.escalate, 2, "two escalations crossed the restart");
+    assert_eq!(
+        tally.unverdicted, 3,
+        "three T-4e admissions crossed the restart"
+    );
+    assert_eq!(tally.admit, 1, "one gate admission");
+    assert_eq!(tally.deny, 1, "one refusal");
+}
+
+/// 🔴 K6 mutant-kill (`verdict_checkpoint`: `escalate` window subtraction, staging
+/// pipeline.rs:1053 `- -> +`): a second window of escalations holds only its own.
+///
+/// Every existing two-checkpoint probe crosses the boundary with `published.escalate == 0`,
+/// where subtraction and addition agree. Two escalations published, one more escalated, and
+/// the second window's claim is `1`: the mutant's `verdicts + published` says `5` here.
+#[test]
+fn a_second_window_of_escalations_subtracts_the_published_ones() {
+    let mut engine = escalating_engine("ac_vc_second_window_escalate");
+    let key = signing_key();
+    for n in 0..2 {
+        let (_, state) = one_verdict(&mut engine, &format!("/tmp/k6-esc2-{n}.txt"), ALLOWED);
+        assert_eq!(state, Lifecycle::Escalated);
+    }
+    let first = engine.verdict_checkpoint(ORIGIN, AT, &key).expect("mint");
+    assert_eq!(first.tally.escalate, 2, "the first window publishes both");
+
+    let (_, state) = one_verdict(&mut engine, "/tmp/k6-esc2-2.txt", ALLOWED);
+    assert_eq!(state, Lifecycle::Escalated);
+    let second = engine
+        .verdict_checkpoint(ORIGIN, Timestamp(AT.0 + 1), &key)
+        .expect("mint");
+    println!(
+        "K6_WINDOW_ESCALATE first={} second={} second_total={}",
+        first.tally.escalate,
+        second.tally.escalate,
+        second.tally.total()
+    );
+    assert_eq!(
+        second.tally.escalate, 1,
+        "the second window speaks for the one escalation after the boundary, not for the \
+         published ones again"
+    );
+    assert_eq!(second.tally.total(), 1, "and for nothing else");
+}
+
+/// 🔴 K6 mutant-kill (`verdict_checkpoint`: `unverdicted` window subtraction, staging
+/// pipeline.rs:1054 `- -> +`): a second window of T-4e admissions holds only its own.
+///
+/// The same boundary as the probe above, on the fourth bucket: two degraded admissions
+/// published, one more admitted under the engaged posture, and the second window claims `1`
+/// where the mutant claims `5`.
+#[test]
+fn a_second_window_of_t4es_subtracts_the_published_ones() {
+    let mut engine = t4e_engine("ac_vc_second_window_t4e");
+    let key = signing_key();
+    for n in 0..2 {
+        let (_, state) = one_verdict(&mut engine, &format!("/tmp/k6-t4e2-{n}.txt"), ALLOWED);
+        assert_eq!(state, Lifecycle::Admitted, "T-4e admits under FailOpen");
+    }
+    let first = engine.verdict_checkpoint(ORIGIN, AT, &key).expect("mint");
+    assert_eq!(
+        first.tally.unverdicted, 2,
+        "the first window publishes both"
+    );
+
+    let (_, state) = one_verdict(&mut engine, "/tmp/k6-t4e2-2.txt", ALLOWED);
+    assert_eq!(state, Lifecycle::Admitted);
+    let second = engine
+        .verdict_checkpoint(ORIGIN, Timestamp(AT.0 + 1), &key)
+        .expect("mint");
+    println!(
+        "K6_WINDOW_T4E first={} second={} second_total={}",
+        first.tally.unverdicted,
+        second.tally.unverdicted,
+        second.tally.total()
+    );
+    assert_eq!(
+        second.tally.unverdicted, 1,
+        "the second window speaks for the one T-4e after the boundary, not for the published \
+         ones again"
+    );
+    assert_eq!(second.tally.total(), 1, "and for nothing else");
+}
+
+/// 🔴 K6 mutant-kill (`Engine::open`'s published fold: `escalate`/`unverdicted` legs, staging
+/// pipeline.rs:828/:829 `+ -> -` and `+ -> *`, mutants run e, `req/38` §73): a reopened chain
+/// does not republish the escalations and T-4es it already published.
+///
+/// FR-M04 rebuilds `published` at `open` by folding the **whole checkpoint chain** (the last
+/// entry carries its own window, not the sum before it). `the_counter_survives_a_restart`
+/// crosses the restart with `admit`/`deny` only, and the two second-window probes above never
+/// restart — so all four rewrites of the fold's third and fourth legs survived: under `-` the
+/// fold underflows the moment a published count is nonzero (a debug reopen dies right there),
+/// and under `*` the accumulator stays pinned at zero, so the next window re-claims everything
+/// ever counted. Here one escalation and one T-4e are published *before* the restart, one more
+/// of each follows it, and each post-restart window must speak for exactly one.
+#[test]
+fn a_reopened_chain_does_not_republish_escalations_or_t4es() {
+    let dir = scratch("ac_vc_reopen_fold");
+    let journal = dir.join("journal.bin");
+    let key = signing_key();
+
+    // Session 1: one escalation (E-M3-4: `invert() == None` at T-3), published as checkpoint 1.
+    {
+        let mut engine = Engine::open(journal.clone(), gate(PERMIT_ALL), InjectedEvidence::none())
+            .expect("a fresh journal opens");
+        engine.register_adapter(Arc::new(StubAdapter::without_inverse()), "k6-fold-esc");
+        let (_, state) = one_verdict(&mut engine, "/tmp/k6-fold-esc-0.txt", ALLOWED);
+        assert_eq!(state, Lifecycle::Escalated);
+        let first = engine.verdict_checkpoint(ORIGIN, AT, &key).expect("mint");
+        assert_eq!(first.tally.escalate, 1, "the first window publishes it");
+    }
+    // Session 2: one T-4e degraded admission (collector down, `FailOpen`), checkpoint 2. This
+    // reopen already folds checkpoint 1, so the escalate leg's `-` dies here in a debug build.
+    {
+        let (adapter, _counts, _world) = CommitAdapter::new("before");
+        let mut engine = Engine::open(
+            journal.clone(),
+            gate(PERMIT_ALL),
+            UnreachableEvidence::new("the collector is down"),
+        )
+        .expect("the chain reopens across its first published escalation")
+        .with_posture(FailPosture::FailOpen);
+        engine.register_adapter(Arc::new(adapter), "k6-fold-t4e");
+        let (_, state) = one_verdict(&mut engine, "/tmp/k6-fold-t4e-0.txt", ALLOWED);
+        assert_eq!(state, Lifecycle::Admitted, "T-4e admits under FailOpen");
+        let second = engine
+            .verdict_checkpoint(ORIGIN, Timestamp(AT.0 + 1), &key)
+            .expect("mint");
+        assert_eq!(
+            second.tally.unverdicted, 1,
+            "the second window publishes it"
+        );
+    }
+    // Session 3 (escalate leg, under measurement): the third window holds only its own.
+    {
+        let mut engine = Engine::open(journal.clone(), gate(PERMIT_ALL), InjectedEvidence::none())
+            .expect("the chain reopens across a published escalation and a published T-4e");
+        engine.register_adapter(Arc::new(StubAdapter::without_inverse()), "k6-fold-esc-2");
+        let (_, state) = one_verdict(&mut engine, "/tmp/k6-fold-esc-1.txt", ALLOWED);
+        assert_eq!(state, Lifecycle::Escalated);
+        let third = engine
+            .verdict_checkpoint(ORIGIN, Timestamp(AT.0 + 2), &key)
+            .expect("mint");
+        println!(
+            "K6_FOLD_ESC third_escalate={} third_total={}",
+            third.tally.escalate,
+            third.tally.total()
+        );
+        assert_eq!(
+            third.tally.escalate, 1,
+            "the reopened fold recovered the published escalation, so the window after the \
+             restart speaks for the one new escalation alone"
+        );
+        assert_eq!(third.tally.total(), 1, "and for nothing else");
+    }
+    // Session 4 (unverdicted leg, the same restart): the fourth window holds only its own.
+    {
+        let (adapter, _counts, _world) = CommitAdapter::new("before");
+        let mut engine = Engine::open(
+            journal,
+            gate(PERMIT_ALL),
+            UnreachableEvidence::new("the collector is down"),
+        )
+        .expect("the chain reopens a third time")
+        .with_posture(FailPosture::FailOpen);
+        engine.register_adapter(Arc::new(adapter), "k6-fold-t4e-2");
+        let (_, state) = one_verdict(&mut engine, "/tmp/k6-fold-t4e-1.txt", ALLOWED);
+        assert_eq!(state, Lifecycle::Admitted);
+        let fourth = engine
+            .verdict_checkpoint(ORIGIN, Timestamp(AT.0 + 3), &key)
+            .expect("mint");
+        println!(
+            "K6_FOLD_T4E fourth_unverdicted={} fourth_total={}",
+            fourth.tally.unverdicted,
+            fourth.tally.total()
+        );
+        assert_eq!(
+            fourth.tally.unverdicted, 1,
+            "the reopened fold recovered the published T-4e count, so the window after the \
+             restart speaks for the one new degraded admission alone"
+        );
+        assert_eq!(fourth.tally.total(), 1, "and for nothing else");
+    }
 }

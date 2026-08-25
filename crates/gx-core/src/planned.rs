@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The opaque planned-delta carrier M3 moves without interpreting.
 //!
 //! Spec: 42 §3.4 for what a `PlannedDelta` is, 41 §4 for the `GateInput` field that needs one,
@@ -6,8 +8,9 @@
 //! 41 §4 types `GateInput.planned` as `&'a PlannedDelta` and makes it one of the five fields a gate
 //! is handed; 42 §0 files `PlannedDelta` under `gx-substrate/delta.rs` -- M4. A gate that cannot be
 //! constructed until M4 is a gate M3 cannot build, which is exactly the shape M2 met with
-//! `Fingerprint`: 「M3-02(採用=案 a): `PlannedDelta` は E-M2-2 と同型の opaque 運搬型を gx-core に
-//! 置き M4 で解釈。`InvariantCheck` も同じ型を受ける」. So the ruling carries the payload bytes now
+//! `Fingerprint`: "M3-02 (adopted = option a): `PlannedDelta` puts an opaque carrier type of the
+//! same shape as E-M2-2 in gx-core and interprets it in M4. `InvariantCheck` takes the same type"
+//! (quoted in SEM-gx-core-074). So the ruling carries the payload bytes now
 //! and lets M4 supply the meaning, and the two carriers sit side by side in this crate rather than
 //! one of them being invented twice.
 
@@ -18,8 +21,9 @@ use core::fmt;
 /// # Why bytes and not a struct
 ///
 /// 42 §3.4 gives `PlannedDelta` three fields -- `substrate`, `payload`, `reference` -- of which
-/// 「`payload` ｜ adapter のみが解釈する **opaque な変更記述。core/gate/witness は byte 列としてのみ
-/// 扱う(P-6)**」. This type is that one field. The other two are not modelled and their absence is
+/// "`payload` | an **opaque change description that only the adapter interprets; core/gate/witness
+/// handle it only as a byte string (P-6)**" (quoted in SEM-gx-core-075). This type is that one
+/// field. The other two are not modelled and their absence is
 /// the point:
 ///
 /// * `substrate` is already on the gate's input twice over -- `GateInput.pre.substrate`
@@ -52,7 +56,8 @@ pub struct PlannedDeltaBytes(pub Vec<u8>);
 
 /// Opaque, like [`crate::FingerprintBytes`]'s and for a stronger reason: a `payload` is an
 /// adapter's own encoding of a change, so a `{:?}` of it in a log line is both unreadable and the
-/// one place where P-6's 「byte 列としてのみ扱う」 would quietly stop being true. The length is
+/// one place where P-6's "handled only as a byte string" (sem: SEM-gx-core-076) would quietly stop
+/// being true. The length is
 /// printed because the length is not the content, and a reader debugging an empty delta needs it.
 impl fmt::Debug for PlannedDeltaBytes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

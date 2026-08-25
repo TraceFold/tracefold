@@ -1,14 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-066 (NFR-003) — sustained commits per second over sixty seconds, measured and **recorded**.
 //!
-//! 34 AC-066 逐語: 「Given: `gx-cli`バッチsubmitまたは専用load generator。When: 60秒間の持続負荷試験を
-//! 実行する。Then: 単一ノード持続スループット ≥ 100 commits/s（p50/p99レイテンシとエラー率を併記）。」
-//! 33 NFR-003 adds why the number exists: 「redteam §3 adoption-physics attack（verify-before-commit
-//! taxがボトルネックになるという指摘）への定量反証材料」.
+//! 34 AC-066, verbatim: "Given: a `gx-cli` batch submit, or a dedicated load generator. When: a
+//! sixty-second sustained load test is run. Then: single-node sustained throughput ≥ 100 commits/s
+//! (p50/p99 latency and error rate stated alongside)." (quoted in SEM-gx-engine-063)
+//! 33 NFR-003 adds why the number exists: "quantitative rebuttal material against redteam §3's
+//! adoption-physics attack (the claim that the verify-before-commit tax becomes the bottleneck)"
+//! (quoted in SEM-gx-engine-063).
 //!
-//! # 「`gx-cli`バッチsubmit**または**専用load generator」 — the second one, because the first is M6
+//! # "a `gx-cli` batch submit **or** a dedicated load generator" (quoted in SEM-gx-engine-063) — the second one, because the first is M6
 //!
-//! `gx-cli` does not exist: req/78 N-01 keeps the CLI out of M5 (「CLI/HTTP を結線しない」) and 51 §15
-//! puts it in M6. The criterion's own 「または」 gives the alternative, and this file is it — a load
+//! `gx-cli` does not exist: req/78 N-01 keeps the CLI out of M5 ("do not wire up CLI/HTTP", quoted
+//! in SEM-gx-engine-063) and 51 §15 puts it in M6. The criterion's own "or" gives the alternative,
+//! and this file is it — a load
 //! generator in-process, driving the same eight transitions AC-065 drives, against the same fs
 //! adapter on the same tmpfs.
 //!
@@ -21,20 +26,20 @@
 //! # What is recorded, and what is not compared
 //!
 //! **M3-15** again: median + count + denominator, and no comparison with 100 commits/s. 33 marks that
-//! value 暫定 (ASM), so it is printed as a budget beside the measurement and the gate is 「measured and
-//! recorded」. `tools/ci.sh`'s bench stage fails on nothing here.
+//! value **provisional** (ASM), so it is printed as a budget beside the measurement and the gate is
+//! "measured and recorded" (quoted in SEM-gx-engine-064). `tools/ci.sh`'s bench stage fails on nothing here.
 //!
 //! Three things are printed rather than one, because 34 asks for three: throughput, the latency
 //! distribution (p50/p99, nearest-rank, with `n`) and the **error rate**. A load test that reported
 //! only a rate could be reporting a fast failure loop.
 //!
-//! # 🔴 Per-bucket, because 「持続」 is the claim
+//! # 🔴 Per-bucket, because "sustained" is the claim (sem: SEM-gx-engine-065)
 //!
 //! A sixty-second average hides a slope. The engine keeps every transformation it has seen in one
 //! table and 43 §8's conflict check walks it (`conflicting_predecessor`), so the cost of a commit at
 //! second 60 is not the cost at second 1 — and an average would report the mean of a line as if it
 //! were a level. So the run is bucketed by ten seconds and each bucket prints its own rate and its
-//! own p50/p99. 「持続スループット」 is a statement about the last bucket at least as much as about the
+//! own p50/p99. "sustained throughput" (quoted in SEM-gx-engine-066) is a statement about the last bucket at least as much as about the
 //! mean.
 //!
 //! The duration is `GLOVREX_BENCH_SECONDS` if set, and 60 otherwise — set for a smoke run, never for
@@ -51,7 +56,7 @@ use gx_adapter_fs::FsAdapter;
 use gx_engine::{Engine, InjectedEvidence, Lifecycle};
 use support::{gate, intent_for, measuring, report, signing_key, Sandbox, AT};
 
-/// 34 AC-066: 「60秒間の持続負荷試験」.
+/// 34 AC-066: "a sixty-second sustained load test" (quoted in SEM-gx-engine-067).
 const DEFAULT_SECONDS: u64 = 60;
 
 /// The bucket width. Six buckets over the default run, which is enough for a slope to be a shape
@@ -73,13 +78,15 @@ struct Attempt {
     committed: bool,
 }
 
-/// 🔴 **M5H7-3 採(b)** — how many directories the load generator spreads its subjects over.
+/// 🔴 **M5H7-3 adopted (b)** (sem: SEM-gx-engine-068) — how many directories the load generator spreads its subjects over.
 ///
 /// `0` (the default) is hand 7's generator exactly: every subject file, for the whole sixty
 /// seconds, in **one** directory. Hand 7 measured the rate falling 899.60 → 225.20 commits/s and
-/// listed three candidate causes, of which the third was 「load generator が単一 dir に 24,000 file
-/// を作る(=**engine ではなく計器**の性質)」. §44 ruled the cheap half first: 「まず load generator を
-/// dir shard に割った**対照実験**(候補③=計器の性質かどうかが 1 走で決まる・安い)」.
+/// listed three candidate causes, of which the third was "the load generator creates 24,000 files
+/// in a single dir (a property **of the instrument, not the engine**)" (quoted in
+/// SEM-gx-engine-069). §44 ruled on the cheap half first: "first, a **controlled experiment** that
+/// splits the load generator across dir shards (candidate ③ -- whether it is a property of the
+/// instrument is settled in one run, and it is cheap)".
 ///
 /// So the arm is a **fixture** knob and nothing else. `crates/gx-engine/src` is untouched by this
 /// experiment, and the two arms come out of one binary so that the comparison is not also a
@@ -166,7 +173,7 @@ fn sustained_load() {
     let shards = shards();
     println!(
         "AC066_LOAD_GENERATOR seconds={seconds} bucket={BUCKET:?} shards={shards} fs={} \
-         (in-process generator; `gx-cli` is M6 -- 34's 「または専用load generator」; shards=0 is \
+         (in-process generator; `gx-cli` is M6 -- 34's \"or a dedicated load generator\" (quoted in SEM-gx-engine-070); shards=0 is \
          hand 7's one-directory generator, which is M5H7-3 (b)'s control arm)",
         support::filesystem_of(sandbox.dir())
     );
@@ -267,7 +274,7 @@ fn engine(sandbox: &Sandbox) -> Engine<InjectedEvidence> {
 
 /// criterion's view of the same work, for 51 §9's regression detection.
 ///
-/// The sixty-second run answers 「持続スループット」 and is not comparable between machines or between
+/// The sixty-second run answers "sustained throughput" (quoted in SEM-gx-engine-071) and is not comparable between machines or between
 /// days; a criterion estimate of one commit is, which is why both exist. It is the same routine
 /// AC-065 measures — the difference between the two files is the question, not the code path.
 fn bench_one(c: &mut Criterion) {

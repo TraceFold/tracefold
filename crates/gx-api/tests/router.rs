@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! What the router serves, and what it deliberately does not.
 //!
-//! Hand 1 wrote this file to measure a **zero**: 「a crate that exists and does nothing is a crate a
+//! Hand 1 wrote this file to measure a **zero**: "a crate that exists and does nothing is a crate a
 //! reader has to rule out, so the zero is stated as a number the next hand has to change
-//! deliberately」. This is that hand, and the number is thirteen.
+//! deliberately" (sem: SEM-gx-api-325). This is that hand, and the number is thirteen.
 
 mod support;
 
@@ -17,11 +19,11 @@ use support::Server;
 ///
 /// # 🔴 The count req/88 §6.2 writes is **eleven** and this is thirteen (M6H5-1)
 ///
-/// 「44 §2 の同期面 11 endpoint(`/stream` と一覧系を除く全部)」. Fourteen minus `/stream` is thirteen,
-/// and 44 §2.7 says the list endpoints do not exist in 44 at all — 「本書指定のエンドポイント群には
-/// 一覧（list）系エンドポイントは含まれない」 — so M6-05's three are hand 6's **additions** and cannot
+/// "44 §2's synchronous face, 11 endpoints (everything except `/stream` and the list family)" (sem: SEM-gx-api-326). Fourteen minus `/stream` is thirteen,
+/// and 44 §2.7 says the list endpoints do not exist in 44 at all — "the endpoints this document
+/// specifies include no list-family endpoint" — so M6-05's three are hand 6's **additions** and cannot
 /// be subtracted from a count of 44's own rows. The parenthetical is the operative text; the numeral
-/// is an enumeration error, raised under 規律49's lane-side reconciliation.
+/// is an enumeration error, raised under discipline 49's lane-side reconciliation (sem: SEM-gx-api-327).
 #[test]
 fn all_fourteen_of_44s_rows_are_served_and_the_four_extensions_are_named() {
     println!(
@@ -51,7 +53,7 @@ fn all_fourteen_of_44s_rows_are_served_and_the_four_extensions_are_named() {
     for endpoint in EXTENSION_ENDPOINTS {
         assert!(
             !SPECIFIED_ENDPOINTS.contains(&endpoint),
-            "{endpoint} is an M6-05 extension (44 §2.6's 「新規エンドポイント」); 44 §2.7 says 44              specifies no list endpoints, so it may not be listed as one of 44's own"
+            "{endpoint} is an M6-05 extension (44 §2.6's \"new endpoint\"; sem: SEM-gx-api-328); 44 §2.7 says 44              specifies no list endpoints, so it may not be listed as one of 44's own"
         );
     }
     for endpoint in SPECIFIED_ENDPOINTS {
@@ -71,7 +73,7 @@ fn all_fourteen_of_44s_rows_are_served_and_the_four_extensions_are_named() {
 /// path would be a route that was declared in the list above and never wired — and what it proves
 /// about `/stream` is that hand 5's placeholder 404 is gone.
 ///
-/// Statuses are **not** asserted here beyond 「not 404」: that is what `endpoints.rs` is for, and a
+/// Statuses are **not** asserted here beyond "not 404" (sem: SEM-gx-api-329): that is what `endpoints.rs` is for, and a
 /// probe asserting both would be two claims one failure could not tell apart.
 #[tokio::test]
 async fn every_served_path_answers_including_stream_and_the_four_extensions() {
@@ -133,8 +135,8 @@ async fn every_served_path_answers_including_stream_and_the_four_extensions() {
         "thirteen of 44's fourteen (the fourteenth is `/stream`, below) plus M6-05's four extensions"
     );
 
-    // 🔴 `/stream` **is** routed now, and hand 5's claim here — 「a route that answered today would
-    // be four rulings made by accident」 — is invalidated deliberately: M6-05, M6-06, M6-12 and
+    // 🔴 `/stream` **is** routed now, and hand 5's claim here — "a route that answered today would
+    // be four rulings made by accident" (sem: SEM-gx-api-330) — is invalidated deliberately: M6-05, M6-06, M6-12 and
     // M6-13 are ruled in §47 and implemented in this hand. The assertion is on the header rather
     // than the body, because `send` drains what it reads and this body does not end (`stream.rs`
     // reads it a frame at a time).
@@ -149,7 +151,7 @@ async fn every_served_path_answers_including_stream_and_the_four_extensions() {
     assert_eq!(stream.status().as_u16(), 200);
 }
 
-/// `/v1` is the base path, and a request without it is not routed (44 §2: 「Base path: `/v1`」).
+/// `/v1` is the base path, and a request without it is not routed (44 §2: "Base path: `/v1`"; sem: SEM-gx-api-331).
 #[tokio::test]
 async fn the_base_path_is_v1() {
     let server = Server::new("router_base_path", "before\n");

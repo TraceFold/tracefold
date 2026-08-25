@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **I-1** applied to the second of the two projections M4 hand 3 creates: `Fingerprint`
 //! (42 §1.3, row 5).
 //!
-//! req/69 §6.0-5: 「M4 が作る射影は `PlannedDelta`(=`{substrate, payload}`・42 §1.3)と
-//! `Fingerprint`(=全 field)の **2 つ**で、いずれも A-10 形(canonical encode の map key 数 assert)+
-//! 「1 field だけ違う 2 値の digest が異なる」を全 field 分」. The delta half is
+//! req/69 §6.0-5: "the projections M4 creates are **two**: `PlannedDelta` (= `{substrate,
+//! payload}`, 42 §1.3) and `Fingerprint` (= all fields), both in A-10 shape (an assert on the
+//! canonical encode's map key count) + "two values differing in only one field have different
+//! digests", for every field" (sem: SEM-gx-canon-082). The delta half is
 //! `crates/gx-substrate/tests/planned_delta_identity.rs`; this is the fingerprint half, and it lives
 //! in gx-canon because the projection does -- **E-M4-1** put the type in gx-core, and the orphan
 //! rule puts every gx-core projection here.
@@ -22,7 +25,7 @@
 //! different scopes have different CIDs *and* no defined comparison at all, so a caller that reached
 //! for `compute(a) == compute(b)` to decide a CAS check would have replaced a refusal with a `false`,
 //! which is precisely the substitution E-M4-15 rejected. What the projection is for is the
-//! conformance harness: L3 and L4 need to say 「the state came back」 and 「the state moved」 about
+//! conformance harness: L3 and L4 need to say "the state came back" and "the state moved" (sem: SEM-gx-canon-083) about
 //! recorded values, and a digest is how a report carries one without holding the substrate.
 
 mod support;
@@ -121,7 +124,7 @@ fn the_fingerprint_projection_lands_on_the_wire_face() {
 /// adapter widen a scope past the object itself, so two fingerprints over the same digest and
 /// different scopes are two different statements about the world. A projection that carried only
 /// `digest` would identify them -- and a harness comparing recorded fingerprints would then report
-/// 「the state did not move」 across a scope change nobody agreed to.
+/// "the state did not move" (sem: SEM-gx-canon-084) across a scope change nobody agreed to.
 #[test]
 fn every_field_of_a_fingerprint_reaches_its_digest() {
     let baseline = digest_of(&base_fingerprint());

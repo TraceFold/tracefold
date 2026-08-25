@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-052**'s git third, and the case that decides whether a scope is a branch or a file.
 //!
-//! 34 AC-052 逐語: 「Given: fs/git/mcp各adapterについて可換な2delta…と非可換な2delta…。When:
-//! `adapter.commutation(a,b)`を呼ぶ。Then: 可換ペアで`Commutes`、非可換ペアで`Conflicts{residual}`（各
-//! adapter最低1組ずつ、**計6ケース**）。」 `req/38` §35 M4H6-9: 「AC-052 の行の完了は M7 の **6/6** 時」 —
+//! 34 AC-052, verbatim: "Given: for each fs/git/mcp adapter, a commuting pair of 2 deltas... and a non-commuting pair of 2 deltas.... When:
+//! `adapter.commutation(a,b)` is called. Then: for a commuting pair `Commutes`, for a non-commuting pair `Conflicts{residual}` (at least one pair per
+//! adapter, **6 cases total**)." `req/38` §35 M4H6-9: "AC-052's row is complete when M7 reaches **6/6**" -- (sem: SEM-gx-adapter-git-097)
 //! this file supplies the git pair (2 of the 6), and `gx-adapter-mcp` supplies the last two in hand 3.
 //!
 //! # 🔴 The case the fs adapter has no analogue for
@@ -22,7 +24,7 @@ use gx_core::Commutation;
 use gx_substrate::SubstrateAdapter;
 use support::{planned, reset_to, GitFixture, BRANCH, OTHER_BRANCH};
 
-/// **AC-052 (git, 可換)**: two changes on two branches.
+/// **AC-052 (git, commuting)**: two changes on two branches. (sem: SEM-gx-adapter-git-098)
 #[test]
 fn two_branches_commute() {
     let fixture = GitFixture::new();
@@ -36,7 +38,7 @@ fn two_branches_commute() {
     assert!(matches!(verdict, Commutation::Commutes));
 }
 
-/// **AC-052 (git, 非可換)**: two changes on one branch, with a residual that names the second.
+/// **AC-052 (git, non-commuting)**: two changes on one branch, with a residual that names the second. (sem: SEM-gx-adapter-git-099)
 #[test]
 fn one_branch_conflicts_and_the_residual_names_the_second_delta() {
     let fixture = GitFixture::new();
@@ -50,8 +52,8 @@ fn one_branch_conflicts_and_the_residual_names_the_second_delta() {
     let Commutation::Conflicts { residual } = verdict else {
         panic!("two changes to one branch are not parallel-independent");
     };
-    // **M4-14**: 「residual CID が test harness 内で解決可能」. There is no delta store here, so 「解決
-    // 可能」 means the reference has a referent somebody holds — and it does: it is `b`, which the
+    // **M4-14**: "the residual CID is resolvable within the test harness". There is no delta store here, so "resolvable"
+    // means the reference has a referent somebody holds -- and it does: it is `b`, which the (sem: SEM-gx-adapter-git-100)
     // caller passed in (**E-M4-8** keeps the payload).
     assert_eq!(
         &residual,
@@ -109,7 +111,7 @@ fn the_verdict_is_symmetric_and_a_delta_conflicts_with_itself() {
         assert!(agree);
     }
 
-    // **M4-25 採(a)**: the reflexive case is `Conflicts`, which is the conservative side.
+    // **M4-25, adopted (a)**: the reflexive case is `Conflicts`, which is the conservative side. (sem: SEM-gx-adapter-git-101)
     let self_verdict = adapter.commutation(&a, &a).expect("comparable");
     println!("L6_GIT_REFLEXIVE {self_verdict:?}");
     assert!(matches!(self_verdict, Commutation::Conflicts { .. }));
@@ -195,7 +197,8 @@ fn an_unborn_branch_has_no_inverse_and_says_so_with_ok_none() {
     let answer = fixture
         .adapter()
         .invert(&delta, &pre)
-        .expect("the question is answerable");
+        .expect("the question is answerable")
+        .into_inverse();
     println!("GIT_OK_NONE is_none={}", answer.is_none());
     assert!(
         answer.is_none(),

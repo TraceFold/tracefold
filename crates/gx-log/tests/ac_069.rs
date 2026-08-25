@@ -1,11 +1,13 @@
-//! AC-069 (NFR-009) — an append that answered 「ok」 is on the disk.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! AC-069 (NFR-009) — an append that answered "ok" (sem: SEM-gx-log-134) is on the disk.
 //!
-//! AC-069 逐語 (34 §K): 「Given: `ledger.append`呼び出し。When: 成功応答を返した直後に電源断/
-//! プロセスkillをシミュレートする。Then: 再起動後に該当entryが必ず存在する（fsync-on-append）。」
-//! NFR-009 逐語 (33 §2): 「`ledger.append`は成功応答を返す前に基盤ストレージへfsyncを完了する
-//! （fsync-on-append）」.
+//! AC-069 verbatim (34 §K): "Given: a call to `ledger.append`. When: a power cut / process kill is
+//! simulated immediately after a success response is returned. Then: after restart, the entry is
+//! necessarily present (fsync-on-append)." NFR-009 verbatim (33 §2): "`ledger.append` completes an
+//! fsync to the underlying storage before returning a success response (fsync-on-append)". (sem: SEM-gx-log-135)
 //!
-//! # What 「電源断/プロセスkill」 can and cannot be simulated here
+//! # What "power cut / process kill" (sem: SEM-gx-log-136) can and cannot be simulated here
 //!
 //! Dropping the store and opening the file again is a **process kill**, not a power cut, and the
 //! difference is the whole of what makes this file weaker than it reads. A killed process loses
@@ -36,7 +38,7 @@ use support::{cid, code_hits, code_lines, scratch, source, tid};
 
 /// Append `n` entries to a fresh store at `path` and return what each successful call returned.
 ///
-/// The store is dropped before this returns, which is the 「プロセスkill」 of AC-069 as far as a
+/// The store is dropped before this returns, which is the "process kill" (sem: SEM-gx-log-137) of AC-069 as far as a
 /// single-process test can stage it.
 fn fill(path: &std::path::Path, n: u64) -> Vec<gx_log::LedgerEntry> {
     let mut store = LedgerStore::open(path).expect("open the ledger");
@@ -120,7 +122,7 @@ fn ac_069_a_reopened_ledger_still_proves_inclusion() {
 
 /// A write that was cut in half is discarded, and the ledger opens.
 ///
-/// This is 批8's 「torn-write は不一致 tail を truncate して復旧」 as a case: a header that promises
+/// This is batch 8's "a torn write recovers by truncating the mismatched tail" (sem: SEM-gx-log-138) as a case: a header that promises
 /// 40 bytes followed by 10 is exactly what a crash between two `write` calls leaves.
 #[test]
 fn ac_069_a_torn_tail_is_discarded_and_the_ledger_still_opens() {
@@ -226,12 +228,12 @@ fn ac_069_damage_in_the_middle_truncates_from_there() {
 
 /// A length header that asks for more than the reader will ever hold is a torn tail (**A-1**).
 ///
-/// A-1 逐語 (`req/38_ERRATA_2026-08-07.md` §18, adopted as a required DoD of M3's first hand):
-/// 「replay の `MAX_RECORD_BYTES` 検査を守る fixture 1 本(`0xFFFFFFFF` header→確保せず torn tail
-/// 切り)。M4 変異が生存した=store.rs 自身の主張を守る test が 0 という具体穴」.
+/// A-1 verbatim (`req/38_ERRATA_2026-08-07.md` §18, adopted as a required DoD of M3's first hand):
+/// "one fixture that guards replay's `MAX_RECORD_BYTES` check (a `0xFFFFFFFF` header -> a torn tail
+/// cut without allocating). An M4 mutant survived = a concrete hole: zero tests guard store.rs's own claim" (sem: SEM-gx-log-139).
 ///
-/// `store.rs` says the ceiling exists so that 「four corrupted bytes ask for a four-gigabyte
-/// allocation before anything has had a chance to refuse them」. What this half asserts is the
+/// `store.rs` says the ceiling exists so that "four corrupted bytes ask for a four-gigabyte
+/// allocation before anything has had a chance to refuse them" (sem: SEM-gx-log-140). What this half asserts is the
 /// behaviour that claim implies and that a caller can see: the three good records survive, the
 /// four bytes that make the impossible promise are removed from the file, and the store opens.
 /// It does **not** assert that no allocation happened -- see the static half below for why that
@@ -281,7 +283,7 @@ fn ac_069_a_length_header_over_the_ceiling_is_a_torn_tail() {
 /// this one fails (M3 hand 1, `req/61`). Saying which half proves which is the point (req/29 §4,
 /// and the M4 mutation of req/58 §2.13 that survived every existing suite).
 ///
-/// The claim 「確保せず」 is an ordering between two lines, so an ordering is what is checked --
+/// The claim "without allocating" (sem: SEM-gx-log-141) is an ordering between two lines, so an ordering is what is checked --
 /// exactly the shape of `ac_069_the_entry_becomes_visible_only_after_the_barrier` one screen down.
 #[test]
 fn ac_069_the_record_ceiling_is_consulted_before_the_buffer_is_allocated() {
@@ -349,7 +351,7 @@ fn ac_069_an_absent_file_opens_as_an_empty_ledger() {
 /// This is the assertion that goes RED when the `fsync` is removed, and it is a source scan rather
 /// than a behaviour because no behaviour visible to this process can tell a build that calls
 /// `fsync` from one that does not (see the module docs). `tools/verify_m2h3.sh` performs that
-/// removal and checks that this test fails -- the check of the check (req/36's 偽 PASS 変異 table,
+/// removal and checks that this test fails -- the check of the check (req/36's false-PASS mutant table, (sem: SEM-gx-log-142)
 /// same discipline).
 #[test]
 fn ac_069_the_durability_barrier_has_exactly_one_call_site() {
@@ -374,7 +376,7 @@ fn ac_069_the_durability_barrier_has_exactly_one_call_site() {
 
 /// The barrier is crossed *before* the entry becomes visible.
 ///
-/// NFR-009 is an ordering (「成功応答を返す前に fsync を完了する」), and an ordering is not checked
+/// NFR-009 is an ordering ("completes the fsync before returning a success response") (sem: SEM-gx-log-143), and an ordering is not checked
 /// by the presence of a call. `append` stages the entry, writes it, syncs, and only then commits
 /// it to the tree; if those two lines were swapped, a caller could read an entry back out of a
 /// log whose bytes were still in a buffer.

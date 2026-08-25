@@ -1,0 +1,14 @@
+{
+  "create_or_update_file": {
+    "restored_by": "create_or_update_file",
+    "arguments": {
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "path": { "forward": "path" },
+      "branch": { "forward": "branch" },
+      "message": { "const": "gx undo: restore the prior contents (A2 tool-aware invert, req/153)" },
+      "content": "prior_contents_utf8",
+      "sha": { "git_blob_sha1_of_forward": "content" }
+    }
+  }
+}

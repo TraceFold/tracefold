@@ -1,20 +1,29 @@
-//! **M4-14** — a `Conflicts{residual}` names a delta, and 「名指す」 has to mean something.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! **M4-14** — a `Conflicts{residual}` names a delta, and "naming" has to mean something. (sem:
+//! SEM-gx-substrate-conformance-114, SEM-gx-substrate-conformance-115, SEM-gx-substrate-conformance-116,
+//! SEM-gx-substrate-conformance-117, SEM-gx-substrate-conformance-118, SEM-gx-substrate-conformance-119,
+//! SEM-gx-substrate-conformance-120)
 //!
-//! req/38 §28 M4-14 逐語: 「41 §3 の `Conflicts{residual: DeltaRef}` 形は**不変**。E-M4-8 の保管行が
-//! residual 本体(adapter が鋳造する `PlannedDelta`)も覆う=「指し先の無い CID」は保管義務違反として排除。
-//! 手6 に「residual CID が test harness 内で解決可能」の判別 test」.
+//! req/38 §28 M4-14, verbatim: "41 §3's `Conflicts{residual: DeltaRef}` shape is **immutable**.
+//! E-M4-8's storage row also covers the residual body (the `PlannedDelta` the adapter mints) too = a
+//! 'CID with no destination to point to' is excluded as a storage-obligation violation. Hand 6 gets a
+//! discriminating test for 'the residual CID resolves inside the test harness'".
 //!
-//! req/69 §6.2 gives hand 3 「形だけ」 of that test, because there is no store to resolve against: the
+//! req/69 §6.2 gives hand 3 "only the shape" of that test, because there is no store to resolve
+//! against: the
 //! delta store is the engine's and the engine is M5. So what is here is the **question**, asked
 //! through [`Fixture::resolve`] over a mock that keeps what it minted -- and the negative case, which
 //! is what stops the question from being rhetorical.
 //!
 //! # Why a CID with no referent is a defect rather than a shrug
 //!
-//! `Commutation::Conflicts` carries a `DeltaRef`, and 42 §3.6 calls the residual 「独立でない部分」. An
+//! `Commutation::Conflicts` carries a `DeltaRef`, and 42 §3.6 calls the residual "the non-independent
+//! part". An
 //! engine that met one has two jobs: stop (43 §8), and tell the operator what clashed. The second is
 //! only possible if the reference resolves. 42 §5's storage table had no row for a `PlannedDelta`
-//! body at all until **E-M4-8** added one -- 「`PlannedDelta.payload` は**保管する(必須)**」 -- and
+//! body at all until **E-M4-8** added one -- "`PlannedDelta.payload` is **stored (mandatory)**" --
+//! and
 //! M4-14 reads that row as covering the residual too. This file is the smallest measurement of that
 //! reading.
 
@@ -30,7 +39,7 @@ fn a_residual_cid_resolves_to_the_delta_it_names() {
     let fixture = MockFixture::new();
     let (a, b) = fixture
         .conflicting_pair()
-        .expect("the mock supplies 51 §7's 非可換 case");
+        .expect("the mock supplies 51 §7's non-commuting case");
 
     let residual = match fixture
         .adapter()
@@ -81,7 +90,7 @@ fn a_reference_nobody_minted_does_not_resolve() {
     };
     assert!(
         fixture.resolve(&invented).is_none(),
-        "the fixture resolved a CID it never minted; 「解決可能」 would then be a property of the \
+        "the fixture resolved a CID it never minted; \"resolvable\" would then be a property of the \
          lookup rather than of the store"
     );
 }

@@ -1,8 +1,10 @@
-//! 🔴 **M6-07 採(b) / M5H8-16** — the subject index, and the oracle that says it answers the same
-//! question the full scan answered.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-07, adopted (b) / M5H8-16** -- the subject index, and the oracle that says it answers the same
+//! question the full scan answered. (sem: SEM-gx-engine-905)
 //!
-//! > **M5H8-16**: `conflicting_predecessor` の subject 索引は M6 reqdef の発火条件(長寿命 engine=
-//! > `gx serve` が表を実際に育てる時)
+//! > **M5H8-16**: `conflicting_predecessor`'s subject index is M6's reqdef firing condition (a
+//! > long-lived engine -- when `gx serve` actually grows the table) (sem: SEM-gx-engine-906)
 //!
 //! §47 fixed the order — measure the decay through `gx serve` first, then index, then re-measure —
 //! and `req/95` carries both halves of that measurement. What this file carries is the part a
@@ -10,12 +12,12 @@
 //! two answers are two things that drift.**
 //!
 //! So every probe here is an equality between the index and a full scan, driven through the public
-//! surface only. There is no probe asserting 「the index is fast」: speed is `req/95`'s table, and a
+//! surface only. There is no probe asserting "the index is fast" (sem: SEM-gx-engine-907): speed is `req/95`'s table, and a
 //! suite that asserted a duration would be a flaky test about a machine.
 //!
 //! # What the index is *not*
 //!
-//! Not part of Σ. Like `Engine::resolved` (M6-02 採(a)) it is derived from the state table and lives
+//! Not part of Σ. Like `Engine::resolved` (M6-02, adopted (a)) (sem: SEM-gx-engine-908) it is derived from the state table and lives
 //! and dies with it, so `Engine::open` starts it empty exactly as it starts the table empty (M5H3-5:
 //! the in-flight table is empty after a restart). A probe asserts that too — an index that survived a
 //! restart the table did not would be an index describing rows that are gone.
@@ -106,7 +108,7 @@ fn the_index_answers_what_a_full_scan_answers() {
     println!("SUBJECT_INDEX subjects={} rows={indexed}", scan.len());
 }
 
-/// 🔴 A subject the table has never seen answers **empty**, not 「every row」.
+/// 🔴 A subject the table has never seen answers **empty**, not "every row" (sem: SEM-gx-engine-909).
 ///
 /// The failure this refuses is the one an index makes possible: a lookup that misses and falls back
 /// to scanning the whole table would still be *correct*, would reintroduce exactly the cost the
@@ -176,7 +178,7 @@ fn a_predecessor_on_the_same_subject_still_blocks() {
     assert_eq!(
         state,
         Lifecycle::Candidate,
-        "a blocked row stays a Candidate (43 §8: 新たな状態は追加しない)"
+        "a blocked row stays a Candidate (43 §8: no new state is added) (sem: SEM-gx-engine-910)"
     );
     let subject = engine.transformation(&a).expect("a exists").subject;
     let mut on = engine.transformations_on(&subject);
@@ -268,5 +270,82 @@ fn a_rehydrated_row_is_in_the_index() {
         engine.transformations_on(&subject),
         vec![id],
         "the rehydrated row reached the table and not the index"
+    );
+}
+
+/// 🔴 K6 mutant-kill (`verify`'s 43 §8 re-evaluation, staging pipeline.rs:1915:58 `== -> !=`,
+/// mutants run e, `req/38` §73): a blocked row whose blocker **committed** is refused, because
+/// its `Fingerprint₀` is stale and 43 §8 forces the re-plan.
+///
+/// > 43 §8: "when `T1` reaches a terminal ... state, `T2` is re-evaluated: if `T1` is `Committed`,
+/// > `T2`'s `Fingerprint₀` is stale, so a re-`plan()` (a re-fingerprint) is forced" (sem: SEM-gx-engine-911)
+///
+/// The suite's existing conflict probes stop at "b is blocked" (sem: SEM-gx-engine-911) or commit nothing, so the
+/// comparison against `Some(Lifecycle::Committed)` was never on the failing side of an assert:
+/// rewritten to `!=`, the refusal fires for a blocker that is *not* committed and waves the one
+/// stale row through. Here the blocker commits and the blocked row's verify must be an error.
+#[test]
+fn a_blocked_row_is_refused_after_its_blocker_commits() {
+    let dir = scratch("subject_index_blocked_commit");
+    let mut engine = Engine::open(
+        dir.join("journal.bin"),
+        gate(PERMIT_ALL),
+        InjectedEvidence::none(),
+    )
+    .expect("a fresh journal opens");
+    let (adapter, _counts, _world) = CommitAdapter::new("before");
+    engine.register_adapter(Arc::new(adapter.conflicting()), "commit-adapter-1");
+
+    let first = intent("/tmp/subject-index/stale.txt", "after-one");
+    engine.submit(&first, 1, AT).expect("submit");
+    let a = engine.plan(&first, AT).expect("plan a");
+    let second = intent("/tmp/subject-index/stale.txt", "after-two");
+    engine.submit(&second, 2, AT).expect("submit");
+    let b = engine.plan(&second, AT).expect("plan b");
+
+    engine
+        .verify(&a, AT, &signing_key(), None)
+        .expect("verify a");
+    engine
+        .verify(&b, AT, &signing_key(), None)
+        .expect("verify b (blocked, still a Candidate)");
+    assert_eq!(engine.blocked_by(&b), Some(a), "the premise: b waits on a");
+
+    engine.canonicalize(&a, AT, None).expect("T-8");
+    engine.commit(&a, AT, &signing_key()).expect("T-11");
+
+    let refused = engine
+        .verify(&b, AT, &signing_key(), None)
+        .expect_err("43 §8: the blocker committed, so the blocked row's fingerprint is stale");
+    println!("BLOCKED_AFTER_COMMIT_REFUSAL={refused:?}");
+    assert!(
+        matches!(refused, gx_engine::Error::InvalidState { .. }),
+        "the refusal forces a re-plan rather than answering a verdict: {refused:?}"
+    );
+}
+
+/// 🔴 K6 mutant-kill (`seat`'s re-seat comparison, staging pipeline.rs:1404:25 `!= -> ==`,
+/// mutants run e, `req/38` §73), **as a scan** — for Λ4's reason: no reachable input exercises
+/// the difference.
+///
+/// The removal arm runs only when one `TransformationId` is seated under two different
+/// subjects, and content addressing forecloses that: all four doors into the table derive or
+/// re-verify the id from the seated row's own content (`plan` computes it, `plan`'s rehydrating
+/// branch equates it with `resolved`'s record, `undo` computes it, `rehydrate_committed`
+/// re-identifies and refuses a mismatch), and `subject` is a field of that content (42 §1.3).
+/// Same id ⟹ same subject, short of a CID collision — so the guard's two readings agree on
+/// every reachable seat, run e caught no probe, and none can be written. The scan pins the
+/// comparison so the equivalent mutant dies in the next run instead of resurfacing as noise.
+#[test]
+fn a_re_seat_compares_subjects_and_not_a_constant() {
+    let source = support::read_repo("crates/gx-engine/src/pipeline.rs");
+    let hits = source
+        .matches("if previous != entry.transformation.subject {")
+        .count();
+    println!("RESEAT_GUARD_HITS={hits}");
+    assert_eq!(
+        hits, 1,
+        "the re-seat guard compares the two subjects (and moves the id between buckets only \
+         when they differ), rather than reading a constant"
     );
 }

@@ -1,16 +1,25 @@
-//! **E-M4-28** — gx-substrate's own error vocabulary, in the E-M2-23 form.
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! **E-M4-28** — gx-substrate's own error vocabulary, in the E-M2-23 form. (sem:
+//! SEM-gx-substrate-126, SEM-gx-substrate-127, SEM-gx-substrate-128, SEM-gx-substrate-129,
+//! SEM-gx-substrate-130, SEM-gx-substrate-131, SEM-gx-substrate-132, SEM-gx-substrate-133,
+//! SEM-gx-substrate-134, SEM-gx-substrate-135, SEM-gx-substrate-136, SEM-gx-substrate-137,
+//! SEM-gx-substrate-138, SEM-gx-substrate-139, SEM-gx-substrate-140)
 //!
-//! `req/38_ERRATA_2026-08-07.md` §30 M4H2-2 採(a) 逐語: 「`gx_substrate::Error`+`Result` を宣言(repo 5
-//! crate の先例どおり)・E-M2-23 形の語彙表を同時に(1 箇所宣言+突合 test+`_` 腕なし kind)・
-//! `From<gx_core::Error>` で下層の拒否を包む。**手4 でなく手3 冒頭**にするのは、conformance harness を
-//! 誤った Result 型の上に建ててから差し替える手戻りを避けるため」.
+//! `req/38_ERRATA_2026-08-07.md` §30 M4H2-2, adopted (a), verbatim: "declare `gx_substrate::Error`+
+//! `Result` (as the repo's 5 other crates already do); the E-M2-23-shaped vocabulary table at the
+//! same time (one declaration + a cross-check test + `kind` with no `_` arm); wrap the lower layer's
+//! refusal with `From<gx_core::Error>`. Putting it **at the start of hand 3 rather than hand 4** is
+//! to avoid the rework of building the conformance harness on the wrong `Result` type and then
+//! swapping it out".
 //!
 //! # The layer split this file is really about
 //!
-//! §30 states it as a rule about who owns which failure: 「外界の失敗(「読めなかった」)は adapter 層の
-//! 語彙・引数の拒否は gx-core の語彙、という**層の分離が 41 §6 の実装形**」. gx-core's own documentation
-//! says the same thing from the other side -- 「The crate does no I/O (41 §6), so there is no error
-//! here that comes from the outside world -- every variant is a rejected argument」 -- which is why
+//! §30 states it as a rule about who owns which failure: "a failure of the outside world ('could not
+//! be read') is the adapter layer's vocabulary; a rejected argument is gx-core's vocabulary -- **that
+//! layer split is 41 §6's implementation form**". gx-core's own documentation says the same thing
+//! from the other side -- "The crate does no I/O (41 §6), so there is no error here that comes from
+//! the outside world -- every variant is a rejected argument" -- which is why
 //! hand 2 could compile a trait against `gx_core::Result` and still not have a type an fs adapter
 //! could report a missing file with (req/71 §2 M4H2-2).
 //!
@@ -102,7 +111,7 @@ fn variants_of(source: &str, name: &str) -> Vec<String> {
 fn table_in_source(source: &str, name: &str) -> Vec<String> {
     let needle = format!("pub const {name}: [&str; ");
     let after = source.split(&needle).nth(1).unwrap_or_else(|| {
-        panic!("gx-substrate's `src/` does not declare `{needle}..]` (E-M2-23 の 1 箇所宣言)")
+        panic!("gx-substrate's `src/` does not declare `{needle}..]` (E-M2-23's one-place declaration)")
     });
     let body = after
         .split_once('[')
@@ -197,10 +206,11 @@ fn the_kind_function_is_exhaustive_without_a_wildcard() {
 
 /// The lower layer's refusals are wrapped rather than restated.
 ///
-/// **E-M4-28** 逐語: 「`From<gx_core::Error>` で下層の拒否を包む」. Two halves. The conversion exists,
+/// **E-M4-28**, verbatim: "wrap the lower layer's refusal with `From<gx_core::Error>`". Two halves.
+/// The conversion exists,
 /// so an adapter writing `snap.locator().parse()?` carries a gx-core refusal outward unchanged; and
 /// no variant of this enum re-spells one, which is what would make the two vocabularies overlap and
-/// leave a caller unable to tell 「the argument was wrong」 from 「the world would not answer」.
+/// leave a caller unable to tell "the argument was wrong" from "the world would not answer".
 #[test]
 fn the_lower_layers_refusals_are_wrapped_and_not_restated() {
     let source = error_rs();
@@ -227,8 +237,9 @@ fn the_lower_layers_refusals_are_wrapped_and_not_restated() {
     );
     assert!(
         overlap.is_empty(),
-        "these names are in both vocabularies: {overlap:?}. 41 §6's layer split (§30: 「外界の失敗は \
-         adapter 層の語彙・引数の拒否は gx-core の語彙」) is only real while the two tables are \
+        "these names are in both vocabularies: {overlap:?}. 41 §6's layer split (§30: \"a failure of \
+         the outside world is the adapter layer's vocabulary; a rejected argument is gx-core's \
+         vocabulary\") is only real while the two tables are \
          disjoint"
     );
 }
@@ -236,7 +247,8 @@ fn the_lower_layers_refusals_are_wrapped_and_not_restated() {
 /// Every variant is the vocabulary for a failure some trait method documents.
 ///
 /// The A-10 shape applied to a vocabulary: a table that grows a variant nobody's `# Errors` section
-/// asks for is 52 契約 2's 「要件外機能の追加」 at the size of one enum. `error.rs` carries the mapping
+/// asks for is 52 contract 2's "adding a feature outside the requirements" at the size of one enum.
+/// `error.rs` carries the mapping
 /// as a table -- one row per variant, naming the method whose documented failure it spells -- and
 /// this reads the mapping back and checks the two agree.
 #[test]
@@ -294,7 +306,7 @@ fn every_variant_is_the_vocabulary_of_a_documented_failure() {
     assert_eq!(
         rows, variants,
         "the variant-to-method table and the enum disagree; a variant with no documented failure \
-         behind it is a word nobody has to say (52 契約 2)"
+         behind it is a word nobody has to say (52 contract 2)"
     );
 }
 
@@ -317,8 +329,8 @@ fn the_exported_table_is_the_declared_one() {
     );
 }
 
-/// A gx-core refusal crosses the boundary as itself (**E-M4-28**: 「`From<gx_core::Error>` で下層の
-/// 拒否を包む」).
+/// A gx-core refusal crosses the boundary as itself (**E-M4-28**: "wrap the lower layer's refusal
+/// with `From<gx_core::Error>`").
 ///
 /// Both halves of what wrapping means. The conversion exists and is reachable through `?`, and the
 /// message is not rewritten on the way -- `#[error(transparent)]`, so an adapter author reading a
@@ -366,8 +378,8 @@ fn every_variant_answers_with_a_kind_the_table_holds() {
             detail: "no canonical form".to_string(),
         },
         // M4 hand 6's ninth and tenth. **E-M4-32** separates a mis-wired call from a state with no
-        // inverse, and **M4H5-5 採(b)** separates 「the argument is not a position」 from 「the delta
-        // could not be applied」 -- both of them the same refusal to let a defect wear a business
+        // inverse, and **M4H5-5, adopted (b)**, separates "the argument is not a position" from "the
+        // delta could not be applied" -- both of them the same refusal to let a defect wear a business
         // condition's face that E-M4-27 made about `cas_eq`.
         Error::LocatorMismatch {
             expected: "/tmp/x".to_string(),
@@ -377,10 +389,10 @@ fn every_variant_answers_with_a_kind_the_table_holds() {
             locator: "relative/x".to_string(),
             normalised: "relative/x".to_string(),
         },
-        // M4 hand 4's eighth. An adapter built one hand at a time has to be able to say 「not yet」
+        // M4 hand 4's eighth. An adapter built one hand at a time has to be able to say "not yet"
         // as a value -- the variant's own documentation says why the three alternatives (panic, a
         // borrowed variant, an invented `Ok`) are each worse -- and the conformance harness reads
-        // exactly this one to report 「無い」 rather than 「落ちた」 (§31 M4H3-4 (b)).
+        // exactly this one to report "NOT_SUPPLIED" rather than "failed" (§31 M4H3-4 (b)).
         Error::Unimplemented {
             method: "apply".to_string(),
             detail: "M4 hand 5 supplies it".to_string(),
@@ -401,9 +413,10 @@ fn every_variant_answers_with_a_kind_the_table_holds() {
 
 /// The vocabulary is **ten** words, and the two hand 6 added are the two the rulings named.
 ///
-/// req/38 §33 逐語: **E-M4-32** 「新 variant **`LocatorMismatch{expected, got}`**(語彙表更新・E-M2-23
-/// 計器準拠)」 and **M4H5-5 採(b)** 「**`NotAPosition`** variant を追加…手6 冒頭・語彙表 8→10(E-M4-32 分
-/// と合わせて)」.
+/// req/38 §33, verbatim: **E-M4-32** "new variant **`LocatorMismatch{expected, got}`** (a
+/// vocabulary-table update, compliant with the E-M2-23 instrument)" and **M4H5-5, adopted (b)**,
+/// "add the **`NotAPosition`** variant ... at the start of hand 6; the vocabulary table goes 8->10
+/// (together with E-M4-32's share)".
 ///
 /// The count is asserted because the scans above are **relative**: they say the enum, the table and
 /// `kind` agree with each other, which they would also do if a variant had been dropped. Two rulings
@@ -422,7 +435,7 @@ fn the_vocabulary_is_the_ten_words_two_rulings_left_it() {
         declared.len(),
         10,
         "§33 puts the vocabulary at ten: eight from hands 3-5, plus `LocatorMismatch` (E-M4-32) and \
-         `NotAPosition` (M4H5-5 採(b))"
+         `NotAPosition` (M4H5-5, adopted (b))"
     );
     for word in ["LocatorMismatch", "NotAPosition"] {
         assert!(
@@ -434,9 +447,9 @@ fn the_vocabulary_is_the_ten_words_two_rulings_left_it() {
 
 /// Every refusal carries the value that makes it diagnosable.
 ///
-/// gx-core's `OrderExceeded` carries the order 「so a caller can report the ceiling it actually hit」,
-/// and the same reason applies one layer up: an adapter author reading 「the substrate would not
-/// answer」 needs to see *which* locator, and an engine author reading `ForeignDelta` needs to see
+/// gx-core's `OrderExceeded` carries the order "so a caller can report the ceiling it actually hit",
+/// and the same reason applies one layer up: an adapter author reading "the substrate would not
+/// answer" needs to see *which* locator, and an engine author reading `ForeignDelta` needs to see
 /// which two substrates. A message that only names the class is a message that sends the reader back
 /// to the code.
 #[test]

@@ -1,16 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The shape of the commit critical section: what `src/` must contain, in what order, and what it
 //! must contain **once**.
 //!
 //! Spec: 43 §3 T-9..T-11 for the transitions, 43 §7 for journal-first and the one place it is
 //! reversed, 42 §3.10 for the receipt and §3.11 for the ledger. req/38 §37 rules M5-24 (`cas_eq`'s
 //! `Err`) and M5-25 (the `Provenance` producer); §40 rules M5H3-4 (the frontier and the root) and
-//! 規律48 (an intermediate stop where a terminal record repairs an earlier one).
+//! discipline 48 (sem: SEM-gx-engine-643) (an intermediate stop where a terminal record repairs an earlier one).
 //!
 //! # Why this suite is scans and not only runs
 //!
 //! Three of hand 4's obligations are **absences or singletons**, and a run cannot see either:
 //!
-//! * 則 2 — 「`adapter.apply` の呼び出し箇所は engine 全体で **1 箇所**」. A counting adapter says how
+//! * Rule 2 -- "the call site of `adapter.apply` is **exactly one place** across the whole engine" (sem: SEM-gx-engine-644). A counting adapter says how
 //!   many times a call was made in one scenario; it cannot say how many roads exist.
 //! * **E-M5-1** — every apply is preceded by an `ApplyStarted`. A run measures the pair it walked;
 //!   the scan measures the pairing.
@@ -82,7 +84,7 @@ fn commit_body(text: &str) -> Vec<&str> {
     // 🔴 M5 hand 5 moved this boundary. `apply_once` used to be the next function after `commit`;
     // 43 §7's recovery now sits between them, and it walks the same road (`self.apply_once`) and
     // writes the same record (`ApplyStarted`). Leaving the end at `apply_once` silently widened
-    // every probe below from 「what `commit` does」 to 「what `commit` and the recovery do」, and the
+    // every probe below from "what `commit` does" to "what `commit` and the recovery do" (sem: SEM-gx-engine-645), and the
     // counts moved from two to three without any of the sentences changing. The recovery's own
     // ordering is `tests/crash_recovery.rs`'s claim; this file stays about the critical section.
     let end = first(&lines, |l| l.starts_with("pub fn recover("))
@@ -102,13 +104,12 @@ fn every(lines: &[&str], needle: &str) -> Vec<usize> {
 }
 
 // ---------------------------------------------------------------------------
-// 則 2 -- one road to the substrate
+// Rule 2 (sem: SEM-gx-engine-646) -- one road to the substrate
 // ---------------------------------------------------------------------------
 
-/// 🔴 **則 2**: `adapter.apply` is invoked from exactly one line in the whole crate.
+/// 🔴 **Rule 2** (sem: SEM-gx-engine-647): `adapter.apply` is invoked from exactly one line in the whole crate.
 ///
-/// req/78 §3.3: 「**則 2(`S` への道は 1 本)**: `adapter.apply` の呼び出し箇所は engine 全体で **1
-/// 箇所**でなければならない」, and AC-035's 「モック呼び出しカウンタ」 is the other instrument.
+/// req/78 §3.3: "**Rule 2 (one road to `S`)**: the call site of `adapter.apply` **must be exactly one place** across the whole engine" (sem: SEM-gx-engine-647), and AC-035's "mock call counter" is the other instrument.
 ///
 /// The claim is about *roads*, not about *walks*. Hand 4's rollback (43 T-10c) applies the escrowed
 /// inverse, which is a second walk down the same road: both go through `Engine::apply_once`, so the
@@ -128,7 +129,7 @@ fn adapter_apply_is_invoked_from_one_line_in_the_crate() {
     assert_eq!(
         sites.len(),
         1,
-        "則 2: the engine has one road to a substrate write, and these are the lines that write \
+        "Rule 2 (sem: SEM-gx-engine-648): the engine has one road to a substrate write, and these are the lines that write \
          one: {sites:?}"
     );
     assert!(
@@ -140,7 +141,7 @@ fn adapter_apply_is_invoked_from_one_line_in_the_crate() {
 /// 🔴 **E-M5-1**: the `ApplyStarted` record is appended **before** the call it describes.
 ///
 /// 43 §7's write-ahead rule, at the one place it protects the property gx exists to sell: a crash
-/// inside `apply` must leave 「the adapter was asked」 on the device. The order of two statements is
+/// inside `apply` must leave "the adapter was asked" (sem: SEM-gx-engine-649) on the device. The order of two statements is
 /// not observable from outside the process — a caller cannot tell a record written before the call
 /// from one written after until the power fails — so it is read off the source, which is the same
 /// instrument `journal_roundtrip.rs` uses for the fsync ordering one layer down.
@@ -160,7 +161,7 @@ fn every_apply_is_preceded_by_an_apply_started_record() {
     assert_eq!(
         calls.len(),
         2,
-        "two walks down 則 2's one road -- the forward delta and the rollback"
+        "two walks down Rule 2's one road -- the forward delta and the rollback (sem: SEM-gx-engine-650)"
     );
     for (n, (record, call)) in records.iter().zip(calls.iter()).enumerate() {
         assert!(
@@ -229,9 +230,9 @@ fn the_critical_section_journals_before_each_side_effect() {
 // M5-24 -- where `cas_eq`'s third answer goes
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5-24 採(a)**: the CAS's `Err` becomes `InternalError` and never `PreconditionChanged`.
+/// 🔴 **M5-24, adopted (a)** (sem: SEM-gx-engine-651): the CAS's `Err` becomes `InternalError` and never `PreconditionChanged`.
 ///
-/// > `cas_eq` の `Err` は `Aborted(InternalError)`(43 T-13 逐語一致・T-13 を踏む 1 本目の経路)
+/// > `cas_eq`'s `Err` is `Aborted(InternalError)` (verbatim match with 43 T-13; the first road that steps on T-13) (sem: SEM-gx-engine-651)
 ///
 /// The behavioural half cannot be written against a stub adapter that answers consistently — an
 /// `Err` from `cas_eq` means two fingerprints over different scopes or from different substrates,
@@ -249,11 +250,11 @@ fn the_cas_has_three_answers_and_two_reasons() {
     println!("CAS_MATCH_ARMS={joined}");
     assert!(
         joined.contains("Ok(false) => return self.abort(id, AbortReason::PreconditionChanged"),
-        "43 T-10a: 「動いた」 is PreconditionChanged"
+        "43 T-10a: \"it moved\" (sem: SEM-gx-engine-652) is PreconditionChanged"
     );
     assert!(
         joined.contains("Err(_) => return self.abort(id, AbortReason::InternalError"),
-        "M5-24 採(a): 「その比較は意味を持たない」 is a wiring bug, and 43 T-13 is where bugs go"
+        "M5-24, adopted (a) (sem: SEM-gx-engine-653): \"that comparison has no meaning\" is a wiring bug, and 43 T-13 is where bugs go"
     );
 }
 
@@ -261,9 +262,9 @@ fn the_cas_has_three_answers_and_two_reasons() {
 // M5-25 -- D-7's third window
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5-25 採(a)**: the engine is the `Provenance` producer, and there is exactly one of it.
+/// 🔴 **M5-25, adopted (a)** (sem: SEM-gx-engine-654): the engine is the `Provenance` producer, and there is exactly one of it.
 ///
-/// D-7's rule is 「2 回 defer して消費者 0 なら作った物自体を疑う」, and §37 settled the third
+/// D-7's rule is "if deferred twice and there are still zero consumers, doubt the thing itself that was built" (sem: SEM-gx-engine-654), and §37 settled the third
 /// window by making the engine the producer with the journal as the destination. This probe is the
 /// count that decides whether the ruling landed: `Provenance::derive_from` had **zero** shipping
 /// callers across M2, M3 and M4, and after this hand it has one.
@@ -281,7 +282,7 @@ fn the_engine_is_the_one_producer_of_provenance() {
     assert_eq!(
         sites.len(),
         1,
-        "M5-25 採(a): one producer, in the engine — {sites:?}"
+        "M5-25, adopted (a) (sem: SEM-gx-engine-655): one producer, in the engine — {sites:?}"
     );
 }
 
@@ -291,8 +292,7 @@ fn the_engine_is_the_one_producer_of_provenance() {
 
 /// **I-3**: whether hand 4 became the consumer §26 reserved the decision for.
 ///
-/// req/38 §26 I-3 逐語: 「accessor 3 件は survivor として数え続け(分類表つき)・**M5 の engine が消費者
-/// にならなければ公開面から落とす**を D-7 形で予約」. The three are gx-gate's `Gate::policies`,
+/// req/38 §26 I-3 verbatim (sem: SEM-gx-engine-656): "the 3 accessors keep being counted as survivors (with a classification table); **if M5's engine does not become a consumer, drop them from the public face** is reserved in D-7's shape". The three are gx-gate's `Gate::policies`,
 /// `Gate::invariants` and `PolicyEngine::is_empty` (req/78 §5's row 30 calls them gx-log's, which
 /// is a mislabel — the audit that raised them is `req/67 §2.2`, and the crate is gx-gate).
 ///
@@ -333,8 +333,7 @@ fn the_three_gx_gate_accessors_are_counted_in_this_hand() {
 
 /// 🔴 The engine holds a `LedgerStore`, and appends to it in exactly one place (43 T-11).
 ///
-/// 42 §3.11's ledger is the public witness log, and INV-S3 is 「各`TransformationId`について
-/// `ledger`entryは高々1件」. Idempotence lives in gx-log (ASM-43-1, keyed on the transformation), so
+/// 42 §3.11's ledger is the public witness log, and INV-S3 is "for each `TransformationId`, there is at most one `ledger` entry" (sem: SEM-gx-engine-657). Idempotence lives in gx-log (ASM-43-1, keyed on the transformation), so
 /// the engine's obligation is narrower and structural: one road in, so that there is one place for
 /// a reviewer to check the key against.
 #[test]
@@ -346,7 +345,7 @@ fn the_ledger_is_wired_and_appended_to_in_one_place() {
         .filter(|l| l.contains("ledger: LedgerStore"))
         .count();
     // The call is written across four lines by rustfmt, so the needle is the argument list rather
-    // than the receiver -- 「`.ledger` and `.append(` on one line」 was the first draft and it
+    // than the receiver -- "`.ledger` and `.append(` on one line" (sem: SEM-gx-engine-658) was the first draft and it
     // reported zero for a call that is plainly there.
     //
     // 🔴 M5 hand 5: the needle used to be `.append(*id, receipt_digest`, and the recovery's call
@@ -373,13 +372,23 @@ fn the_ledger_is_wired_and_appended_to_in_one_place() {
     // `VerdictReceipt`, issued by `Engine::issue_verdict_receipt` for T-4a/b/c, T-4e and T-5/T-5b
     // (M5H4-6). The count is asserted rather than relaxed to `>= 2` so that a fourth road has to be
     // justified where it is added -- two of these three are `CommitReceipt`s and the split matters.
+    // 🔴 **R8 / `req/234` H-01 (b)** makes it four, and the fourth is justified here as this
+    // assertion asks. `Engine::reissue_receipt` rebuilds the receipt of a row that is **already
+    // terminal** -- a project committed by a pre-R8 binary, or one whose caller registered no
+    // `CommitReceiptSink`, where the `Committed` record exists and no receipt was ever filed. It
+    // is a fourth road to `Receipt::issue` and deliberately **not** a fourth road to the
+    // substrate: it never calls `apply`, and it refuses to sign unless the payload it rebuilt
+    // digests to exactly what the ledger already witnessed at that leaf. That check is why a
+    // fourth `CommitReceipt` issuer cannot put a second answer to "what was committed" into the
+    // world.
     assert_eq!(
-        issues, 3,
-        "43 T-11 issues a CommitReceipt, 43 §7-3b re-issues one, and 42 §3.10's VerdictReceipt is \
-         issued in one more place (M5H4-6)"
+        issues, 4,
+        "43 T-11 issues a CommitReceipt, 43 §7-3b re-issues one, R8's `reissue_receipt` \
+         re-issues a terminal row's (req/234 H-01), and 42 §3.10's VerdictReceipt is issued \
+         in one more place (M5H4-6)"
     );
     let kinds = |needle: &str| lines.iter().filter(|l| l.contains(needle)).count();
-    assert_eq!(kinds("ReceiptKind::CommitReceipt"), 2);
+    assert_eq!(kinds("ReceiptKind::CommitReceipt"), 3);
     assert_eq!(kinds("ReceiptKind::VerdictReceipt"), 1);
 }
 
@@ -417,14 +426,14 @@ fn committed(
     (engine, id, counts)
 }
 
-/// 🔴 **E-M4-31 / M5-18 採(a)**: `Timestamp(0)` never reaches the engine's record of the apply.
+/// 🔴 **E-M4-31 / M5-18, adopted (a)** (sem: SEM-gx-engine-659): `Timestamp(0)` never reaches the engine's record of the apply.
 ///
-/// req/38 §31 逐語: 「engine が commit 時に上書きする」, and the adapter answers zero because 41 §6
+/// req/38 §31 verbatim (sem: SEM-gx-engine-659): "the engine overwrites it at commit time", and the adapter answers zero because 41 §6
 /// injects the clock at the engine boundary — `gx-adapter-fs` does exactly this (`apply.rs:104`),
 /// and [`support::CommitAdapter`] copies it so that the overwrite is measured rather than assumed.
 ///
-/// Two claims, because 「the engine overwrote it」 and 「no zero reached the journal」 are different
-/// facts and the ruling names the second: 「`Timestamp(0)` が journal に到達したら engine の bug」.
+/// Two claims, because "the engine overwrote it" and "no zero reached the journal" (sem: SEM-gx-engine-660) are different
+/// facts and the ruling names the second: "if `Timestamp(0)` reaches the journal, it is the engine's bug".
 #[test]
 fn no_timestamp_zero_reaches_the_engine_from_the_adapter() {
     let (engine, id, _counts) = committed("h4_applied_at");
@@ -445,14 +454,13 @@ fn no_timestamp_zero_reaches_the_engine_from_the_adapter() {
     assert_ne!(applied_at, Timestamp(0), "the adapter's answer was zero");
     assert!(
         zeros.is_empty(),
-        "E-M4-31: 「Timestamp(0) が journal に到達したら engine の bug」 -- {zeros:?}"
+        "E-M4-31: \"if Timestamp(0) reaches the journal, it is the engine's bug\" (sem: SEM-gx-engine-661) -- {zeros:?}"
     );
 }
 
 /// 🔴 **M5H3-4**: the journal-witnessed frontier and the ledger's own log agree.
 ///
-/// §40 rules 「手 4 が LedgerStore を結線した同 turn で『frontier と本物の root の一致』を probe 化
-/// する」, which turns 43 §7-3b's recovery question into a standing check. The engine's own
+/// §40 rules "in the same turn that hand 4 wired up `LedgerStore`, turn 'the frontier agreeing with the real root' into a probe" (sem: SEM-gx-engine-662), which turns 43 §7-3b's recovery question into a standing check. The engine's own
 /// `ledger_agrees` compares the count, each row and the root; this probe runs it, and then takes the
 /// three comparisons apart so that a failure names which one moved.
 #[test]
@@ -486,10 +494,9 @@ fn the_frontier_and_the_ledger_agree_after_a_commit() {
     );
 }
 
-/// 🔴 **規律48**: the intermediate states of the critical section, reconstructed and stopped at.
+/// 🔴 **discipline 48** (sem: SEM-gx-engine-663): the intermediate states of the critical section, reconstructed and stopped at.
 ///
-/// §40 制定: 「終端 record が中間 record の情報を再供給する経路では、中間状態で止まる probe を必ず
-/// 1 本置く」, with `Committed` over `CommittingStarted` named as the first case. The masking is
+/// §40 enacted: "wherever a terminal record re-supplies an intermediate record's information, always place one probe that stops at the intermediate state" (sem: SEM-gx-engine-663), with `Committed` over `CommittingStarted` named as the first case. The masking is
 /// real: `reconstruct`'s `Committed` arm writes `state = Committed`, so a broken `CommittingStarted`
 /// arm is invisible in any journal that reached T-11. The prefixes below are the same journal an
 /// execution wrote, cut where a crash would have cut it.
@@ -560,8 +567,8 @@ fn the_critical_sections_intermediate_states_survive_being_stopped_at() {
                 .reference()
                 .cid
         ),
-        "🔴 req/78 §3.2 Λ4: this is the fact that separates 「the world did not move」 from 「the \
-         world moved and nothing recorded it」"
+        "🔴 req/78 §3.2 Λ4: this is the fact that separates \"the world did not move\" from \"the \
+         world moved and nothing recorded it\" (sem: SEM-gx-engine-664)"
     );
 
     // And the terminal record, which is what would have hidden all three.
@@ -576,7 +583,7 @@ fn the_critical_sections_intermediate_states_survive_being_stopped_at() {
 ///
 /// req/81 §5.3 recorded the weakness plainly: Σ's `escrow` and `ledger` components were empty on the
 /// live side, so `tests/sigma_replay.rs` measured the reconstruction against a journal a test had
-/// assembled — 「2 経路の一致」ではなく「再構成そのもの」. T-10b and T-11 are this hand's, so both
+/// assembled -- not "the two roads' agreement" but "the reconstruction itself" (sem: SEM-gx-engine-665). T-10b and T-11 are this hand's, so both
 /// components are live now and the comparison is the one AC-039 asks for, with four non-empty
 /// components instead of two.
 #[test]
@@ -607,11 +614,11 @@ fn sigma_agrees_with_its_reconstruction_after_a_real_commit() {
     );
 }
 
-/// 🔴 **M5-25 採(a)**, run: what the engine actually put in the record (42 §3.9).
+/// 🔴 **M5-25, adopted (a)** (sem: SEM-gx-engine-666), run: what the engine actually put in the record (42 §3.9).
 ///
 /// D-7's third window closes here. The value is checked field by field rather than for existence,
-/// because a `Provenance` with an empty environment and no inputs would satisfy 「a producer exists」
-/// while recording nothing — which is what two milestones of 「the type is there」 already were.
+/// because a `Provenance` with an empty environment and no inputs would satisfy "a producer exists"
+/// while recording nothing -- which is what two milestones of "the type is there" (sem: SEM-gx-engine-667) already were.
 #[test]
 fn the_provenance_the_engine_derived_says_what_42_3_9_asks_for() {
     let (engine, id, _counts) = committed("h4_provenance");
@@ -636,7 +643,7 @@ fn the_provenance_the_engine_derived_says_what_42_3_9_asks_for() {
     assert_eq!(
         p.intent_digest,
         Some(intent_id.0),
-        "42 §3.9: 「`submit`時のIntentのcanonical digest」, and `parents` is empty here"
+        "42 §3.9: \"the Intent's canonical digest at `submit` time\" (sem: SEM-gx-engine-668), and `parents` is empty here"
     );
     assert_eq!(
         p.input_objects,
@@ -649,9 +656,12 @@ fn the_provenance_the_engine_derived_says_what_42_3_9_asks_for() {
     );
     assert!(
         !p.environment.engine_version.is_empty(),
-        "42 §3.9: 「gx-engineのビルドバージョン」"
+        "42 §3.9: \"gx-engine's build version\" (sem: SEM-gx-engine-669)"
     );
-    assert_eq!(p.environment.host_id, None, "ASM-10: 単一ノード運用");
+    assert_eq!(
+        p.environment.host_id, None,
+        "ASM-10: single-node operation (sem: SEM-gx-engine-669)"
+    );
 
     let journalled = engine
         .journal()
@@ -661,13 +671,13 @@ fn the_provenance_the_engine_derived_says_what_42_3_9_asks_for() {
             EngineJournalRecord::ProvenanceDerived { provenance, .. } => Some(provenance.clone()),
             _ => None,
         })
-        .expect("M5-25 採(a)+journal");
+        .expect("M5-25, adopted (a) + journal (sem: SEM-gx-engine-670)");
     assert_eq!(&journalled, p, "the record and the row are one value");
 }
 
 /// 🔴 **M5H3-1(c)**: the receipt is issued, and the clock **still** does not reach Σ.
 ///
-/// §40 sent the question here: 「clock が Σ に入る最初の窓は手 4 の receipt `issued_at`(42 §3.10)」.
+/// §40 sent the question here: "the first window where a clock enters Σ is hand 4's receipt `issued_at` (42 §3.10)" (sem: SEM-gx-engine-671).
 /// The measurement says it is not, and for two separate reasons that both had to hold:
 ///
 /// * **E-M2-6** keeps `issued_at` outside the signed payload, and a receipt is not a component of Σ
@@ -770,14 +780,14 @@ fn the_commit_receipt_is_a_commit_receipt_and_verifies_against_the_ledger() {
     assert_eq!(
         payload.canonical_cid,
         engine.canonical_cid(&id).expect("T-8 fixed one"),
-        "42 §3.10: 「`CommitReceipt`ではcanonicalizeステージ（43 T-8）で再確認された値」"
+        "42 §3.10: \"in `CommitReceipt`, the value reconfirmed at the canonicalize stage (43 T-8)\" (sem: SEM-gx-engine-672)"
     );
     assert!(payload.enforced, "nothing degraded this transformation");
     assert!(!payload.fail_posture_engaged);
     assert_eq!(
         payload.inverse_delta,
         engine.escrowed_inverse(&id),
-        "42 §3.10: 「エスクロー済み逆deltaのCID」"
+        "42 §3.10: \"the CID of the escrowed inverse delta\" (sem: SEM-gx-engine-673)"
     );
     assert!(
         payload.postcondition_fingerprint.is_some(),
@@ -792,15 +802,14 @@ fn the_commit_receipt_is_a_commit_receipt_and_verifies_against_the_ledger() {
 /// 🔴 **M5H4-3 → E-M5-11**: a T-4e degraded admission **is** written down now, and says so.
 ///
 /// This probe was hand 4's refusal, inverted by the erratum hand 4 raised. Its old body asserted
-/// `Error::Unrepresentable` and 「the refusal is before T-9: a section that cannot close is not
-/// opened」, and the report called it 「A limitation measured, not a feature: AC-037 (hand 6) asks
-/// for this path under `RecordOnly`, and it will need a ruling」. §41 gave the ruling:
+/// `Error::Unrepresentable` and "the refusal is before T-9: a section that cannot close is not
+/// opened", and the report called it "a limitation measured, not a feature: AC-037 (hand 6) asks
+/// for this path under `RecordOnly`, and it will need a ruling" (sem: SEM-gx-engine-674). §41 gave the ruling:
 ///
-/// > **M5H4-3 採(a)**=**E-M5-11・手 6 発射条件**: `ReceiptPayload.verdict` を **`Option`** にする…
-/// > 実装窓=**手 6**(AC-037 がこの経路を正面から踏む)
+/// > **M5H4-3, adopted (a)** = **E-M5-11, hand 6's firing condition**: make `ReceiptPayload.verdict` an **`Option`** ... implementation window = **hand 6** (AC-037 steps on this path head-on) (sem: SEM-gx-engine-674)
 ///
 /// So the assertion flips rather than being deleted, and what it now measures is the shape 43 T-4e
-/// requires: 「`enforced=false`と`fail_posture_engaged=true`を必ずreceiptに刻む」, with **no
+/// requires: "always stamp `enforced=false` and `fail_posture_engaged=true` on the receipt" (sem: SEM-gx-engine-675), with **no
 /// verdict** — because no gate ran and no proof exists to digest.
 ///
 /// The `Unrepresentable` refusal did not vanish with it: `tests/ac_037.rs` reaches the half-filled
@@ -857,7 +866,7 @@ fn a_degraded_admission_commits_and_its_receipt_says_no_gate_ran() {
     );
     assert!(
         !payload.enforced && payload.fail_posture_engaged,
-        "43 T-4e: 「`enforced=false`と`fail_posture_engaged=true`を必ずreceiptに刻む」"
+        "43 T-4e: \"always stamp `enforced=false` and `fail_posture_engaged=true` on the receipt\" (sem: SEM-gx-engine-676)"
     );
     assert_eq!(counts.totals()[4], 1, "the world moved exactly once");
 
@@ -883,8 +892,7 @@ fn a_degraded_admission_commits_and_its_receipt_says_no_gate_ran() {
 
 /// 🔴 **M5H3-7**: the mirror count, taken again now that receipts and provenance are persisted.
 ///
-/// §40 asked for it here: 「mirror は現状 2 本。receipt/Provenance の永続化で 3 本目が要るかを数え
-/// 直して起票」. The answer is **no third mirror**, and the reason is a property of the types rather
+/// §40 asked for it here: "mirror currently stands at 2. Recount whether a third is needed now that receipt/Provenance are persisted, and file it" (sem: SEM-gx-engine-677). The answer is **no third mirror**, and the reason is a property of the types rather
 /// than a choice: a mirror exists in this crate when a lower crate's type has no serde face because
 /// it is minted through a checked constructor (`Fingerprint`, `PlannedDelta`). `Provenance`,
 /// `Environment`, `Receipt` and `ReceiptPayload` all derive `Serialize` and `Deserialize` in
@@ -934,7 +942,7 @@ fn the_mirrors_are_still_the_two_hands_one_and_three_declared() {
 /// A second engine over the same files sees the ledger the first one wrote, and not the table.
 ///
 /// 42 §3.13 keeps the journal private to the engine and the ledger public, and the ledger's own
-/// replay (`gx_log::LedgerStore::open`) is what makes 「公開witness台帳」 true across a restart. Σ's
+/// replay (`gx_log::LedgerStore::open`) is what makes "the public witness ledger" (sem: SEM-gx-engine-678) true across a restart. Σ's
 /// view of it does **not** come back, which is M5H3-5's window and hand 5's work — asserted here so
 /// that the partial recovery is a measured fact rather than a surprise for the hand that meets it.
 #[test]
@@ -999,8 +1007,8 @@ fn a_reopened_engine_finds_the_ledger_and_not_the_state_table() {
 
 /// The stub adapter of hands 2 and 3 still refuses to apply, so their fixtures cannot commit.
 ///
-/// Not a defect: `StubAdapter::apply` answers `Error::Unimplemented`, which is 「未実装」 rather than
-/// 「失敗」 (§32 M4H4-2) and is what kept hand 2 from reaching past T-8. Hand 4 adds a second fixture
+/// Not a defect: `StubAdapter::apply` answers `Error::Unimplemented`, which is "not implemented" rather than
+/// "failure" (§32 M4H4-2; sem: SEM-gx-engine-679) and is what kept hand 2 from reaching past T-8. Hand 4 adds a second fixture
 /// rather than changing the first, so the numbers hands 2 and 3 reported are still the numbers their
 /// frozen instruments print (A-7).
 #[test]

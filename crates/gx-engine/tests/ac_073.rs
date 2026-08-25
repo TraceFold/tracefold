@@ -1,17 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-073** — owner cancel (FR-059, DR-11, 43 T-7).
 //!
-//! 34 AC-073 逐語:
+//! 34 AC-073 verbatim (sem: SEM-gx-engine-582):
 //!
-//! > Given: `Committing`到達前の任意状態（Draft/Candidate/Verifying/Admitted/Canonicalized/
-//! > Escalated）のTransformation T。When: `gx cancel <T.id>`（またはAPI …）を実行する。Then: Tは
-//! > `Aborted(OwnerCancelled)`へ遷移する。When: 既に`Committing`以降（Committed含む）のTに対し同
-//! > コマンドを実行する。Then: 無効操作として拒否され既存状態を変更しない。
+//! > Given: a Transformation T in any state before reaching `Committing` (Draft/Candidate/Verifying/
+//! > Admitted/Canonicalized/Escalated). When: `gx cancel <T.id>` (or the API ...) is run. Then: T
+//! > transitions to `Aborted(OwnerCancelled)`. When: the same command is run against a T already at
+//! > `Committing` or beyond (including Committed). Then: it is refused as an invalid operation and
+//! > the existing state is unchanged.
 //!
 //! # 🔴 Four of the six from-states are reachable; `Draft` has no id and `Verifying` is transient
 //!
 //! `gx cancel <T.id>` takes a `TransformationId`, and 43 T-1 says a draft has none
-//! (「`TransformationId`はまだ確定しない」, **E-M5-3**). 42 §3.13's `Aborted` record is keyed on one,
-//! and **M5-17 採(b)** keeps the draft phase in the journal with no row to move. So there is nothing
+//! ("`TransformationId` is not yet fixed", **E-M5-3**; sem: SEM-gx-engine-583). 42 §3.13's
+//! `Aborted` record is keyed on one, and **M5-17, adopted (b)** keeps the draft phase in the
+//! journal with no row to move. So there is nothing
 //! this engine could write about cancelling a draft and nothing it could change — the case is
 //! **unrepresentable in v0.1**, raised as **M5H6-1**, and measured below rather than skipped:
 //! [`ac_073_a_draft_has_no_id_to_cancel`] shows the shape of the gap instead of leaving a blank.
@@ -36,7 +40,7 @@ const CANCELLED_AT: Timestamp = Timestamp(1_754_000_030_000_000_000);
 /// Four of 43 T-7's six. `Draft` has no id (see the module note), and 🔴 **`Verifying` is
 /// transient**: [`Engine::verify`] runs T-3 and one of T-4a..T-4e in one call, so no caller can
 /// hold a transformation there and no `cancel` can arrive while it is. That is 43's own shape --
-/// T-3's side effect is 「evidence collector起動」 and the verdict follows in the same row -- rather
+/// T-3's side effect is "starting the evidence collector" (sem: SEM-gx-engine-584) and the verdict follows in the same row -- rather
 /// than a limitation of this engine, and [`ac_073_verifying_is_never_a_resting_state`] measures it
 /// instead of leaving a gap in the table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,7 +112,7 @@ fn ac_073_every_state_before_committing_can_be_cancelled() {
         assert_eq!(
             after,
             Lifecycle::Aborted(AbortReason::OwnerCancelled),
-            "43 T-7: 「journal: `Aborted{{id, OwnerCancelled}}`」 from {stop:?}"
+            "43 T-7: \"journal: `Aborted{{id, OwnerCancelled}}`\" (sem: SEM-gx-engine-585) from {stop:?}"
         );
         assert_eq!(applies, 0, "T-7 cannot fire from `Committing`");
         assert_eq!(leaves, 0, "INV-S4");
@@ -117,10 +121,10 @@ fn ac_073_every_state_before_committing_can_be_cancelled() {
 
 /// 🔴 AC-073's second half: from `Committed` the same call is refused and changes nothing.
 ///
-/// > 既に`Committing`以降（Committed含む）のTに対し同コマンドを実行する。Then: 無効操作として拒否され
-/// > 既存状態を変更しない。
+/// > the same command is run against a T already at `Committing` or beyond (including Committed).
+/// > Then: it is refused as an invalid operation and the existing state is unchanged. (sem: SEM-gx-engine-586)
 ///
-/// 「既存状態を変更しない」 is read as three things and all three are measured: the state, the
+/// "the existing state is unchanged" (sem: SEM-gx-engine-586) is read as three things and all three are measured: the state, the
 /// journal length, and the ledger. A refusal that wrote an `Aborted` record and then reported an
 /// error would satisfy the first and break the other two.
 #[test]
@@ -147,7 +151,7 @@ fn ac_073_a_committed_transformation_refuses_the_cancel_and_is_unchanged() {
     let receipt = engine.receipt(&id).expect("T-11 issued one").clone();
     let refused = engine
         .cancel(&id, CANCELLED_AT)
-        .expect_err("43 T-7's guard is 「`Committing`到達前」");
+        .expect_err("43 T-7's guard is \"before reaching `Committing`\" (sem: SEM-gx-engine-587)");
     println!(
         "AC073_COMMITTED committed={committed:?} refused={:?} state={:?} \
          records={records}/{} leaves={leaves}/{} receipt_same={} applies={}",
@@ -159,11 +163,15 @@ fn ac_073_a_committed_transformation_refuses_the_cancel_and_is_unchanged() {
         counts.totals()[4]
     );
     assert_eq!(committed, Lifecycle::Committed);
-    assert_eq!(refused.kind(), "InvalidState", "「無効操作として拒否され」");
+    assert_eq!(
+        refused.kind(),
+        "InvalidState",
+        "\"refused as an invalid operation\" (sem: SEM-gx-engine-588)"
+    );
     assert_eq!(
         engine.state(&id),
         Some(Lifecycle::Committed),
-        "「既存状態を変更しない」"
+        "\"the existing state is unchanged\" (sem: SEM-gx-engine-589)"
     );
     assert_eq!(engine.journal().len(), records, "and nothing was written");
     assert_eq!(engine.ledger().log().len(), leaves);
@@ -175,9 +183,9 @@ fn ac_073_a_committed_transformation_refuses_the_cancel_and_is_unchanged() {
     );
 }
 
-/// 43 T-7's idempotency column: 「二重キャンセルは無効操作として無視（既にAborted）」.
+/// 43 T-7's idempotency column: "a duplicate cancel is ignored as a no-op (already Aborted)" (sem: SEM-gx-engine-590).
 ///
-/// Ignored, not refused — 43 says 「無視」 and the difference is observable: an `Err` would make a
+/// Ignored, not refused -- 43 says "ignored" (sem: SEM-gx-engine-590) and the difference is observable: an `Err` would make a
 /// retrying client's second call look like a failure. What must not happen is a **second record**,
 /// which is what a journal would report as a second event.
 #[test]
@@ -199,7 +207,7 @@ fn ac_073_a_second_cancel_is_ignored_rather_than_recorded() {
     let records = engine.journal().len();
     let second = engine
         .cancel(&id, Timestamp(CANCELLED_AT.0 + 1))
-        .expect("「二重キャンセルは無効操作として無視」");
+        .expect("\"a duplicate cancel is ignored as a no-op\" (sem: SEM-gx-engine-591)");
     println!(
         "AC073_TWICE first={first:?} second={second:?} records={records}/{}",
         engine.journal().len()
@@ -250,7 +258,7 @@ fn ac_073_a_draft_has_no_id_to_cancel() {
     assert!(engine.is_drafted(&intent_id), "the draft exists");
     assert!(
         ids.is_empty(),
-        "M5-17 採(b): 「Draft 相は journal だけが持ち状態表は Candidate 以降」"
+        "M5-17, adopted (b) (sem: SEM-gx-engine-592): \"the Draft phase is held only by the journal; the state table starts at Candidate\""
     );
     assert_eq!(
         keyed,

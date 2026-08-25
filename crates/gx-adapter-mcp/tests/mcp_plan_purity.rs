@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `plan` reaches nothing, measured two ways — and one of them is stronger than the other two adapters'.
 //!
-//! **E-M4-29** (§30 M4H2-3 (b)) reads 41 §4's 「純関数」 as 「(intent, pre) の対に対する決定性+substrate への
-//! **書き込み** 0」 and adds 「読み込みは禁じない」, and req/98 §6-7 asks the M7 adapters for that reading:
-//! 「則 1 の M7 版…「I/O 0」ではない」.
+//! **E-M4-29** (§30 M4H2-3 (b)) reads 41 §4's "a pure function" as "determinism over the (intent, pre) pair + zero (sem: SEM-gx-adapter-mcp-285)
+//! **writes** to the substrate" and adds "reads are not forbidden", and req/98 §6-7 asks the M7 adapters for that reading: (sem: SEM-gx-adapter-mcp-286)
+//! "Rule 1's M7 version... is not 'zero I/O'". (sem: SEM-gx-adapter-mcp-287)
 //!
 //! 🔴 **This adapter reads nothing either, and here that is checkable in a way it is not elsewhere.**
 //! `gx-adapter-fs` compares the tree on disk and `gx-adapter-git` compares `.git` byte for byte; both
-//! answer 「nothing was written」 and neither can answer 「nothing was read」, because a read leaves no
+//! answer "nothing was written" and neither can answer "nothing was read", because a read leaves no (sem: SEM-gx-adapter-mcp-288)
 //! trace on a filesystem. A transport is an object, so a **counter** on it answers both questions
 //! exactly: after a plan, `calls` and `reads` are still zero.
 //!
@@ -133,7 +135,7 @@ fn the_plan_module_names_no_transport_operation() {
     );
     assert!(
         named.is_empty(),
-        "`src/plan.rs` names {named:?}: 「calls nothing」 is a claim about source, and the cheapest \
+        "`src/plan.rs` names {named:?}: \"calls nothing\" is a claim about source, and the cheapest (sem: SEM-gx-adapter-mcp-289) \
          honest way to keep it is a module that never names one"
     );
 }

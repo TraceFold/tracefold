@@ -1,41 +1,49 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-039 (FR-039) — deterministic replay: **Σ, rebuilt from the journal, is the Σ the engine held**.
 //!
-//! 34 AC-039 逐語: 「Given: 台帳上のCommitted Transformation列（seed=42, clock固定値T0で生成）。When:
-//! 同一seed/clockで`gx replay`を実行。Then: **再構成結果状態が元の結果状態とbit-equal**。異なるseedでは
-//! 一致が保証されないことも**対照実験**で確認する。」
+//! 34 AC-039, verbatim: "Given: a Committed Transformation series on the ledger (generated with
+//! seed=42, a fixed clock value T0). When: `gx replay` is run with the same seed/clock. Then: **the
+//! reconstructed result state is bit-equal to the original result state**. Also confirm with a
+//! **control experiment** that agreement is not guaranteed under a different seed." (sem:
+//! SEM-gx-engine-481)
 //!
-//! 32 FR-039: 「gx-engineは台帳の記録済みTransformation列から決定的リプレイ（同一入力で同一結果状態を
-//! 再構成）を実装しなければならない（MUST）。乱数・時刻がengine境界で注入されるため同一seed/clockでの
-//! リプレイ結果がbit-equalであることをテストできる。」
+//! 32 FR-039: "gx-engine MUST implement deterministic replay (reconstructing the same result state
+//! from the same input) from the ledger's recorded Transformation series. Because randomness and
+//! time are injected at the engine boundary, it must be testable that a replay's result under the
+//! same seed/clock is bit-equal." (sem: SEM-gx-engine-481)
 //!
-//! # 「結果状態」 = Σ, and Σ is these four components (**E-M5-2**)
+//! # "result state" = Σ, and Σ is these four components (**E-M5-2**)
 //!
-//! req/38 §37 rules what the criterion is about, because 34 does not say whether 「結果状態」 is the
-//! engine's state or the substrate's:
+//! req/38 §37 rules what the criterion is about, because 34 does not say whether "result state" is (sem: SEM-gx-engine-481)
+//! the engine's state or the substrate's:
 //!
-//! > **M5-02 採(a)**=**E-M5-2**: replay は **Σ のみを再構成する read-only 操作**・AC-039 の「結果状態」
-//! > =Σ(状態表+ledger root+escrow index)と読む。adapter は呼ばない(機械検査つき)。
+//! > **M5-02, adopted (a)** = **E-M5-2**: replay is **a read-only operation that reconstructs Σ (sem: SEM-gx-engine-482)
+//! > only**; AC-039's "result state" is read as Σ (state table + ledger root + escrow index). It
+//! > never calls the adapter (mechanically checked). (sem: SEM-gx-engine-481)
 //!
 //! So Σ = `(drafts, state table, escrow index, ledger)`, and the `S` reading is refused for the
 //! reason req/78 §3.2 Λ7 gives: a replay that rebuilt the *substrate* would write to it, and FR-035
 //! forbids the engine to write to a substrate at all.
 //!
-//! # Why 「同一seed/clock」 needs no re-injection
+//! # Why "same seed/clock" needs no re-injection
 //!
-//! The criterion says 「同一seed/clockで実行」, and under E-M5-2 a replay does not re-run anything —
-//! so where do the seed and the clock come in? **The seed is in the records**: `DraftCreated`
-//! carries it (42 §3.13: 「replay時に同一シードで再実行することで決定性を担保する」), a replay reads
-//! what was injected instead of injecting it again, and 「同一seed」 is therefore a property of the
-//! journal rather than a promise about the caller. That is what makes the **control experiment**
-//! real rather than staged: change the seed, and the reconstructed bytes move.
+//! The criterion says "run with the same seed/clock", and under E-M5-2 a replay does not re-run (sem: SEM-gx-engine-483)
+//! anything — so where do the seed and the clock come in? **The seed is in the records**:
+//! `DraftCreated` carries it (42 §3.13: "determinism is secured by re-running under the same seed (sem: SEM-gx-engine-483)
+//! at replay time", sem: SEM-gx-engine-483), a replay reads what was injected instead of
+//! injecting it again, and "same seed" is therefore a property of the journal rather than a promise
+//! about the caller. That is what makes the **control experiment** real rather than staged: change
+//! the seed, and the reconstructed bytes move.
 //!
 //! 🔴 **The clock is a different story, and it was found by a probe failing.**
 //! [`ac_039_the_clock_does_not_reach_sigma_because_42_1_3_excludes_created_at`] was written as the
 //! seed control's twin and failed on its own claim: 42 §1.3's exclusion table puts `created_at`
-//! outside the `TransformationId`'s preimage (「除外: `id`, `created_at`／理由: 自己参照／ASM-4」), and
-//! Σ holds state rather than the `at` of the records that produced it. So the clock reaches Σ
-//! **nowhere** in v0.1, replay is clock-independent — stronger than the criterion asks — and 「同一
-//! clock」 constrains nothing here. The probe now measures that fact, and the report raises it.
+//! outside the `TransformationId`'s preimage ("excluded: `id`, `created_at` / reason: self-reference
+//! / ASM-4", sem: SEM-gx-engine-484), and Σ holds state rather than the `at` of the records that
+//! produced it. So the clock reaches Σ **nowhere** in v0.1, replay is clock-independent — stronger (sem: SEM-gx-engine-484)
+//! than the criterion asks — and "same clock" constrains nothing here. The probe now measures that
+//! fact, and the report raises it.
 //!
 //! # The comparison is not journal-against-journal
 //!
@@ -56,9 +64,9 @@ use support::{
     gate, intent, scratch, signing_key, CountingAdapter, StubAdapter, FORBID_ETC, PERMIT_ALL,
 };
 
-/// 34 AC-039's 「clock固定値T0」.
+/// 34 AC-039's "fixed clock value T0" (sem: SEM-gx-engine-485).
 const T0: Timestamp = Timestamp(1_754_000_000_000_000_000);
-/// 34 AC-039's 「seed=42」.
+/// 34 AC-039's "seed=42" (sem: SEM-gx-engine-485).
 const SEED: u64 = 42;
 
 /// An engine with the stub adapter registered and a policy set chosen by the caller.
@@ -72,7 +80,8 @@ fn engine<E: EvidenceSource>(name: &str, policies: &str, evidence: E) -> Engine<
 
 /// The bytes of Σ as the engine holds it, and as the journal on disk reconstructs it.
 ///
-/// Both sides are canonical DAG-CBOR through gx-canon (41 §6), which is what 「bit-equal」 is
+/// Both sides are canonical DAG-CBOR through gx-canon (41 §6), which is what "bit-equal" (sem:
+/// SEM-gx-engine-486) is
 /// measured on.
 fn both_sides<E: EvidenceSource>(e: &Engine<E>) -> (Vec<u8>, Vec<u8>) {
     let live = e.sigma().canonical_bytes().expect("Σ has a canonical form");
@@ -140,7 +149,8 @@ fn ac_039_the_reconstructed_state_is_bit_equal_to_the_original() {
     );
     assert_eq!(
         live, replayed,
-        "AC-039: 再構成結果状態が元の結果状態と bit-equal"
+        "AC-039: the reconstructed result state is bit-equal to the original result state (sem: \
+         SEM-gx-engine-487)"
     );
 }
 
@@ -178,7 +188,10 @@ fn ac_039_a_degraded_admission_reconstructs_as_degraded() {
     );
     assert_eq!(row.verdict, None, "no gate ran, so no verdict exists");
     assert_eq!(row.verdict_digest, None, "and no proof to digest (E-M5-7)");
-    assert!(!row.enforced, "43 §4: 「record-onlyモード相当へ降格」");
+    assert!(
+        !row.enforced,
+        "43 §4: \"downgrade to record-only-equivalent mode\" (sem: SEM-gx-engine-488)"
+    );
     assert!(
         row.fail_posture_engaged,
         "INV-S5 keeps the difference visible"
@@ -263,13 +276,15 @@ fn ac_039_a_record_only_denial_reconstructs_as_unenforced() {
 }
 
 // ---------------------------------------------------------------------------
-// The control experiments (34 AC-039: 「異なるseedでは一致が保証されない」)
+// The control experiments (34 AC-039: "agreement is not guaranteed under a different seed", sem:
+// SEM-gx-engine-489)
 // ---------------------------------------------------------------------------
 
 /// 🔴 **The control**: the same script under a **different seed** does not reconstruct the same Σ.
 ///
 /// This is the probe that makes the criterion above worth stating. A Σ that ignored the injected
-/// randomness would be bit-equal to itself under every seed, and 「同一seed/clock」 would be
+/// randomness would be bit-equal to itself under every seed, and "same seed/clock" (sem:
+/// SEM-gx-engine-490) would be
 /// decoration. So the difference is located as well as asserted: the **state table is identical**
 /// (nothing in v0.1 consumes the seed yet) and the **draft rows differ**, which is exactly where 42
 /// §3.13 puts the seed.
@@ -286,8 +301,9 @@ fn ac_039_a_different_seed_does_not_reconstruct_the_same_state() {
     let sigma_b = replay(&std::fs::read(b.journal().path()).expect("on disk")).sigma();
 
     // The state table on its own, as bytes: the component that must **not** move when only the seed
-    // does. Locating the difference is what turns 「the two Σ differ」 into 「the seed is what
-    // differs」, which is the claim 34 AC-039's control experiment is actually about.
+    // does. Locating the difference is what turns "the two Σ differ" into "the seed is what
+    // differs" (sem: SEM-gx-engine-491), which is the claim 34 AC-039's control experiment is
+    // actually about.
     let table_a = gx_canon::cbor::encode(&sigma_a.transformations()).expect("encodes");
     let table_b = gx_canon::cbor::encode(&sigma_b.transformations()).expect("encodes");
     println!(
@@ -299,7 +315,8 @@ fn ac_039_a_different_seed_does_not_reconstruct_the_same_state() {
     assert_eq!(table_a, table_b, "the two runs walked the same script");
     assert_ne!(
         replayed_a, replayed_b,
-        "AC-039's control: 異なる seed では一致しない。A Σ that were equal here would be a Σ the \
+        "AC-039's control: under a different seed there is no agreement (sem: \
+         SEM-gx-engine-492). A Σ that were equal here would be a Σ the \
          injected randomness never reached"
     );
     assert_eq!(
@@ -314,20 +331,23 @@ fn ac_039_a_different_seed_does_not_reconstruct_the_same_state() {
     );
 }
 
-/// 🔴 The other half of 「同一seed/clock」, measured: **the clock reaches Σ nowhere**.
+/// 🔴 The other half of "same seed/clock" (sem: SEM-gx-engine-493), measured: **the clock
+/// reaches Σ nowhere**.
 ///
-/// This probe was written to be the seed control's twin — 「a different clock moves the ids, so it
-/// moves Σ」 — and it **failed on its own claim**, which is how the fact below was found rather than
+/// This probe was written to be the seed control's twin — "a different clock moves the ids, so it
+/// moves Σ" (sem: SEM-gx-engine-493) — and it **failed on its own claim**, which is how the fact
+/// below was found rather than
 /// assumed. 42 §1.3's exclusion table is explicit:
 ///
 /// > \| `Transformation` \| `order`, `intent_id`, `subject`, `target`, `delta`, `context`, `actor`,
-/// > `parents` \| `id`, **`created_at`** \| 自己参照／ASM-4 \|
+/// > `parents` \| `id`, **`created_at`** \| self-reference / ASM-4 (sem: SEM-gx-engine-494) \|
 ///
 /// So `created_at` is outside the `TransformationId`'s preimage, and Σ holds **state**, not the
 /// `at` of the records that produced it. Two runs of one script under different clocks reconstruct
 /// to the same bytes.
 ///
-/// That is **stronger** than AC-039 asks (「同一seed/clockでのリプレイ結果がbit-equal」 holds a
+/// That is **stronger** than AC-039 asks ("the replay result under the same seed/clock is
+/// bit-equal" (sem: SEM-gx-engine-495) holds a
 /// fortiori when the clock does not participate at all) and it is **narrower** than 32 FR-039's
 /// sentence reads, because there is no clock in v0.1 whose change Σ would notice. The report raises
 /// it: hand 4's `Committed` rows carry a `ledger_seq` rather than a time, and hand 4 is where a
@@ -355,12 +375,13 @@ fn ac_039_the_clock_does_not_reach_sigma_because_42_1_3_excludes_created_at() {
     assert_eq!(
         replayed_a, replayed_b,
         "and nothing else in Σ carries a timestamp either -- if this fails, something began to \
-         record time as state and 「同一clock」 has become a real condition"
+         record time as state and \"same clock\" has become a real condition (sem: \
+         SEM-gx-engine-496)"
     );
 
     // The journals themselves **do** differ: every record carries its `at`. So the clock is
-    // recorded and simply not part of the state -- which is the difference between 「the engine did
-    // not write the time down」 and 「the time is not what the engine is」.
+    // recorded and simply not part of the state -- which is the difference between "the engine did
+    // not write the time down" and "the time is not what the engine is" (sem: SEM-gx-engine-497).
     let bytes_a = std::fs::read(a.journal().path()).expect("on disk");
     let bytes_b = std::fs::read(b.journal().path()).expect("on disk");
     assert_ne!(
@@ -380,8 +401,9 @@ fn ac_039_the_clock_does_not_reach_sigma_because_42_1_3_excludes_created_at() {
 /// counters are non-zero — an instrument that only ever reads zero is measuring nothing — and then
 /// compares the totals across a replay and across `Engine::sigma`.
 ///
-/// Both are checked because they are the two roads to Σ, and 「read-only」 has to hold on both: an
-/// engine that re-read a snapshot to answer 「what is my state」 would make FR-035's boundary depend
+/// Both are checked because they are the two roads to Σ, and "read-only" has to hold on both: an
+/// engine that re-read a snapshot to answer "what is my state" (sem: SEM-gx-engine-498) would
+/// make FR-035's boundary depend
 /// on who asked.
 #[test]
 fn ac_039_reconstructing_sigma_calls_no_adapter() {
@@ -413,7 +435,8 @@ fn ac_039_reconstructing_sigma_calls_no_adapter() {
     );
     assert_eq!(
         during, after_replay,
-        "E-M5-2: 「adapter は呼ばない」 -- reconstructing Σ from the journal reached the substrate"
+        "E-M5-2: \"never calls the adapter\" -- reconstructing Σ from the journal reached the \
+         substrate (sem: SEM-gx-engine-499)"
     );
     assert_eq!(
         during, after_sigma,
@@ -426,7 +449,7 @@ fn ac_039_reconstructing_sigma_calls_no_adapter() {
 }
 
 // ---------------------------------------------------------------------------
-// The property (34 AC-039: 「integration + property」)
+// The property (34 AC-039: "integration + property", sem: SEM-gx-engine-500)
 // ---------------------------------------------------------------------------
 
 proptest! {
@@ -439,7 +462,8 @@ proptest! {
     ///
     /// The generated part is what an operator varies: which objects, what they are changed to, how
     /// many, and — through the `/etc` prefix — whether the gate admits or denies. The seed and the
-    /// clock are generated as well, so 「同一seed/clock」 is exercised over a range rather than at one
+    /// clock are generated as well, so "same seed/clock" (sem: SEM-gx-engine-501) is exercised
+    /// over a range rather than at one
     /// point.
     ///
     /// What this property does **not** cover is written down rather than implied: `Committed`,

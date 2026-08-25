@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 44 §1.2's pipeline, verb by verb: the draft round-trip, Λ2's journal, the refusals, and the
 //! receipt store `gx commit` writes.
 //!
 //! `ac_054.rs` measures the acceptance criterion and `ac_030_cli.rs` measures identity; this
-//! measures the things req/88 §6.2 手 3's DoD names that are neither.
+//! measures the things req/88 §6.2 hand 3's DoD names that are neither (sem: SEM-gx-cli-2223).
 
 mod support;
 
@@ -29,13 +31,13 @@ fn committed(fixture: &Pipeline, goal: &str) -> String {
     tid
 }
 
-/// 🔴 **M6-01 採(a) の実体** — `.gx/drafts/` carries the intent body from one process to the next.
+/// 🔴 **M6-01 adopted (a)'s substance** (sem: SEM-gx-cli-2224) — `.gx/drafts/` carries the intent body from one process to the next.
 ///
-/// req/88 §6.2 手 3's DoD: 「`.gx/drafts/` 経由の submit→plan が別 process で通る事」. Hand 1 built the
+/// req/88 §6.2 hand 3's DoD: "submit→plan via `.gx/drafts/` passes across a different process" (sem: SEM-gx-cli-2225). Hand 1 built the
 /// store and could only test it in-process; this is the claim it was built for, and the negative
 /// half is what makes it a claim: **delete the draft and `gx plan` cannot run**, because nothing in
-/// the system can rebuild an intent body (req/56 §2 gives the directory `Nature::Source` and 「失われ
-/// る」 for exactly this reason).
+/// the system can rebuild an intent body (req/56 §2 gives the directory `Nature::Source` and "is lost"
+/// (sem: SEM-gx-cli-2226) for exactly this reason).
 #[test]
 fn the_draft_directory_is_what_carries_the_intent_between_processes() {
     let fixture = pipeline("drafts_round_trip", "before\n");
@@ -81,15 +83,15 @@ fn the_draft_directory_is_what_carries_the_intent_between_processes() {
     );
     assert_eq!(
         orphaned.code, 6,
-        "a transformation whose draft is gone is 「未検出」 and not 「内部エラー」: {}",
+        "a transformation whose draft is gone is \"not-found\" and not \"internal error\" (sem: SEM-gx-cli-2227): {}",
         orphaned.stderr
     );
 }
 
 /// 🔴 **req/88 §3 Λ2, measured** — four processes leave the journal one long-lived engine would.
 ///
-/// > 単発 CLI process の `Σ` は毎回 journal から再構成されるので、「N 回の CLI 実行」と「1 個の長寿命
-/// > engine への N 回の呼び出し」は `Σ` について観測等価である
+/// > a one-shot CLI process's `Σ` is reconstructed from the journal every time, so "N CLI invocations" and "N calls into one
+/// > long-lived engine" are observationally equivalent with respect to `Σ` (sem: SEM-gx-cli-2228)
 ///
 /// 43's road from `submit` to `Committed` writes ten records: `DraftCreated`, `Planned`,
 /// `VerifyStarted`, `Verdict`, `Canonicalized`, `CommittingStarted`, `ProvenanceDerived`,
@@ -101,8 +103,8 @@ fn the_draft_directory_is_what_carries_the_intent_between_processes() {
 /// # 🔴 Where Λ2 still does not hold, said here rather than left to a reader
 ///
 /// The Draft phase. `.gx/drafts/` is state the CLI has and 44 §2.1's `POST /candidates` does not,
-/// which is Λ2's own named counter-example and 44 §0's explicit exemption. So **AC-055's 「同一」 is
-/// 「同一 from `Candidate` onward」**, and this test is the evidence for the second half of that
+/// which is Λ2's own named counter-example and 44 §0's explicit exemption. So **AC-055's "identical" is
+/// "identical from `Candidate` onward"** (sem: SEM-gx-cli-2229), and this test is the evidence for the second half of that
 /// sentence.
 #[test]
 fn four_processes_write_the_journal_one_engine_would() {
@@ -156,12 +158,12 @@ fn four_processes_write_the_journal_one_engine_would() {
     );
 }
 
-/// 🔴 **M6H2-1 の writer** — `gx commit` puts the receipt in `.gx/receipts/`, and `gx receipt show`
+/// 🔴 **M6H2-1's writer** (sem: SEM-gx-cli-2230) — `gx commit` puts the receipt in `.gx/receipts/`, and `gx receipt show`
 /// finds it.
 ///
-/// req/38 §49: 「`.gx/receipts/`(nature=Source)追認・**writer は `gx commit`(手3)**」. Hand 2 built
+/// req/38 §49: "`.gx/receipts/` (nature=Source) confirmed — **writer is `gx commit` (hand 3)**" (sem: SEM-gx-cli-2231). Hand 2 built
 /// the store and the four disclosure levels over a fixture; this is the first time the store is
-/// filled by the binary, which is what makes 44 §1.2's 「ローカルストア…から`Receipt`を取得し表示」
+/// filled by the binary, which is what makes 44 §1.2's "retrieve and display the `Receipt` from the local store…" (sem: SEM-gx-cli-2232)
 /// true of a real run.
 #[test]
 fn commit_is_what_fills_the_receipt_store() {
@@ -189,7 +191,7 @@ fn commit_is_what_fills_the_receipt_store() {
     // 🔴 **M6H4-7** (M6 hand 5): `<TID>.<kind>.json`, and a committed transformation leaves **two**
     // documents rather than one — ASM-14's `VerdictReceipt` from 43 T-4a and 43 T-11's
     // `CommitReceipt`. Under the old untagged name they shared one slot and the second writer won,
-    // which is 「what was decided」 being erased by 「what was applied」.
+    // which is "what was decided" being erased by "what was applied" (sem: SEM-gx-cli-2233).
     let stem = tid.replace(':', "_");
     assert_eq!(
         filed.len(),
@@ -309,7 +311,7 @@ fn a_transformation_whose_substrate_moved_is_refused_by_name() {
 
 /// `--idempotency-key` is echoed, derived when absent, and does not change the outcome.
 ///
-/// 44 §1.2: 「未指定時はCLIが`transformation_id`から決定的に導出（同一実行の再試行は自然に冪等）」.
+/// 44 §1.2: "when unspecified, the CLI deterministically derives it from `transformation_id` (retrying the same execution is naturally idempotent)" (sem: SEM-gx-cli-2234).
 /// The cache 44 §2.4 describes is **hand 5's** (M6-11), and what makes a repeated `gx commit` safe
 /// today is 43 T-11's own idempotence. Saying so beside the flag is the difference between a flag
 /// that works and one that looks like it does.
@@ -341,10 +343,10 @@ fn the_idempotency_key_is_derived_when_it_is_not_given() {
 
 /// `gx verify --evidence` reads 42 §3.7 values as JSONL, and a line that is not one is refused.
 ///
-/// 44 §1.2: 「事前収集済み`Evidence`（42 §3.7）をJSONLで追加投入」. Refusing a half-readable file
-/// matters because `InjectedEvidence::none` already means 「省略時はgx-gate組込の…評価のみ」: a
-/// collector file that decoded partially would put 「we collected nothing」 and 「we collected some of
-/// it」 under one face.
+/// 44 §1.2: "inject pre-collected `Evidence` (42 §3.7) as additional JSONL input" (sem: SEM-gx-cli-2235). Refusing a half-readable file
+/// matters because `InjectedEvidence::none` already means "when omitted, gx-gate's built-in evaluation only" (sem: SEM-gx-cli-2236): a
+/// collector file that decoded partially would put "we collected nothing" and "we collected some of
+/// it" (sem: SEM-gx-cli-2237) under one face.
 #[test]
 fn evidence_is_jsonl_and_a_bad_line_is_refused() {
     let fixture = pipeline("evidence_jsonl", "before\n");

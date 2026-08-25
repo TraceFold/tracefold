@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The append-only Merkle transparency log.
 //!
 //! Spec: `req/spec/40-architecture/41-architecture.md` §2 for where this crate sits and what it
@@ -37,7 +39,7 @@
 //!
 //! # The tree is gx's own
 //!
-//! **M2H1-6 → 手 2 裁定** (`req/38_ERRATA_2026-08-07.md` §9) rules the merkle implementation
+//! **M2H1-6 → hand 2 ruling** (`req/38_ERRATA_2026-08-07.md` §9) rules the merkle implementation (sem: SEM-gx-log-031)
 //! self-written and `rs_merkle` observation-only: gx hashes with BLAKE3 (35 DR-3) while the
 //! library brings a second SHA-256 subtree into a workspace that needs none, 42 §3.11's domain
 //! separation is no library's default, and its licence claim did not check out at three points.
@@ -57,12 +59,12 @@
 //!   canonical_dagcbor(LedgerLeaf))`, `node_hash = BLAKE3(0x01 || left || right)`) while 42 §1.1's
 //!   `Cid` carries no prefix byte, and gx-canon published no raw-bytes hash at all. gx-canon now
 //!   has a mint that takes the domain byte (`gx_canon::cid::{mint_leaf, mint_node}`); this crate
-//!   calls it and names neither a codec nor a hash, which is what keeps 41 §6's 「全 canonical
-//!   encode は gx-canon 経由のみ」 true here and `ac_014.rs` meaningful.
+//!   calls it and names neither a codec nor a hash, which is what keeps 41 §6's "all canonical
+//!   encoding goes through gx-canon alone" (sem: SEM-gx-log-032) true here and `ac_014.rs` meaningful.
 //! * **E-M2-8** -- [`proof::verify_consistency`] takes its [`proof::ConsistencyProof`] as an
 //!   argument. AC-023's two-argument `verify_consistency(root_0, root_1)` is the erratum (the same
 //!   shape as E-AC059-1's `compose(g,f)`).
-//! * **E-M2-9** -- AC-024's 「hash algorithm ... 一致」 cannot be satisfied: gx is BLAKE3 (35 DR-3)
+//! * **E-M2-9** -- AC-024's "hash algorithm ... match" (sem: SEM-gx-log-033) cannot be satisfied: gx is BLAKE3 (35 DR-3)
 //!   and Rekor v2 / C2SP tlog-tiles is SHA-256. `tests/ac_024.rs` asserts the *structural*
 //!   correspondence (tile height, the domain-separation bytes) and asserts the hash algorithm as a
 //!   **declared difference** -- a machine-checked mismatch rather than a comparison quietly dropped.
@@ -83,20 +85,45 @@
 
 #![forbid(unsafe_code)]
 
+pub mod head;
 pub mod proof;
 pub mod store;
 pub mod tile;
+pub mod witness_audit;
 
+pub use head::{
+    AcceptedRollback, HeadFloor, HeadStore, HeadWitness, PersistedHead, RolledBack, HEAD_FILE,
+    HEAD_VERSION,
+};
 pub use proof::ConsistencyProof;
 pub use store::{AppendOutcome, LedgerStore, Recovery, MAX_RECORD_BYTES};
 pub use tile::{LedgerEntry, LedgerLeaf, Tile, TileLog, TILE_WIDTH};
+pub use witness_audit::{classify_extension, detect_equivocation, CheckpointContradiction};
+
+/// The retention floor `req/spec/30-requirements/33-non-functional.md` NFR-027 states and 35
+/// ASM-33-2 (§F, `req/38` §69) calls immovable: **180 days**, EU AI Act Art.19/26's "a minimum of 6 months" (sem: SEM-gx-log-034)
+/// read as a number. ASM-33-2 draws a line between this floor and the retention *upper bound*
+/// (the cost of unlimited retention), which stays Owner/v0.2 territory -- this constant is the
+/// floor's half only.
+///
+/// v0.1 meets it **structurally rather than by counting days**: FR-021 requires gx-log's public
+/// surface to offer no function that edits or removes an entry, and `crates/gx-log/tests/ac_021.rs`
+/// (`ac_021_no_public_function_is_named_for_a_mutation`) already scans that surface and asserts
+/// exactly that, for every function this crate exports -- see that file's own note that the claim
+/// is about the *API a caller is handed*, not about whether the bytes on disk could be edited by a
+/// tool outside this crate. An entry that no public function can remove cannot be removed before
+/// 180 days because it cannot be removed through this crate at all, so the floor holds for every
+/// entry ever appended. `tests/nfr_027.rs` is what a v0.2 deletion/pruning API would have to answer
+/// to before it could ship without silently undercutting this constant (`req/38` §81 coverage v2,
+/// v0.2.7 batch Lane B item 4). (sem: SEM-gx-log-035)
+pub const NFR_027_MINIMUM_RETENTION_DAYS: u32 = 180;
 
 /// Everything the log can refuse to do.
 ///
 /// 41 §6 types errors with `thiserror` and counts a panic as a bug, so every refusal here is a
 /// returned value. The three are kept apart because they answer different questions: the canonical
 /// layer would not encode a leaf, the caller named a leaf the tree does not have, or a proof's own
-/// declared shape does not describe growth. 「This proof does not hold」 is none of them -- that is
+/// declared shape does not describe growth. "This proof does not hold" (sem: SEM-gx-log-036) is none of them -- that is
 /// `Ok(false)`, and conflating it with an error would let a caller treat a failed verification as
 /// a transient fault.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -119,7 +146,7 @@ pub enum Error {
     ///
     /// The kind is carried as a value and the message as a string because this enum is `Clone`
     /// and `PartialEq` while `std::io::Error` is neither. `action` says what was being attempted,
-    /// so a reader can tell 「could not open the ledger」 from 「could not fsync it」 — which are the
+    /// so a reader can tell "could not open the ledger" from "could not fsync it" (sem: SEM-gx-log-037) — which are the
     /// same `ErrorKind` and completely different facts about durability.
     #[error("{action} ({path}): {detail}")]
     Io {

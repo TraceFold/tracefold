@@ -1,43 +1,51 @@
-//! 🔴 **裁定 #20** (`req/38` §56, req/98 §7-2 手 5 / §9 行 d-1) — **per-object lock は実装しない**。
-//! D-7 の発火条件を維持したまま、**disjoint object 群での commits/sec を測る**だけ。
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **ruling #20** (`req/38` §56, req/98 §7-2 hand 5 / §9 row d-1) — **a per-object lock is not (sem: SEM-gx-engine-029)
+//! implemented**. Keeping D-7's firing condition as is, this only **measures commits/sec over
+//! disjoint object groups**.
 //!
-//! > **20**: **D-7 発火条件を維持**し lock は実装しない・**disjoint object 群での commits/sec 測定を
-//! > 手 5 に追加**
+//! > **20**: **keep D-7's firing condition** and do not implement a lock -- **add commits/sec
+//! > measurement over disjoint object groups to hand 5** (sem: SEM-gx-engine-029)
 //!
-//! 発火条件 (`req/38:930`): 「serve 経由 AC-066 が SLA を割った時」。SLA=33 NFR-003 の 100 commits/s
-//! (暫定値)。∴ この file が答えるのは 1 つの問いである: **N 並行 agent が互いに素な object を触っても、
-//! 1 本の `Mutex` で 100 commits/s を割るか**。
+//! The firing condition (`req/38:930`): "when AC-066, taken through serve, falls below SLA" (quoted
+//! in SEM-gx-engine-029). SLA = 33 NFR-003's 100 commits/s (a provisional value). ∴ the one question
+//! this file answers is: **does a single `Mutex` fall below 100 commits/s even when N concurrent
+//! agents touch mutually disjoint objects?**
 //!
-//! # 三本の arm と、それぞれが何の上界か
+//! # Three arms, and what each is an upper bound on (sem: SEM-gx-engine-029)
 //!
-//! | arm | 形 | 何を答えるか |
+//! | arm | shape | what it answers (sem: SEM-gx-engine-029) |
 //! |---|---|---|
-//! | `single` | 1 thread・1 engine | 直列の基線 (AC-066 の in-process 版と同形) |
-//! | `shared` | N thread・**1 つの `Arc<Mutex<Engine>>`** | **M6-06 採(a) が出荷した形**。D-7 の発火条件はこの数字に対して立つ |
-//! | `disjoint` | N thread・**N 個の engine** (各々が自分の journal と ledger と lock を持つ) | per-object lock が買いうる物の **上界** |
+//! | `single` | 1 thread, 1 engine | the serial baseline (the same shape as AC-066's in-process version) (sem: SEM-gx-engine-029) |
+//! | `shared` | N threads, **one `Arc<Mutex<Engine>>`** | **the shape M6-06 adopted (a) shipped**. D-7's firing condition stands against this number (sem: SEM-gx-engine-029) |
+//! | `disjoint` | N threads, **N engines** (each with its own journal, ledger and lock) | the **upper bound** on what a per-object lock could buy (sem: SEM-gx-engine-029) |
 //!
-//! 🔴 **`disjoint` は per-object lock の実装ではなく、その上界である**。本物の per-object lock は
-//! 「1 つの engine の中で、触る object が違えば待たない」形であり、**ledger と journal は 1 本のまま**
-//! である (append-only log の writer は 1 つ)。この arm はその 2 つも分けてしまうので、per-object lock
-//! が買える値は `shared` と `disjoint` の**間**に在る。上界を測るのは、上界が `shared` に近ければ
-//! 「lock は問題ではない」が**下界を測らずに**言えるからで、逆は言えない——それも下に書く。
+//! 🔴 **`disjoint` is not an implementation of a per-object lock, it is its upper bound.** A real
+//! per-object lock takes the shape "inside one engine, threads touching different objects do not
+//! wait for each other" (quoted in SEM-gx-engine-029), with **the ledger and the journal staying
+//! single** (the append-only log has one writer). This arm splits those two apart as well, so what a
+//! per-object lock could actually buy sits **between** `shared` and `disjoint`. The upper bound is
+//! measured because, if it lands close to `shared`, "the lock is not the problem" can be said
+//! **without measuring the lower bound** -- the reverse cannot be said, and that is written below too.
 //!
-//! # 待ち時間そのものを測る
+//! # Measuring the wait itself (sem: SEM-gx-engine-029)
 //!
-//! `shared` arm は 1 commit ごとに **lock を取るまでの時間**と**保持していた時間**を別々に記録する。
-//! per-object lock が取り除けるのは前者だけである。∴ 「待ちが全体の何 % か」は、上界の arm を信じなく
-//! ても読める唯一の直接測定であり、`LOCK_WAIT_SHARE` がそれである。
+//! The `shared` arm records, per commit, **the time spent waiting to take the lock** and **the time (sem: SEM-gx-engine-029)
+//! spent holding it**, separately. A per-object lock can only remove the former. ∴ "what percentage
+//! of the total is waiting" is the one direct measurement readable without trusting the upper-bound
+//! arm, and `LOCK_WAIT_SHARE` is it.
 //!
 //! # M3-15 / req/98 §6-8
 //!
-//! median + 回数 + 分母。100 commits/s は 33 の**暫定**値であり、この file はそれを pass mark として
-//! 比較しない——**発火条件の判定として**印字する。それは裁定 #20 が明示的に頼んだ判定だからで、
-//! 「割ったか否かが数字で答えられる」(E-M7-6 逐語) の形である。
+//! median + count + denominator. 100 commits/s is 33's **provisional** value, and this file does not
+//! compare against it as a pass mark -- it prints it **as a firing-condition judgement**. That is
+//! because ruling #20 explicitly asked for that judgement, in the shape of "whether it fell below is
+//! answerable with a number" (E-M7-6, verbatim; quoted in SEM-gx-engine-030).
 //!
-//! # 分母
+//! # Denominator (sem: SEM-gx-engine-030)
 //!
-//! tmpfs (`/dev/shm`)。fsync がほぼ無料の場所なので、この数字は **CPU と lock についての数字**であって
-//! disk についての数字ではない (support の module note と同じ申告)。
+//! tmpfs (`/dev/shm`). Since fsync is close to free there, this number is **a number about CPU and (sem: SEM-gx-engine-030)
+//! the lock**, not a number about disk (the same declaration as `support`'s module note).
 
 mod support;
 
@@ -49,27 +57,30 @@ use gx_adapter_fs::FsAdapter;
 use gx_engine::{Engine, InjectedEvidence, Lifecycle};
 use support::{gate, intent_for, measuring, report, signing_key, Sandbox, AT};
 
-/// 既定の並行 agent 数。`GLOVREX_BENCH_AGENTS` で動かせる。
+/// The default number of concurrent agents. Tunable via `GLOVREX_BENCH_AGENTS`. (sem: SEM-gx-engine-031)
 const DEFAULT_AGENTS: usize = 4;
 
-/// 1 agent あたりの commit 数。`GLOVREX_BENCH_COMMITS` で動かせる。
+/// Commits per agent. Tunable via `GLOVREX_BENCH_COMMITS`. (sem: SEM-gx-engine-032)
 const DEFAULT_COMMITS: usize = 150;
 
-/// 33 NFR-003 の暫定 SLA。D-7 の発火条件が参照する値。
+/// 33 NFR-003's provisional SLA. The value D-7's firing condition refers to. (sem: SEM-gx-engine-033)
 const SLA_COMMITS_PER_SEC: f64 = 100.0;
 
-/// 🔴 **§62 R-7**: この bench の判定を **exit code** にする(結線先=`tools/ci.sh` stage 10・既定 off)。
+/// 🔴 **§62 R-7**: this bench's judgement becomes an **exit code** (wired to `tools/ci.sh` stage 10, (sem: SEM-gx-engine-034)
+/// default off).
 ///
-/// 🔴 **この stage が赤になる事は D-7 の発火ではない**。発火条件の逐語は「**serve 経由**の AC-066 が
-/// SLA を割った時」(`req/38:930`)であり、本計器は in-process で HTTP・router・Bearer・JSON を含ま
-/// ない(req/103 §4-1)。裁定 #20 は「lock は実装しない・測るだけ」で、それは動いていない。
+/// 🔴 **this stage going red is not D-7 firing.** The firing condition, verbatim, is "when AC-066,
+/// **taken through serve**, falls below SLA" (`req/38:930`; quoted in SEM-gx-engine-034), and this
+/// instrument is in-process -- it does not include HTTP, the router, Bearer, or JSON (req/103 §4-1).
+/// Ruling #20 is "do not implement the lock, only measure", and that has not moved.
 ///
-/// ∴ ここでの閾値の身分は**回帰 gate**である: 実測は shared で 1,903〜2,163 commits/s(req/103 §4-2)
-/// =SLA の 19〜21 倍で、100 を割る事は「並行 commit の道が 20 倍遅くなった」以外に説明が付かない。
-/// 20 倍の余裕を持つ閾値は noisy な bench に対して安全に赤くできる唯一の種類の閾値であり、それが
-/// この値を選んだ理由である(「発火条件の数字だから」ではない)。
+/// ∴ the threshold here is, in status, **a regression gate**: measured, `shared` runs 1,903-2,163
+/// commits/s (req/103 §4-2) -- 19-21x the SLA -- and falling below 100 has no explanation other than
+/// "the concurrent-commit path got 20x slower". A threshold with 20x headroom is the one kind of
+/// threshold that can safely turn a noisy bench red, and that is why this value was chosen (quoted
+/// in SEM-gx-engine-034) -- not because it is the firing condition's own number.
 ///
-/// `GLOVREX_DISJOINT_MIN_RATE` で動かせ、使った値と出所が数字の隣に印字される。
+/// Tunable via `GLOVREX_DISJOINT_MIN_RATE`; the value used and its source print next to the number. (sem: SEM-gx-engine-034)
 fn min_rate() -> (f64, String) {
     match std::env::var("GLOVREX_DISJOINT_MIN_RATE")
         .ok()
@@ -95,7 +106,7 @@ fn commits() -> usize {
 }
 
 /// One agent's subject: its own directory, so the object sets are **disjoint by construction** and
-/// not by luck. 裁定 #20 asks for 「disjoint object 群」 and a shared directory would make the
+/// not by luck. ruling #20 asks for "disjoint object groups" (quoted in SEM-gx-engine-035) and a shared directory would make the
 /// filesystem the thing under measurement (M5H7-3 (b)'s finding, one substrate over).
 fn subject(agent: usize, n: usize) -> String {
     format!("agent-{agent:02}/subject-{n}")
@@ -146,7 +157,7 @@ fn one(engine: &mut Engine<InjectedEvidence>, sandbox: &Sandbox, agent: usize, n
     )
 }
 
-/// The shipped shape: N threads, one engine, one lock (**M6-06 採(a)**).
+/// The shipped shape: N threads, one engine, one lock (**M6-06 adopted (a)**, sem: SEM-gx-engine-036).
 fn shared_arm(sandbox: &Sandbox, agents: usize, commits: usize) -> (Vec<Attempt>, Duration) {
     let engine = Arc::new(Mutex::new(engine(sandbox, "shared")));
     let started = Instant::now();
@@ -160,7 +171,7 @@ fn shared_arm(sandbox: &Sandbox, agents: usize, commits: usize) -> (Vec<Attempt>
                         let began = Instant::now();
                         // The wait and the hold are two facts. A per-object lock removes the first
                         // and leaves the second, so a number that mixed them would answer a
-                        // different question than 裁定 #20's.
+                        // different question than ruling #20's (sem: SEM-gx-engine-037).
                         let mut held = engine.lock().expect("not poisoned");
                         let waited = began.elapsed();
                         let committed = one(&mut held, sandbox, agent, n);
@@ -262,7 +273,7 @@ fn main() {
     let sandbox = Sandbox::new("disjoint");
     println!(
         "DISJOINT_GENERATOR agents={agents} commits_per_agent={commits} total={} fs={} \
-         cpus={} (裁定 #20: lock は実装しない・測るだけ)",
+         cpus={} (ruling #20: a lock is not implemented, only measured; sem: SEM-gx-engine-038)",
         agents * commits,
         support::filesystem_of(sandbox.dir()),
         std::thread::available_parallelism().map_or(0, std::num::NonZeroUsize::get),
@@ -277,9 +288,10 @@ fn main() {
     report("DISJOINT_SHARED_WAIT", "lock acquisition", &mut waits);
     let total_wait: Duration = shared.iter().map(|a| a.waited).sum();
     let total_took: Duration = shared.iter().map(|a| a.took).sum();
-    // 🔴 二つの share を印字する。**和の比は 1 本の外れ値で壊れる** ——最初の測定で、600 本のうち
-    // 1 本が 301 ms 待ち、p50 が 50 ns のまま和の比が 0.69 になった。和だけを出せば「待ちが 7 割」と
-    // 読まれ、それは分布についての嘘である。中央値の比を隣に置き、最大待ちを名指しする。
+    // 🔴 Print two shares. **A ratio of sums breaks on one outlier** -- in the first measurement, 1 of
+    // 600 waited 301ms, and with p50 still 50ns the ratio of sums came out 0.69. Printing only the sum
+    // would be read as "70% is waiting" (quoted in SEM-gx-engine-039), and that is a lie about the
+    // distribution. Put the ratio of medians beside it, and name the longest wait.
     let mut sorted_waits: Vec<Duration> = shared.iter().map(|a| a.waited).collect();
     let mut sorted_took: Vec<Duration> = shared.iter().map(|a| a.took).collect();
     sorted_waits.sort_unstable();
@@ -288,7 +300,7 @@ fn main() {
     println!(
         "DISJOINT_LOCK_WAIT_SHARE sum={:.4} median={:.6} total_wait={total_wait:.3?} \
          total_wall={total_took:.3?} max_wait={:.3?}  \
-         (per-object lock が取り除けるのは wait だけ。sum は外れ値 1 本で壊れるので median を隣に置く)",
+         (a per-object lock only removes the wait; the sum breaks on one outlier, so the median sits beside it; sem: SEM-gx-engine-040)",
         total_wait.as_secs_f64() / total_took.as_secs_f64().max(f64::MIN_POSITIVE),
         sorted_waits[mid].as_secs_f64() / sorted_took[mid].as_secs_f64().max(f64::MIN_POSITIVE),
         sorted_waits[sorted_waits.len() - 1],
@@ -308,9 +320,10 @@ fn main() {
     println!(
         "DISJOINT_D7 sla={SLA_COMMITS_PER_SEC} commits/s  shared_below_sla={below}  \
          floor={floor} BUDGET_SOURCE={budget_source}  \
-         (発火条件=`req/38:930`「serve 経由 AC-066 が SLA を割った時」。本計器は **in-process** であり \
-         serve ではない——HTTP・router・Bearer・JSON は含まれない。∴ この行は発火条件そのものの判定では \
-         なく、その手前の数字である)"
+         (the firing condition is `req/38:930`, \"when AC-066, taken through serve, falls below SLA\" \
+         (quoted in SEM-gx-engine-041). This instrument is **in-process** and is not serve -- HTTP, \
+         the router, Bearer and JSON are not included. ∴ this line is not the firing condition's own \
+         judgement, it is the number one step before it)"
     );
 
     // 🔴 §62 R-7: the judgement leaves the process. See `min_rate`'s documentation for why a red
@@ -319,7 +332,8 @@ fn main() {
     if below {
         eprintln!(
             "DISJOINT_FAIL shared={shared_rate:.2} < floor={floor} commits/s ({budget_source}) — \
-             回帰であって D-7 の発火ではない(発火条件は serve 経由・裁定 #20 は不変)"
+             a regression, not D-7 firing (the firing condition goes through serve; ruling #20 is \
+             unchanged; sem: SEM-gx-engine-042)"
         );
         std::process::exit(1);
     }

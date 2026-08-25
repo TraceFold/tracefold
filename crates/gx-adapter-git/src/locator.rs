@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Lexical locator normalisation for git: the `≈` of 42 §2.3, as a function (**E-M4-12**).
 //!
 //! The five clauses are in the crate root, where 42 §2.3 requires them and where an implementor
@@ -84,7 +86,7 @@ impl Position {
 /// The representative spelling of a locator (crate root, clauses 1-5).
 ///
 /// Total: every string has a normal form, including one this adapter would refuse to act on. That is
-/// deliberate and it is L7's shape -- the property is 「normalising twice changes nothing」 over *every*
+/// deliberate and it is L7's shape -- the property is "normalising twice changes nothing" over *every* (sem: SEM-gx-adapter-git-053)
 /// string, and the refusal of a locator that is not a position happens where the locator is **used**
 /// ([`parse`]), not where it is spelled. A normaliser that refused would make L7 a property with
 /// exceptions.
@@ -113,8 +115,8 @@ pub fn normalize(locator: &str) -> String {
 /// # Errors
 /// [`Error::NotAPosition`] when the spelling names fewer than three parts, when the repository is not
 /// absolute (ASM-69-3), when the reference or the path is empty, or when the path has more than
-/// [`crate::delta::MAX_PATH_DEPTH`] components. All five are 「引数が位置でない」 and not 「適用に失敗
-/// した」 (**M4H5-5 採(b)**): 43 T-11 turns `ApplyFailed` into `AbortReason::ApplyFailed`, which would
+/// [`crate::delta::MAX_PATH_DEPTH`] components. All five are "the argument is not a position" and not "application failed
+/// " (**M4H5-5, adopted (b)**): 43 T-11 turns `ApplyFailed` into `AbortReason::ApplyFailed`, which would (sem: SEM-gx-adapter-git-054)
 /// record a change that failed where no change was ever describable.
 pub fn parse(locator: &str) -> Result<Position> {
     let normalised = normalize(locator);

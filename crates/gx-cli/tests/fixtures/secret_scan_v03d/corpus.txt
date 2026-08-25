@@ -1,0 +1,10 @@
+v0.3-d corpus (req/159 SD item 6): the three shapes req/136 S5 declared uncovered, one line each.
+Every value below is constructed to the issuer's documented FORMAT with EXAMPLE markers in the
+material; no real credential was generated, copied, or ever existed for any of them.
+Formats collected from primary documentation (recorded in Desktop/GitRepo/REFERENCES.md 2026-08-15):
+RFC 7519 S3 (JWS compact: base64url header . payload . signature, JSON objects open eyJ);
+learn.microsoft.com storage-configure-connection-string (AccountKey= base64, real keys 88 chars);
+docs.cloud.google.com iam/docs/keys-create-delete (the type field naming service_account marks the file).
+SESSION_JWT_EXAMPLE="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJFWEFNUExFLXN1YmplY3QiLCJpYXQiOjB9.EXAMPLEfakesignaturebytesEXAMPLEnotreal"
+AZURE_STORAGE_CONNECTION_EXAMPLE="DefaultEndpointsProtocol=https;AccountName=exampleacct;AccountKey=EXAMPLEexampleEXAMPLEexampleEXAMPLEexampleEXAMPLEexampleEXAMPLEexample0123456789fake==;EndpointSuffix=core.windows.net"
+GCP_SA_KEY_FILE_MARKER_EXAMPLE='{"type": "service_account", "project_id": "example-project-id"}'

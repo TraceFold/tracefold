@@ -1,17 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! `gx key gen` / `gx key list` — 44 §1.2, req/56 §3, and **M6-29**.
 //!
 //! # 🔴 The secret never reaches stdout, and that is a check rather than a habit
 //!
-//! 44 §1.2: 「`gen`: `Actor`署名鍵を生成（ed25519-dalek, 41既定）。stdout: `{ "key_id": KEY_ID,
-//! "public_key": <base64> }`（秘密鍵はファイル/OSキーストアへ、**標準出力に出さない**）」. req/88 §4
-//! M6-29 turned the last clause into this hand's DoD: 「`gx key gen --json` の出力に秘密鍵 byte が
-//! 現れない probe」. `crates/gx-cli/tests/key_surface.rs` generates from a **known seed**, so it can
-//! look for the actual thirty-two bytes rather than for the word 「secret」 — a probe that grepped
+//! 44 §1.2: "`gen`: generates an `Actor` signing key (ed25519-dalek, 41's default). stdout:
+//! `{ "key_id": KEY_ID, "public_key": <base64> }` (the secret key goes to a file/OS keystore,
+//! **never to stdout**)" (sem: SEM-gx-cli-040). req/88 §4
+//! M6-29 turned the last clause into this hand's DoD: "a probe that checks `gx key gen --json`'s
+//! output contains no secret-key byte". `crates/gx-cli/tests/key_surface.rs` generates from a **known seed**, so it can
+//! look for the actual thirty-two bytes rather than for the word "secret" — a probe that grepped
 //! for a field name would pass on a leak with a different label.
 //!
 //! # Where the keys are
 //!
-//! req/56 §3: 「秘密鍵=`~/.gx/keys/`(user home・0600)。project 側は**公開 keyid の参照のみ**」. The
+//! req/56 §3: "the secret key lives at `~/.gx/keys/` (user home, 0600); the project side holds
+//! **only a reference to the public keyid**" (sem: SEM-gx-cli-041). The
 //! project's `.gx/` therefore holds no key at all, and [`KeyStore`] is rooted at the user's home
 //! rather than at [`crate::layout::Layout`] — the one store in this binary that is not under the
 //! project. `KeyPair::save` sets `0o600` at creation on unix (a `create` then `chmod` leaves a
@@ -41,9 +45,9 @@ pub const ALGORITHM: &str = gx_witness::keys::KEY_ALGORITHM;
 
 /// The id a public key is filed and signed under.
 ///
-/// `ed25519-` and the first eight bytes of the public key, in hex. Not a digest: 則 1 (i) keeps this
+/// `ed25519-` and the first eight bytes of the public key, in hex. Not a digest: Rule 1 (i) keeps this (sem: SEM-gx-cli-042)
 /// crate away from `gx_canon`, and a key id is not a gx identity — 42 §1.2's `gx1:` namespace is for
-/// content addresses and a key id belongs to 42 §3.2's 「DSSE `keyid`と同一名前空間」, which is a
+/// content addresses and a key id belongs to 42 §3.2's "the same namespace as DSSE's `keyid`" (sem: SEM-gx-cli-043), which is a
 /// string. Hex of the key's own bytes is a **rendering** of the key, so two different keys cannot
 /// share an id unless they share sixty-four bits of public key, and the value is reproducible by
 /// anybody holding the key rather than by anybody holding this binary.
@@ -73,6 +77,89 @@ pub struct KeyEntry {
     /// `0o077` to compare against — gx-witness declares that gap (req/54 §5) and a `true` here
     /// would launder it into a guarantee.
     pub permissions_ok: Option<bool>,
+    /// 🔴 **R6 / `req/229` M-06** — the id the key inside the file derives, or `None` if the file
+    /// could not be opened or read as a plaintext key.
+    ///
+    /// `None` covers three cases on purpose and the listing does not pretend to tell them apart:
+    /// an unreadable file (the permissions case this verb exists for), an encrypted key (`gen
+    /// --passphrase-file`, whose id cannot be derived without the passphrase), and a file that is
+    /// not a key at all. What matters for M-06 is the fourth case: a value that is present and
+    /// **different** from [`KeyEntry::key_id`].
+    pub key_id_inside: Option<String>,
+    /// 🔴 **R15 / `req/259` H-01** — the public half, base64, or `None` for the same three cases
+    /// [`KeyEntry::key_id_inside`] covers.
+    ///
+    /// `gx key gen` puts `key_id` and `public_key` on stdout and puts the secret's location on
+    /// stderr. The fifteenth audit measured a run whose stdout never arrived — exit 101 from a
+    /// panicking `eprintln!`, the secret on the disk, and **no string anywhere naming the key**.
+    /// The panic is closed in `emit`; this closes the other half, which is that the two public
+    /// fields existed only on a stream. They do not: the file holds the seed, so both are
+    /// derivable, and this verb already opens the file to answer `key_id_inside`. Nothing new is
+    /// exposed — a public key is the half that is published.
+    pub public_key: Option<String>,
+}
+
+impl KeyEntry {
+    /// 🔴 **R6 / `req/229` M-06** — whether the name on the file and the key inside it agree.
+    ///
+    /// `true` when the id could not be read: an unreadable file is not a mismatch, and calling it
+    /// one would make every encrypted key look tampered with.
+    #[must_use]
+    pub fn named_correctly(&self) -> bool {
+        self.key_id_inside
+            .as_ref()
+            .is_none_or(|inside| inside == &self.key_id)
+    }
+}
+
+/// The id the key inside a file derives, without asserting anything about whether it should be
+/// there.
+///
+/// Plaintext keys only: an encrypted key needs its passphrase and this verb has none, so it answers
+/// `None` rather than prompting or failing. Permission refusals also land here as `None`, which is
+/// what keeps [`KeyStore::list`]'s promise that listing does not need the authority to read.
+fn read_key_id(path: &Path) -> Option<String> {
+    KeyPair::load(path)
+        .ok()
+        .map(|pair| pair.key_id().to_string())
+}
+
+/// 🔴 **R15 / `req/259` H-01** — the public half of the key inside a file, base64.
+///
+/// The same read as [`read_key_id`] and the same three `None`s (unreadable, encrypted, not a key).
+/// Separate rather than folded into one call because these are two facts and `KeyEntry` reports
+/// them as two.
+fn read_public_key(path: &Path) -> Option<String> {
+    KeyPair::load(path)
+        .ok()
+        .map(|pair| gx_core::b64::encode(&pair.public().to_bytes()))
+}
+
+/// 🔴 **R7 / `req/232` H-01** — the key store, in the shape a door asks it for a public key.
+///
+/// `gx_engine::HeadKeys` is asked one question — *do you hold the key this document names?* — and
+/// the answer is a key or nothing. **Nothing is never a failure here**: an encrypted key, a key
+/// this operator does not have, a directory that is not readable and a deployment with no store at
+/// all are all "this environment cannot check the head", which is reported as
+/// `head_authenticity: "unverified"` and is not a pass. The audit's finding was exactly that a
+/// missing check was being reported as a passed one.
+#[derive(Debug)]
+pub struct StoreHeadKeys {
+    store: KeyStore,
+}
+
+impl StoreHeadKeys {
+    /// The verifier over a key store.
+    #[must_use]
+    pub fn new(store: KeyStore) -> Self {
+        Self { store }
+    }
+}
+
+impl gx_engine::HeadKeys for StoreHeadKeys {
+    fn verifying(&self, key_id: &str) -> Option<gx_witness::PublicKey> {
+        self.store.load(key_id).ok().map(|pair| pair.public())
+    }
 }
 
 impl KeyStore {
@@ -87,7 +174,7 @@ impl KeyStore {
     /// # Errors
     /// [`Error::Usage`] if the environment names no home directory. A refusal rather than a
     /// fallback to the working directory: writing a secret into whatever directory the operator
-    /// happened to be in is the failure req/56 §1's 「秘密は project に置かない」 forbids.
+    /// happened to be in is the failure req/56 §1's "do not put secrets in the project" (sem: SEM-gx-cli-044) forbids.
     pub fn user_default() -> Result<Self> {
         let home = std::env::var_os("HOME")
             .or_else(|| std::env::var_os("USERPROFILE"))
@@ -128,18 +215,93 @@ impl KeyStore {
 
     /// Load the key pair filed under `key_id`.
     ///
+    /// # 🔴 **R5 / `req/227` M-06** — the file name and the key inside it have to agree
+    ///
+    /// This function opened `<key_id>.key` and answered with whatever key was inside, without ever
+    /// comparing the two. `req/227` M-06 put an actor key's bytes into the engine key's file and
+    /// watched `gx undo` refuse with `… does not verify under the key it names,
+    /// "ed25519-833a84909f1f9dfe"` — while the receipt in question named `ed25519-ad0f…`, the id
+    /// this store had been asked for. The sentence was false about the document it was about, and
+    /// the operator was sent to look for tampering in the wrong place. `gx key list` reads file
+    /// names alone (deliberately: listing must not need the authority to read), so it answered
+    /// `permissions_ok: true` for both and nothing anywhere said the two disagreed.
+    ///
+    /// A store is a map from an id to a key, and a map whose key and value disagree is not a map.
+    /// So the mismatch is its own refusal, and it names **both** ids: the one that was asked for,
+    /// which is the one every receipt and every config file spells, and the one that is actually in
+    /// the file.
+    ///
     /// # Errors
     /// [`Error::NotFound`] if there is no such file, [`Error::Witness`] if it is not a key this
-    /// version reads or if anyone but its owner can read it.
+    /// version reads or if anyone but its owner can read it, [`Error::Malformed`] if the file's
+    /// name and the key's own id disagree.
+    ///
+    /// 🔴 **R41 / `req/561`** — supplement to the first sentence above: "there is no such file" is
+    /// established by [`crate::layout::presence_of`] answering `Absent` (the operating system said
+    /// `NotFound`), and by nothing else. A path whose `stat` fails for any other reason, or that
+    /// holds something other than a regular file, is **not** answered as absence: it falls through
+    /// to [`KeyPair::load`], whose own `# Errors` words above already cover it. Before R41 this
+    /// door spelled the question `!path.is_file()`, which folds every `stat` failure into "no such
+    /// file" — `req/559` measured that fold turning a transient `stat` failure under parallel load
+    /// into `NOT_FOUND` about a key that was sitting on disk.
     pub fn load(&self, key_id: &str) -> Result<KeyPair> {
         let path = self.path_of(key_id);
-        if !path.is_file() {
+        if crate::layout::presence_of(&path).is_absent() {
             return Err(Error::NotFound {
                 what: "key",
                 id: key_id.to_string(),
             });
         }
-        Ok(KeyPair::load(&path)?)
+        let pair = KeyPair::load(&path)?;
+        self.named_as(key_id, pair, &path)
+    }
+
+    /// 🔴 **R5 / `req/227` M-06** — the file-name-versus-contents check, for both loaders.
+    ///
+    /// # Errors
+    /// [`Error::Malformed`] naming both ids when they disagree.
+    fn named_as(&self, key_id: &str, pair: KeyPair, path: &Path) -> Result<KeyPair> {
+        if pair.key_id() != key_id {
+            return Err(Error::Malformed {
+                what: "key file",
+                path: path.display().to_string(),
+                detail: format!(
+                    "req/56 §3's key store files a key under its own id, and this file is named \
+                     for {key_id:?} while the key inside it is {:?}. Whichever of the two a \
+                     receipt names, one of them is not here — so the store answers neither \
+                     (req/227 M-06). `gx key list` shows the file names; the id printed here is \
+                     the key's own",
+                    pair.key_id()
+                ),
+            });
+        }
+        Ok(pair)
+    }
+
+    /// 🔴 **P2 item2** (`req/130` §1) — load a key [`gen`] wrote **encrypted**
+    /// (`--passphrase-file`), under its passphrase.
+    ///
+    /// # Errors
+    /// [`Error::NotFound`] if there is no such file, [`Error::Witness`] wrapping
+    /// [`gx_witness::Error::WrongPassphrase`] if the passphrase is wrong or the file is corrupted,
+    /// [`gx_witness::Error::KeyFormat`] if the file is not encrypted at all (`load` above is the
+    /// road for that one).
+    ///
+    /// 🔴 **R41 / `req/561`** — the same supplement as [`KeyStore::load`]'s: only
+    /// [`crate::layout::presence_of`]'s `Absent` answers `Error::NotFound`; every other `stat`
+    /// outcome falls through to [`KeyPair::load_encrypted`] and wears that road's own words.
+    pub fn load_encrypted(&self, key_id: &str, passphrase: &str) -> Result<KeyPair> {
+        let path = self.path_of(key_id);
+        if crate::layout::presence_of(&path).is_absent() {
+            return Err(Error::NotFound {
+                what: "key",
+                id: key_id.to_string(),
+            });
+        }
+        let pair = KeyPair::load_encrypted(&path, passphrase)?;
+        // 🔴 **R5 / `req/227` M-06** — the same check on the encrypted road: the passphrase proves
+        // who may open the file and says nothing about which key is inside it.
+        self.named_as(key_id, pair, &path)
     }
 
     /// Every key file in the store, by id.
@@ -150,8 +312,8 @@ impl KeyStore {
     ///
     /// # Errors
     /// [`Error::Io`] if the directory exists and cannot be listed. A directory that is **not there**
-    /// is an empty store rather than a failure: req/56 §3's path is created by `gen`, and 「you have
-    /// no keys yet」 is not an error condition.
+    /// is an empty store rather than a failure: req/56 §3's path is created by `gen`, and "you have
+    /// no keys yet" is not an error condition. (sem: SEM-gx-cli-045)
     pub fn list(&self) -> Result<Vec<KeyEntry>> {
         let entries = match std::fs::read_dir(&self.dir) {
             Ok(entries) => entries,
@@ -167,9 +329,28 @@ impl KeyStore {
             let Some(key_id) = path.file_stem().map(|s| s.to_string_lossy().to_string()) else {
                 continue;
             };
+            // 🔴 **R6 / `req/229` M-06** — the id inside the file, beside the id on the file.
+            //
+            // `req/227` M-06 was closed for `KeyStore::load`, which refuses a file whose contents
+            // are a different key and names both ids. `req/229` measured the half that was left:
+            // this function reads **file names only**, so a store where key `A`'s file holds key
+            // `B`'s bytes answered `{"key_id":"…de56e8db…","permissions_ok":true}` for a key that
+            // does not exist anywhere — while `gx serve --signing-key A` refused. `gx key list` is
+            // the one verb an operator runs to see what they have.
+            //
+            // The reason the ids came from names is kept and is still good: "listing keys should
+            // not require the authority to read them". So a file that will not open is not an
+            // error and not a silence — `key_id_inside` is `null`, `readable` is `false`, and the
+            // permissions judgement is unchanged. Only a file that **does** open and disagrees is
+            // called out, and it is called out as a fact rather than as a refusal.
+            let inside = read_key_id(&path);
+            // 🔴 **R15 / `req/259` H-01** — read from the same file, in the same breath.
+            let public_key = read_public_key(&path);
             out.push(KeyEntry {
                 key_id,
                 permissions_ok: permissions_ok(&path),
+                key_id_inside: inside,
+                public_key,
                 path,
             });
         }
@@ -204,7 +385,7 @@ fn permissions_ok(_path: &Path) -> Option<bool> {
 ///
 /// `None` off unix and for a file nobody else can read. A warning rather than a refusal: an operator
 /// exporting a key to a shared volume on purpose is a real case, and 44 §1.2 gives `gen` no exit
-/// code for 「wrote it, but somewhere unsafe」.
+/// code for "wrote it, but somewhere unsafe" (sem: SEM-gx-cli-046).
 #[must_use]
 pub fn permission_warning(path: &Path) -> Option<String> {
     match permissions_ok(path) {
@@ -227,7 +408,7 @@ pub fn permission_warning(path: &Path) -> Option<String> {
 /// operating system supplies no entropy or the file cannot be written, [`Error::Io`] if the
 /// directory cannot be created.
 pub fn gen(store: &KeyStore, alg: &str, out: Option<&Path>) -> Result<Outcome> {
-    gen_recording(store, alg, out, None)
+    gen_recording(store, alg, out, None, None)
 }
 
 /// 🔴 `gx key gen --record` (**FR-M7-4**): the same generation, with the id written where a server
@@ -237,6 +418,13 @@ pub fn gen(store: &KeyStore, alg: &str, out: Option<&Path>) -> Result<Outcome> {
 /// `gx key gen --json > key.pub.json` — so where the id was recorded goes to **stderr**, next to
 /// where the secret was filed and for the same reason.
 ///
+/// # 🔴 `passphrase` — **P2 item2** (`req/130` §1)
+///
+/// `Some` writes the secret encrypted ([`KeyPair::save_encrypted`]) instead of plaintext-0600
+/// ([`KeyPair::save`]); `None` is unchanged from before P2. Opt-in, per ruling 2 (sem: SEM-gx-cli-047): the caller (`gx key
+/// gen --passphrase-file <PATH>`, main.rs) decides, and a caller that decides nothing gets exactly
+/// today's behaviour.
+///
 /// # Errors
 /// Everything [`gen`] refuses, plus [`Error::Io`] if `.gx/config.toml` cannot be written.
 pub fn gen_recording(
@@ -244,12 +432,13 @@ pub fn gen_recording(
     alg: &str,
     out: Option<&Path>,
     record_into: Option<&Layout>,
+    passphrase: Option<&str>,
 ) -> Result<Outcome> {
-    let outcome = generate(store, alg, out)?;
+    let outcome = generate(store, alg, out, passphrase)?;
     if let Some(layout) = record_into {
         let key_id = outcome.json["key_id"].as_str().unwrap_or_default();
         let path = crate::serve::record_signing_keyid(layout, key_id)?;
-        eprintln!(
+        crate::note!(
             "gx: recorded engine_signing_keyid = {key_id:?} in {} (FR-M7-4)",
             path.display()
         );
@@ -257,7 +446,12 @@ pub fn gen_recording(
     Ok(outcome)
 }
 
-fn generate(store: &KeyStore, alg: &str, out: Option<&Path>) -> Result<Outcome> {
+fn generate(
+    store: &KeyStore,
+    alg: &str,
+    out: Option<&Path>,
+    passphrase: Option<&str>,
+) -> Result<Outcome> {
     if alg != ALGORITHM {
         return Err(Error::Usage {
             detail: format!(
@@ -286,25 +480,56 @@ fn generate(store: &KeyStore, alg: &str, out: Option<&Path>) -> Result<Outcome> 
             std::fs::create_dir_all(parent).map_err(io("create", parent))?;
         }
     }
-    pair.save(&path)?;
+    match passphrase {
+        Some(pass) => pair.save_encrypted(&path, pass)?,
+        None => pair.save(&path)?,
+    }
 
     // 🔴 The two fields 44 §1.2 names, and no third. `path` is deliberately **not** here: it would
     // be the location of a secret, printed by the command whose contract is that the secret does not
     // reach stdout. It goes to stderr as a note in `main`, where a redirect to a file does not
-    // capture it.
+    // capture it. Whether the write was encrypted is not a third field either, for the same reason —
+    // the operator who passed `--passphrase-file` already knows.
     Ok(Outcome::ok(serde_json::json!({
         "key_id": pair.key_id(),
         "public_key": gx_core::b64::encode(&pair.public().to_bytes()),
     })))
 }
 
-/// `gx key list` (44 §1.2: 「ローカル既知鍵ID一覧」).
+/// 🔴 **P2 item2** (`req/130` §1) — read a passphrase from a **file**, the shape 44 §2.5's bearer
+/// token takes (`--token-file`, `crates/gx-cli/src/serve.rs`) and for the identical reason: the
+/// **path** is the argument and the passphrase is not, so `ps` shows where the secret lives and not
+/// what it is.
+///
+/// # Errors
+/// [`Error::Io`] if the file cannot be read, [`Error::Usage`] if it holds nothing (an empty
+/// passphrase silently accepted would be a plaintext key wearing an encrypted one's shape —
+/// [`gx_witness::KeyPair::save_encrypted`] also refuses it, and the message is given here first,
+/// where the operator can still choose a different file).
+pub fn read_passphrase(path: &Path) -> Result<String> {
+    let passphrase = std::fs::read_to_string(path)
+        .map_err(io("read", path))?
+        .trim()
+        .to_string();
+    if passphrase.is_empty() {
+        return Err(Error::Usage {
+            detail: format!(
+                "{} holds no passphrase; an empty passphrase would make `gen --passphrase-file` a \
+                 plaintext key wearing an encrypted one's shape",
+                path.display()
+            ),
+        });
+    }
+    Ok(passphrase)
+}
+
+/// `gx key list` (44 §1.2: "list of locally known key IDs" (sem: SEM-gx-cli-048)).
 ///
 /// # 🔴 The permission warning
 ///
 /// `KeyPair::load` refuses a world-readable key, but a refusal at use time tells an operator only
-/// about the key they reached for. req/88 §4 M6-29 採(a): 「**0600 でない file を見つけたら警告**=
-/// witness の `KeyPermissions` error の CLI 版」. So the listing carries the mode judgement per key,
+/// about the key they reached for. req/88 §4 M6-29 adopted (a): "**warn when a file that is not
+/// 0600 is found** -- the CLI's version of witness's `KeyPermissions` error" (sem: SEM-gx-cli-049). So the listing carries the mode judgement per key,
 /// and the exit status stays 0 — a warning that failed the command would make `list` unusable for
 /// the exact operator who needs it.
 ///
@@ -316,6 +541,18 @@ pub fn list(store: &KeyStore) -> Result<Outcome> {
         .iter()
         .filter(|e| e.permissions_ok == Some(false))
         .count();
+    // 🔴 **R6 / `req/229` M-06** — how many of these files are not the key they are named for.
+    let misnamed = entries.iter().filter(|e| !e.named_correctly()).count();
+    for entry in entries.iter().filter(|e| !e.named_correctly()) {
+        crate::note!(
+            "gx key list: {} is named for {:?} and the key inside it is {:?}. `gx` refuses to load \
+             either id from this file (req/227 M-06); neither key is usable until the file is put \
+             back under its own name (req/229 M-06)",
+            entry.path.display(),
+            entry.key_id,
+            entry.key_id_inside.as_deref().unwrap_or("")
+        );
+    }
     Ok(Outcome::ok(serde_json::json!({
         "dir": store.dir().display().to_string(),
         "keys": entries
@@ -323,15 +560,25 @@ pub fn list(store: &KeyStore) -> Result<Outcome> {
             .map(|e| serde_json::json!({
                 "key_id": e.key_id,
                 "permissions_ok": e.permissions_ok,
+                // 🔴 **R6 / `req/229` M-06** — the two ids, separately, because they are two facts.
+                // The audit's raw is this verb answering `permissions_ok: true` for a key id that
+                // exists nowhere. 44 §1.2's "list of locally known key IDs" is unmoved: the file
+                // name is still `key_id` and still first.
+                "key_id_inside": e.key_id_inside,
+                // 🔴 **R15 / `req/259` H-01** — the field `gx key gen` prints beside `key_id`, so
+                // a key made by a run whose stdout never arrived can still be named in full.
+                "public_key": e.public_key,
+                "named_correctly": e.named_correctly(),
             }))
             .collect::<Vec<_>>(),
         "count": entries.len(),
         "insecure": insecure,
+        "misnamed": misnamed,
     })))
 }
 
 // ---------------------------------------------------------------------------
-// `gx key revoke` / `gx key rotate` (**FR-M7-3**, 裁定 #6)
+// `gx key revoke` / `gx key rotate` (**FR-M7-3**, ruling #6) (sem: SEM-gx-cli-050)
 // ---------------------------------------------------------------------------
 
 /// The revocations a store holds, as the signed envelopes a verifier is handed.
@@ -342,7 +589,7 @@ pub fn list(store: &KeyStore) -> Result<Outcome> {
 /// # Errors
 /// [`Error::Io`] if the file exists and cannot be read, [`Error::Malformed`] if it is not a list of
 /// DSSE envelopes. Malformed is a refusal and not an empty list: a revocation list that cannot be
-/// read is exactly the file an attacker would corrupt, and answering 「no revocations」 about it is
+/// read is exactly the file an attacker would corrupt, and answering "no revocations" (sem: SEM-gx-cli-051) about it is
 /// the fail-open req/29 §4 forbids.
 pub fn read_revocations(path: &Path) -> Result<Vec<DsseEnvelope>> {
     let raw = match std::fs::read(path) {
@@ -383,9 +630,10 @@ fn append_revocation(path: &Path, envelope: DsseEnvelope) -> Result<usize> {
 ///
 /// # This verb is not in 44 §1.2, and that is a ruling rather than an oversight
 ///
-/// 44 §1.2's key section is `gen` and `list`. 裁定 #6 (req/98 §3-2) put rotation and revocation in
-/// M7 — 「U-06/13 鍵ローテ=M7 採」 — and 45 §2's TH-5 has named 「鍵ローテーション（世代付き鍵ID）」 as a
-/// control since v0.1. **M6-24 採(b)** is the precedent for the shape: `gx log checkpoint` is a verb
+/// 44 §1.2's key section is `gen` and `list`. Ruling #6 (req/98 §3-2) put rotation and revocation in
+/// M7 — "U-06/13 key rotation = adopted for M7" (sem: SEM-gx-cli-052) — and 45 §2's TH-5 has named "key rotation
+/// (generation-numbered key id)" as a
+/// control since v0.1. **M6-24 adopted (b)** is the precedent for the shape: `gx log checkpoint` is a verb
 /// 44 §1.1 does not list, added because a ruling required the capability.
 ///
 /// # The signature, and why the store has to hold the secret
@@ -439,6 +687,12 @@ pub fn revoke(
 /// of `Retroaction::FromRevocation` — and deleting the file would make a revoked key
 /// indistinguishable from a lost one at the only place that can tell them apart.
 ///
+/// # 🔴 The successor is written plaintext (**P2 item2 residual**)
+///
+/// `req/130` §1 item2 scopes encryption to `gen`/`load`; `rotate`'s successor has no
+/// `--passphrase-file` of its own in this pass, named rather than silently dropped
+/// (`req/131` §3).
+///
 /// # Errors
 /// Everything [`gen`] and [`revoke`] refuse.
 pub fn rotate(
@@ -453,7 +707,7 @@ pub fn rotate(
     // left a new key behind and could not revoke the old one is the half-done state above.
     let _ = store.load(key_id)?;
 
-    let generated = gen_recording(store, alg, None, record_into)?;
+    let generated = gen_recording(store, alg, None, record_into, None)?;
     let successor = generated.json["key_id"]
         .as_str()
         .unwrap_or_default()
@@ -476,7 +730,7 @@ pub fn rotate(
 ///
 /// Both, in that order, because they are the two things an operator plausibly points `--key` at and
 /// telling them apart costs one parse. A file that is neither is refused with the reason, rather
-/// than with 「not a key」 — an operator who passed the receipt by mistake should be told that.
+/// than with "not a key" (sem: SEM-gx-cli-053) — an operator who passed the receipt by mistake should be told that.
 ///
 /// # Errors
 /// [`Error::Io`] if the file cannot be read; [`Error::Usage`] if it is neither document;

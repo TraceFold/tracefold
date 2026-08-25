@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 44 §2.2's thirteen, driven end to end through 51 §7's test client.
 //!
 //! The whole pipeline over HTTP: create → verify → commit → undo, plus the read side and the two
@@ -21,8 +23,8 @@ fn id_of(json: &serde_json::Value) -> String {
 ///
 /// Three facts and each fails a different wrong implementation:
 ///
-/// * **201 with a `Candidate`** — 44 §2.1's 「submit+plan相当を1呼び出しで実行…Draft単独状態は
-///   HTTP層では観測不可」. A surface that returned a `Draft` would be publishing the state §2.1 says
+/// * **201 with a `Candidate`** — 44 §2.1's "runs the equivalent of submit+plan in one call … the Draft-alone
+///   state is not observable at the HTTP layer" (sem: SEM-gx-api-362). A surface that returned a `Draft` would be publishing the state §2.1 says
 ///   is not observable;
 /// * **the verdict is `Admit` and the proof is there** — M6H3-2's other consumer;
 /// * **the substrate moved** — a commit that answered 200 without applying would be a receipt about
@@ -44,7 +46,7 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
     assert_eq!(
         created.status.as_u16(),
         201,
-        "44 §2.2: 「Response `201 Created`」"
+        "44 §2.2: \"Response `201 Created`\" (sem: SEM-gx-api-363)"
     );
     assert_eq!(created.json["state"], "Candidate");
     assert!(
@@ -56,7 +58,7 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
         created.json["created_at"]
             .as_str()
             .is_some_and(|s| s.ends_with('Z')),
-        "44 §0: 「日時はRFC 3339」, and the conversion is 「API層の責務」 (M6H2-4): {}",
+        "44 §0: \"date-times are RFC 3339\", and the conversion is \"the API layer's responsibility\" (M6H2-4; sem: SEM-gx-api-364): {}",
         created.json
     );
     let id = id_of(&created.json);
@@ -68,7 +70,7 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
     assert_eq!(
         verified.status.as_u16(),
         200,
-        "ASM-44-2 permits the synchronous reading, and M6-06 採(a) is why this build takes it"
+        "ASM-44-2 permits the synchronous reading, and M6-06, adopted (a) (sem: SEM-gx-api-365), is why this build takes it"
     );
     assert_eq!(verified.json["verdict"], "Admit");
     assert_eq!(verified.json["state"], "Admitted");
@@ -86,7 +88,7 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
     assert_eq!(committed.json["state"], "Committed");
     assert!(
         committed.json["envelope"].is_object(),
-        "44 §2.2: 「`Receipt`（42 §3.10のJSON表現、`payload`はbase64）」: {}",
+        "44 §2.2: \"`Receipt` (42 §3.10's JSON representation, `payload` is base64)\" (sem: SEM-gx-api-366): {}",
         committed.json
     );
     assert_eq!(
@@ -136,10 +138,10 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
     assert_eq!(by_index.status.as_u16(), 200);
     assert_eq!(
         by_index.json, proof.json,
-        "44 §2.2: 「`leaf`は`u64`…または`gx1:...`…を受理する」 — the two spellings name one leaf"
+        "44 §2.2: \"`leaf` accepts a `u64` … or `gx1:...` …\" (sem: SEM-gx-api-367) — the two spellings name one leaf"
     );
 
-    // 🔴 M6-24 採(b): the handler is the producer of a **signed** head.
+    // 🔴 M6-24, adopted (b) (sem: SEM-gx-api-368): the handler is the producer of a **signed** head.
     let checkpoint = client.send("GET", "/v1/ledger/checkpoint", None).await;
     println!(
         "CHECKPOINT={} {}",
@@ -151,7 +153,7 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
         checkpoint.json["signature"]["sig"]
             .as_str()
             .is_some_and(|s| !s.is_empty()),
-        "44 §2.2: 「`Checkpoint`（42 §3.11、**DSSE署名込み**）」 — an unsigned head would carry the \
+        "44 §2.2: \"`Checkpoint` (42 §3.11, **DSSE-signed**)\" (sem: SEM-gx-api-369) — an unsigned head would carry the \
          empty placeholder `unsigned_checkpoint` has to leave in the field: {}",
         checkpoint.json
     );
@@ -159,7 +161,7 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
     // rather than an oversight: `Checkpoint` is 42 §3.11's value with its own canonical encoding,
     // and `gx receipt verify --checkpoint <FILE>` reads the same bytes back. Re-shaping a domain
     // type on the wire would make the two surfaces disagree about what a checkpoint file **is**.
-    // 44 §0's 「API層の責務」 is therefore read as covering this surface's own envelope fields
+    // 44 §0's "the API layer's responsibility" (sem: SEM-gx-api-370) is therefore read as covering this surface's own envelope fields
     // (`at`, `created_at`) and not the interior of the values it carries. Raised with M6H5-5.
     assert!(
         checkpoint.json["timestamp"].is_i64(),
@@ -199,7 +201,7 @@ async fn the_pipeline_runs_over_http_and_the_substrate_moves() {
     assert_eq!(
         server.target_contents(),
         "before\n",
-        "P-5: 「取り消しは新たな逆変換のcommit」 — the world is back"
+        "P-5: \"an undo is the commit of a new inverse transformation\" (sem: SEM-gx-api-371) — the world is back"
     );
 }
 
@@ -222,8 +224,8 @@ async fn a_checkpoint_over_an_empty_log_is_not_found() {
 
 /// 🔴 `cancel` is T-7 over HTTP, and the `actor` it requires is checked against nothing.
 ///
-/// 44 §2.2 makes the body `{ actor }` and 43 T-7's guard is 「actorがオーナー権限…を保持」. v0.1 has no
-/// authorization layer (M5H6-4 採(a)), so what the field does is appear in the response under a name
+/// 44 §2.2 makes the body `{ actor }` and 43 T-7's guard is "the actor holds owner privilege …" (sem: SEM-gx-api-372). v0.1 has no
+/// authorization layer (M5H6-4, adopted (a)), so what the field does is appear in the response under a name
 /// that says what happened to it.
 #[tokio::test]
 async fn cancel_is_t7_and_the_actor_is_unchecked() {
@@ -253,7 +255,7 @@ async fn cancel_is_t7_and_the_actor_is_unchecked() {
     assert_eq!(
         cancelled.json["actor_unchecked"]["Human"]["key"], "somebody-else",
         "🔴 an actor nobody has heard of cancelled somebody else's transformation, and the field \
-         name is the only thing telling the client so (還流台帳 §1.2: 「cancel は誰でも押せる」)"
+         name is the only thing telling the client so (the feedback ledger §1.2: \"anybody can press cancel\"; sem: SEM-gx-api-373)"
     );
     assert_eq!(
         server.target_contents(),
@@ -261,16 +263,16 @@ async fn cancel_is_t7_and_the_actor_is_unchecked() {
         "a cancelled transformation never reaches `apply`"
     );
 
-    // 44 §2.2's refusal: 「`409`（既に`Committing`以降または終端状態, `gx_code=INVALID_STATE`）」.
+    // 44 §2.2's refusal: "`409` (already `Committing` or beyond, or a terminal state, `gx_code=INVALID_STATE`)" (sem: SEM-gx-api-374).
     //
     // 🔴 Measured on a **committed** transformation rather than by cancelling the aborted one twice.
     // 43 T-7's idempotency column answers a repeated cancel with the state it already reached, so a
-    // second `cancel` of an `Aborted` row is 200 and correctly so — 「the transition applied and
-    // changed nothing」 (req/29 §4). The refusal 44 §2.2 specifies is the guard 「`Committing`到達前」,
+    // second `cancel` of an `Aborted` row is 200 and correctly so — "the transition applied and
+    // changed nothing" (sem: SEM-gx-api-375) (req/29 §4). The refusal 44 §2.2 specifies is the guard "before reaching `Committing`",
     // and reaching it needs a row past that point.
     // 🔴 A **different** goal, and the reason is 42 §3.3: the `IntentId` is the CID of the intent,
     // so the same goal against the same locator is the same intent — and `Engine::plan` refuses to
-    // re-plan one whose transformation has left `Candidate` (43 §8's 「再`plan()`を強制する」 seen
+    // re-plan one whose transformation has left `Candidate` (43 §8's "forces a re-`plan()`" (sem: SEM-gx-api-376) seen
     // from the other side). Reusing the goal here would measure that refusal instead of T-7's.
     let committed = client
         .send(
@@ -314,7 +316,7 @@ async fn cancel_is_t7_and_the_actor_is_unchecked() {
 
 /// 🔴 An escalation is signed by the **ruler's** key, and a key this server does not hold is refused.
 ///
-/// **E-M6-15** / INV-S6: 「裁かれる側が自分を承認する既定値は存在しない」. The negative half is the one
+/// **E-M6-15** / INV-S6: "there is no default under which the party being ruled on approves themselves" (sem: SEM-gx-api-377). The negative half is the one
 /// worth having — a server that fell back to its own key would sign a human ruling as itself.
 #[tokio::test]
 async fn an_escalation_is_signed_by_the_ruler_and_never_by_default() {
@@ -388,7 +390,7 @@ async fn an_escalation_is_signed_by_the_ruler_and_never_by_default() {
         "and not by the submitter either, which is the party the ruling is about"
     );
 
-    // 44 §2.2's refusal for a second ruling: 「対象が`Escalated`でない」.
+    // 44 §2.2's refusal for a second ruling: "the target is not `Escalated`" (sem: SEM-gx-api-378).
     let again = client
         .send(
             "POST",
@@ -407,7 +409,7 @@ async fn an_escalation_is_signed_by_the_ruler_and_never_by_default() {
 
 /// 🔴 An unknown id is 404 everywhere it can be, and a malformed one is 422.
 ///
-/// The two are different facts (E-M4-35: 「読めない」 と 「無い」) and 44 §2.3 gives them two codes.
+/// The two are different facts (E-M4-35: "unreadable" and "absent"; sem: SEM-gx-api-379) and 44 §2.3 gives them two codes.
 #[tokio::test]
 async fn an_unknown_id_is_not_found_and_a_malformed_one_is_invalid() {
     let server = Server::new("endpoints_unknown", "before\n");
@@ -503,7 +505,7 @@ async fn an_undo_with_no_inverse_is_a_conflict_and_not_a_not_found() {
     assert_eq!(undone.gx_code(), "INVERSE_UNAVAILABLE");
 }
 
-/// 🔴 A second undo of one commit is `409` too — 42 §3.12's `Consumed`, which is what 「一度だけ」 is.
+/// 🔴 A second undo of one commit is `409` too — 42 §3.12's `Consumed`, which is what "only once" (sem: SEM-gx-api-380) is.
 #[tokio::test]
 async fn a_second_undo_of_one_commit_is_refused() {
     let server = Server::new("endpoints_second_undo", "before\n");
@@ -585,15 +587,15 @@ async fn a_denied_transformation_cannot_be_committed() {
     assert_eq!(
         committed.status.as_u16(),
         403,
-        "44 §2.2: 「`403`（非record-onlyかつVerdict≠Admit）」"
+        "44 §2.2: \"`403` (not record-only and Verdict≠Admit)\" (sem: SEM-gx-api-381)"
     );
     assert_eq!(committed.gx_code(), "NOT_ADMITTED");
 }
 
-/// 🔴 **M6-08 採(a)** — `record_only` is a per-request argument and does not leak to the next request.
+/// 🔴 **M6-08, adopted (a)** (sem: SEM-gx-api-382) — `record_only` is a per-request argument and does not leak to the next request.
 ///
-/// The leak is what (b) 「serve が request ごとに `&mut self` で mode を差し替える」 was ruled
-/// 「採ってはならない」 for, so it is measured rather than assumed: two transformations, the first
+/// The leak is what (b) "serve swaps the mode via `&mut self` on a per-request basis" was ruled
+/// "must not be adopted" (sem: SEM-gx-api-383) for, so it is measured rather than assumed: two transformations, the first
 /// verified with `record_only: true` and the second with no body at all, and the second must not
 /// inherit the posture.
 #[tokio::test]
@@ -671,7 +673,7 @@ async fn evidence_is_per_request_and_is_cleared() {
             &format!("/v1/candidates/{first_id}/verify"),
             Some(serde_json::json!({
                 // 42 §3.7's `TestResult`, in `Evidence`'s own serialised shape. 🔴 The first
-                // spelling of this body was **rejected** (422, 「unknown variant `kind`」) and the
+                // spelling of this body was **rejected** (422, "unknown variant `kind`"; sem: SEM-gx-api-384) and the
                 // suite still passed, because a request that never reached the handler leaves an
                 // empty cell — which is what a probe about a cell being empty was asking for. The
                 // status is asserted below for that reason.

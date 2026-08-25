@@ -1,20 +1,22 @@
-//! 🔴 **M6-07 採(b)** — AC-066 measured **again, through the HTTP surface**, so that the decay hand 7
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-07, adopted (b)** (sem: SEM-gx-api-023) — AC-066 measured **again, through the HTTP surface**, so that the decay hand 7
 //! is asked to fix is a thing this hand has seen rather than a thing a previous report described.
 //!
-//! > **推奨=(b)** ——順序が主張を作る: **手 7 で serve 経由の AC-066 を先に測り、decay を再現させて
-//! > から索引を入れて再測**する。これで「索引が効いた」が対照つきで言える。
+//! > **recommendation = (b)** — the order is what makes the claim: **hand 7 measures AC-066 via serve first, reproduces the decay,
+//! > then adds the index and re-measures** (sem: SEM-gx-api-024). This lets "the index worked" be said with a control.
 //!
 //! # What is different from `gx-engine/benches/throughput.rs`
 //!
 //! M5 hand 7's load generator drives `Engine`'s eight entry points **in process, with no lock and no
 //! router**. This one drives 44 §2.2's three write endpoints through `gx_api::router` — the same
-//! service stack 51 §7 names (「axum test client（`tower::ServiceExt`相当）」) — over the
-//! `Arc<Mutex<Engine>>` that **M6-06 採(a)** made the v0.1 lifetime model. Three requests per
+//! service stack 51 §7 names ("an axum test client, equivalent to `tower::ServiceExt`"; sem: SEM-gx-api-025) — over the
+//! `Arc<Mutex<Engine>>` that **M6-06, adopted (a)**, made the v0.1 lifetime model. Three requests per
 //! transformation rather than five calls:
 //!
 //! | request | 44 §2.2 | what the engine does |
 //! |---|---|---|
-//! | `POST /v1/candidates` | 「submit+plan を一括atomically実行」 | T-1 and T-2 under one hold |
+//! | `POST /v1/candidates` | "submit+plan run atomically as one" (sem: SEM-gx-api-026) | T-1 and T-2 under one hold |
 //! | `POST /v1/candidates/{id}/verify` | T-3, T-4a | **`conflicting_predecessor` is called here** |
 //! | `POST /v1/candidates/{id}/commit` | T-8..T-11 | canonicalise and the critical section |
 //!
@@ -29,7 +31,7 @@
 //!
 //! # 🔴 The control, and why it is two builds
 //!
-//! §47 fixed the **order**: 「decay が再現してから入れる」. A subject index is a change to
+//! §47 fixed the **order**: "add it only after decay has been reproduced" (sem: SEM-gx-api-027). A subject index is a change to
 //! `crates/gx-engine/src/pipeline.rs`, so the two arms cannot come out of one binary the way M5 hand
 //! 7's shard experiment did (that arm was a fixture knob, `GLOVREX_BENCH_SHARDS`, and this one is
 //! not). Making it a runtime knob would ship a switch whose only consumer is a benchmark, which is a
@@ -44,7 +46,7 @@
 //! median + count + denominator. Nothing here is compared with 33 NFR-003's 100 commits/s; that
 //! number is printed as a budget beside the measurement. p99 is recorded, never a gate.
 //!
-//! # 🔴 Per-bucket, because 「持続」 is the claim (and because the slope *is* the finding)
+//! # 🔴 Per-bucket, because "sustained" (sem: SEM-gx-api-028) is the claim (and because the slope *is* the finding)
 //!
 //! A sixty-second mean hides a line. `Engine::conflicting_predecessor` walks the whole state table
 //! (43 §8's conflict check), the table only grows, and M5 hand 8 identified the decay by matching an
@@ -67,7 +69,7 @@ use gx_engine::Engine;
 use gx_witness::KeyPair;
 use tower::ServiceExt;
 
-/// 34 AC-066: 「60秒間の持続負荷試験」.
+/// 34 AC-066: "a sixty-second sustained-load test" (sem: SEM-gx-api-029).
 const DEFAULT_SECONDS: u64 = 60;
 
 /// The bucket width, the same ten seconds `gx-engine/benches/throughput.rs` uses, so that the two
@@ -105,7 +107,7 @@ impl ServerKeys for Keys {
 
 /// A directory on the fastest filesystem this machine offers, cleared on entry.
 ///
-/// `/dev/shm` when it is there — 33 NFR-002's 測定 column says tmpfs and AC-065's fixture proves the
+/// `/dev/shm` when it is there — 33 NFR-002's measurement column (sem: SEM-gx-api-030) says tmpfs and AC-065's fixture proves the
 /// mount from `/proc/self/mountinfo`; the filesystem actually used is printed with the numbers, so a
 /// run that fell back to a disk cannot be read as a run that did not.
 fn sandbox(name: &str) -> PathBuf {
@@ -189,7 +191,7 @@ impl Server {
         Self { root, state }
     }
 
-    /// The subject file for attempt `n`. One directory, on purpose: **M5H7-3 採(b)**'s control arm
+    /// The subject file for attempt `n`. One directory, on purpose: **M5H7-3, adopted (b)**'s control arm (sem: SEM-gx-api-031)
     /// found the shard question to be about the instrument, and this hand is asking about the engine,
     /// so the generator is kept in the shape whose behaviour is already known.
     fn subject(&self, n: usize) -> PathBuf {
@@ -290,7 +292,7 @@ async fn one(server: &Server, n: usize) -> Attempt {
     }
 }
 
-/// Nearest-rank percentiles with the sample count beside them (M3-15's 「median+回数+分母」).
+/// Nearest-rank percentiles with the sample count beside them (M3-15's "median + count + denominator"; sem: SEM-gx-api-032).
 fn report(tag: &str, name: &str, samples: &mut [Duration]) {
     assert!(!samples.is_empty(), "a distribution needs samples");
     samples.sort_unstable();
@@ -321,7 +323,7 @@ fn sustained_load() {
     let server = Server::new("ac066-serve");
     println!(
         "AC066_SERVE_GENERATOR seconds={seconds} bucket={BUCKET:?} fs={} stack=router(oneshot) \
-         lock=Arc<Mutex<Engine>> (M6-06 採(a)); the socket is deliberately outside this -- \
+         lock=Arc<Mutex<Engine>> (M6-06, adopted (a); sem: SEM-gx-api-033); the socket is deliberately outside this -- \
          `crates/gx-cli/tests/ac_056.rs` measures that",
         filesystem_of(&server.root)
     );

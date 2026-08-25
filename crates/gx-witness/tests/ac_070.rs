@@ -1,12 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-070 (FR-018, CommitReceipt) — the ledger claim, checked offline against a known checkpoint.
+//! (sem: SEM-gx-witness-168, SEM-gx-witness-169, SEM-gx-witness-170, SEM-gx-witness-171,
+//! SEM-gx-witness-172)
 //!
-//! AC-070 逐語: 「Given: commit成功済みTransformationの`CommitReceipt`（`VerdictReceipt`の内容に加え
-//! inclusion proof・inverse-CIDを含むDSSE envelope）。When: オフライン環境で署名検証＋inclusion
-//! proof検証（既知checkpoint照合）を実行する。Then: 検証成功（`Ok(true)`、`checks.inclusion=true`）。
-//! inclusion proofを欠落させた不正なCommitReceiptでは検証失敗（スキーマ不正または`Ok(false)`）と
-//! なることも確認する。」判定方法 `integration`, M2.
+//! AC-070 verbatim: "Given: a `CommitReceipt` for a Transformation that already committed
+//! successfully (a DSSE envelope carrying `VerdictReceipt`'s content plus an inclusion proof and an
+//! inverse CID). When: signature verification + inclusion proof verification (matched against a
+//! known checkpoint) is run in an offline environment. Then: verification succeeds (`Ok(true)`,
+//! `checks.inclusion=true`). Also confirm that an invalid CommitReceipt with the inclusion proof
+//! missing fails verification (a schema violation or `Ok(false)`)." Judgement method:
+//! `integration`, M2.
 //!
-//! # What makes 「オフライン」 possible, and where it stopped being free
+//! # What makes "offline" possible, and where it stopped being free
 //!
 //! A verifier here holds a receipt and a checkpoint. It does not hold the log, the entry, or the
 //! neighbouring leaves. That works because 42 §3.11 makes `LedgerLeaf` `{transformation,
@@ -15,7 +21,7 @@
 //! [`ReceiptPayload::ledger_digest`]. So the leaf is *rebuilt* rather than fetched, and the audit
 //! path walk is `gx_log`'s (`verify_inclusion_of`, added by this hand for exactly this caller).
 //!
-//! 🔴 The third of those is a **derivation**, because 42 §3.11's literal 「DSSE envelope bytes全体」
+//! 🔴 The third of those is a **derivation**, because 42 §3.11's literal "the whole of the DSSE envelope bytes"
 //! has no value at the moment 43 T-11 appends: the append precedes the receipt, and the proof it
 //! produces goes inside the payload the digest would have to cover. `ledger_digest`'s documentation
 //! is the argument and req/54 §4 the ticket. `the_ledger_digest_excludes_exactly_two_things` below
@@ -81,8 +87,8 @@ fn ac_070_the_audit_path_is_actually_walked() {
     }
 }
 
-/// AC-070's second half: 「inclusion proofを欠落させた不正なCommitReceiptでは検証失敗（スキーマ不正
-/// または`Ok(false)`）」. The first alternative is the one taken -- a `CommitReceipt` with no proof
+/// AC-070's second half: "an invalid CommitReceipt with the inclusion proof missing fails
+/// verification (a schema violation or `Ok(false)`)". The first alternative is the one taken -- a `CommitReceipt` with no proof
 /// is not a receipt at all under ASM-14, and refusing it at the schema is stronger than answering
 /// `Ok(false)` about a claim it never made.
 #[test]
@@ -142,7 +148,23 @@ fn ac_070_a_forged_audit_path_is_refuted() {
     assert_eq!(checks.inclusion, InclusionCheck::Refuted);
 }
 
-/// A proof naming another leaf's index is refuted, and so is one claiming another tree size.
+/// A proof naming another leaf's index is refuted, and so is one whose audit path was emptied.
+///
+/// 🔴 **v0.4 · H-09 changed one of the three, and the change is disclosed rather than absorbed.**
+/// The middle case — a proof claiming `tree_size + 1` — used to be asserted as `Refuted` and is now
+/// [`InclusionCheck::Unbridged`]. Nothing about the forgery changed; what changed is that the
+/// verifier no longer pretends to have an opinion it cannot hold. The anchor commits to a tree of
+/// `n` leaves and the proof is about a tree of `n + 1`: this head is **older** than the statement,
+/// and an older head is silent about a later tree whether the receipt is honest or not. Saying
+/// "refuted" there is the same false negative `req/222` measured in the other direction (a head
+/// *newer* than the receipt), and a third party holding a stale checkpoint would have received an
+/// accusation of tampering for a receipt with nothing wrong with it.
+///
+/// AC-070's own text asks for two things — a known checkpoint verifies, and a `CommitReceipt`
+/// without a proof is refused (`req/spec/30-requirements/34-acceptance.md` line 49) — and says
+/// nothing about tree sizes, so this is a probe's expectation moving and not an acceptance
+/// criterion weakening. What must not move is that **none of the three is a pass**, and that is now
+/// asserted directly, on `verified()`, rather than implied by the word.
 #[test]
 fn ac_070_a_proof_for_another_position_is_refuted() {
     let key = keypair(6);
@@ -150,25 +172,39 @@ fn ac_070_a_proof_for_another_position_is_refuted() {
     let payload = receipt.payload().expect("decodes");
     let original = payload.inclusion_proof.clone().expect("some");
 
-    for wrong in [
-        InclusionProof {
-            leaf_index: original.leaf_index + 1,
-            ..original.clone()
-        },
-        InclusionProof {
-            tree_size: original.tree_size + 1,
-            ..original.clone()
-        },
-        InclusionProof {
-            audit_path: Vec::new(),
-            ..original.clone()
-        },
+    for (wrong, expected) in [
+        (
+            InclusionProof {
+                leaf_index: original.leaf_index + 1,
+                ..original.clone()
+            },
+            InclusionCheck::Refuted,
+        ),
+        (
+            InclusionProof {
+                tree_size: original.tree_size + 1,
+                ..original.clone()
+            },
+            InclusionCheck::Unbridged,
+        ),
+        (
+            InclusionProof {
+                audit_path: Vec::new(),
+                ..original.clone()
+            },
+            InclusionCheck::Refuted,
+        ),
     ] {
         let mut tampered = payload.clone();
         tampered.inclusion_proof = Some(wrong);
         let forged = issue(&tampered, &key);
         let checks = verify_offline(&forged, &key.verifying(), Some(&head)).expect("a verdict");
-        assert_eq!(checks.inclusion, InclusionCheck::Refuted);
+        println!("AC070_WRONG_PROOF {:?}", checks.inclusion);
+        assert_eq!(checks.inclusion, expected);
+        assert!(
+            !checks.verified(),
+            "whatever the word, a forged proof is not a pass"
+        );
     }
 }
 
@@ -194,8 +230,8 @@ fn ac_070_a_proof_moved_onto_another_transformation_is_refuted() {
 
 /// A `CommitReceipt` verified with no anchor is **not** a pass.
 ///
-/// Its signature is good and its ledger claim was never examined, and req/29 §4's 「skip と pass を
-/// 同じ見た目にしない」 is the whole reason [`InclusionCheck::Unanchored`] is a value rather than a
+/// Its signature is good and its ledger claim was never examined, and req/29 §4's "a skip and a
+/// pass must not look the same" is the whole reason [`InclusionCheck::Unanchored`] is a value rather than a
 /// silent `NotApplicable`. This is the difference between AC-018's `"skipped"` (nothing to check)
 /// and a check that could not be made.
 #[test]

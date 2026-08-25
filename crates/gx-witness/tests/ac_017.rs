@@ -1,29 +1,34 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-017 (FR-017) — `Proof` holds any one of F0's five theorem identifiers, and survives serde.
+//! (sem: SEM-gx-witness-161, SEM-gx-witness-162, SEM-gx-witness-163, SEM-gx-witness-164,
+//! SEM-gx-witness-165, SEM-gx-witness-166, SEM-gx-witness-167)
 //!
-//! AC-017 逐語: 「Given: `Proof`型にT1〜T5いずれかの識別子を設定。When: serde往復。Then: 5定理ID
-//! すべてが個別に表現・復元可能。」判定方法 `unit`, M2.
+//! AC-017 verbatim: "Given: set one of T1-T5's identifiers on the `Proof` type. When: a serde round
+//! trip. Then: all five theorem ids can be individually represented and restored." Judgement
+//! method: `unit`, M2.
 //!
-//! FR-017 逐語: 「gx-witnessは `Proof`（Lean定理参照または検証器の検証結果への参照構造）を実装
-//! しなければならない（MUST）。F0のT1〜T5いずれかの識別子を保持できる列挙またはID型であることを
-//! テストできる。」
+//! FR-017 verbatim: "gx-witness MUST implement `Proof` (a reference structure to a Lean theorem
+//! reference or a verifier's verification result). It must be testable that it is an enum or id
+//! type able to hold one of F0's T1-T5 identifiers."
 //!
 //! # Where the type lives, and why the subject of this file is `gx_witness::Proof`
 //!
-//! **E-M2-12** (`req/38_ERRATA_2026-08-07.md` §8): 「`Proof` 系型は E-M2-1 と同じく gx-core へ」.
+//! **E-M2-12** (`req/38_ERRATA_2026-08-07.md` §8): "the `Proof` family of types goes to gx-core, same as E-M2-1".
 //! req/49 §3 M2-3 raised the collision — FR-017 asks gx-witness for a `Proof` while 42 §0 files the
 //! nearly identical `ProofRef` under gx-gate/verdict.rs (M3) — and the ruling put one set of types
 //! below both, so the two crates refer to one idea rather than to two spellings that can drift.
 //!
 //! FR-017's MUST is then satisfied by gx-witness **publishing** the type, not by defining a second
 //! one: `gx_witness::Proof` is `gx_core::Proof`, which this file asserts rather than assumes
-//! (`ac_017_the_two_paths_name_one_type`). A re-export is the only reading of 「gx-witnessは実装
-//! しなければならない」 that does not contradict E-M2-12, and it is what makes AC-017's subject —
+//! (`ac_017_the_two_paths_name_one_type`). A re-export is the only reading of "gx-witness MUST
+//! implement" that does not contradict E-M2-12, and it is what makes AC-017's subject —
 //! `Proof` reached through gx-witness — exist at all. req/50 §4's `m2_types.rs` said this hand
 //! would take that shape; this is it.
 //!
 //! # Two round trips, not one
 //!
-//! AC-017 says 「serde往復」 without naming a format. JSON is the human-readable face (42 §1.2), and
+//! AC-017 says "a serde round trip" without naming a format. JSON is the human-readable face (42 §1.2), and
 //! canonical DAG-CBOR is the face an identity is computed over (42 §2.1) — a type that survives one
 //! and not the other survives the wrong half. Both are here, and the CBOR side goes through
 //! gx-canon rather than through a codec named in this crate (41 §6).
@@ -88,7 +93,7 @@ fn ac_017_every_f0_theorem_survives_a_canonical_dagcbor_round_trip() {
     }
 }
 
-/// 「個別に」 is the load-bearing word: five ids that round-trip but share a spelling are one id
+/// "individually" is the load-bearing word: five ids that round-trip but share a spelling are one id
 /// wearing five names, and every one of them would pass the two tests above.
 #[test]
 fn ac_017_the_five_identifiers_are_individually_distinguishable() {
@@ -109,7 +114,7 @@ fn ac_017_the_five_identifiers_are_individually_distinguishable() {
     assert_eq!(binary.len(), 5, "two theorem ids share a canonical form");
 }
 
-/// FR-017's second form: 「検証器の検証結果への参照構造」. A `Proof` that is a checker result has to
+/// FR-017's second form: "a reference structure to a verifier's verification result". A `Proof` that is a checker result has to
 /// round-trip too, or half the requirement is untested.
 #[test]
 fn ac_017_a_checker_result_reference_is_the_other_form_of_a_proof() {

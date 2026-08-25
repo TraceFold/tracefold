@@ -1,17 +1,19 @@
-//! The two 「無い事」 scans this hand owes: `plan` touches no filesystem (**E-M4-29**) and nothing in
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The two "absence" scans this hand owes: `plan` touches no filesystem (**E-M4-29**) and nothing in (sem: SEM-gx-adapter-fs-168)
 //! this crate reads a clock (**M4-17**).
 //!
 //! # Why a scan and not an assertion about behaviour
 //!
-//! §30 M4H2-3 採(b) read the trait's 「純関数」 as 「(intent, pre) の対に対する決定性+substrate への
-//! **書き込み** 0」 and deliberately left reading open, 「読み込みは禁じない——M7 の git adapter が object
-//! store を読む道を閉じない」. Then it added a stronger clause for this adapter only:
+//! §30 M4H2-3, adopted (b) read the trait's "pure function" as "determinism over the (intent, pre) pair + zero
+//! **writes** to the substrate" and deliberately left reading open, "reading is not forbidden -- it does not close the road for M7's git adapter to read an object
+//! store". Then it added a stronger clause for this adapter only: (sem: SEM-gx-adapter-fs-169)
 //!
-//! > 「**ただし fs adapter v0.1 の `plan` は I/O 0 が成立する**(単一 file 全置換では target digest は
-//! > goal bytes から導出可能)ので、**手4 の DoD に「fs の plan は std::fs を呼ばない」機械検査**を置く
-//! > (契約より強い実装を機械で固定)」
+//! > "**however, for the fs adapter v0.1, `plan` achieving zero I/O holds** (for a single whole-file replacement, the target digest is
+//! > derivable from the goal bytes), so **hand 4's DoD carries a machine check that 'fs's plan does not call std::fs'**
+//! > (a machine-fixed implementation stronger than the contract)" (sem: SEM-gx-adapter-fs-170)
 //!
-//! A behavioural test cannot see the difference between 「did not read」 and 「read and ignored」: both
+//! A behavioural test cannot see the difference between "did not read" and "read and ignored": both (sem: SEM-gx-adapter-fs-171)
 //! answer the same delta. So the claim is about the source, and the source is arranged to make the
 //! claim cheap to check -- `src/plan.rs` is a module that never names the filesystem, and the trait
 //! method delegates to it in one line.
@@ -19,8 +21,8 @@
 //! # The greps read invocation lines only
 //!
 //! §30's own erratum about `verify_m4h2.sh`: `FMT_ALL_USES=1` counted the **comment** in `ci.sh` that
-//! explains why `--all` is not used. 「以後の verify script の「無い事」grep は comment を除外するか
-//! invocation 行のみを対象にする」. [`code_lines`] drops `//` and `//!` lines, which is why this file
+//! explains why `--all` is not used. "henceforth, a verify script's 'absence' grep excludes comments or
+//! targets only invocation lines". [`code_lines`] drops `//` and `//!` lines, which is why this file (sem: SEM-gx-adapter-fs-172)
 //! can describe `std::fs` in prose without failing itself.
 
 use std::path::PathBuf;
@@ -72,8 +74,8 @@ fn the_planning_module_calls_no_filesystem_operation() {
     );
     assert!(
         offenders.is_empty(),
-        "E-M4-29 fixes 「fs の plan は std::fs を呼ばない」 as a machine check, and these lines call \
-         one: {offenders:?}"
+        "E-M4-29 fixes 'plan does not call std::fs' as a machine check, and these lines call \
+         one: {offenders:?} (sem: SEM-gx-adapter-fs-173)"
     );
 }
 
@@ -114,9 +116,9 @@ fn the_trait_method_only_delegates_to_that_module() {
 /// stops covering the code is the failure §29 M4H1-8 and §30's `FMT_ALL_USES` are two earlier
 /// instances of.
 ///
-/// 41 §6 逐語: 「乱数・時刻はengine境界で注入（決定的リプレイのため）」, and §31 **E-M4-31** settled what
-/// an adapter does instead: 「`applied_at` は **engine が commit 時に上書きする**…adapter は
-/// `Timestamp(0)` placeholder」. The workspace-wide count is in `tools/verify_m4h4.sh`; this is the
+/// 41 §6, verbatim: "randomness and time are injected at the engine boundary (for deterministic replay)", and §31 **E-M4-31** settled what
+/// an adapter does instead: "`applied_at` is a convention **overwritten by the engine at commit time**... the adapter [writes a]
+/// `Timestamp(0)` placeholder". The workspace-wide count is in `tools/verify_m4h4.sh`; this is the (sem: SEM-gx-adapter-fs-174)
 /// one crate that would have had a reason to reach for a clock, because a file has an mtime.
 ///
 /// It has no reason after all: ASM-69-1 keeps mtime out of the fingerprint digest, so the adapter

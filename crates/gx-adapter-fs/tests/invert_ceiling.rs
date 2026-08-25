@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **M4-21**'s ceiling: the one declaration, the boundary either side of it, and the row that names
 //! it.
 //!
-//! req/38 §28 M4-21 採(a): 「逆 delta payload の上限を**定数 1 箇所**で宣言・超過は `invert`=`Ok(None)`
-//! (**AC-048 の None の実在する第 1 の理由**)。値は手5 が根拠印字つきで決定(本裁定は形のみ固定)」, and
-//! §30 M4H2-8 採用 added the probe that keeps the two ends tied together: 「手5 DoD に「契約表の行と定数
-//! 宣言箇所の 1:1 probe」を追加(M4-21 の定数が入った時に契約が測れる形になる)」.
+//! req/38 §28 M4-21, adopted (a): "the ceiling on the inverse delta payload is declared **in exactly one constant**; exceeding it is `invert`=`Ok(None)`
+//! (**the 1st reason AC-048's `None` actually occurs**). The value is decided by hand 5, with the reasoning printed (this ruling fixes only the shape)", and
+//! §30 M4H2-8 adoption added the probe that keeps the two ends tied together: "hand 5's DoD adds a '1:1 probe between the contract table's row and the constant
+//! declaration's site' (once M4-21's constant lands, the contract becomes measurable)". (sem: SEM-gx-adapter-fs-225)
 //!
 //! # Why a boundary needs two cases and not one
 //!
@@ -32,7 +34,10 @@ fn invert_over(size: usize) -> (Option<usize>, usize) {
 
     let pre = snapshot_of(&adapter, &locator);
     let delta = planned(&adapter, &locator, GOAL);
-    let answer = adapter.invert(&delta, &pre).expect("invert answers");
+    let answer = adapter
+        .invert(&delta, &pre)
+        .expect("invert answers")
+        .into_inverse();
     (answer.map(|d| d.payload().len()), size)
 }
 
@@ -65,11 +70,11 @@ fn the_ceiling_is_the_number_the_source_declares() {
 /// An escrow of **exactly** the ceiling is carried, which is the byte `>` and `>=` disagree about.
 ///
 /// 🔴 req/76 §2.2 listed `invert.rs:111` (`>` → `>=`) as a `cargo mutants` survivor, with the same
-/// one-line reason as the forward bound: 「payload がちょうど 1,048,576 の case を誰も作っていない」. The
+/// one-line reason as the forward bound: "nobody has built the case where payload is exactly 1,048,576". The (sem: SEM-gx-adapter-fs-226)
 /// pair above differs by one byte of *content* and lands on neither side of the bound exactly -- the
-/// note in it says so in as many words (「the exact crossing point is a function of the path length」).
-/// This probe closes that by solving for the content whose **payload** is the number, so 「at most N」
-/// and 「fewer than N」 stop being the same claim.
+/// note in it says so in as many words ("the exact crossing point is a function of the path length").
+/// This probe closes that by solving for the content whose **payload** is the number, so "at most N"
+/// and "fewer than N" stop being the same claim. (sem: SEM-gx-adapter-fs-227)
 ///
 /// M4-21's `Ok(None)` is an escalation to a human (**E-M3-4**), so the byte in question is the one
 /// where a change stops being undoable without anybody being asked. Off by one in the safe direction
@@ -92,6 +97,7 @@ fn an_escrow_of_exactly_the_ceiling_is_carried() {
         adapter
             .invert(&delta, &pre)
             .expect("invert answers")
+            .into_inverse()
             .map(|d| d.payload().len())
     };
 
@@ -100,8 +106,8 @@ fn an_escrow_of_exactly_the_ceiling_is_carried() {
     let content = MAX_INVERSE_PAYLOAD_BYTES - overhead;
 
     let exact = escrow_of(content).expect(
-        "an escrow of exactly the ceiling answered Ok(None): `invert` reads its bound as 「fewer \
-         than」 where M4-21 採(a) declares 「at most」, so a change that fits is escalated to a human",
+        "an escrow of exactly the ceiling answered Ok(None): `invert` reads its bound as 'fewer
+         than' where M4-21, adopted (a) declares 'at most', so a change that fits is escalated to a human (sem: SEM-gx-adapter-fs-228)",
     );
     println!(
         "INVERT_CEILING={MAX_INVERSE_PAYLOAD_BYTES} OVERHEAD={overhead} CONTENT={content} \
@@ -123,17 +129,17 @@ fn an_escrow_of_exactly_the_ceiling_is_carried() {
 ///
 /// The row is a promise a reader of the trait acts on; the constant is what runs. Neither one on its
 /// own is a contract, and a row that named a constant nobody declared -- or two declarations that
-/// could drift -- is the shape M4-21 wrote 「定数 1 箇所」 against.
+/// could drift -- is the shape M4-21 wrote "one constant" against. (sem: SEM-gx-adapter-fs-229)
 ///
 /// 🔴 **M7 hand 3 narrowed the scan, and the narrowing is req/99 §9 R-3 answered.** Until there was an
 /// adapter whose inverse carries a body this walked every crate under `crates/` and asserted **one**
 /// declaration workspace-wide. M7 hand 1 did the same narrowing for `MAX_FORWARD_PAYLOAD_BYTES` when
 /// `gx-adapter-git` declared its own (req/99 §7), and left this one alone **because git declares none**
 /// -- an inverse there carries an object id, so a ceiling could not be reached by any input and
-/// declaring it would be 「a refusal nobody asked for」 (52 契約 2, req/99 §3 D-4). R-3 is the residue that
-/// raised the question for hand 3: 「mcp が escrow 上限を宣言するなら同じ読み直しが要る」. It does.
+/// declaring it would be "a refusal nobody asked for" (52 contract 2, req/99 §3 D-4). R-3 is the residue that
+/// raised the question for hand 3: "if mcp declares an escrow ceiling, it needs the same re-reading". It does. (sem: SEM-gx-adapter-fs-230)
 ///
-/// So the reading is 「**at most one per adapter, none anywhere else**」 rather than 「one per adapter」:
+/// So the reading is "**at most one per adapter, none anywhere else**" rather than "one per adapter": (sem: SEM-gx-adapter-fs-231)
 /// unlike the forward bound, which every adapter needs because every adapter accepts payloads, the
 /// escrow bound is needed only by an adapter whose inverse **carries a body**, and that is not a fact
 /// in the source. The two adapters that made the choice each say so where a reader will find it --
@@ -141,7 +147,7 @@ fn an_escrow_of_exactly_the_ceiling_is_carried() {
 /// `the_escrow_ceiling_is_reachable_here_and_answers_ok_none`.
 ///
 /// The gate is not weakened. A crate below the boundary declaring one is red; an adapter declaring two
-/// is red; and 「nobody declares one」 is red, which is the case that would make M4-21 a constant with no
+/// is red; and "nobody declares one" is red, which is the case that would make M4-21 a constant with no (sem: SEM-gx-adapter-fs-232)
 /// reader.
 #[test]
 fn the_contract_row_and_the_one_declaration_name_each_other() {
@@ -202,12 +208,12 @@ fn the_contract_row_and_the_one_declaration_name_each_other() {
         let limit = usize::from(name.starts_with("gx-adapter-"));
         assert!(
             found.len() <= limit,
-            "M4-21 fixes the ceiling at 「定数 1 箇所」 per adapter and no crate below the boundary              declares one; `{name}` has {found:?}"
+            "M4-21 fixes the ceiling at 'one constant' per adapter and no crate below the boundary declares one; `{name}` has {found:?} (sem: SEM-gx-adapter-fs-233)"
         );
     }
 
     // The row that promises it. The cell is `invert`'s, not the table's -- §30 M4H2-6's rule about
-    // 「どこかに書いてある」 -- and `adapter_contract.rs` is where the clause 「上限超過は `Ok(None)`」
+    // "somewhere in the file" -- and `adapter_contract.rs` is where the clause "over the ceiling is `Ok(None)`" (sem: SEM-gx-adapter-fs-234)
     // itself is held to that cell.
     let trait_doc = std::fs::read_to_string(root.join("crates/gx-substrate/src/adapter.rs"))
         .expect("the trait is readable");
@@ -247,15 +253,15 @@ fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 /// 🔴 This probe is hand 5's, reversed. Hand 5 answered `Ok(None)` here and raised the reading against
 /// itself (req/74 §2 M4H5-1); §33 took case (b) and made it **E-M4-32**:
 ///
-/// > 「**別位置を指す `pre` での `invert` は `Err`**。理由: delta と無関係な pre を渡すのは engine の
-/// > 配線 bug であり、`Ok(None)`→Escalate は bug を「逆が構成できない」という正当な業務条件に化けさせて
-/// > 隠す(E-M4-27 が `Ok(false)` を拒んだのと同じ論法)。**`Ok(None)` は「同一 object の正当な構成不能」
-/// > (上限超過・旧内容破棄済み)に限定**」
+/// > "**`invert` for a `pre` that names another position is `Err`**. Reason: passing a pre unrelated to the delta is a wiring
+/// > bug in the engine, and `Ok(None)`->Escalate would disguise the bug as a legitimate business condition of 'the inverse cannot be
+/// > constructed' (the same fallacy as E-M4-27 refusing `Ok(false)`). **`Ok(None)` is limited to 'a legitimate construction of the same object
+/// > is not possible' (over the ceiling, or the old content already discarded)** (sem: SEM-gx-adapter-fs-235)
 ///
 /// So the two answers now mean two things that cannot be confused: `Ok(None)` is a real business
 /// condition an operator is asked about (E-M3-4's escalation), and `Err(LocatorMismatch)` is a defect
 /// in whoever assembled the call. The pin is rewritten rather than deleted -- the same operation §29
-/// M4H1-9 and §21 C-9 認めた for the door pin and the `cas_eq` pin, with the fixture unchanged and the
+/// M4H1-9 and §21 C-9 acknowledged for the door pin and the `cas_eq` pin, with the fixture unchanged and the (sem: SEM-gx-adapter-fs-236)
 /// name and documentation moved to the new intent.
 #[test]
 fn a_pre_that_names_another_position_is_a_locator_mismatch() {
@@ -284,6 +290,7 @@ fn a_pre_that_names_another_position_is_a_locator_mismatch() {
         adapter
             .invert(&delta, &snapshot_of(&adapter, &subject))
             .expect("the question is answerable")
+            .inverse()
             .is_some(),
         "the control: the same delta with the matching pre has an inverse"
     );

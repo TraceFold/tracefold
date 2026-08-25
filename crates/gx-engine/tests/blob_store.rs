@@ -1,19 +1,19 @@
-//! The CID-keyed blob store (**M5-05 採(a)**), its ceiling (**M5-20 採(a)**), and the escrow
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The CID-keyed blob store (**M5-05, adopted (a)**), its ceiling (**M5-20, adopted (a)**), and the escrow (sem: SEM-gx-engine-623)
 //! round-trip (**E-M5-6**) — measured by behaviour.
 //!
 //! req/38 §37:
 //!
-//! > **M5-05 採(a)**: CID キーの blob store 1 本が `PlannedDelta` と `inverse_delta` の両方を持つ
-//! > (M4H6-3「既知 CID は参照のみ」を内包)。GC は DR-9(器のみ・OSS 既定無期限)。
+//! > **M5-05, adopted (a)**: a single CID-keyed blob store holds both `PlannedDelta` and `inverse_delta` (carrying M4H6-3's "a known CID is reference-only") (sem: SEM-gx-engine-624). GC is DR-9 (vessel only; OSS defaults to unlimited).
 //!
-//! > **M5-20 採(a)+(c)**: engine 受取口の decode 前 byte 上限 1 箇所+契約行 1:1 probe(M4H2-8 形)。
+//! > **M5-20, adopted (a)+(c)**: one pre-decode byte ceiling at the engine's intake, plus a 1:1 probe of the contract row (in M4H2-8's shape) (sem: SEM-gx-engine-624).
 //!
 //! and req/38 §38:
 //!
-//! > **M5H1-3 採(a)**=**E-M5-6**: 42 §3.12 の erratum——`inverse_delta` は **`Option`**・status と
-//! > payload は checked constructor(`held`/`unavailable`/`restore`)が歩調を保つ。
+//! > **M5H1-3, adopted (a)** = **E-M5-6**: 42 §3.12's erratum -- `inverse_delta` becomes **`Option`**; status and payload are kept in step by a checked constructor (`held`/`unavailable`/`restore`) (sem: SEM-gx-engine-625).
 //!
-//! # 「参照のみ」 is measured by what did *not* happen
+//! # "reference-only" (sem: SEM-gx-engine-625) is measured by what did *not* happen
 //!
 //! A second `put` of a known CID returning `AlreadyPresent` proves what the function *said*, not
 //! what it *did*: an implementation that rewrote the file and then answered `AlreadyPresent` would
@@ -24,9 +24,8 @@
 //!
 //! # The ceiling is measured **on** the bound, both ways
 //!
-//! req/76 §2.2 recorded a `cargo mutants` survivor whose whole content was 「payload がちょうど
-//! 1,048,576 の case を誰も作っていない」: a bound probed only at neighbouring values cannot tell
-//! 「at most N」 from 「fewer than N」. So the write side is measured at exactly `MAX_BLOB_BYTES` and
+//! req/76 §2.2 recorded a `cargo mutants` survivor whose whole content was "nobody has made the case where payload is exactly 1,048,576" (sem: SEM-gx-engine-626): a bound probed only at neighbouring values cannot tell
+//! "at most N" from "fewer than N". So the write side is measured at exactly `MAX_BLOB_BYTES` and
 //! at one byte over, and the read side is measured on a file of exactly the ceiling and one byte
 //! over it.
 
@@ -55,13 +54,13 @@ fn wire(delta: &PlannedDelta) -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------------
-// M5-05 採(a): one store, keyed by the CID the value already carries
+// M5-05, adopted (a) (sem: SEM-gx-engine-627): one store, keyed by the CID the value already carries
 // ---------------------------------------------------------------------------
 
 /// A delta is filed under its own CID and comes back through the checked constructor.
 ///
-/// 「CID キー」 is not a convention the store follows — the key is `delta.reference().cid`, which
-/// `PlannedDelta::new` minted from the same projection the file holds (M4H1-3 採(a)). So the name of
+/// "CID key" (sem: SEM-gx-engine-628) is not a convention the store follows — the key is `delta.reference().cid`, which
+/// `PlannedDelta::new` minted from the same projection the file holds (M4H1-3, adopted (a)). So the name of
 /// the file is a digest of the contents of the file, and `get` re-mints it on the way back rather
 /// than trusting the directory entry.
 #[test]
@@ -92,17 +91,29 @@ fn a_delta_is_filed_under_its_own_cid_and_rebuilt_through_the_constructor() {
     );
 }
 
-/// 🔴 **M4H6-3**: a second put of a known CID is a **reference**, and writes nothing.
+/// 🔴 **M4H6-3**: a second put of a known CID is a **reference** — ~~and writes nothing~~, and
+/// **R9 / `req/236` H-01**: a reference to *what is actually there*.
 ///
-/// The two instruments are in one probe on purpose, because either alone is weak:
+/// # What this probe used to assert, and why it is not that any more
 ///
-/// 1. the outcome is `AlreadyPresent` — what the store *says*;
-/// 2. a blob damaged between the two puts is **still damaged** afterwards — what the store *did*.
+/// The two instruments were the outcome (`AlreadyPresent`) and the file: ~~a blob damaged between
+/// the two puts is **still damaged** afterwards~~ — "reference-only is what the store *does* and
+/// not only what the outcome says". The struck sentence is kept because it is what M4H6-3 was read
+/// as, and because the reader of the repair should see the claim it replaced.
 ///
-/// The damage is not noise: it is the canonical encoding of a *different* delta, so the file stays
-/// decodable and only the digest disagrees. That keeps the second half of this probe about writing
-/// rather than about parsing, and it sets up
-/// [`a_blob_that_does_not_hash_to_its_name_is_refused`] with the same fixture.
+/// `req/236` H-01 measured what that reading cost when the "damage" is an **accident** rather than
+/// an impostor. `BlobStore::put` had no temporary file and no rename, so a full disk left
+/// **204,800 bytes of a 400,096-byte body at its own content address** — and the early return made
+/// it permanent. The next entirely successful commit escrowed the same inverse CID, took the
+/// fragment as its own undo, and produced an `rc=0` commit with a signed receipt whose `gx undo`
+/// could never run. `req/38` §175 ruling 2 is the ruling that changes it: `exists()` is believed
+/// only after the **bytes** are compared.
+///
+/// So M4H6-3 is now read on the body rather than on the name: **equal bytes are a reference**
+/// (`AlreadyPresent`, nothing written), and anything else is rewritten. The impostor below is the
+/// canonical encoding of a *different* delta, so the file stays decodable and only the digest
+/// disagrees — which is the hardest case for a comparison to catch and the one this probe keeps.
+/// It sets up [`a_blob_that_does_not_hash_to_its_name_is_refused`] with the same fixture.
 #[test]
 fn a_second_put_of_a_known_cid_writes_nothing() {
     let s = store("blob_reference_only");
@@ -119,7 +130,7 @@ fn a_second_put_of_a_known_cid_writes_nothing() {
         .expect("one blob is filed");
     std::fs::write(&path, wire(&impostor)).expect("damage the stored blob");
 
-    let (again, second) = s.put(&mine).expect("second put");
+    let (again, second) = s.put(&mine).expect("second put over a damaged file");
     let after = std::fs::read(&path).expect("read the blob back");
     println!(
         "SECOND_PUT={} FILES={} DAMAGE_SURVIVED={}",
@@ -128,25 +139,48 @@ fn a_second_put_of_a_known_cid_writes_nothing() {
         after == wire(&impostor)
     );
     assert_eq!(again, cid);
+    // 🔴 **R9 / `req/236` H-01**. ~~`AlreadyPresent`~~ — the file at this address is not the body
+    // this CID names, so the put writes it.
     assert_eq!(
         second,
-        PutOutcome::AlreadyPresent,
-        "M4H6-3: 「同一 CID なら参照のみ登録」"
+        PutOutcome::Stored,
+        "a name that is taken is not a body that is here (req/236 H-01)"
     );
     assert_eq!(
         after,
-        wire(&impostor),
-        "the second put rewrote the file, so 「参照のみ」 is what the outcome says and not what the \
-         store does"
+        wire(&mine),
+        "🔴 and what is there afterwards is the body the CID names. A full disk, a power cut or an \
+         older binary can leave half a body at a content address; leaving it is what let a later \
+         commit adopt it as its own inverse (req/236 H-01)"
     );
     assert_eq!(s.len(), 1, "one CID, one file");
+
+    // 🔴 And the reference is still a reference: **equal bytes** write nothing, which is M4H6-3's
+    // "if the CID is the same, register reference-only" (sem: SEM-gx-engine-629) read on the body.
+    let (third_cid, third) = s.put(&mine).expect("third put over the correct body");
+    assert_eq!(third_cid, cid);
+    // 🔴 ~~"the second put rewrote the file, so \"reference-only\" (sem: SEM-gx-engine-630) is what the outcome says and not what the \
+    //  store does"~~ — the struck assertion is what this probe held until R9, and it is kept
+    // because the reader of the repair should see the sentence it replaced. What the store *does*
+    // now depends on the bytes: it rewrote the impostor above, and it writes nothing here.
+    assert_eq!(
+        third,
+        PutOutcome::AlreadyPresent,
+        "reference-only, for the case it was always about"
+    );
+    assert_eq!(
+        std::fs::read(&path).expect("read the blob back"),
+        wire(&mine),
+        "and nothing moved"
+    );
+    assert_eq!(s.len(), 1, "still one CID, one file");
 }
 
 /// The blob whose name and contents disagree is refused (content addressing, from the read side).
 ///
 /// Same fixture as above: a decodable blob under the wrong name. `get` re-mints the CID and refuses,
-/// which is the only reason the reference-only rule above is safe — 「the file already there holds
-/// the same bytes」 is an assumption, and this is the check that turns it into one that fails loudly.
+/// which is the only reason the reference-only rule above is safe — "the file already there holds
+/// the same bytes" (sem: SEM-gx-engine-631) is an assumption, and this is the check that turns it into one that fails loudly.
 #[test]
 fn a_blob_that_does_not_hash_to_its_name_is_refused() {
     let s = store("blob_digest_check");
@@ -175,7 +209,7 @@ fn a_blob_that_does_not_hash_to_its_name_is_refused() {
 
 /// 🔴 **M4H6-3 in its own words**: an inverse whose payload equals a forward delta's is one blob.
 ///
-/// req/38 §34: 「residual CID が既存 delta CID と一致するのは**保管の一度性の裏返し**=利点」. The
+/// req/38 §34: "residual CID matching an existing delta CID is **the flip side of storing once** = an advantage" (sem: SEM-gx-engine-632). The
 /// `StubAdapter`'s `invert` returns the delta itself, which is the smallest real instance of that:
 /// two *different roles* for one value, and a store that held it twice would be keeping a copy of a
 /// thing it already had under the same name.
@@ -202,7 +236,7 @@ fn an_inverse_with_the_same_payload_is_the_same_blob() {
 
 /// A CID nobody stored is `NotFound`, which is not `Malformed`.
 ///
-/// req/29 §4's rule at the smallest scale: 「it is not here」 and 「it is here and unreadable」 are
+/// req/29 §4's rule at the smallest scale: "it is not here" and "it is here and unreadable" (sem: SEM-gx-engine-633) are
 /// different facts, and a store that gave them one face would make a missing body look like a
 /// damaged one to the recovery that hand 5 will write against it.
 #[test]
@@ -216,7 +250,7 @@ fn a_cid_nobody_stored_is_not_found() {
 }
 
 // ---------------------------------------------------------------------------
-// M5-20 採(a): the ceiling, on the bound, from both sides
+// M5-20, adopted (a) (sem: SEM-gx-engine-634): the ceiling, on the bound, from both sides
 // ---------------------------------------------------------------------------
 
 /// The write side, **on** the bound: exactly `MAX_BLOB_BYTES` is stored, one byte over is refused.
@@ -263,7 +297,7 @@ fn a_blob_of_exactly_the_ceiling_is_stored_and_one_byte_over_is_refused() {
 
 /// 🔴 The read side, **before the decode**: a file over the ceiling is refused by its size.
 ///
-/// This is the whole content of 「decode 前 byte 上限」. The file written here is not a blob at all —
+/// This is the whole content of "pre-decode byte ceiling" (sem: SEM-gx-engine-635). The file written here is not a blob at all —
 /// it is `MAX_BLOB_BYTES + 1` bytes of a single repeated byte, which is what four corrupted length
 /// bytes or a hostile write looks like from the outside. The refusal has to arrive from
 /// `Metadata::len`, and it does: the error names the ceiling and the size, and no decoder saw the
@@ -288,7 +322,7 @@ fn a_file_one_byte_over_the_ceiling_is_refused_before_it_is_decoded() {
         "the refusal is the ceiling's, not the decoder's: {refused}"
     );
 
-    // The control that makes the line above 「at most」 rather than 「fewer than」: a file of
+    // The control that makes the line above "at most" rather than "fewer than" (sem: SEM-gx-engine-636): a file of
     // **exactly** the ceiling passes the size check and is refused by the decoder instead. Same
     // bytes, one fewer of them, and a different refusal.
     std::fs::write(&path, vec![0x41u8; MAX_BLOB_BYTES as usize])
@@ -299,7 +333,7 @@ fn a_file_one_byte_over_the_ceiling_is_refused_before_it_is_decoded() {
     assert!(
         !decoded.to_string().contains("over the"),
         "a file of exactly the ceiling was refused by the ceiling, so the bound is read as \
-         「fewer than」: {decoded}"
+         \"fewer than\" (sem: SEM-gx-engine-637): {decoded}"
     );
 }
 
@@ -310,13 +344,13 @@ fn a_file_one_byte_over_the_ceiling_is_refused_before_it_is_decoded() {
 /// 🔴 **E-M5-6 across storage**: `Unavailable` may not name a body, in both directions.
 ///
 /// §38 settled the contradiction in 42 §3.12 (`inverse_delta: PlannedDelta` beside
-/// `Unavailable`=「`invert()`がNoneを返した場合」) by making the field an `Option` and the three
+/// `Unavailable`="the case where `invert()` returns None" (sem: SEM-gx-engine-638)) by making the field an `Option` and the three
 /// constructors keep it in step. That held for values built in memory; hand 3 is where they are
 /// built from something that was **written down**, and the door is the same one:
 /// `BlobStore::escrowed` goes through `EscrowedInverse::restore`.
 ///
-/// Both directions are measured, because they are different lies: a row that says 「no inverse could
-/// be constructed」 while holding one, and a row that promises an undo it has no body for.
+/// Both directions are measured, because they are different lies: a row that says "no inverse could
+/// be constructed" (sem: SEM-gx-engine-639) while holding one, and a row that promises an undo it has no body for.
 #[test]
 fn a_persisted_escrow_row_cannot_contradict_itself() {
     let s = store("escrow_roundtrip");
@@ -338,7 +372,7 @@ fn a_persisted_escrow_row_cannot_contradict_itself() {
     assert_eq!(
         held.retained_until(),
         None,
-        "DR-9: the OSS default is 無期限, and the 器 is present"
+        "DR-9: the OSS default is unlimited, and the vessel is present (sem: SEM-gx-engine-640)"
     );
 
     let unavailable = s
@@ -359,7 +393,7 @@ fn a_persisted_escrow_row_cannot_contradict_itself() {
             retained_until: None,
             status: InverseStatus::Unavailable,
         })
-        .expect_err("「持っていない」と言いながら保管した store は再構成できない");
+        .expect_err("a store that kept something while saying \"I don't have it\" cannot be reconstructed (sem: SEM-gx-engine-641)");
     let empty = s
         .escrowed(&EscrowRow {
             transformation: t,
@@ -373,7 +407,7 @@ fn a_persisted_escrow_row_cannot_contradict_itself() {
     assert_eq!(empty.kind(), "InconsistentEscrow");
 }
 
-/// A `retained_until` a caller supplies survives the round trip — the 器, and no more (DR-9, N-06).
+/// A `retained_until` a caller supplies survives the round trip — the vessel, and no more (DR-9, N-06) (sem: SEM-gx-engine-642).
 ///
 /// Nothing in v0.1 enforces the deadline and nothing in the journal carries one (see
 /// [`gx_engine::EscrowRow`]); what this probe fixes is that the field is not quietly dropped by the

@@ -3,8 +3,8 @@
 #
 # 🔴 What this is **not**, and the line is 47 §6's rather than this file's taste:
 #
-#   > v0.1で必須なのは (a)単一静的バイナリ + (c)docker-compose.yaml … (b)コンテナイメージのcosign署名
-#   > +SLSA provenance付与は…(d)Helm chart・T3（K8s常駐）・T4（air-gapped）は…v0.2+の提案
+#   > v0.1 requires only (a) a single static binary + (c) `docker-compose.yaml` … (b) a cosign
+#   > signature over the container image + SLSA provenance is …(d) a Helm chart, T3 (K8s-resident), T4 (air-gapped) are …a v0.2+ proposal (sem: SEM-Dockerfile-001)
 #
 # So there is **no cosign signature and no SLSA provenance attestation here** (47 §1(b)), and this
 # image is not the distributable 47 §1(b) describes — it is the wrapper 47 §1(c) needs in order to
@@ -13,7 +13,7 @@
 #
 # # Why `scratch`
 #
-# NFR-019 asks for 「単一静的バイナリとしてデプロイ可能」 and hand 7 measured that: `readelf -d` finds
+# NFR-019 asks for "deployable as a single static binary" and hand 7 measured that: `readelf -d` finds (sem: SEM-Dockerfile-002)
 # **0** `NEEDED` entries and there is no `INTERP` segment, so the binary needs no loader, no libc and
 # no base image. A distroless or Wolfi base (47 §1(b)'s eventual shape) would add a filesystem this
 # binary does not read. `scratch` makes the claim checkable: if the binary were not static, the
@@ -36,7 +36,7 @@ FROM scratch
 # 🔴 The `x86_64-unknown-linux-gnu` + `+crt-static` arm, not musl, and the difference is measured
 # rather than preferred: `psm 0.1.32` (cedar-policy → stacker → psm) compiles assembly through
 # cc-rs, and cross-compiling it to musl needs `x86_64-linux-musl-gcc`, which this machine does not
-# have and cannot install (no sudo). NFR-019's requirement is 「動的リンク依存なし」 and this arm meets
+# have and cannot install (no sudo). NFR-019's requirement is "no dynamic-link dependency" and this arm meets (sem: SEM-Dockerfile-003)
 # it; 47 §1(a)'s named *means* is musl and that remains unmet. req/95 §6 carries both statements and
 # raises the gap rather than letting the second stand in for the first.
 COPY target/x86_64-unknown-linux-gnu/release/gx /gx

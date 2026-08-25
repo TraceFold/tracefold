@@ -1,27 +1,30 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-071** — an escalation approved by a person (FR-058, DR-11, 43 T-5, INV-S6).
 //!
-//! 34 AC-071 逐語:
+//! 34 AC-071, verbatim (sem: SEM-gx-engine-565):
 //!
-//! > Given: `Escalated`状態のCandidate T（EscalationTicket発行済み）。When:
-//! > `gx escalation approve <ticket-id> --reason "reviewed and approved"`（またはAPI …）を実行する。
-//! > Then: Tは`Admitted`へ遷移し、以後canonicalize→commitのpipelineが続行可能になる。発行される
-//! > receipt trail（journal/Receiptメタデータ）に`Evidence(HumanDecision)`（decision=Admit, reason,
-//! > 裁定者actor）が含まれることを確認する。 | integration + E2E | M5/M6
+//! > Given: a Candidate T in the `Escalated` state (an EscalationTicket has been issued). When:
+//! > `gx escalation approve <ticket-id> --reason "reviewed and approved"` (or the API ...) is run.
+//! > Then: T transitions to `Admitted`, and the canonicalize->commit pipeline can continue from
+//! > there. Confirm that the issued receipt trail (journal/Receipt metadata) includes
+//! > `Evidence(HumanDecision)` (decision=Admit, reason, the ruler as actor). | integration + E2E | M5/M6
 //!
-//! # What is in scope, and what the M列 excludes
+//! # What is in scope, and what the M column excludes (sem: SEM-gx-engine-565)
 //!
-//! 51 §15's M5 row is 「escalation解決・owner cancel（AC-071〜073, DR-11）の**engineロジック分**pass」
+//! 51 §15's M5 row is "escalation resolution and owner-cancel (AC-071~073, DR-11) -- the
+//! **engine-logic share** passes" (sem: SEM-gx-engine-565)
 //! and req/78 N-01 keeps `gx escalation approve` out of this milestone entirely. So the trigger here
 //! is [`gx_engine::Engine::escalation`] and not a command line; the E2E half is M6's.
 //!
 //! # 🔴 `Evidence(HumanDecision)` is a type that does not exist, and **E-M2-3** is why
 //!
-//! > **E-M2-3**: Evidence=42 の 4 variant が正(43/44/34/35 の `HumanDecision` 参照は erratum・
-//! > DR-03-1 の HumanApprovalToken が対応物)
+//! > **E-M2-3**: Evidence = 42's four variants are canon (43/44/34/35's references to
+//! > `HumanDecision` are an erratum; DR-03-1's HumanApprovalToken is the counterpart) (sem: SEM-gx-engine-566)
 //!
-//! and gx-witness's own module documentation spells out where the fact goes instead: 「43 T-5's
-//! 「人間裁定receipt（署名済み）」 is a receipt」. So 「receipt trail（journal/Receiptメタデータ）に…
-//! 含まれる」 is read as the pair this hand writes — the journal's `HumanDecision` record, which
+//! and gx-witness's own module documentation spells out where the fact goes instead: "43 T-5's
+//! 'human-ruling receipt (signed)' is a receipt". So "is included in the receipt trail
+//! (journal/Receipt metadata)" (sem: SEM-gx-engine-566) is read as the pair this hand writes — the journal's `HumanDecision` record, which
 //! carries `decision`, `reason` and the ruler (**M5H6-2**), and the signed
 //! [`gx_witness::ReceiptKind::VerdictReceipt`], which carries the ruler's key inside the signature.
 //! Both are asserted below, and the reading is raised as **M5H6-7** rather than assumed.
@@ -62,7 +65,7 @@ fn ac_071_an_approved_escalation_becomes_admitted_and_commits() {
     let ticket = engine.ticket(&id).cloned().expect("T-4c raised one");
 
     // The ruler is not the submitter, and the key is not the engine's. 43 T-5's guard is
-    // 「裁定者が有効な署名鍵を保持」, so the ruling is signed under a key of the person's own.
+    // "the ruler holds a valid signing key" (sem: SEM-gx-engine-567), so the ruling is signed under a key of the person's own.
     let owner_key = gx_witness::KeyPair::from_seed("key-owner-1", &[11u8; 32]);
     let ruling = HumanRuling {
         decision: VerdictKind::Admit,
@@ -73,7 +76,7 @@ fn ac_071_an_approved_escalation_becomes_admitted_and_commits() {
         .escalation(&id, &ruling, RULED_AT, &owner_key)
         .expect("T-5");
 
-    // 「以後canonicalize→commitのpipelineが続行可能になる」 -- so the pipeline is continued.
+    // "the canonicalize->commit pipeline can continue from here" (sem: SEM-gx-engine-568) -- so the pipeline is continued.
     engine.canonicalize(&id, RULED_AT, None).expect("T-8");
     let committed = engine.commit(&id, RULED_AT, &signing_key()).expect("T-11");
 
@@ -106,7 +109,11 @@ fn ac_071_an_approved_escalation_becomes_admitted_and_commits() {
 
     assert_eq!(escalated, Lifecycle::Escalated, "the Given");
     assert_eq!(admitted, Lifecycle::Admitted, "43 T-5's to-state");
-    assert_eq!(committed, Lifecycle::Committed, "「以後…続行可能になる」");
+    assert_eq!(
+        committed,
+        Lifecycle::Committed,
+        "\"...can continue from here\" (quoted in SEM-gx-engine-568, sem: SEM-gx-engine-569)"
+    );
     assert_eq!(engine.ledger().log().len(), 1);
     assert_eq!(counts.totals()[4], 1, "the change was applied exactly once");
 
@@ -122,14 +129,18 @@ fn ac_071_an_approved_escalation_becomes_admitted_and_commits() {
         } => {
             assert_eq!(*kind, VerdictKind::Admit, "decision=Admit");
             assert_eq!(reason, REASON, "AC-071's `reason` reaches the record");
-            assert_eq!(*actor, ruler(1), "AC-071's 裁定者actor");
+            assert_eq!(
+                *actor,
+                ruler(1),
+                "AC-071's ruler `actor` (sem: SEM-gx-engine-570)"
+            );
             assert_eq!(*at, RULED_AT, "and the clock 41 §6 injected");
         }
         other => panic!("the filter admitted a {other:?}"),
     }
 
     // The receipt half. Two of them: T-4c's, signed by the engine's key, and T-5's, signed by the
-    // ruler's -- 43 T-5's 「provenance鎖に追記」 as a chain rather than a replacement.
+    // ruler's -- 43 T-5's "appended to the provenance chain" (sem: SEM-gx-engine-571) as a chain rather than a replacement.
     assert_eq!(receipts.len(), 2, "T-4c then T-5");
     assert_eq!(
         receipts[0]
@@ -146,7 +157,7 @@ fn ac_071_an_approved_escalation_becomes_admitted_and_commits() {
     assert_eq!(
         human.key_id,
         *owner_key.key_id(),
-        "43 T-5: 「裁定者が有効な署名鍵を保持」 -- the receipt names whose"
+        "43 T-5: \"the ruler holds a valid signing key\" (quoted in SEM-gx-engine-567, sem: SEM-gx-engine-572) -- the receipt names whose"
     );
     assert_eq!(
         human.receipt_kind,
@@ -167,8 +178,8 @@ fn ac_071_an_approved_escalation_becomes_admitted_and_commits() {
 
 /// 🔴 **INV-S6, the other direction**: a ruling on something nobody escalated is refused.
 ///
-/// The probe below says 「nothing but a ruling moves an `Escalated`」. This says 「a ruling moves
-/// nothing else」, and the two together are what INV-S6 asks for. Without it, widening 43 T-5's
+/// The probe below says "nothing but a ruling moves an `Escalated`". This says "a ruling moves
+/// nothing else" (sem: SEM-gx-engine-573), and the two together are what INV-S6 asks for. Without it, widening 43 T-5's
 /// from-state guard would let a person admit a `Candidate` **no gate has ever seen** — an approval
 /// that skips T-3, T-4a..e and the whole of FR-032 — and every probe in this hand would stay green.
 ///
@@ -252,7 +263,8 @@ fn ac_071_a_ruling_on_a_transformation_nobody_escalated_is_refused() {
 
 /// 🔴 **INV-S6**: nothing else moves an `Escalated` to `Admitted`.
 ///
-/// > `Escalated`はT-5/T-5bの署名済み人間裁定receiptを経由せずに`Admitted`/`Denied`へ自動遷移しない
+/// > `Escalated` does not automatically transition to `Admitted`/`Denied` without going through
+/// > T-5/T-5b's signed human-ruling receipt (sem: SEM-gx-engine-574)
 ///
 /// The absence, measured from four directions: `verify` refuses it (T-3 is a `Candidate`'s),
 /// `canonicalize` refuses it (43 T-8's from-state is `Admitted`), `commit` refuses it, and the

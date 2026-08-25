@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The bytes a checkpoint signature covers (**E-M2-19**, `req/38_ERRATA_2026-08-07.md` §9).
 //!
 //! No acceptance criterion is claimed here. 34 gives the checkpoint none -- AC-021..024 are the
@@ -6,30 +8,33 @@
 //!
 //! # The ruling
 //!
-//! E-M2-19 逐語: 「`Checkpoint` の**署名 core={origin, tree_size, root_hash}**とし `timestamp` は
-//! 署名 core の外（unsigned advisory field）へ——E-M2-6 と完全同型（CM-5: clock-free signed
-//! payload）。根拠は内部一貫性が一次（同じ原則が receipt にだけ効いて checkpoint に効かない状態は
-//! 説明不能）。…field 自体は 42 §3.11 どおり残す（lane の据え置きは正しかった）。手 2/手 4 で実装」.
+//! E-M2-19 verbatim: "`Checkpoint`'s **signed core = {origin, tree_size, root_hash}**, with
+//! `timestamp` moved outside the signed core (an unsigned advisory field) -- fully the same shape
+//! as E-M2-6 (CM-5: a clock-free signed payload). The primary ground is internal consistency (a
+//! state where the same principle governs the receipt but not the checkpoint cannot be explained).
+//! …the field itself stays as 42 §3.11 has it (the lane's earlier deferral was correct). Implemented
+//! across hand 2 / hand 4." (sem: SEM-gx-log-149)
 //!
 //! Two things follow, and both are checked below. The `Checkpoint` struct keeps all five fields
 //! 42 §3.11 gives it -- hand 1 was right not to remove `timestamp`, and this hand does not remove
 //! it either. What changes is that there is now one function that says which of them a signature
-//! covers, so 「the clock is not signed」 is a property of a byte string rather than a sentence in
+//! covers, so "the clock is not signed" (sem: SEM-gx-log-150) is a property of a byte string rather than a sentence in
 //! a document.
 //!
 //! # What is not here
 //!
 //! Signing. Producing a `DsseSignature` needs a PAE encoding and an Ed25519 key, both of which are
-//! `gx-witness::dsse` (hand 5, AC-018..020). This hand stops at the bytes: 「署名生成自体が手 2
-//! scope 外なら『署名対象 byte 列を作る関数』までを置き doc に E-M2-19 anchor を書く」.
+//! `gx-witness::dsse` (hand 5, AC-018..020). This hand stops at the bytes: "if generating the
+//! signature itself is outside hand 2's scope, go as far as 'the function that builds the
+//! signed-over byte string' and write an E-M2-19 anchor in the doc" (sem: SEM-gx-log-151).
 //! Consequently nothing in this file verifies a signature, and a caller that signs these bytes has
 //! done nothing this crate can check.
 //!
 //! # Hand 3 adds the head itself (H2-4)
 //!
-//! req/38 §11 逐語: 「H2-4（Checkpoint 生成関数の不在）→ 手 3: store が木の状態を持って初めて
-//! 作れる。unsigned 生成（署名 core byte 列は手 2 の checkpoint_core が既設）を手 3・
-//! DsseSignature 装着は手 5」. So the second half of this file is
+//! req/38 §11 verbatim: "H2-4 (no Checkpoint constructor function) → hand 3: only once store holds
+//! the tree's state can one be built. unsigned construction (the signed core byte string already
+//! exists as hand 2's checkpoint_core) is hand 3's; DsseSignature attachment is hand 5's" (sem: SEM-gx-log-152). So the second half of this file is
 //! [`gx_log::proof::unsigned_checkpoint`]: the head a log can state about itself, carrying a
 //! signature nothing can verify because none has been made.
 
@@ -181,9 +186,10 @@ fn map_keys(bytes: &[u8]) -> (u8, Vec<String>) {
 /// `Checkpoint` encodes exactly five map keys: the three the signature covers plus two it does not
 /// (**A-10**).
 ///
-/// A-10 逐語 (`req/38_ERRATA_2026-08-07.md` §18, adopted as a required DoD of M3's first hand):
-/// 「`Checkpoint` の encode map key 数=5(=3 covered+2 declared-out)を assert する 1 本。field 追加が
-/// 黙って署名対象から外れる mirror-struct 構造の機械 guard」.
+/// A-10 verbatim (`req/38_ERRATA_2026-08-07.md` §18, adopted as a required DoD of M3's first hand):
+/// "one assert that `Checkpoint`'s encoded map key count = 5 (= 3 covered + 2 declared-out). A
+/// mechanical guard against the mirror-struct shape where an added field silently falls outside the
+/// signed set." (sem: SEM-gx-log-153)
 ///
 /// # What was unguarded until this test
 ///
@@ -253,7 +259,7 @@ fn an_unsigned_checkpoint_states_the_tree_it_was_taken_from() {
 ///
 /// An empty `sig` is not a signature anybody could mistake for one: Ed25519 makes 64 bytes, and
 /// AC-019 asks a verifier to reject a malformed envelope. Leaving the field empty is the honest
-/// spelling of 「not signed yet」 -- the alternative, making `Checkpoint.signature` an `Option`,
+/// spelling of "not signed yet" (sem: SEM-gx-log-154) -- the alternative, making `Checkpoint.signature` an `Option`,
 /// would be a change to 42 §3.11's field table, which this hand does not have the standing to make.
 #[test]
 fn an_unsigned_checkpoint_carries_no_signature() {

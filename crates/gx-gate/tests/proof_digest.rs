@@ -1,13 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! M2-10 (req/49 §3) — what a receipt records for each of the three verdicts.
 //!
 //! 42 §3.10 gives `ReceiptPayload.verdict` a `VerdictSummary { kind, proof_digest: Cid }` and says
-//! only 「`Verdict`全体ではなくそのCID化digestを埋め込む」 -- but 「proof」 names something only the
+//! only "embed not the whole `Verdict` but its CID'd digest" (sem: SEM-gx-gate-309) -- but "proof" names something only the
 //! `Admit` arm has. M2 hand 5 met that and could implement none of it, because all three payload
 //! types are this crate's (req/49 §1 N-01), so it wrote the rule into `VerdictSummary`'s own
 //! documentation and left the ticket open:
 //!
-//! > 「**M2-10**: Deny/Escalate の `proof_digest` 元が未定義 … Deny=`Vec<Reason>`・Escalate=
-//! > `EscalationTicket` の CID を取る規則を明記(**型自体は M3**)」
+//! > "**M2-10**: the source of Deny/Escalate's `proof_digest` is undefined ... spell out the rule
+//! > for taking Deny=`Vec<Reason>`'s and Escalate=`EscalationTicket`'s CID (**the type itself is
+//! > M3**)" (sem: SEM-gx-gate-310)
 //!
 //! This is the hand the types exist in. [`Verdict::proof_digest`] is the rule as a function, and
 //! this file is where it is put back together with the gx-witness side.
@@ -91,7 +94,7 @@ fn escalation() -> EscalationTicket {
 // One rule per arm
 // ---------------------------------------------------------------------------
 
-/// `Admit` digests its [`AdmitProof`], over 42 §1.3's 「全フィールド」.
+/// `Admit` digests its [`AdmitProof`], over 42 §1.3's "every field". (sem: SEM-gx-gate-311)
 #[test]
 fn the_admit_arm_digests_its_proof() {
     let Verdict::Admit(proof) = admit() else {
@@ -158,7 +161,7 @@ fn the_excluded_fields_do_not_reach_the_digest() {
 /// The three arms are three different digests for the same change.
 ///
 /// Not a tautology: a `proof_digest` that were taken over a common wrapper -- the `Verdict` enum
-/// itself, say -- would still differ, but a digest taken over 「the reasons」 for both `Deny` and
+/// itself, say -- would still differ, but a digest taken over "the reasons" for both `Deny` and (sem: SEM-gx-gate-312)
 /// `Escalate` would not, since an escalation carries reasons too. This asserts the arms are
 /// distinguishable by the value the receipt holds, not only by the `kind` beside it.
 #[test]

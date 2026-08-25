@@ -1,15 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **E-M3-9**: the order every vector of an `AdmitProof` is put into, and the one that is left alone.
 //!
-//! 42 §1.3 lists `AdmitProof` as 「全フィールド」 in the IdentityView table, so the order of its four
+//! 42 §1.3 lists `AdmitProof` as "every field" in the IdentityView table, so the order of its four (sem: SEM-gx-gate-379)
 //! vectors reaches the CID a receipt records. 42 fixes no order. req/38 §19 does:
 //!
-//! > 「M3-20(採用+分離): Vec 正準化=id 昇順(policy_id/invariant_id 辞書順・evidence_digests は CID
-//! > byte 昇順)。**`composed_from` のみ合成順序を保持**(T5 の verdict 鎖復元に順序が意味を持つ——
-//! > 昇順に畳んではならない、の lane 指摘を採用)」 → **E-M3-9**
+//! > "M3-20 (adopted + separated): Vec canonicalization = ascending id (policy_id/invariant_id
+//! > lexicographic; evidence_digests ascending CID byte order). **Only `composed_from` keeps
+//! > composition order** (adopting the lane's point that order carries meaning for T5's
+//! > verdict-chain reconstruction -- it must not be folded into ascending)" -> **E-M3-9** (sem: SEM-gx-gate-380)
 //!
 //! # What this file proves and what hand 4 owes
 //!
-//! req/60 §5.2 assigns hand 1 「実装は構成子で強制(手 4 で test)」. So the tests here are of the
+//! req/60 §5.2 assigns hand 1 "the implementation is enforced by the constructor, tested in hand 4" (sem: SEM-gx-gate-381). So the tests here are of the
 //! constructor's behaviour; what hand 4 adds is the harder half -- that the constructor cannot be
 //! walked around once `AdmitProof` grows a wire face, since a `Deserialize` derive would be a
 //! second door into the struct that skips this ordering entirely. Until then the fields are
@@ -97,7 +100,7 @@ fn collection_order_does_not_reach_the_value() {
 ///
 /// T5 asks for the chain of witnesses behind a composed transformation to be recoverable, and a
 /// chain is an ordered thing: `g ∘ f` is not `f ∘ g`. Sorting this vector would destroy exactly the
-/// information 42 §3.8 says it carries (「下位の `AdmitProof` を lax 合成した際の参照元」). The two
+/// information 42 §3.8 says it carries ("the source referenced when lower `AdmitProof`s were laxly composed") (sem: SEM-gx-gate-382). The two
 /// cases below are the same set in two orders, and they must **not** be equal.
 #[test]
 fn composed_from_keeps_composition_order() {
@@ -127,7 +130,7 @@ fn composed_from_keeps_composition_order() {
     );
 }
 
-/// Duplicates survive (H4-3: 「多重度は畳まない・順序のみ正準化」).
+/// Duplicates survive (H4-3: "multiplicity is not folded; only order is canonicalized"). (sem: SEM-gx-gate-383)
 ///
 /// Two policies that both answered, or one evidence item cited twice, are facts about the
 /// evaluation that happened. A constructor that deduplicated would make the proof describe a

@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! Inclusion and consistency proofs, and the bytes a checkpoint signature covers.
 //!
 //! Spec: 42 §3.11 for `ConsistencyProof` and `Checkpoint`, 32 FR-022/FR-023 for what must be
 //! provable, 34 AC-022/AC-023 for how that is judged, RFC 6962 §2.1.1 and §2.1.2 for the two
 //! algorithms 42 §3.11 inherits along with the domain separation, and — for the **verifying**
 //! halves, which RFC 6962 states only as prose — **RFC 9162 §2.1.3.2 and §2.1.4.2**, whose numbered
-//! steps [`reconstruct_root`] and [`verify_consistency`] transcribe. Hand 7 fetched RFC 9162 from
+//! steps `reconstruct_root` (private) and [`verify_consistency`] transcribe. Hand 7 fetched RFC 9162 from
 //! the RFC Editor and compared the two symbol by symbol (`req/58_M2_HAND7_AUDIT_2026-08-08.md` §2);
 //! the correspondence is `fn` = `node`, `sn` = `last`, `r` = `hash`, `HASH` = `node_hash`, which is
 //! BLAKE3 rather than SHA-256 (35 DR-3, a declared and asserted difference — AC-024).
@@ -84,7 +86,7 @@ pub fn prove_inclusion_at(log: &TileLog, index: u64, tree_size: u64) -> Result<I
     let size = size_to_usize(tree_size, "tree size")?;
     let at = size_to_usize(index, "leaf index")?;
 
-    // 🔴 **FR-M7-2 案 A** (`req/38` §56 追加裁定 a): the walk is the same walk and the fold under it
+    // 🔴 **FR-M7-2 option A** (`req/38` §56, additional ruling a): the walk is the same walk and the fold under it (sem: SEM-gx-log-038)
     // reads the tile cache, so a proof costs `O(n/256)` node hashes instead of `O(n)`. Nothing about
     // the **proof** changed — same siblings, same order, same three fields on the wire — which is
     // what `tests/incremental_inclusion.rs` measures against an independent transcription of
@@ -113,7 +115,7 @@ pub fn prove_inclusion_at(log: &TileLog, index: u64, tree_size: u64) -> Result<I
 ///
 /// # Errors
 /// [`Error::Canon`] if the entry's leaf has no canonical form, i.e. it could never have been
-/// appended at all. That is a different statement from 「this proof does not hold」, so it is a
+/// appended at all. That is a different statement from "this proof does not hold" (sem: SEM-gx-log-039), so it is a
 /// different return.
 pub fn verify_inclusion(proof: &InclusionProof, root: &Cid, entry: &LedgerEntry) -> Result<bool> {
     verify_inclusion_of(proof, root, &entry.leaf())
@@ -137,11 +139,39 @@ pub fn verify_inclusion(proof: &InclusionProof, root: &Cid, entry: &LedgerEntry)
 /// # Errors
 /// [`Error::Canon`] if the leaf has no canonical form.
 pub fn verify_inclusion_of(proof: &InclusionProof, root: &Cid, leaf: &LedgerLeaf) -> Result<bool> {
+    // 🔴 **H-09**: one equality over [`root_of_inclusion`], which holds the two gates and the walk.
+    // Written as a delegation rather than as a second copy so that the reached root a bridged
+    // verification needs (RFC 6962 §2.1.2) and the reached root this equality tests are the **same**
+    // computation — two transcriptions would be two verifiers, and the newer one would be the one
+    // nothing has been measuring.
+    Ok(root_of_inclusion(proof, leaf)?.is_some_and(|reached| reached == *root))
+}
+
+/// 🔴 **H-09** — the root the proof and the leaf *reach*, rather than whether they reach a given one.
+///
+/// [`verify_inclusion_of`] is this function plus one equality, and is written in terms of it. The
+/// smaller answer exists because an inclusion proof is relative to **one** `tree_size`
+/// (`prove_inclusion_at`'s note), so a verifier holding a checkpoint of a *later* tree cannot ask
+/// `verify_inclusion_of` anything true: the roots differ by construction and `Ok(false)` would read
+/// as "this proof is a forgery" (sem: SEM-gx-log-045) when what happened is that the log grew. RFC 6962 §2.1.2's
+/// consistency proof is the bridge between the two sizes, and [`verify_consistency`] needs the old
+/// root as an input — this is where a receipt's holder gets one **without being handed it**.
+///
+/// Nothing is taken on trust. The root that comes back is whatever the proof and the leaf compute
+/// to; a caller that then binds it to a believed head through [`verify_consistency`] has a chain
+/// with no unchecked link in it, and a caller that does not has learned nothing.
+///
+/// `None` for a proof that does not fit the tree it declares — the two length gates
+/// [`verify_inclusion_of`] documents, in the same order and for the same reasons.
+///
+/// # Errors
+/// [`Error::Canon`] if the leaf has no canonical form.
+pub fn root_of_inclusion(proof: &InclusionProof, leaf: &LedgerLeaf) -> Result<Option<Cid>> {
     if leaf.index != proof.leaf_index {
-        return Ok(false);
+        return Ok(None);
     }
-    // **H2-5** (`req/38_ERRATA_2026-08-07.md` §11): 「(leaf_index, tree_size) から path 長は
-    // 数学的に一意——hash 計算の**前に**長さ照合し、不一致は即 reject」. Before this the walk below
+    // **H2-5** (`req/38_ERRATA_2026-08-07.md` §11): "the path length follows mathematically from
+    // (leaf_index, tree_size) alone -- check the length **before** hashing, and reject immediately on a mismatch" (sem: SEM-gx-log-040). Before this the walk below
     // reached the same answer, but only after hashing every element a sender chose to include, so
     // the cost of refusing a proof was set by the proof. `audit_path_length.rs` asserts both the
     // answers and — from the source, because the return value cannot show it — this ordering.
@@ -169,12 +199,12 @@ pub fn verify_inclusion_of(proof: &InclusionProof, root: &Cid, leaf: &LedgerLeaf
     // So the gate changes **when** a wrong-length path is refused (before any hash, in O(log n)
     // integer operations) and never **whether**. What follows from 3 is also why the two `None`
     // arms in `reconstruct_root` below are unreachable from this call site: hand 7 measured that by
-    // deleting them, and nothing went red (req/58 §2, mutation M5, and §4 の起票).
+    // deleting them, and nothing went red (req/58 §2, mutation M5, and §4's filing). (sem: SEM-gx-log-041)
     if audit_path_len(proof.leaf_index, proof.tree_size) != Some(proof.audit_path.len()) {
-        return Ok(false);
+        return Ok(None);
     }
     let hash = crate::tile::leaf_hash(leaf)?;
-    Ok(reconstruct_root(proof, &hash).is_some_and(|reached| reached == *root))
+    Ok(reconstruct_root(proof, &hash))
 }
 
 /// Walk the audit path from the leaf to a root (RFC 6962 §2.1.1's verification).
@@ -349,7 +379,7 @@ pub fn verify_consistency(
 ///
 /// A private mirror of the three signed fields of 42 §3.11's `Checkpoint`, in bytewise field order
 /// so the encoded map is canonical as written (42 §2.1-2). It exists because the signed message
-/// has to be a value in its own right — signing 「the struct minus two fields」 by convention is how
+/// has to be a value in its own right — signing "the struct minus two fields" (sem: SEM-gx-log-042) by convention is how
 /// two implementations end up signing two different messages.
 #[derive(Debug, Serialize)]
 struct CheckpointCore<'a> {
@@ -363,13 +393,13 @@ struct CheckpointCore<'a> {
 /// `timestamp` and `signature` are excluded. The clock because a signed payload that carries one
 /// binds the signature to when the head was written down rather than to what the head says — the
 /// same reasoning E-M2-6 applied to `ReceiptPayload.issued_at`, and E-M2-19 extends here for
-/// internal consistency: 「同じ原則が receipt にだけ効いて checkpoint に効かない状態は説明不能」.
+/// internal consistency: "a state where the same principle governs the receipt but not the checkpoint cannot be explained" (sem: SEM-gx-log-043).
 /// The signature because a message cannot contain itself.
 ///
 /// # These bytes are signed inside a pre-authentication encoding (**E-M2-26**)
 ///
 /// Hand 5 signed this byte string directly. `req/38_ERRATA_2026-08-07.md` §15 ruled that off: the
-/// message is `PAE(`「application/vnd.glovrex.checkpoint+dagcbor」`, these bytes)`, so that a
+/// message is `PAE(`"application/vnd.glovrex.checkpoint+dagcbor"`, these bytes)` (sem: SEM-gx-log-044), so that a
 /// checkpoint signature and a receipt signature made under one key are separated by a
 /// length-prefixed payload type rather than by two encodings that happen not to collide.
 /// `gx_witness::dsse::checkpoint_signing_message` is that message and this function is its body.
@@ -399,9 +429,9 @@ pub fn checkpoint_signing_bytes(checkpoint: &Checkpoint) -> Result<Vec<u8>> {
 
 /// The head a log states about itself, before anybody has signed it (**H2-4**).
 ///
-/// req/38 §11 逐語: 「H2-4（Checkpoint 生成関数の不在）→ 手 3: store が木の状態を持って初めて
-/// 作れる。unsigned 生成（署名 core byte 列は手 2 の checkpoint_core が既設）を手 3・
-/// DsseSignature 装着は手 5」.
+/// req/38 §11 verbatim: "H2-4 (no Checkpoint constructor function) → hand 3: only once store holds
+/// the tree's state can one be built. unsigned construction (the signed core byte string already
+/// exists as hand 2's checkpoint_core) is hand 3's; DsseSignature attachment is hand 5's" (sem: SEM-gx-log-045).
 ///
 /// The three signed fields come from the tree — `tree_size` from its length and `root_hash` from
 /// its fold, so a head cannot claim a size the log has not reached or a root it does not have.
@@ -453,8 +483,8 @@ pub fn unsigned_checkpoint(
 
 /// What a verdict checkpoint's signature covers (**FR-M04**).
 ///
-/// The same shape as [`CheckpointCore`] and for the same reason: signing 「the struct minus two
-/// fields」 by convention is how two implementations end up signing two different messages, so the
+/// The same shape as [`CheckpointCore`] and for the same reason: signing "the struct minus two
+/// fields" (sem: SEM-gx-log-046) by convention is how two implementations end up signing two different messages, so the
 /// signed core is a value in its own right. `timestamp` and `signature` are outside it -- CM-5,
 /// which E-M2-19 already extended from the receipt to the tree head, and which has no reason to
 /// stop here.
@@ -475,7 +505,7 @@ struct VerdictCheckpointCore<'a> {
 /// The **core** a verdict checkpoint's signature covers (**FR-M04**) -- not the message it travels
 /// in.
 ///
-/// The message is `PAE(`「application/vnd.glovrex.verdict-checkpoint+dagcbor」`, these bytes)`, and
+/// The message is `PAE(`"application/vnd.glovrex.verdict-checkpoint+dagcbor"`, these bytes)` (sem: SEM-gx-log-047), and
 /// `gx_witness::dsse::verdict_checkpoint_signing_message` is that message. Public because a
 /// verifier needs it: a third party holding a published count and a key has to rebuild the message
 /// from something better than a formula in a doc comment.
@@ -506,10 +536,10 @@ pub fn verdict_checkpoint_signing_bytes(checkpoint: &VerdictCheckpoint) -> Resul
 ///
 /// # Infallible, where `unsigned_checkpoint` is not
 ///
-/// That function refuses an empty log — 「a checkpoint with no root would be a signed statement
-/// about nothing」. Here an empty ledger is the **interesting** case: a window in which everything
+/// That function refuses an empty log — "a checkpoint with no root would be a signed statement
+/// about nothing" (sem: SEM-gx-log-048). Here an empty ledger is the **interesting** case: a window in which everything
 /// was refused commits nothing. So the root is an `Option` and a zero-leaf ledger produces a
-/// perfectly meaningful checkpoint saying 「n refusals, nothing committed」.
+/// perfectly meaningful checkpoint saying "n refusals, nothing committed" (sem: SEM-gx-log-049).
 ///
 /// # What the caller owes
 ///
@@ -544,12 +574,12 @@ pub fn unsigned_verdict_checkpoint(
 
 /// What a chain of verdict checkpoints does not add up about (**FR-M04**, AC-VC-2 / AC-VC-5).
 ///
-/// A **derived** type: 42 assigns it no field table, so it has the standing of [`Recovery`] and of
+/// A **derived** type: 42 assigns it no field table, so it has the standing of `Recovery` and of
 /// `CheckerResultRef` (E-M2-17) — the derivation is written down here and an owner ruling replaces
 /// it.
 ///
-/// Every variant carries the two numbers that disagree, because a finding which says only 「this is
-/// wrong」 sends its reader back to recompute what the check already knew.
+/// Every variant carries the two numbers that disagree, because a finding which says only "this is
+/// wrong" (sem: SEM-gx-log-050) sends its reader back to recompute what the check already knew.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ChainBreak {
     /// Two consecutive checkpoints whose windows do not meet: something was published between them
@@ -588,7 +618,7 @@ pub enum ChainBreak {
 /// * `ledger_tree_size` — the size of the commit ledger's head, which a verifier reads from a
 ///   signed [`Checkpoint`] rather than from the operator's word.
 ///
-/// An empty answer means 「nothing here contradicts itself」 and never 「the counts are true」. The
+/// An empty answer means "nothing here contradicts itself" and never "the counts are true" (sem: SEM-gx-log-051). The
 /// two limits that stay open whatever this function returns are written on [`VerdictCheckpoint`].
 #[must_use]
 pub fn audit_verdict_chain(

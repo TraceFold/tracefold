@@ -1,22 +1,26 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! What the rulings added to 51 §7, kept in a section of its own.
 //!
 //! # The laws the rulings added
 //!
-//! req/69 §3.4 wrote eight laws and §28 ruled 「全 8 本採用」; §30 M4H2-4 added one more property that is
+//! req/69 §3.4 wrote eight laws and §28 ruled "all eight adopted" (sem: SEM-gx-substrate-conformance-019);
+//! §30 M4H2-4 added one more property that is
 //! not in the L-list, and `req/38` §58 R-4 added a second. Each row names where it comes from, because
-//! a law with no ruling behind it would be a house rule wearing the harness's authority.
+//! a law with no ruling behind it would be a house rule wearing the harness's authority (sem:
+//! SEM-gx-substrate-conformance-020).
 //!
-//! | 法則 | 内容 | 出自 |
+//! | law | content | origin |
 //! |---|---|---|
-//! | L1 | `plan` は (intent, snapshot) の対に対して決定的——substrate が動いても同じ対には同じ答え | E-M4-4 / E-M4-29 / AC-047 |
-//! | L2 | `apply` の再入(retry)は状態も観測値(`resulting_digest`/`postcondition`)も動かさない | E-M4-3 / 51 §7 契約 7 / 43 T-10c |
-//! | L3 | 往復は bit-equal。量化は `invert` に渡した **pre の 1 点**で、その状態を Given に書く | E-M4-3 / AC-049 |
-//! | L4 | `precondition` は状態変化を検知し、**変化が無ければ同じ値を返す**(対照つき) | 51 §7 契約 3 / AC-034 |
-//! | L5 | `plan` が target を予言したなら `apply(δ).resulting_digest == target` | M4-06 採(b) |
-//! | L6 | `commutation(a,b) == commutation(b,a)`・`commutation(a,a)` は `Conflicts` | M4-25 採(a) |
-//! | L7 | locator 正規化は冪等で、同値な綴りを 1 つへ写す | E-M4-12 / 42 §2.3 |
-//! | K1 | `plan`・`precondition`・`snapshot` の産物の `substrate` はすべて `kind()` | M4H2-4 採(a) |
-//! | K2 | `apply` が報告する `postcondition` と、その後の `precondition` が**比較可能**で一致する | §58 R-4 / 51 §7 契約 3 / E-M4-15 |
+//! | L1 | `plan` is deterministic over the pair (intent, snapshot) -- even if the substrate moves, the same pair gets the same answer | E-M4-4 / E-M4-29 / AC-047 |
+//! | L2 | a re-entry (retry) of `apply` moves neither the state nor the observed values (`resulting_digest`/`postcondition`) | E-M4-3 / 51 §7 contract 7 / 43 T-10c |
+//! | L3 | the round trip is bit-equal. The quantifier is the **one pre-state point** handed to `invert`, and that state is written into the Given | E-M4-3 / AC-049 |
+//! | L4 | `precondition` detects a state change, and **returns the same value when there is no change** (with a control) | 51 §7 contract 3 / AC-034 |
+//! | L5 | if `plan` prophesies a target, then `apply(δ).resulting_digest == target` | M4-06, adopted (b) |
+//! | L6 | `commutation(a,b) == commutation(b,a)`; `commutation(a,a)` is `Conflicts` | M4-25, adopted (a) |
+//! | L7 | locator normalisation is idempotent, and maps equivalent spellings to one | E-M4-12 / 42 §2.3 |
+//! | K1 | the `substrate` of everything `plan`/`precondition`/`snapshot` produces is always `kind()` | M4H2-4, adopted (a) |
+//! | K2 | the `postcondition` `apply` reports and the `precondition` taken right after it are **comparable** and agree | §58 R-4 / 51 §7 contract 3 / E-M4-15 |
 //!
 //! # 🔴 Why K2 exists: fifteen obligations could not see a real defect
 //!
@@ -31,20 +35,23 @@
 //! of different scopes (**E-M4-15**, **E-M4-27**), so an engine holding that adapter would find 42
 //! §3.5's CAS unusable -- an object failing to compare with itself -- and would read the refusal as a
 //! wiring bug somewhere else entirely. Fifteen obligations, and the one question that would have
-//! noticed was 「are these two of yours about the same thing?」.
+//! noticed was "are these two of yours about the same thing?" (sem: SEM-gx-substrate-conformance-021).
 //!
-//! `req/38` §58 ruled it: 「共有 harness に precondition↔postcondition 突合 obligation を足し、監査手が
-//! fs/git/mcp 3 adapter で再検」. This is that obligation, and M7 hand 3 is the hand that runs it against
+//! `req/38` §58 ruled it: "add a precondition<->postcondition cross-check obligation to the shared
+//! harness, and have the audit hand re-examine it across the three fs/git/mcp adapters" (sem:
+//! SEM-gx-substrate-conformance-022). This is that obligation, and M7 hand 3 is the hand that runs it against
 //! the three.
 //!
 //! # Where L8 went
 //!
-//! **L8** (opacity: 「gx-core/canon/gate/witness/log の src に fs delta 文法を読む code が 0」) is not in
+//! **L8** (opacity: "zero code in the src of gx-core/canon/gate/witness/log reads fs delta grammar"
+//! (sem: SEM-gx-substrate-conformance-023)) is not in
 //! the table, and its absence is not an omission. It is not a property of an adapter -- the subject
 //! of the sentence is the five crates below the boundary -- so running it through [`crate::Fixture`]
 //! would ask an adapter to vouch for the code it is supposed to be opaque to. It is measured in
 //! `tests/opacity.rs` of this crate, where the subject is the workspace, and a mutation in
-//! `tools/verify_m4h3.sh` is what stops 「無い事」 from being vacuous.
+//! `tools/verify_m4h3.sh` is what stops "the absence" (sem: SEM-gx-substrate-conformance-024) from
+//! being vacuous.
 //!
 //! # Why a law can fail without the adapter being wrong
 //!
@@ -54,6 +61,7 @@
 //! rather than inferred from a name (§30 M4H2-1 (a)).
 
 use gx_core::Commutation;
+use gx_substrate::InvertOutcome;
 
 use crate::{unmeasured_or_failed, Check, Fixture, Origin, Outcome};
 
@@ -92,9 +100,11 @@ pub(crate) fn run(fixture: &dyn Fixture) -> Vec<Check> {
 
 /// **L1** — `plan` answers about the pair it was handed, not about the world it can see.
 ///
-/// **E-M4-29** (§30 M4H2-3 (b)) reads the trait's 「純関数」 as 「(intent, pre) の対に対する決定性+
-/// substrate への書き込み 0」 and adds 「読み込みは禁じない——M7 の git adapter が object store を読む道を
-/// 閉じない」. The two halves are consistent exactly when reading does not make the answer depend on
+/// **E-M4-29** (§30 M4H2-3 (b)) reads the trait's "pure function" as "determinism over the pair
+/// (intent, pre), plus zero writes to the substrate" and adds "reading is not forbidden -- it does
+/// not close the road for M7's git adapter to read the object store" (sem:
+/// SEM-gx-substrate-conformance-025). The two halves are consistent exactly when reading does not
+/// make the answer depend on
 /// anything but the pair, and this is where that is measured: the same `(intent, pre)` is planned
 /// twice with a disturbance in between, and the deltas have to agree.
 ///
@@ -185,13 +195,15 @@ fn law_2_apply_re_entry(fixture: &dyn Fixture) -> Outcome {
 /// **L3** — the round trip, quantified at the one state it was built for.
 ///
 /// **E-M4-3** is the ruling and req/69 §3.2 is the three-line proof behind it: reading 41 §4's
-/// 「適用は冪等」 and AC-049's round trip as laws about a state map at once forces `⟦δ⟧ = id`, so both
-/// are narrowed. This law's Given is 「the state `invert` was handed」 and the message carries that
-/// state's digest, because 「往復 property の Given に状態を書く事」 is what §28 made a condition -- a
+/// "application is idempotent" and AC-049's round trip as laws about a state map at once forces
+/// `⟦δ⟧ = id`, so both are narrowed. This law's Given is "the state `invert` was handed" and the
+/// message carries that state's digest, because "writing the state into the Given of the round-trip
+/// property" (sem: SEM-gx-substrate-conformance-026) is what §28 made a condition -- a
 /// property test whose generator moves the state between the two applications falsifies correct
 /// adapters, which is M3-05 one milestone later.
 ///
-/// It differs from contract 4 in what 「元に戻る」 is measured over: the contract compares the object's
+/// It differs from contract 4 in what "returns to where it started" (sem:
+/// SEM-gx-substrate-conformance-027) is measured over: the contract compares the object's
 /// digest, and this compares the **fingerprint**, which 42 §3.5 lets an adapter widen past the object
 /// itself. An undo that restored the file and left the scope changed passes the first and fails this.
 fn law_3_round_trip_at_one_point(fixture: &dyn Fixture) -> Outcome {
@@ -212,7 +224,11 @@ fn law_3_round_trip_at_one_point(fixture: &dyn Fixture) -> Outcome {
         Ok(d) => d,
         Err(e) => return fail(format!("plan refused: {e}")),
     };
-    let inverse = match adapter.invert(&delta, &pre) {
+    // 🔴 **DR-46-26** — the body only; see `contracts.rs`'s note at contract 5.
+    let inverse = match adapter
+        .invert(&delta, &pre)
+        .map(InvertOutcome::into_inverse)
+    {
         Ok(Some(i)) => i,
         Ok(None) => {
             return Outcome::NotSupplied(format!(
@@ -255,7 +271,8 @@ fn law_3_round_trip_at_one_point(fixture: &dyn Fixture) -> Outcome {
 /// **L4** — the fingerprint moves when the state moves, and holds still when it does not.
 ///
 /// 51 §7's contract 3 is the first half. The control is what stops an adapter from passing it with a
-/// counter: a `precondition` that returned a fresh value on every call would 「detect」 every change
+/// counter: a `precondition` that returned a fresh value on every call would "detect" (sem:
+/// SEM-gx-substrate-conformance-028) every change
 /// and every non-change alike, and CON-2's CAS would abort commits nobody interfered with.
 fn law_4_precondition_sensitivity(fixture: &dyn Fixture) -> Outcome {
     let adapter = fixture.adapter();
@@ -300,18 +317,21 @@ fn law_4_precondition_sensitivity(fixture: &dyn Fixture) -> Outcome {
 
 /// **L5** — an adapter that promises a post-state has to reach it.
 ///
-/// **M4-06 採(b)**: 「M4 は「adapter の自己整合」を conformance property で強制——`plan` が `target` を
-/// 予言したら `apply(δ).resulting_digest == target`(L5・harness 収載=手5)。engine 側の拒否と
-/// `AbortReason` 拡張は **M5 起票**」. req/69 §4 M4-06 is why it exists at all: `resulting_digest` has
-/// exactly one mention in the whole canon (42 §3.4's field table) and nothing compares it with the
-/// `target` a plan promised, so 「post は返り値でなく観測値」 was an observation nobody looked at.
+/// **M4-06, adopted (b)** (sem: SEM-gx-substrate-conformance-029): "M4 enforces "adapter
+/// self-consistency" as a conformance property -- if `plan` prophesies a `target`, then
+/// `apply(δ).resulting_digest == target` (L5, included in the harness = hand 5). The engine-side
+/// refusal and the `AbortReason` extension are **filed for M5**." req/69 §4 M4-06 is why it exists
+/// at all: `resulting_digest` has exactly one mention in the whole canon (42 §3.4's field table) and
+/// nothing compares it with the `target` a plan promised, so "post is not a return value but an
+/// observation" was an observation nobody looked at.
 ///
 /// The prophecy is the fixture's because it is `Transformation.target` (41 §3), an engine-side value.
 fn law_5_the_prophecy_holds(fixture: &dyn Fixture) -> Outcome {
     let Some(target) = fixture.promised_target() else {
         return Outcome::NotSupplied(
             "the fixture promises no target for its intent, so there is no prophecy to check \
-             (M4-06 採(b); the engine-side refusal is M5's)"
+             (M4-06, adopted (b) (sem: SEM-gx-substrate-conformance-030); the engine-side refusal \
+             is M5's)"
                 .to_string(),
         );
     };
@@ -336,9 +356,11 @@ fn law_5_the_prophecy_holds(fixture: &dyn Fixture) -> Outcome {
 
 /// **L6** — independence is a relation between two deltas, not a view one has of the other.
 ///
-/// **M4-25 採(a)+反射=Conflicts** (§28): 「`commutation` の**対称性を契約に**足し L6 property で測る。
-/// `commutation(a,a)` は **`Conflicts`**(同一資源への二重干渉=保守側 fail-closed・DPO 並列独立性は同一
-/// match で一般に不成立)」. 41 §4 and 51 §7 both leave the relation between `commutation(a,b)` and
+/// **M4-25, adopted (a) + reflexive = Conflicts** (§28) (sem: SEM-gx-substrate-conformance-031):
+/// "add `commutation`'s **symmetry to the contract** and measure it with the L6 property.
+/// `commutation(a,a)` is **`Conflicts`** (double interference on the same resource = the
+/// conservative fail-closed side; DPO parallel independence generally does not hold for the same
+/// match)". 41 §4 and 51 §7 both leave the relation between `commutation(a,b)` and
 /// `commutation(b,a)` unwritten, which req/69 §4 M4-25 measured; ASM-2's DPO parallel independence is
 /// symmetric, so the asymmetric reading was never the intended one.
 fn law_6_commutation_is_symmetric(fixture: &dyn Fixture) -> Outcome {
@@ -425,7 +447,8 @@ fn law_7_normalisation(fixture: &dyn Fixture) -> Outcome {
     if spellings.is_empty() {
         return Outcome::NotSupplied(
             "normalisation is idempotent, but the fixture names no equivalent spellings, so the \
-             second half of L7 (「同値写像」, 42 §2.3's `≈`) is unmeasured"
+             second half of L7 (\"the equivalence map\" (sem: SEM-gx-substrate-conformance-032), \
+             42 §2.3's `≈`) is unmeasured"
                 .to_string(),
         );
     }
@@ -438,8 +461,9 @@ fn law_7_normalisation(fixture: &dyn Fixture) -> Outcome {
         if l != r {
             return fail(format!(
                 "{left:?} and {right:?} are called equivalent and normalise to {l:?} and {r:?}; \
-                 M3-10 fixed the gate's effective range at locator 級, so two spellings of one \
-                 subject are two policy subjects"
+                 M3-10 fixed the gate's effective range at the granularity of a locator (sem: \
+                 SEM-gx-substrate-conformance-033), so two spellings of one subject are two policy \
+                 subjects"
             ));
         }
     }
@@ -448,11 +472,13 @@ fn law_7_normalisation(fixture: &dyn Fixture) -> Outcome {
 
 /// **K1** — everything an adapter produces names the substrate the adapter speaks for.
 ///
-/// **§30 M4H2-4 採(a)**: 「「plan/precondition の産物の `substrate` == `kind()`」を harness の契約
-/// property に(手3・adapter 非依存で全 adapter に効く)」. req/71 §2 M4H2-4 is the defect it closes:
+/// **§30 M4H2-4, adopted (a)** (sem: SEM-gx-substrate-conformance-034): "put '`plan`/`precondition`'s
+/// products have `substrate` == `kind()`' into the harness's contract property (hand 3,
+/// adapter-independent, applies to every adapter)". req/71 §2 M4H2-4 is the defect it closes:
 /// `PlannedDelta::new` and `Fingerprint::new` both take a `SubstrateKind`, so an adapter can build a
-/// delta naming somebody else's grammar, and **E-M4-27**'s refusal only fires later -- as 「this
-/// adapter's own fingerprints are not comparable with each other」, which reads as a wiring bug
+/// delta naming somebody else's grammar, and **E-M4-27**'s refusal only fires later -- as "this
+/// adapter's own fingerprints are not comparable with each other" (sem:
+/// SEM-gx-substrate-conformance-035), which reads as a wiring bug
 /// somewhere else entirely.
 fn law_k1_products_name_the_kind(fixture: &dyn Fixture) -> Outcome {
     let adapter = fixture.adapter();
@@ -506,7 +532,8 @@ fn law_k1_products_name_the_kind(fixture: &dyn Fixture) -> Outcome {
 /// follows is the shape of the measurement, and both halves of it are load-bearing:
 ///
 /// * **`Err` is a failure, not a skip.** [`gx_core::Fingerprint::cas_eq`] answers `Err` when the two
-///   values name different substrates or different scopes -- 「その比較は意味を持たない」 (**E-M4-15**,
+///   values name different substrates or different scopes -- "that comparison has no meaning" (sem:
+///   SEM-gx-substrate-conformance-036) (**E-M4-15**,
 ///   **E-M4-27**). For two fingerprints of **one object taken by one adapter**, that answer is not a
 ///   fact about the question: it is the adapter contradicting itself, and 42 §3.5's CAS is unusable
 ///   for it. This is the arm the git mutation lands in.
@@ -520,7 +547,8 @@ fn law_k1_products_name_the_kind(fixture: &dyn Fixture) -> Outcome {
 /// next commit will ask, one moment earlier.
 ///
 /// It is a **law** and not a contract because 51 §7 does not write it: the seven rows are copied cell
-/// for cell in [`crate::contracts`] and adding an eighth would make 「上記7契約」 mean eight things
+/// for cell in [`crate::contracts`] and adding an eighth would make "the above seven contracts"
+/// (sem: SEM-gx-substrate-conformance-037) mean eight things
 /// quietly (§30 M4H2-1 (a)). Its ruling is §58's.
 fn law_k2_the_two_fingerprints_are_about_one_thing(fixture: &dyn Fixture) -> Outcome {
     let adapter = fixture.adapter();

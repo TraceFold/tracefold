@@ -1,16 +1,22 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **AC-046** — a `Box<dyn SubstrateAdapter>` satisfies `Send + Sync`, and one that would not fails
-//! to compile.
+//! to compile. (sem: SEM-gx-substrate-103, SEM-gx-substrate-104, SEM-gx-substrate-105,
+//! SEM-gx-substrate-106)
 //!
-//! 34 逐語: 「Given: `SubstrateAdapter` trait実装。When: `Box<dyn SubstrateAdapter>`としてtrait object
-//! を格納するコードをコンパイルする。Then: `Send + Sync`境界を満たしコンパイル成功する（境界を満たさない
-//! 負例ではコンパイルエラーになることをtrybuildで確認）」.
+//! 34, verbatim: "Given: an implementation of the `SubstrateAdapter` trait. When: code that stores
+//! it as a trait object, `Box<dyn SubstrateAdapter>`, is compiled. Then: it satisfies the
+//! `Send + Sync` bound and compiles successfully (confirm with trybuild that a negative example
+//! failing to satisfy the bound is a compile error)".
 //!
 //! # Why there is no `trybuild`
 //!
-//! **M4-20 採(b)** (req/38 §28): 「AC-046 は **compile_fail doctest**(依存 0・M1 先例・51 §2 が明示
-//! 許容)+`Box<dyn SubstrateAdapter>: Send+Sync` の正例 assert。trybuild 不採用=package 244 不変(表外
-//! 依存を増やさない)」. 51 §2 allows either instrument -- 「`trybuild`または単純なコンパイル成功
-//! アサーション」 -- and `trybuild` is not in the selection table of `req/spec/research/02`, so taking
+//! **M4-20, adopted (b)** (req/38 §28): "AC-046 is a **compile_fail doctest** (zero dependencies,
+//! the M1 precedent, 51 §2 explicitly allows it) + a positive-example assertion of
+//! `Box<dyn SubstrateAdapter>: Send+Sync`. `trybuild` is not adopted = the package count of 244 is
+//! unchanged (adds no dependency outside the table)". 51 §2 allows either instrument -- "`trybuild`
+//! or a plain compile-success assertion" -- and `trybuild` is not in the selection table of
+//! `req/spec/research/02`, so taking
 //! it would have been a dependency chosen by an AC's example rather than by a comparison.
 //!
 //! The negative case therefore lives in `crates/gx-substrate/src/adapter.rs` as a `compile_fail`
@@ -24,7 +30,7 @@
 use std::path::{Path, PathBuf};
 
 use gx_core::{Commutation, Fingerprint, Intent, ObjectSnapshot, SubstrateKind};
-use gx_substrate::{AppliedDelta, PlannedDelta, Result, SubstrateAdapter};
+use gx_substrate::{AppliedDelta, InvertOutcome, PlannedDelta, Result, SubstrateAdapter};
 
 /// The smallest thing that is an adapter: it implements the seven methods and holds nothing.
 ///
@@ -54,7 +60,7 @@ impl SubstrateAdapter for Minimal {
         unimplemented!("AC-046 measures the bound, not the behaviour")
     }
 
-    fn invert(&self, _delta: &PlannedDelta, _pre: &ObjectSnapshot) -> Result<Option<PlannedDelta>> {
+    fn invert(&self, _delta: &PlannedDelta, _pre: &ObjectSnapshot) -> Result<InvertOutcome> {
         unimplemented!("AC-046 measures the bound, not the behaviour")
     }
 
@@ -70,8 +76,8 @@ fn requires_send_and_sync<T: Send + Sync + ?Sized>(_: &T) {}
 // The positive case
 // ---------------------------------------------------------------------------
 
-/// 34 AC-046 逐語: 「`Box<dyn SubstrateAdapter>`としてtrait objectを格納するコードをコンパイルする…
-/// `Send + Sync`境界を満たしコンパイル成功する」.
+/// 34 AC-046, verbatim: "code that stores it as a trait object, `Box<dyn SubstrateAdapter>`, is
+/// compiled ... it satisfies the `Send + Sync` bound and compiles successfully".
 #[test]
 fn ac_046_a_boxed_adapter_satisfies_send_and_sync() {
     let boxed: Box<dyn SubstrateAdapter> = Box::new(Minimal);
@@ -181,7 +187,7 @@ fn ac_046_the_negative_example_is_a_compile_fail_doctest() {
 
 /// The negative example is the positive one plus the thing that breaks the bound.
 ///
-/// This is what stops 「it failed to compile」 from meaning 「something in it was wrong」. The two
+/// This is what stops "it failed to compile" from meaning "something in it was wrong". The two
 /// blocks implement the same trait for the same seven methods; the failing one holds an `Rc`, whose
 /// only relevant property is that it is neither `Send` nor `Sync`, and the passing one does not.
 #[test]

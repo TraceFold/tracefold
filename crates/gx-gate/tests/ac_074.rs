@@ -1,22 +1,25 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-074 (FR-028, git half) and **G-4** — the shipped git pack, and the one road a pack is checked by.
 //!
-//! AC-074 逐語: 「Given: git/MCP substrate向け出荷policy pack（`policies/{git,mcp}/`）。When: 各packの
-//! conformanceテストを実行する。Then: 各packが最低1 Admitケース・1 Denyケースを持ち両方pass。」判定方法:
-//! 「integration（pack単位×2）」. **Both halves are here**: hand 2 wrote the git one, hand 4 the mcp
-//! one, and 「pack 単位×2」 is why they are two case tables checked separately rather than one table
+//! AC-074 verbatim: "Given: the shipped git/MCP-substrate policy packs (`policies/{git,mcp}/`). When:
+//! each pack's conformance test is run. Then: each pack has at least 1 Admit case and 1 Deny case and
+//! both pass." Judgment method: "integration (per-pack x2)". **Both halves are here**: hand 2 wrote
+//! the git one, hand 4 the mcp one, and "per-pack x2" is why they are two case tables checked separately rather than one table (sem: SEM-gx-gate-219)
 //! with a substrate column.
 //!
 //! 🔴 What this file does **not** measure, now that there is more than one pack in the artifact:
 //! what the packs do **together**. AC-074 is a statement about each pack alone (`check_pack` builds
 //! its gate from one pack), and the composed set a deployment actually starts from is
 //! `gx_gate::packs::shipped_pack_set` -- whose obligation is `crates/gx-gate/tests/shipped_set.rs`.
-//! req/101 §9-1 named that gap before this hand opened it: 「AC-074 は「合わせた set」を測っていない。
-//! 合わせるなら**合成 set の conformance** が新しい obligation として要る」.
+//! req/101 §9-1 named that gap before this hand opened it: "AC-074 does not measure the 'combined
+//! set'. If they are combined, **the composed set's conformance** is required as a new obligation". (sem: SEM-gx-gate-220)
 //!
 //! # G-4, and why it decides the shape of this file
 //!
-//! `req/38_ERRATA_2026-08-07.md` §19 reserved G-4 as 「M7 reqdef の必須 ticket」 and req/98 §3-4 states
-//! it: 「第三者 pack を投入した時、conformance 検査が**同じ 1 本の経路**で走る(自社/第三者で分岐しない)」.
+//! `req/38_ERRATA_2026-08-07.md` §19 reserved G-4 as "a required ticket for M7's reqdef" and req/98
+//! §3-4 states it: "when a third-party pack is dropped in, conformance checking runs down **the same
+//! single road** (no branching between ours and a third party's)". (sem: SEM-gx-gate-221)
 //! So the cases below are not run by a loop written here. They are run by
 //! [`gx_gate::packs::check_pack`], which is library code a third party can call, and the third-party
 //! pack in this file is run by **the same call**.
@@ -30,7 +33,7 @@
 //! | a third-party pack decides for itself | a stranger's pack with its own rules gets its own answers, so the first row is not passing because the runner ignores the pack |
 //!
 //! `tools/verify_m7h2.sh` §2 mutates the runner to take a second road for shipped packs and shows
-//! this suite go red; req/60 §7.2's rule about absence checks (「『無い事』の検査には変異が要る」) is
+//! this suite go red; req/60 §7.2's rule about absence checks ("checking for 'absence' needs a mutation") is (sem: SEM-gx-gate-222)
 //! why that mutation exists rather than this comment standing alone.
 
 use gx_core::SubstrateKind;
@@ -155,7 +158,7 @@ fn ac_074_git_every_conformance_case_holds() {
     assert!(report.holds());
 }
 
-/// AC-074's own arithmetic: 「最低1 Admitケース・1 Denyケース」, counted from the table.
+/// AC-074's own arithmetic: "at least 1 Admit case and 1 Deny case", counted from the table. (sem: SEM-gx-gate-223)
 ///
 /// Asserted about the suite rather than satisfied by it accidentally: a table that lost its Admit
 /// case would otherwise still pass every row it kept.
@@ -169,8 +172,8 @@ fn ac_074_git_holds_at_least_one_admit_case_and_one_deny_case() {
         report.denies(),
         report.rows().len()
     );
-    assert!(report.admits() >= 1, "AC-074: 「最低1 Admitケース」");
-    assert!(report.denies() >= 1, "AC-074: 「1 Denyケース」");
+    assert!(report.admits() >= 1, "AC-074: \"at least 1 Admit case\""); // (sem: SEM-gx-gate-224)
+    assert!(report.denies() >= 1, "AC-074: \"1 Deny case\"");
 }
 
 /// The cases ran against the artifact that ships, not against a set assembled here.
@@ -194,7 +197,7 @@ fn the_git_conformance_runs_against_the_pack_the_build_embeds() {
 
 /// 🔴 Every rule in the shipped git pack can fire on a locator the git adapter can produce.
 ///
-/// **D-4**'s shape, one layer along (req/99 §3): 「到達不能な定数を宣言しない」. `MAX_PATH_DEPTH` is 1
+/// **D-4**'s shape, one layer along (req/99 §3): "do not declare an unreachable constant" (sem: SEM-gx-gate-225). `MAX_PATH_DEPTH` is 1
 /// in `gx-adapter-git`, so a locator whose tree path has two components is refused by the adapter
 /// before a gate ever sees it — a pack rule matching `*/.github/workflows/*` would look in force and
 /// could never fire. Every locator in the table above is therefore a **single** entry under a
@@ -347,7 +350,7 @@ fn ac_074_mcp_every_conformance_case_holds() {
     assert!(report.holds());
 }
 
-/// AC-074's own arithmetic for the second of its two packs: 「最低1 Admitケース・1 Denyケース」.
+/// AC-074's own arithmetic for the second of its two packs: "at least 1 Admit case and 1 Deny case". (sem: SEM-gx-gate-226)
 #[test]
 fn ac_074_mcp_holds_at_least_one_admit_case_and_one_deny_case() {
     let report =
@@ -358,8 +361,8 @@ fn ac_074_mcp_holds_at_least_one_admit_case_and_one_deny_case() {
         report.denies(),
         report.rows().len()
     );
-    assert!(report.admits() >= 1, "AC-074: 「最低1 Admitケース」");
-    assert!(report.denies() >= 1, "AC-074: 「1 Denyケース」");
+    assert!(report.admits() >= 1, "AC-074: \"at least 1 Admit case\""); // (sem: SEM-gx-gate-227)
+    assert!(report.denies() >= 1, "AC-074: \"1 Deny case\"");
 }
 
 /// The cases ran against the artifact that ships, not against a set assembled here.
@@ -383,7 +386,7 @@ fn the_mcp_conformance_runs_against_the_pack_the_build_embeds() {
 
 /// 🔴 Every rule in the shipped mcp pack can fire on a locator the mcp adapter can produce.
 ///
-/// **D-4** for the third time (req/99 §3: 「到達不能な定数を宣言しない」), and on this substrate it bites
+/// **D-4** for the third time (req/99 §3: "do not declare an unreachable constant") (sem: SEM-gx-gate-228), and on this substrate it bites
 /// hardest: the rule a reader expects from an MCP pack is about the **tool**, and a tool's name
 /// lives in the payload, which P-6 keeps opaque to a gate. So what the table may name is what the
 /// locator carries, and this test is what keeps a row honest when one is added.
@@ -410,8 +413,8 @@ fn every_case_names_a_locator_the_mcp_adapter_could_produce() {
         let (server, resource) = locator.split_once('#').expect("counted one");
         assert!(
             server.contains("://"),
-            "{locator}: the server endpoint carries a scheme (ASM-69-3: a bare name is 「whichever \
-             server that name pointed at when this ran」)"
+            "{locator}: the server endpoint carries a scheme (ASM-69-3: a bare name is \"whichever \
+             server that name pointed at when this ran\")" // (sem: SEM-gx-gate-229)
         );
         assert!(
             !resource.is_empty() && !server.is_empty(),
@@ -573,7 +576,7 @@ fn the_pack_conformance_runner_names_no_pack() {
 /// | `crates/gx-engine/src/pipeline.rs` | the **real** decision — 43 T-4, the gate a transformation passes through |
 /// | `crates/gx-gate/src/packs.rs` | the **hypothetical** decision — the one conformance road (G-4) |
 ///
-/// A third is a second answer to 「how is a pack checked」 waiting to drift. `tools/verify_m7h2.sh`
+/// A third is a second answer to "how is a pack checked" waiting to drift. `tools/verify_m7h2.sh` (sem: SEM-gx-gate-230)
 /// §2 adds one back into gx-cli and shows this go red — the mutation req/60 §7.2 requires before an
 /// absence check counts for anything.
 #[test]
@@ -656,7 +659,7 @@ fn runner_source(text: &str) -> String {
 // The shipped set
 // ---------------------------------------------------------------------------
 
-/// All three packs are declared in one table, and both of AC-074's are in it.
+/// All four packs are declared in one table, and both of AC-074's are in it.
 ///
 /// The table is what `tests/pack_embedding.rs` walks to count roads, so a pack that shipped without
 /// a row here would be invisible to the road count — which is the fail-open that test exists to
@@ -670,9 +673,12 @@ fn the_shipped_set_holds_every_pack() {
         vec![
             "policies/fs/deny-etc.cedar",
             "policies/git/deny-nonbranch-refs.cedar",
-            "policies/mcp/deny-etc-resources.cedar"
+            "policies/mcp/deny-etc-resources.cedar",
+            "policies/postgres/deny-system-catalogs.cedar"
         ],
-        "FR-028 ships the fs pack (M3), the git pack (M7 hand 2) and the mcp pack (M7 hand 4)"
+        "FR-028 ships the fs pack (M3), the git pack (M7 hand 2) and the mcp pack (M7 hand 4); \
+         req/446 V0-C adds the postgres pack, which is the first written against \
+         `policies/PACK_FORMAT.md` and the first to declare a deny-default"
     );
     for pack in SHIPPED_PACKS {
         let engine = PolicyEngine::parse(pack.source).expect("a shipped pack parses");

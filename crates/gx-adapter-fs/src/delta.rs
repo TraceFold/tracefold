@@ -1,24 +1,26 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The fs delta grammar: a sequence of whole-file operations, in canonical DAG-CBOR.
 //!
-//! Spec: 42 §3.4 for `PlannedDelta.payload` (「adapterのみが解釈するopaqueな変更記述」), 42 §2.1 for
-//! what canonical means. The rulings are **M4-13 採(a)** (the shape and the length), **M4-07 採(c)**
+//! Spec: 42 §3.4 for `PlannedDelta.payload` ("an opaque description of the change that only the adapter interprets"), 42 §2.1 for
+//! what canonical means. The rulings are **M4-13, adopted (a)** (the shape and the length), **M4-07, adopted (c)** (sem: SEM-gx-adapter-fs-029)
 //! (the free monoid), and **N-14** (no parser of this adapter's own).
 //!
 //! # The shape, and the two rulings that fix it
 //!
-//! **M4-13 採(a)**: 「v0.1 の fs delta は **単一 file 全置換**・原子性は rename…**v0.1 の `apply` は
-//! len==1 の列のみ受理**・len>1 は Err(未対応の明示・黙って非原子実行しない=fail-closed)」. The reason
-//! the accepted length is one is 45 §3: TH-3's residual condition is 「`adapter.apply`が単一syscallで
-//! ない場合（例: 複数ファイル書き込み）」, and one `rename` is one syscall.
+//! **M4-13, adopted (a)**: "v0.1's fs delta is a **single whole-file replacement** -- atomicity is from `rename`...**v0.1's `apply` accepts
+//! only a sequence of `len==1`**; `len>1` is Err (unimplemented, stated explicitly -- it does not run non-atomically in silence, i.e. fail-closed)". The reason
+//! the accepted length is one is 45 §3: TH-3's residual condition is "`adapter.apply` is not a single syscall
+//! (e.g. multiple file writes)", and one `rename` is one syscall. (sem: SEM-gx-adapter-fs-030)
 //!
-//! **M4-07 採(c)** is why the shape is a *sequence* even so: 「合成 delta は **free monoid**——fs
-//! payload を「単一 file 操作の列」とし、列の連結が合成の witness」. A grammar that admitted one
+//! **M4-07, adopted (c)** is why the shape is a *sequence* even so: "a composite delta is a **free monoid** -- the fs
+//! payload is a 'sequence of single-file operations', and concatenating the sequence is the witness of composition". A grammar that admitted one (sem: SEM-gx-adapter-fs-031)
 //! operation and had no room for two would have nothing for composition to be.
 //!
-//! ## What 「連結が witness」 means when the payload is a CBOR array
+//! ## What "concatenation is the witness" means when the payload is a CBOR array (sem: SEM-gx-adapter-fs-032)
 //!
-//! **N-14** requires the payload to be canonical DAG-CBOR -- 「adapter 固有の parser を作るなら話が
-//! 変わる」 -- and a CBOR array carries its length in its head, so two payloads do not concatenate as
+//! **N-14** requires the payload to be canonical DAG-CBOR -- "it would be a different matter if the adapter wrote its own
+//! parser" -- and a CBOR array carries its length in its head, so two payloads do not concatenate as (sem: SEM-gx-adapter-fs-033)
 //! bytes. The monoid operation is therefore on the **sequences**: `decode`, concatenate, `encode`.
 //! `tests/fs_delta.rs` measures the associativity that makes it one, and the crate root of
 //! `gx-substrate` is where gx refuses the general law about composite arrows that this does **not**
@@ -31,9 +33,9 @@
 //! op      := { "content": bytes | null, "locator": text }
 //! ```
 //!
-//! `null` content is a removal. AC-049 (hand 5) asks for 「作成/変更/削除の 3 種」, so all three have a
+//! `null` content is a removal. AC-049 (hand 5) asks for "creation / change / deletion, the three kinds", so all three have a
 //! spelling here; hand 4 plans only the replacement, because an [`gx_core::Intent`] carries a goal
-//! and 42 §3.3 gives 「remove this」 no spelling of its own.
+//! and 42 §3.3 gives "remove this" no spelling of its own. (sem: SEM-gx-adapter-fs-034)
 
 use gx_canon::cbor;
 use gx_core::b64;
@@ -43,7 +45,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use core::fmt;
 
-/// How many operations v0.1 accepts (**M4-13 採(a)**).
+/// How many operations v0.1 accepts (**M4-13, adopted (a)**). (sem: SEM-gx-adapter-fs-035)
 ///
 /// One constant, so that hand 5's `apply` and this decoder cannot disagree about the bound, and so
 /// that the day v0.2 raises it is one edit. The bound is enforced in [`FsDelta::decode`] rather than
@@ -51,21 +53,21 @@ use core::fmt;
 /// monoid free) and an illegal *v0.1 payload*.
 pub const MAX_OPS: usize = 1;
 
-/// How large an **inverse** payload this adapter is willing to escrow (**M4-21 採(a)**).
+/// How large an **inverse** payload this adapter is willing to escrow (**M4-21, adopted (a)**).
 ///
-/// req/38 §28 逐語: 「逆 delta payload の上限を**定数 1 箇所**で宣言・超過は `invert`=`Ok(None)`(**AC-048
-/// の None の実在する第 1 の理由**)。値は手5 が根拠印字つきで決定(本裁定は形のみ固定)」. This is the one
+/// req/38 §28, verbatim: "the ceiling on the inverse delta payload is declared **in exactly one constant**; exceeding it is
+/// `invert` = `Ok(None)` (**the 1st reason AC-048's `None` actually occurs**). The value is decided by hand 5, with the reasoning printed (this ruling fixes only the shape)". This is the one (sem: SEM-gx-adapter-fs-036)
 /// declaration; `crates/gx-adapter-fs/tests/invert_ceiling.rs` asserts that there is no second one and
 /// that the contract row in `gx-substrate`'s trait documentation names it (**M4H2-8**).
 ///
 /// # Why a ceiling exists at all
 ///
-/// 42 §5 requires the escrowed inverse to carry the **body** and not a digest -- 「digest-onlyでは実際の
-/// undoが物理的に不可能なため」 -- and an fs inverse of a whole-file replacement carries the whole old
+/// 42 §5 requires the escrowed inverse to carry the **body** and not a digest -- "because a digest-only inverse makes
+/// an actual undo physically impossible" -- and an fs inverse of a whole-file replacement carries the whole old (sem: SEM-gx-adapter-fs-037)
 /// file. So an undoable transformation costs its file's size twice: once in the forward payload and
 /// once in the escrow. Without a bound, one `apply` over a large file would put an unbounded body into
-/// the journal an engine keeps (M5), and the alternative to a bound is not 「no cost」 but 「a cost
-/// nobody declared」.
+/// the journal an engine keeps (M5), and the alternative to a bound is not "no cost" but "a cost
+/// nobody declared". (sem: SEM-gx-adapter-fs-038)
 ///
 /// # Why **1 MiB**, measured rather than asserted
 ///
@@ -86,19 +88,19 @@ pub const MAX_OPS: usize = 1;
 /// declaration.
 pub const MAX_INVERSE_PAYLOAD_BYTES: usize = 1024 * 1024;
 
-/// How large a **forward** payload this adapter is willing to plan (**M4H5-4 採(b)**).
+/// How large a **forward** payload this adapter is willing to plan (**M4H5-4, adopted (b)**). (sem: SEM-gx-adapter-fs-039)
 ///
-/// req/38 §33 逐語: 「forward payload は**別の定数**(escrow 上限=「運べるか」・forward 上限=「受けるか」=
-/// gate/journal の資源保護で判断が異なる)。宣言 1 箇所+契約行 1:1 probe(M4H2-8 形)・値は手6 が根拠印字
-/// つきで決定」. Hand 5 raised the gap it closes (req/74 §2 M4H5-4): the inverse had a bound and the
+/// req/38 §33, verbatim: "the forward payload is a **separate constant** (the escrow ceiling asks 'can it be carried', the forward
+/// ceiling asks 'will it be accepted' -- gate/journal resource protection makes the two judgements differ). One declaration
+/// site + a 1:1 contract-row probe (M4H2-8 shape); the value is decided by hand 6, with the reasoning printed". Hand 5 raised the gap it closes (req/74 §2 M4H5-4): the inverse had a bound and the (sem: SEM-gx-adapter-fs-040)
 /// forward direction had none, so a plan of any size travelled through a gate and into a journal.
 ///
 /// # Why it is a second constant rather than the first one reused
 ///
-/// The two bound different bytes for different reasons. [`MAX_INVERSE_PAYLOAD_BYTES`] asks 「can this
-/// adapter carry the **old** content back?」 and its answer is `Ok(None)`, which **E-M3-4** escalates
-/// to a human. This asks 「will this adapter accept the **new** content at all?」 and its answer is a
-/// refusal to plan, because a payload is kept (**E-M4-8**: 「`PlannedDelta.payload` は保管する(必須)」)
+/// The two bound different bytes for different reasons. [`MAX_INVERSE_PAYLOAD_BYTES`] asks "can this
+/// adapter carry the **old** content back?" and its answer is `Ok(None)`, which **E-M3-4** escalates
+/// to a human. This asks "will this adapter accept the **new** content at all?" and its answer is a
+/// refusal to plan, because a payload is kept (**E-M4-8**: "`PlannedDelta.payload` is stored (mandatory)") (sem: SEM-gx-adapter-fs-041)
 /// and an unbounded one is a cost nobody declared in a place nobody chose. Two questions that can be
 /// answered differently need two numbers that can move separately, even on a day they agree.
 ///
@@ -122,7 +124,7 @@ pub const MAX_INVERSE_PAYLOAD_BYTES: usize = 1024 * 1024;
 /// In [`crate::plan`], which is where a goal becomes a payload. It is **not** in
 /// [`FsDelta::decode`], so a payload written by hand still applies -- the same split [`MAX_OPS`] has
 /// between a legal value and a legal v0.1 payload, except that `MAX_OPS` is enforced at decode and
-/// this is not. §33 M4H5-4 (b) put the refusal 「plan 側」 and this hand did not widen it; the residue
+/// this is not. §33 M4H5-4 (b) put the refusal on the **plan side** and this hand did not widen it; the residue (sem: SEM-gx-adapter-fs-042)
 /// is raised in `req/75` §2 rather than closed by a hand that was not asked to.
 pub const MAX_FORWARD_PAYLOAD_BYTES: usize = 1024 * 1024;
 
@@ -200,7 +202,7 @@ impl<'de> Deserialize<'de> for Blob {
     }
 }
 
-/// One whole-file operation (**M4-13 採(a)**).
+/// One whole-file operation (**M4-13, adopted (a)**). (sem: SEM-gx-adapter-fs-043)
 ///
 /// Fields are private with accessors (F-6): one spelling per field, and a payload that cannot be
 /// edited after the delta that carries it has been named by its CID.
@@ -213,7 +215,7 @@ pub struct FsOp {
 impl FsOp {
     /// Replace the whole file at `locator` with `content`.
     ///
-    /// Whole replacement rather than a patch, which is M4-13 採(a) in one word: the atomicity of the
+    /// Whole replacement rather than a patch, which is M4-13, adopted (a) in one word: the atomicity of the (sem: SEM-gx-adapter-fs-044)
     /// change is the atomicity of a `rename`, and a rename replaces a file entire.
     #[must_use]
     pub fn write(locator: String, content: Vec<u8>) -> Self {
@@ -249,7 +251,7 @@ impl FsOp {
     /// One place, so that `apply` and `invert` cannot disagree about which file a payload names.
     /// [`crate::plan`] already normalises what it writes, and normalising again is free (L7's
     /// idempotence) and is what stops a hand-written payload from reaching the filesystem with a
-    /// spelling no gate ever saw -- M3-10 fixed a policy pack's effective range at 「locator 級」, so
+    /// spelling no gate ever saw -- M3-10 fixed a policy pack's effective range at the "locator level", so (sem: SEM-gx-adapter-fs-045)
     /// two spellings of one position would be two policy subjects and one file.
     ///
     /// # Errors
@@ -258,7 +260,7 @@ impl FsOp {
     /// is a legal *value* (L7 is defined over every string) and an illegal thing to act on.
     ///
     /// Hand 5 spelled this refusal [`Error::ApplyFailed`] and raised it against itself (req/74 §2
-    /// M4H5-5); §33 採(b) gave it a word of its own, because 43 T-11 turns `ApplyFailed` into
+    /// M4H5-5); §33, adopted (b) gave it a word of its own, because 43 T-11 turns `ApplyFailed` into (sem: SEM-gx-adapter-fs-046)
     /// `AbortReason::ApplyFailed` and would have recorded a change that failed where no change was
     /// ever describable.
     pub fn position(&self) -> Result<String> {
@@ -273,7 +275,7 @@ impl FsOp {
     }
 }
 
-/// A sequence of operations: the free monoid of **M4-07 採(c)**.
+/// A sequence of operations: the free monoid of **M4-07, adopted (c)**. (sem: SEM-gx-adapter-fs-047)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FsDelta {
     ops: Vec<FsOp>,
@@ -313,13 +315,13 @@ impl FsDelta {
         })
     }
 
-    /// Read a payload back, and hold it to v0.1's length (**M4-13 採(a)**).
+    /// Read a payload back, and hold it to v0.1's length (**M4-13, adopted (a)**). (sem: SEM-gx-adapter-fs-048)
     ///
     /// The two refusals are different facts and are spelled differently on purpose:
     ///
-    /// * A sequence longer than [`MAX_OPS`] is **未対応** -- the grammar can say it and this version
+    /// * A sequence longer than [`MAX_OPS`] is **unimplemented** -- the grammar can say it and this version
     ///   will not run it, because two file writes are not one syscall (45 §3's TH-3 condition) and
-    ///   「黙って非原子実行しない=fail-closed」. That is [`Error::Unimplemented`], the same word the
+    ///   "it does not run non-atomically in silence, i.e. fail-closed". That is [`Error::Unimplemented`], the same word the (sem: SEM-gx-adapter-fs-049)
     ///   adapter uses for `apply`, and it is what stops a caller from reading the refusal as damage.
     /// * Anything else -- bytes that are not canonical DAG-CBOR, an array of something else, the
     ///   empty sequence -- is a payload this adapter would never have written, which is

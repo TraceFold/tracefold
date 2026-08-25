@@ -1,15 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **H-2** — the locator this adapter hands a gate is the **normalised** one (**M7 hand 4**).
 //!
-//! `req/38` §25's H-2 was ruled 採(案 c 両方) and its first half was a ticket: 「M4 adapter 契約の必須
-//! ticket「locator は正規化済みで gate に渡す」を予約(M7 の G-4/H-9 と並ぶ M4 reqdef 必須項目)」, with
+//! `req/38` §25's H-2 was ruled adopted (both option c) and its first half was a ticket: "M4 adapter contract's mandatory (sem: SEM-gx-adapter-mcp-362)
+//! ticket 'the locator is normalised before it reaches the gate' reserved (a M4 reqdef mandatory item alongside M7's G-4/H-9)", with (sem: SEM-gx-adapter-mcp-363)
 //! the second half a line in `packs.rs` saying that a gate compares the string it is given. req/98
-//! §3-4 row 3 is what M7 owes on it: 「git/mcp adapter が locator を正規化してから gate に渡す事を
-//! **adapter 側の probe** で固定(gate 内正規化は不採)」.
+//! §3-4 row 3 is what M7 owes on it: "the git/mcp adapter normalises the locator before handing it to the gate is (sem: SEM-gx-adapter-mcp-364)
+//! fixed **by an adapter-side probe** (in-gate normalisation is not adopted)". (sem: SEM-gx-adapter-mcp-365)
 //!
 //! `gx-substrate`'s `substrate_contract.rs` measures the **contract's words** and `gx-adapter-fs`'s
 //! `locator_normalisation.rs` measures **the function**. Neither of them measures the sentence H-2
 //! actually makes, which is about a *road*: the locator a policy is evaluated against is the one an
-//! adapter put in an `ObjectSnapshot`, so 「normalised」 has to hold at the point of handover and not
+//! adapter put in an `ObjectSnapshot`, so "normalised" has to hold at the point of handover and not (sem: SEM-gx-adapter-mcp-366)
 //! only inside a helper.
 //!
 //! # The road, in one line
@@ -27,7 +29,7 @@
 //! # 🔴 And the third fact, which is the one that says whose job this is
 //!
 //! [`the_gate_normalises_nothing_and_that_is_why_this_probe_is_here`] hands a gate the **raw**
-//! spelling directly and watches it be admitted. 「gate 内正規化は不採」 (req/98 §3-4) is not a
+//! spelling directly and watches it be admitted. "in-gate normalisation is not adopted" (req/98 §3-4) is not a (sem: SEM-gx-adapter-mcp-367)
 //! preference: a path algebra inside a policy layer would be an invention the spec does not carry and
 //! a second definition of what a locator means (`packs.rs` argues it at length).
 //!
@@ -36,7 +38,7 @@
 //! about the gate rather than about the fs adapter.** The fs adapter folds `..` as well — E-M4-12
 //! makes lexical normalisation a contract for *every* adapter — so that probe reaches the gate with
 //! an unfolded spelling only because it builds the `ObjectSnapshot` itself instead of asking
-//! `snapshot` for one. Reading it as 「fs is broken and mcp is not」 would be reading a probe's
+//! `snapshot` for one. Reading it as "fs is broken and mcp is not" would be reading a probe's (sem: SEM-gx-adapter-mcp-368)
 //! construction as a substrate's property, so this file says the opposite out loud: what these three
 //! probes measure is the **handover**, and it holds on both M7 adapters for the same reason it holds
 //! on the M4 one.
@@ -134,6 +136,10 @@ fn verdict_for(gate: &Gate, pre: &ObjectSnapshot) -> VerdictKind {
         planned: &planned,
         evidence: &[],
         invert_available: true,
+        // E-DR4627-1 (DR-46-27): the sixth field. This file's subject is not the clock, so the
+        // epoch pins it -- a value chosen once here is what makes `decided_at_seat.rs`'s claim (that
+        // varying this field alone moves no verdict) about the field and not about this fixture.
+        decided_at: Timestamp(0),
     })
     .expect("the shipped pack evaluates this request")
     .kind()
@@ -197,7 +203,7 @@ fn snapshot_reports_the_normal_form_of_whatever_spelling_it_was_asked_about() {
 /// 🔴 The shipped pack refuses every spelling, and two of the four would have evaded its patterns.
 ///
 /// This is H-2's whole point stated as a consequence rather than as a contract: M3-10 fixes a pack's
-/// effective range at 「locator 級」, so two spellings of one position are **two policy subjects**, and
+/// effective range at "the locator level", so two spellings of one position are **two policy subjects**, and (sem: SEM-gx-adapter-mcp-369)
 /// an adapter that handed on the caller's spelling would be handing a policy author a rule that is
 /// not in force on the position they wrote it about.
 #[test]
@@ -227,7 +233,7 @@ fn the_shipped_pack_refuses_a_spelling_that_would_have_evaded_it() {
 
 /// 🔴 The gate normalises nothing, and that is why the probe above is in **this** crate.
 ///
-/// 「gate 内正規化は不採」 (req/38 §25 H-2, req/98 §3-4): a path algebra inside a policy layer would be
+/// "in-gate normalisation is not adopted" (req/38 §25 H-2, req/98 §3-4): a path algebra inside a policy layer would be (sem: SEM-gx-adapter-mcp-370)
 /// an invention 42 §3.1 does not carry, and Cedar's `like` cannot express one either (`*` matches any
 /// run of characters, `..` included). So the responsibility is the adapter's, and the way to show a
 /// responsibility is somebody's is to show what happens when they do not discharge it.
@@ -241,7 +247,7 @@ fn the_gate_normalises_nothing_and_that_is_why_this_probe_is_here() {
         answer,
         VerdictKind::Admit,
         "recorded, not endorsed: if this becomes Deny, something in gx-gate resolves locators now, \
-         and req/38 §25's H-2 ruling (案 c: the ticket goes to the adapter contract, and the gate \
+         and req/38 §25's H-2 ruling (option c: the ticket goes to the adapter contract, and the gate (sem: SEM-gx-adapter-mcp-371) \
          states that it judges the spelling it is given) has been reversed without being re-ruled"
     );
     // And the normal form of that same spelling is refused, by the same gate, in the same run.

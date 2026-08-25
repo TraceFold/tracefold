@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The measure implementations the law tests are run against, and the little world they measure.
 //!
 //! AC-059 asks for the law-breaking implementation to live in `conformance/`
-//! (「法則に違反する意図的実装（例: θを2倍で返す壊れた実装）を conformance/ に負テストとして用意し」).
+//! ("a deliberately law-breaking implementation (e.g. a broken one that returns θ doubled) is
+//! provided under conformance/ as a negative test"; sem: SEM-gx-core-149).
 //! 46 §3.1's `conformance/` is the JSONL vector tree of the Lean differential harness, which is
 //! M8 work and has no Rust crate yet; this directory is the M1-sized reading of the same word --
 //! a named place where the deliberately wrong implementations live, apart from the tests that
@@ -245,7 +248,8 @@ impl MorphismMeasure for Free {
 
 /// θ(f) = 1 + 2·|parents|: a cost that charges *extra* for having been composed.
 ///
-/// AC-059's example is 「θを2倍で返す壊れた実装」. Doubling a subadditive measure is still
+/// AC-059's example is "a broken implementation that returns θ doubled" (sem: SEM-gx-core-150).
+/// Doubling a subadditive measure is still
 /// subadditive (`2c <= 2a + 2b` whenever `c <= a + b`), so a literal doubling would pass the
 /// property and prove nothing. What breaks the law is charging per composition edge: two atomic
 /// arrows cost 1 each, their composite carries two parents and costs 5, and 5 > 2.
@@ -283,8 +287,9 @@ impl ObjectMeasure for SizeOptedOut {
 
 /// One row of AC-060's registry: a measure pair, and the opt-in state carried in the type.
 ///
-/// FR-055 is opt-in (「opt-inで`m(Y) ≤ m(X)+θ(f)`則を有効化した`ObjectMeasure`実装と、
-/// 無効化（opt-out）した実装」). The switch is [`Lyapunov`], a gx-core marker trait, rather than a
+/// FR-055 is opt-in ("an `ObjectMeasure` implementation that has opted in to the `m(Y) ≤ m(X)+θ(f)`
+/// law, and one that has opted out"; sem: SEM-gx-core-151). The switch is [`Lyapunov`], a gx-core
+/// marker trait, rather than a
 /// `bool` written here: a hand-set boolean can disagree with the implementation it labels, and a
 /// registry that lies about which rows opted in would make the skip meaningless.
 pub enum Entry<'w> {

@@ -1,18 +1,20 @@
-//! **M4H5-4 採(b)** — the forward payload has a ceiling of its own, declared once and named by the
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! **M4H5-4, adopted (b)** -- the forward payload has a ceiling of its own, declared once and named by the (sem: SEM-gx-adapter-fs-210)
 //! contract it belongs to.
 //!
-//! req/38 §33 逐語: 「forward payload は**別の定数**(escrow 上限=「運べるか」・forward 上限=「受けるか」=
-//! gate/journal の資源保護で判断が異なる)。宣言 1 箇所+契約行 1:1 probe(M4H2-8 形)・値は手6 が根拠印字
-//! つきで決定」.
+//! req/38 §33, verbatim: "the forward payload is a **separate constant** (the escrow ceiling asks 'can it be carried', the forward
+//! ceiling asks 'will it be accepted' -- gate/journal resource protection makes the two judgements differ). One declaration
+//! site + a 1:1 contract-row probe (M4H2-8 shape); the value is decided by hand 6, with the reasoning printed". (sem: SEM-gx-adapter-fs-211)
 //!
 //! # Why the two ceilings are two constants and not one
 //!
 //! They answer different questions about different bytes. [`MAX_INVERSE_PAYLOAD_BYTES`] bounds what
 //! this adapter is willing to **carry back**: the escrowed inverse holds the *old* content (42 §5:
-//! 「digest-onlyでは実際のundoが物理的に不可能」), and over the bound `invert` answers `Ok(None)`, which
+//! "because a digest-only inverse makes an actual undo physically impossible"), and over the bound `invert` answers `Ok(None)`, which (sem: SEM-gx-adapter-fs-212)
 //! **E-M3-4** turns into an escalation to a human. The forward ceiling bounds what it is willing to
-//! **accept**: the payload of a plan travels through a gate and into a journal (**E-M4-8**: 「
-//! `PlannedDelta.payload` は保管する(必須)」), so an unbounded one is a cost nobody declared, in a place
+//! **accept**: the payload of a plan travels through a gate and into a journal (**E-M4-8**: "
+//! `PlannedDelta.payload` is stored (mandatory)"), so an unbounded one is a cost nobody declared, in a place (sem: SEM-gx-adapter-fs-213)
 //! nobody chose. One number could not move without moving the other question with it.
 //!
 //! # The relation, in one line
@@ -30,8 +32,8 @@ use gx_substrate::SubstrateAdapter;
 use support::{intent_for, snapshot_of, Sandbox, SUBJECT};
 
 /// Hand 6's ceiling. Declared test-side in the RED commit and replaced by the crate's own `pub const`
-/// here -- the practice §33 **M4H5-10 採(b)** fixed after hand 5 put one declaration line into a red
-/// commit: 「以後は test 側に private const を置き実装 commit で差し替える形を慣行に(RED の純度)」.
+/// here -- the practice §33 **M4H5-10, adopted (b)** fixed after hand 5 put one declaration line into a red
+/// commit: "henceforth, put a private const test-side and swap it in the implementation commit as the practice (RED's purity)". (sem: SEM-gx-adapter-fs-214)
 use gx_adapter_fs::MAX_FORWARD_PAYLOAD_BYTES as FORWARD_CEILING;
 
 fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
@@ -70,7 +72,7 @@ fn plan_of(size: usize) -> Result<usize, String> {
 /// Either side of the bound, and the refusal is `plan`'s own word.
 ///
 /// The refusal is [`gx_substrate::Error::NotPlannable`] because that is what 41 §4 documents for this
-/// method -- 「no delta plans this intent against this snapshot」 -- and a goal too large to carry is
+/// method -- "no delta plans this intent against this snapshot" -- and a goal too large to carry is (sem: SEM-gx-adapter-fs-215)
 /// exactly that: a fact about the pair, not damage and not an unimplemented feature. `Ok(None)` has no
 /// spelling here; `plan` is total in its answer or it refuses.
 #[test]
@@ -91,17 +93,17 @@ fn the_forward_ceiling_is_the_number_the_source_declares() {
     assert_eq!(
         over.expect_err("a goal over the ceiling is refused"),
         "NotPlannable",
-        "an over-large goal is 「this intent cannot be planned against this snapshot」 and not a \
-         failure of the world"
+        "an over-large goal is 'this intent cannot be planned against this snapshot' and not a \
+         failure of the world (sem: SEM-gx-adapter-fs-216)"
     );
 }
 
 /// **Exactly** the ceiling is accepted, which is the byte `>` and `>=` disagree about.
 ///
 /// 🔴 req/76 §2.2 listed `plan.rs:72` (`>` → `>=`) as a `cargo mutants` survivor with the reason in
-/// one line: 「payload がちょうど 1,048,576 の case を誰も作っていない」. Hand 6 measured 1,047,552 and
+/// one line: "nobody has built the case where payload is exactly 1,048,576". Hand 6 measured 1,047,552 and (sem: SEM-gx-adapter-fs-217)
 /// 1,048,577 -- either side, and neither of them **on** the bound. A ceiling probed only at
-/// neighbouring values cannot tell 「at most N」 from 「fewer than N」, and the two differ by exactly the
+/// neighbouring values cannot tell "at most N" from "fewer than N", and the two differ by exactly the (sem: SEM-gx-adapter-fs-218)
 /// change that mutation makes.
 ///
 /// The size is solved for rather than guessed. `plan` bounds the **payload**, which carries the
@@ -128,8 +130,8 @@ fn a_payload_of_exactly_the_ceiling_is_planned() {
     let goal = FORWARD_CEILING - overhead;
 
     let exact = payload_of(goal).expect(
-        "a payload of exactly the ceiling was refused: `plan` reads its bound as 「fewer than」 \
-         where M4H5-4 (b) declares 「at most」",
+        "a payload of exactly the ceiling was refused: `plan` reads its bound as 'fewer than'
+         where M4H5-4 (b) declares 'at most' (sem: SEM-gx-adapter-fs-219)",
     );
     println!(
         "FORWARD_CEILING={FORWARD_CEILING} OVERHEAD={overhead} GOAL={goal} PAYLOAD={exact} \
@@ -149,17 +151,17 @@ fn a_payload_of_exactly_the_ceiling_is_planned() {
 
 /// **M4H2-8**: the `plan` contract row in `gx-substrate` and the one declaration name each other.
 ///
-/// The form hand 5 used for the escrow ceiling, applied to the second constant: 「契約表の行と定数宣言
-/// 箇所の 1:1 probe」. Neither end is a contract on its own -- a row naming a constant nobody declares
+/// The form hand 5 used for the escrow ceiling, applied to the second constant: "the contract table's row and the constant declaration's
+/// site are a 1:1 probe". Neither end is a contract on its own -- a row naming a constant nobody declares (sem: SEM-gx-adapter-fs-220)
 /// is a promise with no mechanism, and a constant no row mentions is a mechanism with no promise --
-/// and two declarations that could drift are what 「定数 1 箇所」 is written against.
+/// and two declarations that could drift are what "one constant" is written against. (sem: SEM-gx-adapter-fs-221)
 ///
 /// 🔴 **M7 hand 1 narrowed the scan, and the narrowing is the ruling's own words.** Until there was a
 /// second adapter this walked every crate under `crates/` and asserted **one** declaration
 /// workspace-wide, which read correctly while `gx-adapter-fs` was the only adapter and became false
 /// the moment `gx-adapter-git` declared its own bound. The trait's contract row says which reading is
-/// right, verbatim: 「payload 上限超過は拒否(**定数 1 箇所=各 adapter が宣言する**
-/// `MAX_FORWARD_PAYLOAD_BYTES`・fs の値は 1 MiB)」 -- 「1 箇所」 is **per adapter**, because the bound is
+/// right, verbatim: "payload over the ceiling is refused (**one constant per adapter, each adapter declares its own**
+/// `MAX_FORWARD_PAYLOAD_BYTES`; fs's value is 1 MiB)" -- "one constant" is **per adapter**, because the bound is (sem: SEM-gx-adapter-fs-222)
 /// a fact about what one adapter will accept and two adapters bound different things.
 ///
 /// So the count is per crate and the gate is not weakened: **every** adapter crate is required to
@@ -238,7 +240,7 @@ fn the_contract_row_and_the_one_declaration_name_each_other() {
 
 /// The two ceilings are separate declarations, and the relation between them is stated as one.
 ///
-/// Both halves are the ruling: **separate** because 「受けるか」 and 「運べるか」 are different judgements
+/// Both halves are the ruling: **separate** because "will it be accepted" and "can it be carried" are different judgements (sem: SEM-gx-adapter-fs-223)
 /// (M4H5-4 (b)), and **related** because an adapter whose forward bound exceeded its escrow bound
 /// would be one that accepts changes it has already decided it cannot carry back.
 ///
@@ -286,8 +288,8 @@ fn the_two_ceilings_are_separate_declarations_with_one_relation() {
 /// The bound is on **what this adapter will plan**, not on what its grammar can express -- the same
 /// split [`gx_adapter_fs::MAX_OPS`] has between a legal *value* and a legal *v0.1 payload*, except
 /// that `MAX_OPS` is enforced in `decode` and this is enforced in `plan`. So a hand-written payload
-/// over the ceiling still applies, which is a real hole in the resource bound and is raised as a起票
-/// in `req/75` §2 rather than quietly closed by a hand whose ruling said 「plan 側」.
+/// over the ceiling still applies, which is a real hole in the resource bound and is raised as **filed**
+/// in `req/75` §2 rather than quietly closed by a hand whose ruling said "on the plan side". (sem: SEM-gx-adapter-fs-224)
 #[test]
 fn a_hand_written_payload_over_the_ceiling_is_not_refused_by_the_grammar() {
     let sandbox = Sandbox::new();

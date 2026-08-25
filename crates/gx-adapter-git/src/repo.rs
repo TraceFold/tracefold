@@ -1,14 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The gix boundary: every call into gitoxide this crate makes, in one place.
 //!
-//! Spec: 41 §2's dependency line (「`dep: gix (gitoxide)`」) and 32 FR-045's 「gix経由で実装」. 41 §6 gives
+//! Spec: 41 §2's dependency line ("`dep: gix (gitoxide)`") and 32 FR-045's "implemented via gix". 41 §6 gives (sem: SEM-gx-adapter-git-055)
 //! this workspace one encoder and one hash for **gx's own** values; git's object ids are git's, and
 //! this module is the only place the two vocabularies meet.
 //!
 //! # One place, and what that buys
 //!
 //! `gx-adapter-fs` names `std::fs` in three modules and pays for it with a source scan per module
-//! (`tests/plan_purity.rs`). Here every gitoxide call is behind this module's functions, so 「`plan`
-//! writes nothing」 is checkable by reading one import list rather than by classifying call sites --
+//! (`tests/plan_purity.rs`). Here every gitoxide call is behind this module's functions, so "`plan`
+//! writes nothing" is checkable by reading one import list rather than by classifying call sites -- (sem: SEM-gx-adapter-git-056)
 //! and the day gitoxide's API moves, one file moves with it.
 //!
 //! # No repository is held (**AC-046**)
@@ -23,7 +25,7 @@
 //! # The clock, in the one place it would have got in
 //!
 //! [`gx_signature`] is the whole of the identity this adapter writes into git, and its time is **the
-//! epoch**. 41 §6: 「乱数・時刻はengine境界で注入（決定的リプレイのため）」 -- and a commit's timestamp is
+//! epoch**. 41 §6: "randomness and time are injected at the engine boundary (for deterministic replay)" -- and a commit's timestamp is (sem: SEM-gx-adapter-git-057)
 //! part of its object id, so an adapter that read a clock would mint a different commit for the same
 //! change on every attempt. 51 §7 contract 7's idempotence would then be unreachable by construction,
 //! not merely unimplemented.
@@ -77,11 +79,11 @@ pub fn content_digest(content: &[u8]) -> Cid {
     cid::mint(Domain::Leaf, &[content])
 }
 
-/// The digest of 「there is nothing here」.
+/// The digest of "there is nothing here".
 ///
 /// 🔴 The same value as the digest of an **empty** entry, and the same residue `gx-adapter-fs` records
-/// for its own absence: 「digest=内容のみ」 leaves an adapter nothing with which to distinguish 「no entry
-/// at this path」 from 「an entry with no bytes」. Inventing a marker would not help -- any byte string a
+/// for its own absence: "digest = content only" leaves an adapter nothing with which to distinguish "no entry
+/// at this path" from "an entry with no bytes". Inventing a marker would not help -- any byte string a (sem: SEM-gx-adapter-git-058)
 /// marker used is also a possible content -- so the fix belongs with a wider `Fingerprint` (v0.2) and
 /// this paragraph is the disclosure rather than a workaround.
 #[must_use]
@@ -100,7 +102,7 @@ pub fn open(position: &Position) -> Result<gix::Repository> {
     })
 }
 
-/// The commit a branch points at, or `None` when the branch has no commits (git's 「unborn」).
+/// The commit a branch points at, or `None` when the branch has no commits (git's "unborn"). (sem: SEM-gx-adapter-git-059)
 ///
 /// The absence is a **state** and not a failure, which is why it is an `Option` here and an error
 /// only where a caller needs a commit. It is the state `git init` leaves and the state
@@ -121,7 +123,7 @@ pub fn tip(repo: &gix::Repository, position: &Position) -> Result<Option<ObjectI
         return Ok(None);
     };
     // Peeled rather than read raw: a symbolic reference names another reference and a tag names a
-    // commit through an object, and both are 「where does this branch point」 to a caller. The
+    // commit through an object, and both are "where does this branch point" to a caller. The (sem: SEM-gx-adapter-git-060)
     // deprecated in-place form is the one gitoxide renamed in 0.86; `peel_to_id` is the same walk
     // under the name that is not deprecated, and it still borrows mutably because peeling caches
     // what it resolved.
@@ -134,7 +136,7 @@ pub fn tip(repo: &gix::Repository, position: &Position) -> Result<Option<ObjectI
 /// The bytes of the entry at a position's path, under a given commit.
 ///
 /// `None` when the tree holds no entry of that name, or when the entry is not a blob -- a directory
-/// where a file was expected is 「there is no file here」 to this adapter, which is the same answer
+/// where a file was expected is "there is no file here" to this adapter, which is the same answer (sem: SEM-gx-adapter-git-061)
 /// `gx-adapter-fs` gives for a path that is not a regular file.
 ///
 /// # Errors

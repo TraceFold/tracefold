@@ -1,16 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 51 §7's seven, one to one.
 //!
 //! # The seven contracts of 51 §7
 //!
 //! Copied out of `req/spec/50-delivery/51-test-strategy.md` cell for cell rather than paraphrased,
-//! because 51 §7's completion condition -- 「各adapterは上記7契約すべてに合格しない限りM4/M7完了条件を
-//! 満たさない」 -- counts to seven and 「上記7契約」 has to stay resolvable.
-//! `tests/harness_shape.rs` compares this table with the canon's on every run.
+//! because 51 §7's completion condition -- "no adapter satisfies the M4/M7 completion condition
+//! unless it passes all seven of the above contracts" -- counts to seven and "the above seven
+//! contracts" has to stay resolvable (sem: SEM-gx-substrate-conformance-005).
+//! `tests/harness_shape.rs` compares this table with the canon's on every run. The table below (sem:
+//! SEM-gx-substrate-conformance-006) is kept in Japanese, byte-for-byte identical with
+//! `req/spec/50-delivery/51-test-strategy.md`'s canon table, because that identity is what
+//! `the_seven_contracts_are_51_7s_seven` asserts cell by cell; translating it here without also
+//! touching the untouchable canon file would fail that test.
 //!
 //! | 契約 | 検証内容 | 対応AC |
 //! |---|---|---|
 //! | snapshot | `snapshot(locator)`が対象substrateの現在状態を正しく反映したObjectSnapshotを返す | AC-049〜051の前提 |
-//! | plan | 純関数性（副作用なし・同一intentから同一PlannedDelta） | AC-047 |
+//! | plan | 純関数性（副作用なし・同一intentから同一PlannedDelta）<br>🔴 **v0.2.1 訂正（§65 B-11・E-M4-4）**: 決定性の量化子は「**(intent, snapshot) の対に対して**」同一`PlannedDelta`である（`crates/gx-substrate/src/adapter.rs:86` 逐語・**44 `:58` の側が正しい**＝「adapterの`snapshot`+`plan`を実行し」の2引数の読み）。旧綴りは1引数の読みであり**実装より狭い**——その字面では本 repo の全 adapter が契約2に落ちる。旧文は no-delete のため残す。 | AC-047 |
 //! | precondition | `precondition`が状態変化を検知できるFingerprintを返す（変更前後で異なる値） | AC-034の前提 |
 //! | apply/invert往復 | `apply(delta)`→`invert`→`apply(inverse)`で対象状態が元に戻る | AC-049, AC-050 |
 //! | invertのNone契約 | 逆構成不能時`Ok(None)`を返しgate側が扱いを変える | AC-048 |
@@ -19,7 +26,8 @@
 //!
 //! # What a shared harness can and cannot decide
 //!
-//! Contract 1 asks whether a snapshot 「正しく反映した」 the substrate. No adapter-independent code can
+//! Contract 1 asks whether a snapshot "correctly reflected" (sem: SEM-gx-substrate-conformance-008)
+//! the substrate. No adapter-independent code can
 //! answer that: reading the substrate to check is exactly what P-6 forbids the layers above an
 //! adapter to do, and a harness that read it would need the adapter's grammar. What is decidable is
 //! the part that is falsifiable without a second oracle -- the snapshot names this adapter's
@@ -29,28 +37,33 @@
 //!
 //! # 🔴 Contract 4 is run in 43 T-10b's order, and 51 §7 writes another
 //!
-//! 51 §7's cell is 「`apply(delta)`→`invert`→`apply(inverse)`で対象状態が元に戻る」 -- invert **after**
+//! 51 §7's cell is "`apply(delta)` -> `invert` -> `apply(inverse)` returns the target state to
+//! where it started" (sem: SEM-gx-substrate-conformance-009) -- invert **after**
 //! apply. 43 T-10b puts the call before it: the inverse is constructed and escrowed while the
-//! pre-state is still live, and 42 §5 requires the escrowed body 「digest-onlyでは実際のundoが物理的に
-//! 不可能なため」.
+//! pre-state is still live, and 42 §5 requires the escrowed body "because with digest-only, actually
+//! undoing is physically impossible" (sem: SEM-gx-substrate-conformance-010).
 //!
 //! The difference is not cosmetic. An inverse of an overwrite has to carry the **old** content
 //! (M4-21), and after `apply` the old content is gone -- an adapter asked to invert then would have
 //! to read a state that no longer exists. So 51 §7's literal order can only be satisfied by an
 //! adapter that keeps its own history, which no ruling requires. This harness therefore runs
 //! `snapshot → plan → invert(δ, pre) → apply(δ) → apply(δ⁻¹)` and prints `ORDER=T-10b`, and the
-//! divergence is raised as a起票 in `req/72` §2 rather than decided here. req/69 §4 M4-21 saw the same
-//! seam from the other side: 「逐語例は `invert` が apply の**前**(43 T-10b)に呼ばれる事と噛み合って
-//! いない」.
+//! divergence is raised as a filing in `req/72` §2 rather than decided here. req/69 §4 M4-21 saw the
+//! same seam from the other side: "the verbatim example does not mesh with `invert` being called
+//! **before** apply (43 T-10b)" (sem: SEM-gx-substrate-conformance-011).
 
 use gx_core::Commutation;
+use gx_substrate::InvertOutcome;
 
 use crate::{unmeasured_or_failed, Check, Fixture, Origin, Outcome};
 
 /// The seven ids, which are 51 §7's first column.
 ///
 /// Declared here and compared with the table above by `tests/harness_shape.rs`, so that a report
-/// line and a canon row can be matched by a reader without a translation table.
+/// line and a canon row can be matched by a reader without a translation table. Three of the seven
+/// (sem: SEM-gx-substrate-conformance-007) are kept in Japanese for the same reason as the table
+/// they are drawn from: `the_contract_ids_are_the_first_column_of_that_table` compares this array
+/// against that table verbatim.
 pub const CONTRACT_IDS: [&str; 7] = [
     "snapshot",
     "plan",
@@ -123,8 +136,9 @@ fn contract_snapshot(fixture: &dyn Fixture) -> Outcome {
     };
     if after.digest() == before.digest() {
         return fail(
-            "the substrate moved and the snapshot did not: 「現在状態を正しく反映した」 is the one \
-             half of contract 1 a shared harness can decide, and it is this one"
+            "the substrate moved and the snapshot did not: \"correctly reflected the current state\" \
+             (sem: SEM-gx-substrate-conformance-012) is the one half of contract 1 a shared harness \
+             can decide, and it is this one"
                 .to_string(),
         );
     }
@@ -156,8 +170,9 @@ fn contract_plan(fixture: &dyn Fixture) -> Outcome {
     };
     if first != second {
         return fail(
-            "two plans over the same (intent, snapshot) disagree: 51 §7 契約 2 「同一intentから同一\
-             PlannedDelta」, quantified over the pair by E-M4-4"
+            "two plans over the same (intent, snapshot) disagree: 51 §7 contract 2, \"the same \
+             PlannedDelta from the same intent\" (sem: SEM-gx-substrate-conformance-013), \
+             quantified over the pair by E-M4-4"
                 .to_string(),
         );
     }
@@ -173,8 +188,8 @@ fn contract_plan(fixture: &dyn Fixture) -> Outcome {
     match before.cas_eq(&after) {
         Ok(true) => Outcome::Pass,
         Ok(false) => fail(
-            "planning moved the substrate: 51 §7 契約 2 「副作用なし」, and E-M4-29 reads it as \
-             「substrate への書き込み 0」"
+            "planning moved the substrate: 51 §7 contract 2, \"no side effects\", and E-M4-29 reads \
+             it as \"zero writes to the substrate\" (sem: SEM-gx-substrate-conformance-014)"
                 .to_string(),
         ),
         Err(e) => fail(format!(
@@ -210,7 +225,8 @@ fn contract_precondition(fixture: &dyn Fixture) -> Outcome {
         Ok(false) => Outcome::Pass,
         Ok(true) => fail(
             "the substrate moved and the fingerprint did not: a `precondition` that never changes \
-             makes the CAS check of 41 §5-5b unfalsifiable (51 §7 契約 3, AC-034 の前提)"
+             makes the CAS check of 41 §5-5b unfalsifiable (51 §7 contract 3, premise of AC-034) \
+             (sem: SEM-gx-substrate-conformance-015)"
                 .to_string(),
         ),
         Err(e) => fail(format!(
@@ -236,8 +252,16 @@ fn contract_round_trip(fixture: &dyn Fixture) -> Outcome {
     };
 
     // ORDER=T-10b: the inverse is constructed while the pre-state is still live.
+    // 🔴 **DR-46-26** — `invert` answers an `InvertOutcome` now, and the harness reads its
+    // `inverse` projection. 51 §7 contract 5 is a law about the inverse **body**: the verdict and
+    // the read-set beside it are attested facts, not obligations an adapter is measured against
+    // here, and inventing a conformance clause for them out of a wider return would be this
+    // harness measuring something 51 §7 never asked for.
     let inverse =
-        match adapter.invert(&delta, &pre) {
+        match adapter
+            .invert(&delta, &pre)
+            .map(InvertOutcome::into_inverse)
+        {
             Ok(Some(i)) => i,
             Ok(None) => return Outcome::NotSupplied(
                 "invert returned Ok(None) for the fixture's own delta, so there is no round trip \
@@ -278,7 +302,11 @@ fn contract_invert_none(fixture: &dyn Fixture) -> Outcome {
                 .to_string(),
         );
     };
-    match fixture.adapter().invert(&delta, &pre) {
+    match fixture
+        .adapter()
+        .invert(&delta, &pre)
+        .map(InvertOutcome::into_inverse)
+    {
         Ok(None) => Outcome::Pass,
         Ok(Some(_)) => fail(
             "the adapter built an inverse for the delta the fixture calls uninvertible; one of the \
@@ -287,7 +315,7 @@ fn contract_invert_none(fixture: &dyn Fixture) -> Outcome {
         ),
         Err(e) => unmeasured_or_failed(
             &e,
-            "invert answered with an error rather than `Ok(None)` (41 §4 separates 「the question              cannot be answered」 from 「the answer is no inverse」, and E-M3-4 escalates on the              second)",
+            "invert answered with an error rather than `Ok(None)` (41 §4 separates \"the question              cannot be answered\" from \"the answer is no inverse\" (sem: SEM-gx-substrate-conformance-016), and E-M3-4 escalates on the              second)",
         ),
     }
 }
@@ -298,7 +326,9 @@ fn contract_commutation(fixture: &dyn Fixture) -> Outcome {
     let (Some((a, b)), Some((c, d))) = (fixture.commuting_pair(), fixture.conflicting_pair())
     else {
         return Outcome::NotSupplied(
-            "the fixture supplies fewer than both of 51 §7's two cases (可換/非可換)".to_string(),
+            "the fixture supplies fewer than both of 51 §7's two cases (commuting/non-commuting) \
+             (sem: SEM-gx-substrate-conformance-017)"
+                .to_string(),
         );
     };
 
@@ -359,9 +389,10 @@ fn contract_apply_idempotence(fixture: &dyn Fixture) -> Outcome {
         Outcome::Pass
     } else {
         fail(format!(
-            "the retry moved the object: {:?} became {:?}. The quantifier is 「同一 delta の再入」 \
-             (E-M4-3), which is the one reading under which 41 §4's 「適用は冪等」 and AC-049's round \
-             trip can both hold (req/69 §3.2)",
+            "the retry moved the object: {:?} became {:?}. The quantifier is \"the same delta \
+             re-entering\" (E-M4-3), which is the one reading under which 41 §4's \"application is \
+             idempotent\" and AC-049's round trip can both hold (req/69 §3.2) (sem: \
+             SEM-gx-substrate-conformance-018)",
             once.digest(),
             twice.digest()
         ))

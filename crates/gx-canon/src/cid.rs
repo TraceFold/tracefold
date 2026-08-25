@@ -1,4 +1,6 @@
-//! The identity face: what a value *is*, as opposed to how it was recorded (A-4 面2).
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! The identity face: what a value *is*, as opposed to how it was recorded (A-4 face 2) (sem: SEM-gx-canon-008).
 //!
 //! Spec: 42 §1.3 for the projection, 42 §1.1 for the digest, 42 §1.2 for the text form.
 //! `req/38_ERRATA_2026-08-07.md` §1 A-4 is the ruling that splits this face from the wire face
@@ -107,14 +109,14 @@ impl IdentityView for ObjectSnapshot {
 
 /// `Intent` -- all five fields (42 §1.3, row 2).
 ///
-/// The row has an empty exclusion column and the reason 「Intent自体が独立の意図記述であり除外規則
-/// なし」, so this is the one projection in the workspace that is required to be the whole struct.
+/// The row has an empty exclusion column and the reason "Intent itself is an independent
+/// description of intent, with no exclusion rule" (sem: SEM-gx-canon-009), so this is the one projection in the workspace that is required to be the whole struct.
 /// That makes the mirror strict: a sixth field added to `Intent` and not here would be a field
 /// outside its own name. `crates/gx-canon/tests/intent_identity.rs` compares the two field sets
 /// rather than trusting the count, which is the A-10 shape **I-1** asks of every projection.
 ///
 /// The CID of this view is `IntentId` (ASM-11), fixed at `submit` (43 T-1) and immutable after --
-/// so 「同一intent→同一IntentId」 (42 §3.3) is a property of this function and of the encoder it
+/// so "same intent → same IntentId" (sem: SEM-gx-canon-010) (42 §3.3) is a property of this function and of the encoder it
 /// feeds, and of nothing else.
 #[derive(Debug, Serialize)]
 pub struct IntentView<'a> {
@@ -142,12 +144,12 @@ impl IdentityView for Intent {
 /// `Fingerprint` -- all three fields (42 §1.3, row 5).
 ///
 /// The row's exclusion column is empty, so the projection is the whole struct: what a fingerprint
-/// *is* is 「which adapter computed it, over which scope, and what the digest of that scope was」, and
+/// *is* is "which adapter computed it, over which scope, and what the digest of that scope was" (sem: SEM-gx-canon-011), and
 /// there is no self-reference or metadata among the three to leave out.
 ///
 /// # Why this impl lives here and the type does not
 ///
-/// **E-M4-1** (req/38 §28) put `Fingerprint` in gx-core -- 「型は下層・計算は上層」 -- because 42 §3.10
+/// **E-M4-1** (req/38 §28) put `Fingerprint` in gx-core -- "types down, computation up" (sem: SEM-gx-canon-012) -- because 42 §3.10
 /// has a receipt name one, and a receipt (gx-witness) may not depend on an adapter. The projection
 /// then has to be here for the reason every other gx-core projection is: [`IdentityView`] is
 /// gx-canon's trait, and the orphan rule admits a foreign type only with a local trait. The same
@@ -158,7 +160,7 @@ impl IdentityView for Intent {
 /// for it without gx-canon learning that adapters exist.
 ///
 /// What this projection is *for* is `crates/gx-substrate-conformance`'s L3 and L4 -- a fingerprint's
-/// CID is how a harness says 「the state came back」 without reading the substrate. The comparison
+/// CID is how a harness says "the state came back" (sem: SEM-gx-canon-013) without reading the substrate. The comparison
 /// 42 §3.5 defines is still [`gx_core::Fingerprint::cas_eq`] and never `==` (**E-M4-15**); a digest
 /// of the whole projection answers a different question, and the two are not interchangeable: two
 /// fingerprints with different scopes have different CIDs and no defined equality at all.
@@ -191,7 +193,7 @@ impl IdentityView for Fingerprint {
 /// Written as a composition on purpose. The projection is applied, the result goes through the
 /// wire face's [`crate::cbor::encode`], and only then is anything hashed -- so there is no
 /// argument shape that reaches a `Cid` while skipping either step. That is what AC-014's
-/// 「迂回禁止」 asks for at the level of this function: the rule is not that callers should use
+/// "no bypass" (sem: SEM-gx-canon-014) asks for at the level of this function: the rule is not that callers should use
 /// the projection, it is that the projection is the only input the hash has.
 ///
 /// Nothing here is a second encoder. 42 §2.1-6 admits one, in [`crate::cbor`], and this function
@@ -204,6 +206,39 @@ impl IdentityView for Fingerprint {
 pub fn compute<T: IdentityView + ?Sized>(value: &T) -> Result<Cid> {
     let bytes = crate::cbor::encode(&value.identity_view())?;
     Ok(digest(&[&bytes]))
+}
+
+/// The same digest [`compute`] takes, over bytes the caller already holds.
+///
+/// # 🔴 The third road, and the reason is `req/38` §324 ruling 3
+///
+/// [`compute`] answers "what does **this value** digest to". For a document that was signed some
+/// releases ago, that is the wrong question and asking it is the defect §324 sent a lane back for:
+/// the value is reached by decoding the bytes into *this year's* type, and the canonical form of
+/// this year's type is not the canonical form the bytes were written in. `req/519` §7-5 measured
+/// the consequence — every member ever added to `ReceiptPayload` had already moved every
+/// historical ledger leaf, so a receipt nobody touched verified as `refuted`.
+///
+/// This road answers "what do **these bytes** digest to", which is the question a holder of a
+/// signed document can actually ask. The bytes are audited to 42 §2.1 first, because a digest over
+/// bytes nobody checked would let two spellings of one value carry two leaves — the property
+/// [`crate::cbor::decode`]'s strictness exists to prevent, and the reason this is not simply
+/// `blake3::hash`.
+///
+/// A **third** public road to a digest and not a second: E-M2-12 already established that more
+/// than one road is legitimate when the questions differ (it added [`mint`] for the ledger's
+/// domain-separated leaf hash). What `tests/ac_014.rs` guards is that the hash is *taken* on one
+/// line, and it still is — every road below ends at the same private function.
+///
+/// Not domain-separated, and that is the whole point: it has to answer exactly what [`compute`]
+/// answers for the same bytes, or it would be a different number rather than the same number
+/// reached honestly. `tests/canonical_bytes_road.rs` asserts the two agree.
+///
+/// # Errors
+/// Whatever [`crate::cbor::scan_strict`] raises when the bytes are not canonical DAG-CBOR.
+pub fn of_canonical_bytes(bytes: &[u8]) -> Result<Cid> {
+    crate::cbor::scan_strict(bytes)?;
+    Ok(digest(&[bytes]))
 }
 
 /// The one place in the workspace where the hash is taken.
@@ -238,9 +273,9 @@ pub const DIGEST_ALGORITHM: &str = "BLAKE3-256";
 
 /// Which position in a Merkle tree a digest is being taken for (42 §3.11).
 ///
-/// 42 §3.11 逐語: 「プレフィクスバイト（`0x00`=leaf, `0x01`=internal node）は second-preimage
-/// 攻撃防止のための標準的ドメイン分離であり、Certificate Transparency（RFC 6962）由来の設計を
-/// そのまま再利用する」. Without them a leaf whose content happens to look like two concatenated
+/// 42 §3.11 verbatim: "the prefix byte (`0x00`=leaf, `0x01`=internal node) is standard domain
+/// separation to prevent second-preimage attacks, reusing as-is the design originating from
+/// Certificate Transparency (RFC 6962)" (sem: SEM-gx-canon-015). Without them a leaf whose content happens to look like two concatenated
 /// child hashes could be presented as an internal node, and a proof could be built for a leaf the
 /// log never held.
 ///
@@ -275,8 +310,8 @@ impl Domain {
 ///
 /// # What this is not
 ///
-/// Not an identity. [`compute`] answers 「what is this value」 by projecting through
-/// [`IdentityView`] first (42 §1.3); this answers 「what is this position in a tree」 and takes
+/// Not an identity. [`compute`] answers "what is this value" (sem: SEM-gx-canon-016) by projecting through
+/// [`IdentityView`] first (42 §1.3); this answers "what is this position in a tree" and takes
 /// whatever bytes it is handed. The two never collide -- the domain byte is what separates the
 /// tree's hashes from every unprefixed `Cid` in the system -- but the `Cid` type is shared,
 /// because 42 §3.11 types `leaf_cid`, `audit_path` and `root_hash` as `Cid` and req/49 §3 M2-6
@@ -295,8 +330,8 @@ pub fn mint(domain: Domain, parts: &[&[u8]]) -> Cid {
 
 /// `leaf_hash = BLAKE3(0x00 || canonical_dagcbor(leaf))` (42 §3.11).
 ///
-/// The canonical form comes from [`crate::cbor::encode`], so 41 §6's 「全 canonical encode は
-/// gx-canon 経由のみ」 holds for the ledger as it does for everything else: gx-log hands over a
+/// The canonical form comes from [`crate::cbor::encode`], so 41 §6's "every canonical encode
+/// goes through gx-canon only" (sem: SEM-gx-canon-017) holds for the ledger as it does for everything else: gx-log hands over a
 /// value and never a byte string it produced itself.
 ///
 /// # Errors
@@ -370,7 +405,7 @@ pub fn from_text(text: &str) -> Result<Cid> {
 
 /// Kani harness 2 of 3 (46 §4.2, row `gx-canon::cid::compute`).
 ///
-/// The row's two claims are 「panic-freedom、固定長出力の保証」. Both are below.
+/// The row's two claims are panic-freedom and guaranteed fixed-length output (sem: SEM-gx-canon-018). Both are below.
 ///
 /// # Bounds (51 §5)
 ///
@@ -379,8 +414,8 @@ pub fn from_text(text: &str) -> Result<Cid> {
 /// **Not** checked: `Transformation` (its `parents` vector makes the encoded length symbolic,
 /// which is what a bounded check cannot absorb), non-empty locators, and the correctness of
 /// `blake3` itself -- the crate is called, and 46 §1's non-goals put the verification of
-/// cryptographic primitives outside this project by name (「暗号…のLean内検証」は非目標、実装は
-/// audited crate に委譲).
+/// cryptographic primitives outside this project by name ("in-Lean verification of
+/// cryptography… is a non-goal; the implementation is delegated to an audited crate") (sem: SEM-gx-canon-019).
 ///
 /// The unwind value was measured, not guessed; see the same note in [`crate::cbor`]'s harness.
 #[cfg(kani)]

@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! T-24 — the text form `gx1:<base32>` (42 §1.2).
 //!
-//! 42 §1.2 verbatim: 「`gx1:` 固定prefix + RFC 4648 Base32（小文字・パディングなし）でエンコード
-//! した32byte生バイト列。例: `gx1:abc123...`（32byte→52文字）」. Human-readable output for CLI,
+//! 42 §1.2 verbatim: "a fixed `gx1:` prefix + 32 raw bytes encoded in RFC 4648 Base32
+//! (lowercase, no padding). Example: `gx1:abc123...` (32 bytes → 52 characters)" (sem: SEM-gx-canon-075). Human-readable output for CLI,
 //! API and logs is this form and no other; the binary embedding stays a 32-byte byte string
 //! (42 §1.1, already fixed by the golden vector G-1 in step 3).
 //!
@@ -14,7 +16,7 @@
 //! serializer that mints the spelling cannot be a layer that does not know it. So the alphabet
 //! moved to `gx_core::Cid::to_text` and this module's [`to_text`]/[`from_text`] delegate to it.
 //!
-//! The rule that 42 §1.2's 「正とする」 actually asks for is unaffected and is what the check at
+//! The rule that 42 §1.2's "takes as canonical" (sem: SEM-gx-canon-076) actually asks for is unaffected and is what the check at
 //! the bottom of this file enforces: **one** implementation of the spelling in the workspace. A
 //! copy kept here "for layering" would be the second text format. `gx-core::Cid` still has an
 //! opaque `Debug` and no `Display`, so no `{}` in a log line mints one by accident.
@@ -48,8 +50,12 @@ fn t_024_thirty_two_bytes_become_fifty_two_characters() {
     let body = text
         .strip_prefix("gx1:")
         .expect("the prefix is fixed (42 §1.2)");
-    assert_eq!(body.len(), 52, "42 §1.2: 32byte→52文字");
-    assert!(!text.contains('='), "パディングなし");
+    assert_eq!(
+        body.len(),
+        52,
+        "42 §1.2: 32 bytes -> 52 characters (sem: SEM-gx-canon-077)"
+    );
+    assert!(!text.contains('='), "no padding (sem: SEM-gx-canon-078)");
     assert!(
         body.chars().all(|c| ALPHABET.contains(c)),
         "RFC 4648 base32, lowercase only: {body}"

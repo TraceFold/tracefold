@@ -1,14 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-068 (NFR-008) — how long a restart takes to get its state back, measured and **recorded**.
 //!
-//! 34 AC-068 逐語: 「Given: 合成journal（10,000エントリ、一部が`Committing`未解決状態）。When: engine
-//! 起動〜全Transformation状態復元完了までの時間を測定する。Then: RTO ≤ 5秒。」 33 NFR-008 says the
-//! same with the population named: 「in-flight Transformation 10,000件までのjournal replay」.
+//! 34 AC-068, verbatim: "Given: a synthetic journal (10,000 entries, some in the unresolved
+//! `Committing` state). When: the time from engine startup to every Transformation's state being
+//! fully restored is measured. Then: RTO ≤ 5s." (quoted in SEM-gx-engine-043) 33 NFR-008 says the
+//! same with the population named: "journal replay for up to 10,000 in-flight Transformations".
 //!
-//! # What 「全Transformation状態復元完了」 is in v0.1, said before the number
+//! # What "every Transformation's state fully restored" is in v0.1, said before the number (sem: SEM-gx-engine-043)
 //!
-//! **E-M5-2** (req/38 §37, ruling M5-02 (a)) defines the reconstructed state: 「replay は **Σ のみを
-//! 再構成する read-only 操作**・AC-039 の「結果状態」=Σ(状態表+ledger root+escrow index)と読む。
-//! adapter は呼ばない」. So the thing this bench times is:
+//! **E-M5-2** (req/38 §37, ruling M5-02 (a)) defines the reconstructed state: "replay is a
+//! **read-only operation that reconstructs only Σ**; AC-039's 'result state' reads as Σ (the state
+//! table + ledger root + escrow index). No adapter is called" (quoted in SEM-gx-engine-043). So the
+//! thing this bench times is:
 //!
 //! 1. [`Engine::open`] — the journal's bytes are replayed, a torn tail is truncated once, the blob
 //!    store and the ledger are opened (43 §7-1); and
@@ -55,10 +59,10 @@ use gx_engine::{
 };
 use support::{committed_records, gate, measuring, report, unresolved_records, Sandbox};
 
-/// 34 AC-068: 「合成journal（10,000エントリ」.
+/// 34 AC-068: "a synthetic journal (10,000 entries)" (quoted in SEM-gx-engine-044).
 const ENTRIES: usize = 10_000;
 
-/// 「一部が`Committing`未解決状態」 — one transformation in ten.
+/// "some in the unresolved `Committing` state" (quoted in SEM-gx-engine-045) -- one transformation in ten.
 const UNRESOLVED_IN: usize = 10;
 
 /// How many times the restart is timed. Fewer than AC-065's thousand because each sample replays ten
@@ -78,7 +82,7 @@ struct Journal {
     planned: usize,
     /// `Committed` records, i.e. lifecycles that finished.
     committed: usize,
-    /// `CommittingStarted` without a `Committed`: 34's 「一部が`Committing`未解決状態」.
+    /// `CommittingStarted` without a `Committed`: 34's "some in the unresolved `Committing` state" (quoted in SEM-gx-engine-046).
     unresolved: usize,
 }
 
@@ -159,7 +163,7 @@ fn recovery_distribution() {
     );
     assert_eq!(
         in_committing, built.unresolved,
-        "34's 「一部が`Committing`未解決状態」 is the population this benchmark exists for"
+        "34's \"some in the unresolved `Committing` state\" (quoted in SEM-gx-engine-047) is the population this benchmark exists for"
     );
 
     let mut opens: Vec<Duration> = Vec::with_capacity(SAMPLES);

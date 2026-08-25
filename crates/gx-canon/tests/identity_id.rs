@@ -1,10 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! F-1 — the id of an identity arrow, computed the way 42 §1.3 defines it.
 //!
 //! `req/46C_AUDIT_PRACTICAL_2026-08-07.md` §2 B-1 measured two natural implementations of
 //! `identity()`'s `id_of` and got **two different `TransformationId`s for one identity arrow**.
 //! The cause was the signature: `id_of` received an `&ObjectSnapshot`, so the value whose
 //! identity was being minted -- the `Transformation` -- was not in scope inside the callback, and
-//! 42 §1.3's 「生成される Transformation 自身の IdentityView を BLAKE3」 could not be evaluated
+//! 42 §1.3's "the BLAKE3 of the generated Transformation's own IdentityView" (sem: SEM-gx-canon-094) could not be evaluated
 //! there at all. Every caller had to invent a substitute, and substitutes differ.
 //! `req/46D_AUDIT_RULING_2026-08-07.md` §1 F-1 rules the callback unified with [`compose`]'s:
 //! it receives the provisional `Transformation`.

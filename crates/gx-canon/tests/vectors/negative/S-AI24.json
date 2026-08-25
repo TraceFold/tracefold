@@ -1,18 +1,18 @@
 {
   "id": "S-AI24",
   "kind": "codec-deviation",
-  "statement": "additional-info 24(1 byte 引数)で ai 直値に収まる 23 を書いた byte 列は decode されない",
+  "statement": "A byte string writing 23 -- a value that fits in the ai inline value -- with additional-info 24 (a 1-byte argument) is not decoded",
   "vector": "1817",
   "expected": "REJECT",
   "expected_error": "NonMinimal",
   "normative_basis": "IPLD-SHOULD+gx-policy",
   "tier": "Tier2",
-  "deviation": "整数 23 は ai 直値(0..=23)で 1 byte `17` が最短。ai=24 形式 `18 17` は 1 byte 長い。**境界そのもの**: 23 は直値に収まる最大値で、24 は収まらない最小値——scanner の判定は `v >= 24` の 1 本で、この vector と control はその比較の両側に 1 つずつ在る。req/33 A-2 は値 1 を使うため境界から遠く、`>=` を `>` に替えても落ちない。",
+  "deviation": "The integer 23's shortest form is the 1-byte `17`, with the ai inline value (0..=23). The ai=24 form `18 17` is 1 byte longer. **The boundary itself**: 23 is the largest value that fits the inline value, and 24 is the smallest that does not -- the scanner's judgement is the single comparison `v >= 24`, and this vector and its control sit one on each side of it. req/33's A-2 uses the value 1, far from the boundary, so it would not fail even if `>=` were swapped for `>`.",
   "spec_anchor": "ipld/ipld@a65340b specs/codecs/dag-cbor/spec.md L55 / RFC 8949 §3 Table 1 / 42 §2.1-1",
-  "origin": "gx self-authored for the fix hand (req/38 §16 H6-4: 「additional-info 境界の判別 vector(24/25/26/27・28-30・31)」)",
+  "origin": "gx self-authored for the fix hand (req/38 §16 H6-4: \"the vectors that discriminate the additional-info boundary (24/25/26/27, 28-30, 31)\")",
   "control": {
     "vector": "1818",
     "expected": "ACCEPT",
-    "note": "24 は ai 直値に収まらない最小値なので ai=24 形式が最短=受理"
+    "note": "24 is the smallest value that does not fit the inline value, so the ai=24 form is shortest = accepted"
   }
 }

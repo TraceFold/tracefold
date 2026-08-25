@@ -1,22 +1,27 @@
-//! 🔴 **M6-18 採(a) = AC-M6-b** — what a restart costs when it has work to finish, measured and
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
+//! 🔴 **M6-18 adopted (a) = AC-M6-b** — what a restart costs when it has work to finish, measured and (sem: SEM-gx-engine-048)
 //! **recorded**. 51 §9's bench table gains its sixth row here.
 //!
-//! > **§44 M5H7-4 採(a) = E-M5-16** 逐語: 「`Engine::recover`（43 §7-3 の resume）の cost 実測は
-//! > **未測のまま記録**——実装窓は M6」
-//! > **§47** の新 AC: 「**AC-M6-b**(recover cost=median+回数+分母)」
+//! > **§44 M5H7-4 adopted (a) = E-M5-16**, verbatim: "the measured cost of `Engine::recover`
+//! > (43 §7-3's resume) is **recorded as unmeasured** -- the implementation window is M6" (quoted in
+//! > SEM-gx-engine-049)
+//! > **§47**'s new AC: "**AC-M6-b** (recover cost = median + count + denominator)"
 //!
 //! # Why this is not `journal_recovery.rs` with one more number
 //!
 //! AC-068 (`benches/journal_recovery.rs`) times `Engine::open` + `reconstruct`: the **read** side,
-//! 「起動〜全Transformation状態復元完了」, which **E-M5-2** defines as Σ and nothing else. That file
+//! "startup through every Transformation's state fully restored" (quoted in SEM-gx-engine-050), which
+//! **E-M5-2** defines as Σ and nothing else. That file
 //! says in its own header why it stops there:
 //!
 //! > `Engine::recover` — 43 §7-3's resume — is a *side-effecting* procedure: it re-applies deltas
 //! > through registered adapters, appends to the ledger and issues receipts… its cost at 10,000
 //! > entries is not measured by anything yet, and that is the honest state.
 //!
-//! This file is that sentence being paid off. 還流台帳 §1.2's reason for caring is not tidiness:
-//! 「crash後の再開時間はflight recorderの製品約束そのもの」 — DR-1(a)'s wedge is a recorder that can
+//! This file is that sentence being paid off. The recovery-flow ledger, §1.2's reason for caring is
+//! not tidiness: "the time to resume after a crash is the flight recorder's product promise itself"
+//! (quoted in SEM-gx-engine-051) — DR-1(a)'s wedge is a recorder that can
 //! be trusted to come back, and the number that claim rests on had never been taken.
 //!
 //! # 🔴 The journal is **real**, and that is what cost this file its complexity
@@ -35,7 +40,7 @@
 //! | record | why it is the one appended |
 //! |---|---|
 //! | `CommittingStarted` (T-9) | opens the critical section; `reconstruct` reads it as `Committing` |
-//! | `ApplyStarted` (**E-M5-1**) | 「the adapter was asked and nothing says whether it answered」 |
+//! | `ApplyStarted` (**E-M5-1**) | "the adapter was asked and nothing says whether it answered" (sem: SEM-gx-engine-052) |
 //!
 //! That pair is 51 §8.1's **third** injection point and the hardest window — the one where the
 //! recovery cannot know whether the world moved, so it takes 43 §7-3c's road and applies again. A
@@ -49,7 +54,7 @@
 //! # 🔴 One sample destroys its own fixture
 //!
 //! `recover` finishes the work. Run it twice on one directory and the second run has nothing to do,
-//! so a naive loop would report a median of 「no rows to resume」. Each sample therefore gets a
+//! so a naive loop would report a median of "no rows to resume" (sem: SEM-gx-engine-053). Each sample therefore gets a
 //! **copy** of the prepared project, and building the template is outside the timed region — the
 //! same discipline `journal_recovery.rs` applies to writing its synthetic journal.
 //!
@@ -72,10 +77,10 @@ use gx_engine::{
 };
 use support::{gate, intent_for, measuring, report, signing_key, Sandbox, AT};
 
-/// 34 AC-068's population, borrowed by AC-M6-b: 「合成journal（10,000エントリ」.
+/// 34 AC-068's population, borrowed by AC-M6-b: "a synthetic journal (10,000 entries)" (quoted in SEM-gx-engine-054).
 const ENTRIES: usize = 10_000;
 
-/// 🔴 **§47's AC-M6-b**: 「10,000 entry・未解決 `Committing` **101 件**」.
+/// 🔴 **§47's AC-M6-b**: "10,000 entries, **101** unresolved `Committing`" (quoted in SEM-gx-engine-055).
 ///
 /// A hundred and one rather than a hundred, because the ruling says so, and because an odd number
 /// makes an off-by-one in the fixture visible in the printed denominator instead of hiding inside a
@@ -287,7 +292,7 @@ fn recovery_cost() {
         "RECOVER_BUDGET 33 NFR-008's RTO <= 5 s is AC-068's budget for the **replay** \
          (`Engine::open` + `reconstruct`, E-M5-2's Σ) and is printed here as context only. Nothing \
          above is compared against it: 34 gives `Engine::recover` no criterion at all, which is why \
-         §47 raised AC-M6-b as a new one (M3-15: the gate is 「measured and recorded」)."
+         §47 raised AC-M6-b as a new one (M3-15: the gate is \"measured and recorded\", sem: SEM-gx-engine-056)."
     );
 }
 

@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-005 (FR-005) — `Commutation` survives a serde round trip, residual CID included.
 //!
-//! AC-005 逐語: 「Given: `Commutation::Conflicts{residual: DeltaRef(cid)}`と
-//! `Commutation::Commutes`。When: serde往復。Then: `residual`のCIDを含め全フィールドが
-//! bit-equalに復元される。」
+//! AC-005, verbatim (quoted in SEM-gx-core-112): "Given: `Commutation::Conflicts{residual:
+//! DeltaRef(cid)}` and `Commutation::Commutes`. When: a serde round trip. Then: every field,
+//! including the CID in `residual`, is restored bit-equal."
 //!
 //! The interesting field is the 32 raw bytes inside `DeltaRef.cid`: an encoding that dropped or
 //! reordered them would still produce a `Conflicts` that looks right at the variant level, so
@@ -65,8 +67,9 @@ proptest! {
 /// E-JCS-1 (`req/38_ERRATA_2026-08-07.md` §5): a `Cid` embedded in JSON is spelled
 /// `gx1:<base32>`, not a thirty-two element array of numbers.
 ///
-/// 42 §1.2 is verbatim on the point -- 「CLI/API/ログの人間可読表示・**JSON埋め込み**はすべて
-/// この形式を正とする」 -- and hand 4 shipped the array form, which req/42 §5-2 raised and the
+/// 42 §1.2 is verbatim on the point -- "human-readable display in CLI/API/logs and **JSON
+/// embedding** all take this form as canonical" (quoted in SEM-gx-core-113) -- and hand 4 shipped
+/// the array form, which req/42 §5-2 raised and the
 /// erratum settled against. The AC-005 round trip alone cannot see the difference (an array
 /// round trips as faithfully as a string), so the spelling is asserted here rather than left to
 /// be inferred from a property that passes either way.

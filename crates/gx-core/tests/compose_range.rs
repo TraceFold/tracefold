@@ -1,19 +1,25 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **E-M3-13** (D-6) — the value range a composed arrow's metadata has to be in.
 //!
-//! `req/38_ERRATA_2026-08-07.md` §22 逐語: 「🔴**D-6(採用=erratum E-M3-13・述語①②③・実装は手 6 窓)**:
-//! A-7 値域検査を **gx-core `compose`(と `Transformation::new`)側に置く**事を erratum として採用。
-//! 述語は ①`created_at ≥ 0` ②`intent_id ≠ 全 0 placeholder` ③`created_at ≥ max(f,g)`(compose のみ)。
-//! **④(intent ∈ {f,g})は不採用**……「未来でない」は時計=M5」.
+//! `req/38_ERRATA_2026-08-07.md` §22, verbatim (quoted in SEM-gx-core-134): "🔴 **D-6 (adopted =
+//! erratum E-M3-13; predicates ①②③; implementation in the hand 6 window)**: adopt as an erratum
+//! that the A-7 value-range check is placed **on the gx-core `compose` (and `Transformation::new`)
+//! side**. The predicates are ① `created_at ≥ 0` ② `intent_id ≠ the all-zero placeholder`
+//! ③ `created_at ≥ max(f,g)` (compose only). **④ (intent ∈ {f,g}) is not adopted** ... 'not in the
+//! future' is a clock = M5".
 //!
-//! Until this hand the gap was `req/38` §7's: 「合成後 `created_at`/`intent_id` の許容値域が未定義の
-//! まま `compose()` は無検査で通す(46B WARN)」. `CompositionMetadata` is supplied by a caller, and
+//! Until this hand the gap was `req/38` §7's: "with the admissible range of the composite's
+//! `created_at`/`intent_id` undefined, `compose()` passes them unchecked (46B WARN)" (quoted in
+//! SEM-gx-core-135). `CompositionMetadata` is supplied by a caller, and
 //! nothing read it -- so a composite could be dated before the arrows it was made of, and could name
 //! a Draft that does not exist, and the crate had no opinion.
 //!
 //! # What this suite is written to keep, and what it deliberately does not assert
 //!
-//! Four of the probes below assert that something is **admitted**. They are not filler: ④ and 「未来
-//! でない」 were ruled *out*, and a ruling that only lives in prose is a ruling the next hand
+//! Four of the probes below assert that something is **admitted**. They are not filler: ④ and "not
+//! in the future" (sem: SEM-gx-core-136) were ruled *out*, and a ruling that only lives in prose is
+//! a ruling the next hand
 //! re-litigates. `the_composite_may_carry_an_intent_neither_part_carries` fails the day somebody
 //! implements ④, and `a_far_future_created_at_is_not_this_crates_business` fails the day somebody
 //! reaches for a clock in a crate that 41 §6 forbids one to (the check would need `now`, and gx-core
@@ -26,8 +32,9 @@
 //! # The third door (**reported by M3 hand 6, closed by M4 hand 1**)
 //!
 //! [`gx_core::identity`] takes the same [`CompositionMetadata`] and was infallible -- 41 §3's
-//! reading recorded in `transformation.rs`: 「returning a `Result` whose error arm is unreachable
-//! would be a lie about the API」. E-M3-13 named `compose` and `Transformation::new` and said
+//! reading recorded in `transformation.rs`: "returning a `Result` whose error arm is unreachable
+//! would be a lie about the API" (sem: SEM-gx-core-137). E-M3-13 named `compose` and
+//! `Transformation::new` and said
 //! nothing about `identity`, so M3 hand 6 implemented the two it names and **measured** the third
 //! rather than widening a ruling on its own authority; `req/66` §4 raised it and `req/38` §25 H-1
 //! ruled it (**E-M3-18**). `identity_is_the_third_door_and_e_m3_18_closed_it` is the same fixture
@@ -98,7 +105,7 @@ fn a_composite_inside_the_range_is_still_built() {
 // ① created_at >= 0
 // ---------------------------------------------------------------------------
 
-/// 「①`created_at ≥ 0`」, at `compose`.
+/// "① `created_at ≥ 0`" (sem: SEM-gx-core-138), at `compose`.
 #[test]
 fn d6_1_compose_refuses_a_negative_created_at() {
     let world = World::new(1, 2, 3);
@@ -106,7 +113,7 @@ fn d6_1_compose_refuses_a_negative_created_at() {
     assert_eq!(got, Error::CreatedAtNegative { got: -1 }, "{got}");
 }
 
-/// 「①」, at the other door E-M3-13 names.
+/// "①" (sem: SEM-gx-core-139), at the other door E-M3-13 names.
 #[test]
 fn d6_1_new_refuses_a_negative_created_at() {
     let x = snapshot(1, 4);
@@ -138,9 +145,10 @@ fn d6_1_the_epoch_itself_is_admitted() {
 // ② intent_id != the all-zero placeholder
 // ---------------------------------------------------------------------------
 
-/// 「②`intent_id ≠ 全 0 placeholder`」, at `compose`.
+/// "② `intent_id ≠ the all-zero placeholder`" (sem: SEM-gx-core-140), at `compose`.
 ///
-/// The all-zero id is the crate's own spelling for 「no value yet」 -- `PROVISIONAL_ID` in
+/// The all-zero id is the crate's own spelling for "no value yet" (sem: SEM-gx-core-141) --
+/// `PROVISIONAL_ID` in
 /// `transformation.rs` is exactly those bytes -- and 42 §1.3 puts `intent_id` **inside** the
 /// IdentityView. So an arrow carrying it has an identity computed over a placeholder.
 #[test]
@@ -152,7 +160,7 @@ fn d6_2_compose_refuses_the_placeholder_intent_id() {
     assert_eq!(got, Error::IntentIdUnset, "{got}");
 }
 
-/// 「②」, at `Transformation::new`.
+/// "②" (sem: SEM-gx-core-142), at `Transformation::new`.
 #[test]
 fn d6_2_new_refuses_the_placeholder_intent_id() {
     let x = snapshot(1, 4);
@@ -172,7 +180,7 @@ fn d6_2_new_refuses_the_placeholder_intent_id() {
 }
 
 /// One zero byte away from the placeholder is a legitimate id, so the check is equality with the
-/// placeholder rather than 「looks mostly empty」.
+/// placeholder rather than "looks mostly empty" (sem: SEM-gx-core-143).
 #[test]
 fn d6_2_an_almost_zero_intent_id_is_admitted() {
     let world = World::new(1, 2, 3);
@@ -187,7 +195,7 @@ fn d6_2_an_almost_zero_intent_id_is_admitted() {
 // ③ created_at >= max(f, g) -- compose only
 // ---------------------------------------------------------------------------
 
-/// 「③`created_at ≥ max(f,g)`(compose のみ)」, with `f` holding the maximum.
+/// "③ `created_at ≥ max(f,g)` (compose only)" (sem: SEM-gx-core-144), with `f` holding the maximum.
 #[test]
 fn d6_3_compose_refuses_a_composite_dated_before_f() {
     let x = snapshot(1, 4);
@@ -268,8 +276,9 @@ fn d6_3_is_not_applied_by_new_which_has_no_parts_to_be_before() {
 
 /// **④ was not adopted**, and this is the probe that says so mechanically.
 ///
-/// req/38 §22 逐語: 「**④(intent ∈ {f,g})は不採用**——`CompositionMetadata` の doc 自身が「両者が別
-/// intent から来うる」と書き、合成物が新しい intent を持つ読みを spec は禁じていない」.
+/// req/38 §22, verbatim: "**④ (intent ∈ {f,g}) is not adopted** -- `CompositionMetadata`'s own doc
+/// writes that 'the two may come from different intents', and the spec does not forbid the reading
+/// that a composite has a new intent" (quoted in SEM-gx-core-145).
 #[test]
 fn the_composite_may_carry_an_intent_neither_part_carries() {
     let world = World::new(1, 2, 3);
@@ -280,14 +289,16 @@ fn the_composite_may_carry_an_intent_neither_part_carries() {
     compose_with(&world, meta).expect("④ is not implemented, and must not be");
 }
 
-/// 「『未来でない』は時計=M5」 -- a far-future timestamp is admitted here.
+/// "'not in the future' is a clock = M5" (sem: SEM-gx-core-146) -- a far-future timestamp is
+/// admitted here.
 ///
 /// Not an oversight: deciding it needs `now`, and 41 §6 forbids this crate the clock that would
 /// answer. The ruling routes it to M5, where the clock is injected at the engine boundary.
 #[test]
 fn a_far_future_created_at_is_not_this_crates_business() {
     let world = World::new(1, 2, 3);
-    compose_with(&world, meta_at(1, i64::MAX)).expect("「未来でない」 is M5's, not this crate's");
+    compose_with(&world, meta_at(1, i64::MAX))
+        .expect("'not in the future' is M5's, not this crate's (sem: SEM-gx-core-147)");
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +310,8 @@ fn a_far_future_created_at_is_not_this_crates_business() {
 /// **This probe is the pin rewritten, not a new one.** M3 hand 6 wrote
 /// `identity_is_a_third_door_and_this_hand_did_not_close_it`, which asserted the *opposite* -- that
 /// `identity` builds a value `compose` and `new` refuse -- on the discipline that a known
-/// discrepancy is pinned rather than hidden, 「so that changing it is a deliberate act」. `req/38`
+/// discrepancy is pinned rather than hidden, "so that changing it is a deliberate act" (sem:
+/// SEM-gx-core-148). `req/38`
 /// §25 H-1 is the deliberate act (**E-M3-18**), so the assertion is inverted here rather than
 /// deleted: the same fixture, the same two out-of-range fields, and the answer that changed.
 ///

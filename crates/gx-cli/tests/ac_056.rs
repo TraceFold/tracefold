@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **AC-056** over a real socket, and `gx serve`'s three shutdown stages under a real `SIGTERM`.
 //!
 //! `crates/gx-api/tests/stream.rs` measures the same acceptance criterion through the router, which
-//! answers 「is the projection right」. This file answers the other half — 「does the *server* work」 —
+//! answers "is the projection right" (sem: SEM-gx-cli-1920). This file answers the other half — "does the *server* work" (sem: SEM-gx-cli-1920) —
 //! and there is no way to ask it without a process, a port and a signal:
 //!
 //! * the **runtime** (`tokio` inside gx-api, no `#[tokio::main]` in this binary);
@@ -13,10 +15,10 @@
 //! # 🔴 Timing, and the retry rule (req/88 §8.2, 51 §13-4)
 //!
 //! Same rule as the in-process suite, restated because a reader of this file should not have to find
-//! the other one: **零 retries**. Every wait is a socket read timeout of [`READ_TIMEOUT`] or a bounded
+//! the other one: **zero retries** (sem: SEM-gx-cli-1921). Every wait is a socket read timeout of [`READ_TIMEOUT`] or a bounded
 //! poll of [`STARTUP_WAIT`] for the process to print its first line, and an expiry **fails**. Nothing
 //! here re-runs a step, and no probe is `#[ignore]`d. If one of these expires it is a real defect —
-//! 「それでも落ちたら flaky でなく実バグ」.
+//! "if it still fails, that's a real bug, not flaky" (sem: SEM-gx-cli-1922).
 //!
 //! # Why the HTTP client is thirty lines of `std::net`
 //!
@@ -55,7 +57,7 @@ impl Serving {
     /// 🔴 `--bind 127.0.0.1:0` is loopback, so M6-10's policy admits it, and the **kernel** picks the
     /// port. A test that picked its own would either collide with whatever else is on this machine or
     /// need a bind-then-release dance that is itself a race; 44 §1.2 asks for a structured start-up
-    /// line, and the port in that line is the answer to 「which one did you get」.
+    /// line, and the port in that line is the answer to "which one did you get" (sem: SEM-gx-cli-1923).
     fn start(project: &std::path::Path, home: &std::path::Path, key_id: &str) -> Self {
         let token = "m6h6-socket-token".to_string();
         let token_file = project.join("token");
@@ -83,8 +85,8 @@ impl Serving {
             line.clear();
             if stdout.read_line(&mut line).unwrap_or(0) == 0 {
                 // stdout closed: the process stopped. Its refusal is on stderr (44 §1.3) and is
-                // worth more than a timeout — a fixture that reported 「no start-up line」 for 「the
-                // server said why it would not start」 would be M4H4-2's mistake in a test harness.
+                // worth more than a timeout — a fixture that reported "no start-up line" for "the (sem: SEM-gx-cli-1924)
+                // server said why it would not start" would be M4H4-2's mistake in a test harness.
                 let mut why = String::new();
                 if let Some(mut err) = child.stderr.take() {
                     let _ = err.read_to_string(&mut why);
@@ -93,7 +95,7 @@ impl Serving {
             }
         }
         let start: serde_json::Value = serde_json::from_str(line.trim()).unwrap_or_else(|e| {
-            panic!("44 §1.2: 「stdout: 起動ログ（構造化JSON行）」; got {line:?} ({e})")
+            panic!("44 §1.2: \"stdout: startup log (structured JSON line)\" (sem: SEM-gx-cli-1925); got {line:?} ({e})")
         });
         println!("SERVE_START={start}");
         assert_eq!(start["event"], serde_json::json!("gx.serve.started"));
@@ -103,7 +105,7 @@ impl Serving {
             .to_string();
         assert!(
             addr.starts_with("127.0.0.1:"),
-            "M6-10 採(b): the default and the only permitted family is loopback; got {addr}"
+            "M6-10 adopted (b; sem: SEM-gx-cli-1926): the default and the only permitted family is loopback; got {addr}"
         );
         // 🔴 M6H5-13's other half, in the log rather than in `--help`: the absence follows the
         // server into the place a second operator will look six months from now.
@@ -178,7 +180,7 @@ impl Serving {
         assert!(headers.starts_with("HTTP/1.1 200"), "{headers}");
         assert!(
             headers.to_lowercase().contains("application/x-ndjson"),
-            "44 §2.2: 「`Content-Type: application/x-ndjson`」 — {headers}"
+            "44 §2.2: \"`Content-Type: application/x-ndjson`\" (sem: SEM-gx-cli-1927) — {headers}"
         );
         assert!(
             headers.to_lowercase().contains("transfer-encoding: chunked"),
@@ -224,7 +226,7 @@ fn next_line(reader: &mut BufReader<TcpStream>) -> serde_json::Value {
 
 /// 🔴 **AC-056**, end to end: subscribe over a socket, commit from a second connection, read the line.
 ///
-/// 34's text: 「購読中に別 client が commit → `event: "committed"` が 1 行配信」. Every noun is real
+/// 34's text: "while subscribed, another client commits → one line of `event: "committed"` is delivered" (sem: SEM-gx-cli-1928). Every noun is real
 /// here — two connections, one server process, one signal at the end.
 #[test]
 fn ac_056_over_a_socket_a_subscriber_sees_another_clients_commit() {
@@ -330,7 +332,7 @@ fn graceful_shutdown_ends_the_subscriptions_and_exits_zero() {
     assert_eq!(
         stopped["exit"],
         serde_json::json!(0),
-        "44 §1.2: 「0=正常終了（SIGTERM等）」 — and 1 when work was abandoned, which is the case this \
+        "44 §1.2: \"0=normal termination (SIGTERM, etc.)\" (sem: SEM-gx-cli-1929) — and 1 when work was abandoned, which is the case this \
          probe shows did not arise"
     );
 
@@ -344,6 +346,58 @@ fn graceful_shutdown_ends_the_subscriptions_and_exits_zero() {
          task would still be polling and `axum::serve`'s graceful shutdown would have waited for a \
          body with no last frame — every shutdown would reach the deadline and every exit would be 1"
     );
+}
+
+/// 🔴 **P3.1 repair, gotcha65** (`req/38` §74 item②, `req/125` §4-2) — idle, no connections, no
+/// signal, and the process must still be there past `gx_api::serve::DEFAULT_GRACE` (10s).
+///
+/// Before the repair, `serve.rs` wrapped `axum::serve(...).with_graceful_shutdown(...)`'s **whole**
+/// lifetime in `tokio::time::timeout(config.grace, server)` — a future that does not resolve until a
+/// shutdown signal arrives, so the timeout fired on the clock alone and `gx serve` exited
+/// `deadline_exceeded: true` after ten seconds regardless of load or signal (the audit's own
+/// reproduction: "if nothing connects and 15 seconds pass … it terminates on its own" (sem: SEM-gx-cli-1930)). This probe is that reproduction run
+/// against the fix: fifteen real seconds — five past the ten-second grace, the same margin the audit
+/// used — with the process touched by nothing, and only then a real `SIGTERM` to prove the grace
+/// window is still there in full for the drain once one arrives (`deadline_exceeded: false`).
+#[test]
+fn idle_with_no_signal_outlives_the_grace_period() {
+    let fixture = pipeline("m6h6_shutdown_idle", "before\n");
+    assert_eq!(
+        fixture
+            .submit(
+                "warm
+"
+            )
+            .code,
+        0
+    );
+    let mut server = Serving::start(&fixture.project, &fixture.home, &fixture.key_id);
+
+    std::thread::sleep(std::time::Duration::from_secs(15));
+    let status = server
+        .child
+        .try_wait()
+        .expect("try_wait does not error on a live child");
+    println!(
+        "IDLE_15S_STILL_ALIVE={} STATUS={status:?}",
+        status.is_none()
+    );
+    assert!(
+        status.is_none(),
+        "🔴 gotcha65: `gx serve` must still be running after 15s idle with zero connections and \
+         zero signals — DEFAULT_GRACE (10s) bounds stage 2's drain wait *after* a shutdown signal, \
+         not the process's total unsignalled lifetime. A `Some` here means the whole-lifetime \
+         `tokio::time::timeout` regressed and this process already exited: {status:?}"
+    );
+
+    let stopped = shut_down(server);
+    println!("IDLE_15S_SHUTDOWN={stopped}");
+    assert_eq!(
+        stopped["deadline_exceeded"],
+        serde_json::json!(false),
+        "a signal that arrives after the idle wait still drains inside the full grace window"
+    );
+    assert_eq!(stopped["exit"], serde_json::json!(0));
 }
 
 /// Send `SIGTERM`, wait for the process, and hand back the line it printed on the way out.

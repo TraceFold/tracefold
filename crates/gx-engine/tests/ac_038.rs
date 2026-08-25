@@ -1,16 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-038 (FR-038) — a failed `apply`, the best-effort rollback, and where the outcome is written.
 //!
-//! 34 AC-038 逐語: 「Given: inverse escrow済み（T-10b実行済み）のCommitting状態Tで`adapter.apply`が
-//! 意図的に失敗するモックadapterを使用。When: commitパイプラインを実行。Then: 自動巻き戻し試行が発生
-//! し、結果は`Aborted(ApplyFailed)`として記録され、journal/Receiptに巻き戻し試行の有無（成功/失敗）が
-//! 記録される。」
+//! 34 AC-038, verbatim: "Given: a Committing-state T with the inverse escrowed (T-10b already run),
+//! using a mock adapter whose `adapter.apply` fails deliberately. When: the commit pipeline runs.
+//! Then: an automatic rollback attempt occurs, and the result is recorded as `Aborted(ApplyFailed)`,
+//! and journal/Receipt records whether a rollback attempt occurred (success/failure)." (sem:
+//! SEM-gx-engine-471)
 //!
-//! 43 T-10c: 「部分適用がありescrow済みinverseがあれば自動巻き戻しを試行（ベストエフォート、結果に
-//! 関わらず次へ）；journal: `Aborted{id, ApplyFailed}`」.
+//! 43 T-10c: "if there was a partial apply and an escrowed inverse exists, attempt an automatic
+//! rollback (best-effort; move on regardless of the outcome); journal: `Aborted{id, ApplyFailed}`"
+//! (sem: SEM-gx-engine-471).
 //!
 //! # 🔴 The last clause had no seat, and this is where it went (**M5H4-2**)
 //!
-//! 「journal/Receiptに…記録される」 names two places and neither could take it:
+//! "...is recorded in journal/Receipt" (sem: SEM-gx-engine-472) names two places and neither
+//! could take it:
 //!
 //! * **Receipt** — ASM-14 defines two kinds, `VerdictReceipt` and `CommitReceipt`. An aborted
 //!   transformation gets neither, so there is no receipt for a rollback outcome to be written on.
@@ -49,8 +54,30 @@ type Fixture = (
     Arc<std::sync::Mutex<Vec<u8>>>,
 );
 
-/// A canonicalized transformation whose adapter will refuse the applications in `script`.
+/// 🔴 **R30 / `req/372` M-01 (`req/38` §240 ruling 2)** — a canonicalized transformation whose
+/// adapter **performs** the applications in `script` and *then* answers an error.
+///
+/// This is the fixture the three criteria below now use, and the change is not cosmetic. Until R30
+/// they used [`canonicalised_refusing`], whose forward apply returns before it touches the world —
+/// and the engine now reads the object the instant an apply fails and declines to send a
+/// compensation for an effect that does not exist. On a forward apply that changed nothing there is
+/// nothing to take back, so `NotAttempted(WorldNeverMoved)` is the answer and no inverse is sent.
+///
+/// AC-038 is about what happens when the escrowed inverse **is** applied, so the fixture has to
+/// produce a world that actually moved. `the_compensation_is_not_sent_for_an_apply_that_moved_nothing`
+/// below holds the other half, so both roads are measured rather than one being replaced.
 fn canonicalised(name: &str, script: &[bool]) -> Fixture {
+    canonicalised_with(name, &[], script)
+}
+
+/// A canonicalized transformation whose adapter will refuse the applications in `script` **without
+/// touching the world**.
+fn canonicalised_refusing(name: &str, script: &[bool]) -> Fixture {
+    canonicalised_with(name, script, &[])
+}
+
+/// The body of both: `refuse` returns before the world is written, `after` returns after it.
+fn canonicalised_with(name: &str, refuse: &[bool], after: &[bool]) -> Fixture {
     let dir = scratch(name);
     let mut engine = Engine::open(
         dir.join("journal.bin"),
@@ -59,7 +86,10 @@ fn canonicalised(name: &str, script: &[bool]) -> Fixture {
     )
     .expect("a fresh journal opens");
     let (adapter, counts, world) = CommitAdapter::new("before");
-    engine.register_adapter(Arc::new(adapter.refusing(script)), "commit-adapter-1");
+    engine.register_adapter(
+        Arc::new(adapter.refusing(refuse).failing_after_the_effect(after)),
+        "commit-adapter-1",
+    );
 
     let i = intent("/tmp/target.txt", "after");
     engine.submit(&i, 42, AT).expect("submit");
@@ -74,7 +104,7 @@ fn canonicalised(name: &str, script: &[bool]) -> Fixture {
 /// 🔴 The criterion: the apply fails, the escrowed inverse is applied, and both facts are recorded.
 #[test]
 fn ac_038_a_failed_apply_rolls_back_and_the_outcome_is_journalled() {
-    // The forward application refuses; the rollback's does not.
+    // The forward application lands and then errors; the rollback's is clean.
     let (mut e, id, counts, world) = canonicalised("ac038_succeeded", &[true]);
     let state = e.commit(&id, AT, &signing_key()).expect("commit runs");
     let totals = counts.totals();
@@ -88,16 +118,18 @@ fn ac_038_a_failed_apply_rolls_back_and_the_outcome_is_journalled() {
     assert_eq!(
         state,
         Lifecycle::Aborted(AbortReason::ApplyFailed),
-        "43 T-10c: 「結果に関わらず次へ」 -- a successful rollback does not rescue the commit"
+        "43 T-10c: \"move on regardless of the outcome\" -- a successful rollback does not rescue \
+         the commit (sem: SEM-gx-engine-473)"
     );
     assert_eq!(
         totals[APPLY], 2,
-        "two walks down 則 2's one road: the forward delta, and the escrowed inverse"
+        "two walks down Rule 2's one road (sem: SEM-gx-engine-474): the forward delta, and the \
+         escrowed inverse"
     );
     assert_eq!(
         e.rollback(&id),
         Some(Rollback::Succeeded),
-        "AC-038: 「巻き戻し試行の有無（成功/失敗）」"
+        "AC-038: \"whether a rollback attempt occurred (success/failure)\" (sem: SEM-gx-engine-475)"
     );
 
     let (reason, rollback) = e
@@ -118,6 +150,85 @@ fn ac_038_a_failed_apply_rolls_back_and_the_outcome_is_journalled() {
         "the journal is where AC-038's outcome lives (M5H4-2)"
     );
     assert_eq!(e.ledger().log().len(), 0, "INV-S4: no leaf for an abort");
+}
+
+/// 🔴 **R30 / `req/372` M-01 (`req/38` §240 ruling 2)** — the other half of the criterion above,
+/// and the road the twenty-ninth audit's worst finding runs down: when the forward apply fails
+/// **without moving the world**, the escrowed inverse is *not* sent.
+///
+/// # Why this is a criterion and not a regression
+///
+/// 43 T-10c is "roll back on a best-effort basis", and until this window that was read as *send the
+/// inverse whatever happened*. The audit measured what the two words leave out. The escrowed
+/// inverses every shipped adapter mints are **absolute**, so they restore from any world — and one
+/// of the worlds they restore from is a world a third party legitimately created. With the shipped
+/// git adapter, on a real branch: a colleague's commit `d2d09b5` was taken off the branch by a
+/// compensation for a change that had never landed, and `Succeeded` was recorded over it.
+///
+/// A transformation that did nothing has nothing to take back. Sending an absolute inverse anyway
+/// cannot restore anything (the object is already at `fp0`) and can only overwrite whatever is
+/// there now, so declining is not a weaker best effort — there was no effort available to make.
+///
+/// This arm is what keeps that true: it counts the adapter's **own** apply calls rather than asking
+/// the engine whether the engine behaved, and it asserts the announcement count too, because a
+/// compensation that was announced and not sent would leave recovery re-applying a delta nobody
+/// applied.
+#[test]
+fn the_compensation_is_not_sent_for_an_apply_that_moved_nothing() {
+    // The forward application refuses **before touching the world**, which is a permission denial,
+    // a policy refusal at the far end, or any call the substrate declined outright.
+    let (mut e, id, counts, world) = canonicalised_refusing("ac038_never_moved", &[true]);
+    let state = e.commit(&id, AT, &signing_key()).expect("commit runs");
+    let announced = e
+        .journal()
+        .records()
+        .iter()
+        .filter(|r| matches!(r, EngineJournalRecord::ApplyStarted { .. }))
+        .count();
+
+    println!(
+        "R30_AC038 STATE={state:?} APPLY_CALLS={} ROLLBACK={:?} CAUSE={:?} ANNOUNCED={announced} \
+         WORLD={:?}",
+        counts.totals()[APPLY],
+        e.rollback(&id),
+        e.rollback_not_attempted_because(&id).map(|c| c.kind()),
+        String::from_utf8_lossy(&world.lock().expect("the world"))
+    );
+
+    assert_eq!(
+        state,
+        Lifecycle::Aborted(AbortReason::ApplyFailed),
+        "the abort itself is unchanged: what the compensation did does not rescue the commit"
+    );
+    assert_eq!(
+        counts.totals()[APPLY],
+        1,
+        "🔴 the finding, taken from the **adapter's own** counter rather than from gx's account of \
+         itself: the forward apply is the only application that happened. Before R30 this was 2, \
+         and the second one was an absolute inverse written over whatever the object held"
+    );
+    assert_eq!(
+        e.rollback(&id),
+        Some(Rollback::NotAttempted),
+        "and the word says so: no compensating inverse was sent"
+    );
+    assert_eq!(
+        e.rollback_not_attempted_because(&id).map(|c| c.kind()),
+        Some("WorldNeverMoved"),
+        "🔴 with the cause beside the value (`req/324` §5(d)) -- `NotAttempted` is reached by five \
+         other roads and a reader given the value alone cannot tell which"
+    );
+    assert_eq!(
+        announced, 1,
+        "🔴 and the compensation was not **announced** either: an `ApplyStarted` for a delta that \
+         was never sent is exactly the record E-M5-1 exists to prevent, because recovery would \
+         re-apply a delta nobody applied"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&world.lock().expect("the world")),
+        "before",
+        "the premise this arm rests on: the refused apply left the world where it found it"
+    );
 }
 
 /// The other outcome: the rollback is attempted and the adapter refuses it too.
@@ -145,7 +256,7 @@ fn ac_038_a_rollback_that_fails_is_recorded_as_a_failure() {
 /// Two `ApplyStarted` records, naming two different deltas: the forward one and the escrowed
 /// inverse. A rollback that ran without a record would leave a crash inside it indistinguishable
 /// from a crash before it — which is the exact hole `ApplyStarted` was added to close, one step
-/// further along the section than req/78 §3.2 Λ4 描いた place.
+/// further along the section than the place req/78 §3.2 Λ4 drew (sem: SEM-gx-engine-476).
 #[test]
 fn ac_038_both_applications_are_announced_and_they_name_different_deltas() {
     let (mut e, id, _counts, _world) = canonicalised("ac038_records", &[true]);
@@ -179,7 +290,8 @@ fn ac_038_both_applications_are_announced_and_they_name_different_deltas() {
     assert_eq!(announced[1], escrowed, "then the inverse that undoes it");
     assert_ne!(
         forward, escrowed,
-        "the two deltas differ, so 「the same record twice」 would be visible"
+        "the two deltas differ, so \"the same record twice\" would be visible (sem: \
+         SEM-gx-engine-477)"
     );
 
     let kinds: Vec<&str> = e
@@ -205,7 +317,8 @@ fn ac_038_both_applications_are_announced_and_they_name_different_deltas() {
 
 /// The escrowed inverse's **body** is in the blob store, not only its name.
 ///
-/// 42 §5's exception to ASM-9 exists for this moment: 「digest-onlyでは実際のundoが実行不能なため」.
+/// 42 §5's exception to ASM-9 exists for this moment: "because a digest-only record cannot actually
+/// execute an undo" (sem: SEM-gx-engine-478).
 /// The rollback above applied a delta, and this is where that delta came from.
 #[test]
 fn ac_038_the_escrowed_inverse_body_is_retrievable() {
@@ -243,13 +356,15 @@ fn ac_038_an_aborted_commit_issues_no_receipt() {
     );
     assert!(
         e.receipt(&id).is_none(),
-        "42 §3.10 / ASM-14: a `CommitReceipt` is issued 「commit成功時のみ」"
+        "42 §3.10 / ASM-14: a `CommitReceipt` is issued \"only on a successful commit\" (sem: \
+         SEM-gx-engine-479)"
     );
 }
 
 /// 🔴 `Rollback::NotAttempted` is unreachable in v0.1, and here is the measurement.
 ///
-/// **E-M3-4** makes 「no inverse」 the one condition that produces an `Escalate` in v0.1, so a
+/// **E-M3-4** makes "no inverse" (sem: SEM-gx-engine-480) the one condition that produces an
+/// `Escalate` in v0.1, so a
 /// transformation whose `invert` answers `None` stops at `Escalated` and never reaches T-9 at all.
 /// Naming the value and never writing it is the shape 42 §3.12's `InverseStatus::Expired` already
 /// has; measuring the reason is what keeps it from being an excuse.

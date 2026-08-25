@@ -1,11 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The pack a deployment starts from, and the one road it takes into a build (FR-028).
 //!
-//! Spec: 32 FR-028 逐語 -- 「gx-gateは出荷policy pack（既製invariant集）を`policies/`配下に同梱
-//! しなければならない（MUST）。fs substrate向けpackはM3で同梱する…各policy packが少なくとも1つの
-//! AdmitケースとDenyケースをconformanceテストで持つことを確認できる」 -- with 34 AC-028 stating the
-//! conformance half and 41 §2 naming this module. Why a pack ships at all is 35 RSK-5: 「Policy
-//! authorship cold start（invariant/policyを書ける人が希少）」, mitigated by 「出荷時policy pack」 and
-//! -- 45 §87 is explicit -- 「緩和するが解消しない」.
+//! Spec: 32 FR-028 verbatim -- "gx-gate MUST bundle a shipped policy pack (a ready-made invariant
+//! set) under `policies/`. The fs-substrate pack is bundled in M3 ... it must be confirmed that each
+//! policy pack carries at least one Admit case and one Deny case in a conformance test" -- with 34
+//! AC-028 stating the conformance half and 41 §2 naming this module. Why a pack ships at all is 35
+//! RSK-5: "policy-authorship cold start (people who can write invariants/policies are scarce)",
+//! mitigated by a "pack shipped at launch" and -- 45 §87 is explicit -- "mitigates but does not
+//! resolve". (sem: SEM-gx-gate-075)
 //!
 //! Rulings this file implements: **M3-16** (the directory is at the repository root), **M3-10** (what
 //! a pack may reason over), **ASM-62-1** / C-4 (`@id` is a format requirement), C-8 and C-1 (two
@@ -18,14 +21,14 @@
 //! | | |
 //! |---|---|
 //! | [`FS_PACK_PATH`] | `policies/fs/deny-etc.cedar` -- the path 34 AC-025 writes, at the root (M3-16) |
-//! | `fs-permit-default` | a permit scoped to the fs substrate. Cedar is default-deny (「no request is authorized … unless there is a specific permit policy that grants it」), so without this statement an fs deployment admits nothing at all |
-//! | `fs-deny-etc` | a forbid over `/etc` and everything under it. 「forbid overrides permit」, so it needs no exception carved into the permit |
+//! | `fs-permit-default` | a permit scoped to the fs substrate. Cedar is default-deny ("no request is authorized ... unless there is a specific permit policy that grants it"), so without this statement an fs deployment admits nothing at all | (sem: SEM-gx-gate-076)
+//! | `fs-deny-etc` | a forbid over `/etc` and everything under it. "forbid overrides permit", so it needs no exception carved into the permit |
 //! | [`GIT_PACK_PATH`] | `policies/git/deny-nonbranch-refs.cedar` -- **M7 hand 2**, FR-028's git half. 34 AC-074 writes the directory and this hand writes the name |
 //! | `git-permit-default` | the same argument on the git substrate: without a permit a git deployment admits nothing |
 //! | `git-deny-nonbranch-refs` | a forbid over `refs/tags/*` and `refs/remotes/*` -- the two namespaces gx is not the writer of. The file itself carries why those two and not others, including why the obvious rule (CI configuration) **cannot** ship in v0.1: `MAX_PATH_DEPTH` is 1 in `gx-adapter-git`, so no locator with a nested path reaches a gate and a rule about one could never fire (req/99 §3 **D-4**) |
 //! | [`MCP_PACK_PATH`] | `policies/mcp/deny-etc-resources.cedar` -- **M7 hand 4**, FR-028's mcp half |
 //! | `mcp-permit-default` | the same argument again, on the mcp substrate |
-//! | `mcp-deny-etc-resources` | a forbid over `file:` resources at or under `/etc` -- **the fs pack's rule, written on the substrate that is otherwise the road around it**. The file carries why the rule a reader expects (「forbid the `shell.exec` tool」) **cannot** ship: the tool's name lives in the payload and P-6 keeps a payload opaque, so a statement about it could never fire -- D-4 again, and the third time this project has had to write it down |
+//! | `mcp-deny-etc-resources` | a forbid over `file:` resources at or under `/etc` -- **the fs pack's rule, written on the substrate that is otherwise the road around it**. The file carries why the rule a reader expects ("forbid the `shell.exec` tool") **cannot** ship: the tool's name lives in the payload and P-6 keeps a payload opaque, so a statement about it could never fire -- D-4 again, and the third time this project has had to write it down | (sem: SEM-gx-gate-077)
 //!
 //! Two statements per pack is a decision rather than a stopping point: the rules worth shipping are
 //! the ones a pack can state truthfully at the visibility M3 has, and
@@ -34,18 +37,19 @@
 //!
 //! # The one road
 //!
-//! req/60 §5.2 asks hand 5 for 「pack の file が build に埋め込まれる経路が 1 本(=第 2 の経路を作らない
-//! ・AC-014 と同型の機械検査)」. [`FS_PACK_SOURCE`] is that road for the fs pack and
+//! req/60 §5.2 asks hand 5 for "there is exactly one road by which a pack's file gets embedded into
+//! the build (i.e. do not create a second road; a mechanical check of the same shape as AC-014)"
+//! (sem: SEM-gx-gate-078). [`FS_PACK_SOURCE`] is that road for the fs pack and
 //! [`GIT_PACK_SOURCE`] is the git pack's: one `include_str!` each, in this file, naming the file on
 //! disk. The claim is **per pack** -- one embedding of one file -- and [`SHIPPED_PACKS`] is what
 //! makes it countable now that there is more than one.
 //!
 //! # The other one road (**G-4**)
 //!
-//! A second road is counted in this file, and it is not the same question. FR-028's is 「how do these
-//! bytes reach a build」; G-4's (`req/38_ERRATA_2026-08-07.md` §19, req/98 §3-4) is 「when a third
-//! party's pack is checked, does it go the same way ours does」 -- 「conformance 検査が同じ 1 本の経路
-//! で走る(自社/第三者で分岐しない)」. [`check_pack`] is that road: it takes a [`Gate`] and a case
+//! A second road is counted in this file, and it is not the same question. FR-028's is "how do these
+//! bytes reach a build"; G-4's (`req/38_ERRATA_2026-08-07.md` §19, req/98 §3-4) is "when a third
+//! party's pack is checked, does it go the same way ours does" -- "conformance checking runs down the
+//! same single road (no branching between ours and a third party's)" (sem: SEM-gx-gate-079). [`check_pack`] is that road: it takes a [`Gate`] and a case
 //! table and knows nothing about where the policies came from. `gx policy test` (44 §1.2) is the
 //! operator's face of it and `crates/gx-gate/tests/ac_074.rs` is the shipped pack's.
 //!
@@ -63,8 +67,9 @@
 //!
 //! # What a pack can reason over (M3-10)
 //!
-//! req/38 §19 rules the range and requires it be said out loud: 「M3-10(採用=案 b+a 起票): v0.1 pack の
-//! 実効範囲=**locator/actor/context/order 級と明記**(overclaim 禁)」. What follows is that range,
+//! req/38 §19 rules the range and requires it be said out loud: "M3-10 (adopted = option b+a, filed):
+//! the v0.1 pack's effective reach is **stated explicitly as the locator/actor/context/order class**
+//! (no overclaiming)" (sem: SEM-gx-gate-080). What follows is that range,
 //! taken from ASM-60-1's mapping (`crate::policy::RequestView`) rather than restated beside it:
 //!
 //! | a policy may read | it comes from | as |
@@ -78,26 +83,29 @@
 //!
 //! And three things a pack **cannot** say, each of which has bitten somebody who assumed otherwise:
 //!
-//! 1. **The change itself is invisible.** 42 §3.4 makes a delta's `payload` 「opaque な変更記述。
-//!    core/gate/witness は byte 列としてのみ扱う(P-6)」, so a rule of the form 「this change must not
-//!    delete more than ten lines」 cannot be written -- not 「is not written yet」. 45 TH-1's
-//!    line-count invariant and the 「既製invariant集」 FR-028 names in passing both live behind that
+//! 1. **The change itself is invisible.** 42 §3.4 makes a delta's `payload` "an opaque change
+//!    description; core/gate/witness treat it only as a byte string (P-6)", so a rule of the form
+//!    "this change must not delete more than ten lines" cannot be written -- not "is not written
+//!    yet". 45 TH-1's line-count invariant and the "ready-made invariant set" FR-028 names in passing
+//!    both live behind that (sem: SEM-gx-gate-081)
 //!    wall until an adapter hands the gate structured facts, which req/38 §19 keeps as an M4
 //!    requirement. `crates/gx-gate/tests/ac_028.rs` measures the wall rather than describing it: two
 //!    changes with different payloads and the same locator get the same verdict.
-//! 2. **Reads never arrive.** 読み取りは gate を通らない: every `Transformation` is a change to the
+//! 2. **Reads never arrive.** A read does not pass through the gate (sem: SEM-gx-gate-082): every `Transformation` is a change to the
 //!    thing it names (P-1), and 41 §3 has no read/write field, so a pack cannot write a rule about
 //!    reading and does not need one -- a read was never going to reach this gate. (req/38 §21 C-8
-//!    asks for exactly this line, because 「P-1 の帰結だが無言はやめる」.)
-//! 3. **actor は key でのみ識別できる.** ASM-60-1 maps `t.actor.key()` and nothing else, so 41 §3's
-//!    distinction between a `Human` and an `Agent` -- and the agent's `model` -- is not visible to a
-//!    policy. 「agent の変更には追加 evidence を要求する」 is therefore unwritable in v0.1, and req/38
-//!    §21's C-1 ruling keeps it that way on purpose: 「M3 では増やさない … 表現力の要求が実在するなら
-//!    M4 の facts 経路と同窓で 1 度に」. FR-006/P-7's 「accountability は variant に依存しない」 is
+//!    asks for exactly this line, because "it follows from P-1, but stop leaving it unsaid" (sem: SEM-gx-gate-083).)
+//! 3. **The actor can be identified only by key.** ASM-60-1 maps `t.actor.key()` and nothing else, so
+//!    41 §3's distinction between a `Human` and an `Agent` -- and the agent's `model` -- is not
+//!    visible to a policy. "require additional evidence for an agent's changes" is therefore
+//!    unwritable in v0.1 (sem: SEM-gx-gate-084), and req/38
+//!    §21's C-1 ruling keeps it that way on purpose: "do not grow it in M3 ... if the need for
+//!    expressiveness is real, do it once, in the same window as M4's facts path". FR-006/P-7's
+//!    "accountability does not depend on the variant" is (sem: SEM-gx-gate-084)
 //!    about who answers for a change, not about what a policy can branch on.
 //!
-//! And one thing the table above assumes rather than reads: **locator は与えられた綴りで判定される
-//! (正規化は adapter の責務)**. A pack compares the string an adapter put in `pre.locator()`, so
+//! And one thing the table above assumes rather than reads: **the locator is judged by the spelling
+//! it was given (normalization is the adapter's responsibility)** (sem: SEM-gx-gate-085). A pack compares the string an adapter put in `pre.locator()`, so
 //! `/tmp/../etc/passwd` and `/etc/passwd` are two different strings and the first is admitted by the
 //! rules above (`crates/gx-gate/tests/false_admit.rs` pins that behaviour rather than hiding it).
 //! Resolving a path is not this layer's to do -- 42 §3.1 makes the locator the adapter's value, and a
@@ -111,7 +119,7 @@
 //! arithmetic rather than taste: `PolicySet::from_str` names policies by position, that id lands in
 //! `PolicyDecisionRecord`, 42 §1.3 puts the record inside `AdmitProof`'s IdentityView, and an
 //! `AdmitProof` reaches a receipt's CID -- so swapping two statements in a file would change what a
-//! receipt says without changing what was decided. req/38 §21 C-4 追認's it as ASM-62-1 and asks for
+//! receipt says without changing what was decided. req/38 §21 C-4 confirms it as ASM-62-1 (sem: SEM-gx-gate-086) and asks for
 //! it to be written into the pack's specification, which is this paragraph: **a third-party pack
 //! without `@id` on every statement is not loadable by gx**, and the failure is at load rather than
 //! at the first request.
@@ -122,20 +130,20 @@
 //!
 //! # No ready-made invariant ships with it (**D-9**)
 //!
-//! req/38 §22's D-9 leaves this hand the question 「order-2 の変換に追加承認を要求する既製 invariant を
-//! pack に同梱するか」, with no ruling either way. It does not ship, for three reasons, and `req/65`
+//! req/38 §22's D-9 leaves this hand the question "should a ready-made invariant that requires
+//! additional approval for an order-2 transformation ship bundled with the pack" (sem: SEM-gx-gate-087), with no ruling either way. It does not ship, for three reasons, and `req/65`
 //! §3 carries them in full:
 //!
 //! 1. **Whatever it could say, a policy already says.** An invariant sees a `GateInput`; the order,
 //!    the locator and the evidence summary in it are all mapped into the Cedar request already, so a
 //!    rule about order-2 is one `when { context.order == 2 }` clause. Shipping a Rust body for it
 //!    would be a second road to one rule -- the thing the road count above exists to prevent.
-//! 2. **「追加承認」 is not an invariant's word.** An [`crate::InvariantCheck`] answers holds or does
+//! 2. **"additional approval" is not an invariant's word.** (sem: SEM-gx-gate-088) An [`crate::InvariantCheck`] answers holds or does
 //!    not hold, and a `false` becomes a `Deny` (**E-M3-6**'s `INVARIANT_VIOLATED`). Asking a human is
 //!    the `Escalate` arm, which **E-M3-4** generates from `invert_available=false` and which 43 T-5
-//!    resolves one layer up. A shipped invariant named 「requires approval」 that in fact refuses
+//!    resolves one layer up. A shipped invariant named "requires approval" that in fact refuses (sem: SEM-gx-gate-089)
 //!    would teach the conflation the ruling asks the docs to avoid.
-//! 3. **The invariant RSK-5 actually wants cannot be written.** 「行数保存」-shaped checks need the
+//! 3. **The invariant RSK-5 actually wants cannot be written.** "row-count preserved"-shaped checks need the (sem: SEM-gx-gate-090)
 //!    payload, and P-6 says no until M4's facts path exists. Shipping a substitute that only looks at
 //!    the locator would be the overclaim M3-10 forbids.
 //!
@@ -155,8 +163,9 @@ use crate::{Error, Gate, GateInput, ReasonSource, Result, Verdict};
 
 /// Where the shipped fs pack lives, relative to the repository root.
 ///
-/// 34 AC-025 writes this path 逐語, and req/38 §19's M3-16 puts the directory at the root: 「`policies/`
-/// は **root 直下**(AC-025 の逐語 path 優先・出荷物は req/ 下に置かない)」. It is spelled here so that a
+/// 34 AC-025 writes this path verbatim, and req/38 §19's M3-16 puts the directory at the root:
+/// "`policies/` is **directly under root** (AC-025's verbatim path takes priority; shipped artifacts
+/// are not placed under req/)" (sem: SEM-gx-gate-091). It is spelled here so that a
 /// test, a report or a deployment names the file in one way, and so that moving the file is one
 /// edit plus a failing test rather than a silent divergence between the two.
 pub const FS_PACK_PATH: &str = "policies/fs/deny-etc.cedar";
@@ -185,7 +194,7 @@ pub const FS_PACK_POLICY_IDS: [&str; 2] = ["fs-deny-etc", "fs-permit-default"];
 /// The shipped fs pack, parsed.
 ///
 /// The entry point every consumer of the pack uses -- the conformance suite included -- so that
-/// 「which bytes did this gate decide with」 has one answer. Build a gate from it with
+/// "which bytes did this gate decide with" has one answer (sem: SEM-gx-gate-092). Build a gate from it with
 /// `Gate::with_policies(packs::fs_pack()?)`; the registry a deployment runs beside it is the
 /// deployment's own (D-9 above).
 ///
@@ -211,7 +220,7 @@ pub const GIT_PACK_PATH: &str = "policies/git/deny-nonbranch-refs.cedar";
 
 /// The shipped git pack, as the build embeds it -- **the second road, for the second pack**.
 ///
-/// FR-028's 「経路が 1 本」 is a claim per pack rather than per repository: one embedding of *this*
+/// FR-028's "exactly one road" is a claim per pack rather than per repository (sem: SEM-gx-gate-093): one embedding of *this*
 /// file, so that the bytes in the build and the bytes on disk cannot diverge. `SHIPPED_PACKS` is what
 /// makes the claim countable for a set of packs, and `crates/gx-gate/tests/pack_embedding.rs` counts.
 pub const GIT_PACK_SOURCE: &str = include_str!("../../../policies/git/deny-nonbranch-refs.cedar");
@@ -253,6 +262,45 @@ pub fn mcp_pack() -> Result<PolicyEngine> {
     PolicyEngine::parse(MCP_PACK_SOURCE)
 }
 
+// ---------------------------------------------------------------------------
+// The postgres pack (policy pack v0, req/446 V0-C)
+// ---------------------------------------------------------------------------
+
+/// Where the shipped postgres pack lives, relative to the repository root.
+pub const POSTGRES_PACK_PATH: &str = "policies/postgres/deny-system-catalogs.cedar";
+
+/// The shipped postgres pack, as the build embeds it -- **the fourth road, for the fourth pack**.
+pub const POSTGRES_PACK_SOURCE: &str =
+    include_str!("../../../policies/postgres/deny-system-catalogs.cedar");
+
+/// The ids the shipped postgres pack answers under, sorted (**ASM-62-1**).
+///
+/// 🔴 **One, not two.** The other three packs declare a `<substrate>-permit-default` beside their
+/// forbid; this one deliberately does not, and `policies/PACK_FORMAT.md`'s F3 is written to admit
+/// both shapes for that reason. The consequence is measured, not asserted: adding this pack to
+/// [`SHIPPED_PACKS`] changes the admissible surface by zero, and
+/// `crates/gx-gate/tests/ac_074.rs::adding_the_postgres_pack_admits_nothing_it_did_not_admit_before`
+/// runs the three-pack set and the four-pack set against the same requests to show it.
+pub const POSTGRES_PACK_POLICY_IDS: [&str; 1] = ["postgres-deny-system-catalogs"];
+
+/// 🔴 The exact string a policy in the postgres pack must compare `resource.substrate` against.
+///
+/// `substrate_tag` maps `SubstrateKind::Custom(name)` to `custom:{name}`, so this is
+/// `custom:postgres` and **not** `postgres`. It is a `const` here so that the pack's own text can be
+/// checked against a value the crate produces rather than against a second copy of the literal;
+/// `ac_074.rs` closes the loop by deriving the same string from [`crate::policy::RequestView`]
+/// itself, which is the only comparison that would survive `substrate_tag` changing.
+pub const POSTGRES_SUBSTRATE_TAG: &str = "custom:postgres";
+
+/// The shipped postgres pack, parsed.
+///
+/// # Errors
+/// [`crate::Error::PolicySetUnreadable`] if the embedded source does not parse or a statement in it
+/// carries no `@id`.
+pub fn postgres_pack() -> Result<PolicyEngine> {
+    PolicyEngine::parse(POSTGRES_PACK_SOURCE)
+}
+
 /// One pack this build ships: where it lives, what it says, what it answers under, and **whose
 /// substrate it speaks for**.
 ///
@@ -273,11 +321,11 @@ pub struct ShippedPack {
     ///
     /// **M7 hand 4**, and it is declared for two consumers that would otherwise each guess:
     ///
-    /// 1. [`shipped_pack_set`]'s locality obligation -- 「each pack decides only its own substrate」
+    /// 1. [`shipped_pack_set`]'s locality obligation -- "each pack decides only its own substrate" (sem: SEM-gx-gate-094)
     ///    is the property that makes composing the packs safe, and it cannot be stated without
     ///    knowing whose substrate each one is.
     /// 2. `crates/gx-gate/tests/false_admit.rs`'s **vector expiry** (**H-9**). A negative vector
-    ///    whose expectation is 「no shipped pack speaks for this substrate」 stops being true the day
+    ///    whose expectation is "no shipped pack speaks for this substrate" stops being true the day (sem: SEM-gx-gate-095)
     ///    one does, silently, and this field is what a harness reads to notice.
     ///
     /// Declared and then **checked against the file**: `crates/gx-gate/tests/pack_embedding.rs::
@@ -295,10 +343,11 @@ pub struct ShippedPack {
 ///
 /// 🔴 **What this table now does say, and did not until hand 4**: that a deployment loads these.
 /// Until this hand `gx_cli::session::open_engine` built its gate from the fs pack alone, and the
-/// note here read 「the day a surface registers a second adapter, the default policy set has to
-/// become the shipped **set**」. req/38 §60 ruled that day to be this one (**R-9 の対裁定**), and
+/// note here read "the day a surface registers a second adapter, the default policy set has to
+/// become the shipped **set**". req/38 §60 ruled that day to be this one (**the counter-ruling to
+/// R-9**) (sem: SEM-gx-gate-096), and
 /// [`shipped_pack_set`] is the value the CLI now starts from.
-pub const SHIPPED_PACKS: [ShippedPack; 3] = [
+pub const SHIPPED_PACKS: [ShippedPack; 4] = [
     ShippedPack {
         path: FS_PACK_PATH,
         source: FS_PACK_SOURCE,
@@ -317,15 +366,394 @@ pub const SHIPPED_PACKS: [ShippedPack; 3] = [
         policy_ids: &MCP_PACK_POLICY_IDS,
         substrate: "mcp",
     },
+    ShippedPack {
+        path: POSTGRES_PACK_PATH,
+        source: POSTGRES_PACK_SOURCE,
+        policy_ids: &POSTGRES_PACK_POLICY_IDS,
+        substrate: POSTGRES_SUBSTRATE_TAG,
+    },
 ];
+
+/// 🔴 **PACK_FORMAT F3 shape 2's second conjunct, in one canonical form** (**R36**, `req/476` M-01).
+///
+/// F3 shape 2 is "no permit statement at all, **declared as such in the pack's header**". The
+/// second clause is a *statement a human wrote*, not a property of the policy set, so a machine can
+/// only check it against a form agreed in advance — and this is that form, quoted from the pack
+/// that already shipped it:
+///
+/// ```text
+/// // # 🔴 This pack declares a **deny-default**. It has no permit statement, and that is the ruling.
+/// ```
+///
+/// Two things follow from choosing the phrase that was already there rather than inventing a
+/// marker. First, **no shipped pack was edited to pass the new gate**: `policies/postgres/` carries
+/// it verbatim today, so this check measures the artifacts rather than a change made to satisfy it.
+/// Second, the phrase is prose an author would write anyway, so a pack that means it says it
+/// naturally, and a pack that does not cannot acquire it by accident.
+///
+/// 🔴 **This is a spelling, and `req/476` §10 item 6 is the standing warning about those** — a
+/// census that greps a name goes quiet when the name moves. It is accepted here for one reason: the
+/// thing being checked *is* a sentence. Everything else this clause needs — how many permits, which
+/// ids — is derived from Cedar's parse, precisely so that this is the only spelling in the check.
+pub const DENY_DEFAULT_DECLARATION: &str = "declares a **deny-default**";
+
+/// The words that turn a sentence carrying [`DENY_DEFAULT_DECLARATION`] into one that does **not**
+/// make the declaration.
+///
+/// 🔴 **R37 / `req/496` M-03.** This list is short, it is here rather than implied, and it is not
+/// claimed to be complete — see [`declares_deny_default`] for what is and is not promised.
+const DENIALS: [&str; 7] = [
+    " not ",
+    " no ",
+    "n't ",
+    " never ",
+    "cannot",
+    " nor ",
+    " without ",
+];
+
+/// 🔴 **R37 / `req/496` M-03** — does this pack's text declare a deny-default?
+///
+/// # What was wrong
+///
+/// R36 read the declaration as `source.lines().map(trim_start).filter(starts_with("//"))
+/// .any(contains(NEEDLE))` — a scan of line beginnings, in the same function whose own note says
+/// "a newline is not what should decide whether it has", one branch after the branch where that
+/// note was written. Audit 36 (`req/496` §4-3) wrote one sentence five ways:
+///
+/// * on its own comment line — accepted (R36's shape);
+/// * as a trailing `//` on a statement's line — **refused**;
+/// * wrapped across two `//` lines the way a formatter wraps prose — **refused**;
+/// * inside a Cedar `@doc(...)` annotation — **refused**;
+/// * inside a comment that **denies** it, quoting the phrase — **accepted**.
+///
+/// The last one is the fail-open. F3 exists so that a pack picks its default out loud, and a header
+/// reading "This pack does NOT say that it \"declares a **deny-default**\" — nobody decided its
+/// default and a reader must not rely on one" picks nothing at all.
+///
+/// # What this does instead
+///
+/// Two changes, and they answer the two directions separately.
+///
+/// **Where it looks.** The declaration is looked for in the pack's text with `//` markers removed
+/// and runs of whitespace collapsed to one space. A line beginning stops deciding anything: the
+/// same words are the same declaration on their own line, at the end of a statement's line, split
+/// across two lines, or inside an annotation a reader of the pack sees. This is looking *less*
+/// carefully at typography, which is the direction the whole clause wants.
+///
+/// **Whether it is affirmed.** Looking less carefully is the direction that opens fail-opens, so
+/// the sentence the phrase sits in is then read for a denial. The sentence runs between the nearest
+/// `.`, `;`, `!` or `?` on each side, and if it carries any of [`DENIALS`] the occurrence does not
+/// count. A pack may still declare its default elsewhere in the same file; every occurrence is
+/// tried, and one affirmative occurrence is a declaration.
+///
+/// A quotation mark is deliberately **not** a sentence boundary. It is the tempting fifth
+/// delimiter — an annotation value is wrapped in them — and taking it would re-open the exact
+/// fail-open being closed: audit 36's denying header quotes the phrase, so a `"` boundary would cut
+/// the sentence down to the quotation itself and read `declares a **deny-default**` with the word
+/// `NOT` outside it. The annotation case does not need the boundary anyway; nothing between the
+/// annotation's opening quote and the phrase is a denial.
+///
+/// # 🔴 What is **not** claimed
+///
+/// This is prose matching and it stays prose matching. It is not a natural-language understander,
+/// [`DENIALS`] is a list of seven strings rather than a theory of negation, and a header written to
+/// evade it can be — "this pack refrains from saying it declares a **deny-default**" carries no
+/// word on that list and would be read as a declaration.
+///
+/// The reason that is acceptable **here** and would not be elsewhere: F3 is a gate on a pack a
+/// deployment composes at start-up, and the thing it checks *is a sentence an author wrote on
+/// purpose*. The failure mode this guards is a pack that says nothing being read as one that said
+/// something, and the guard closes the shapes anybody has measured. What it does not do is what
+/// R36's note claimed for the permit count and audit 36 falsified for this branch — it does not
+/// promise that no spelling gets past. `req/502` records the residue rather than letting the
+/// doc-comment imply it away.
+#[must_use]
+pub fn declares_deny_default(source: &str) -> bool {
+    // 🔴 **R38 / `req/513` L-03** — the pack's comments and annotation values, not the whole file.
+    // Runs of whitespace collapse to one space so that a wrapped sentence is one sentence.
+    let flattened = declaration_surface(source);
+    let normalized: String = flattened.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    let mut from = 0usize;
+    while let Some(at) = normalized[from..].find(DENY_DEFAULT_DECLARATION) {
+        let start = from + at;
+        let end = start + DENY_DEFAULT_DECLARATION.len();
+        let is_boundary = |c: char| matches!(c, '.' | ';' | '!' | '?');
+        let sentence_start = normalized[..start]
+            .rfind(is_boundary)
+            .map_or(0, |cut| cut + 1);
+        let sentence_end = normalized[end..]
+            .find(is_boundary)
+            .map_or(normalized.len(), |cut| end + cut);
+        let sentence = normalized[sentence_start..sentence_end].to_ascii_lowercase();
+        // A leading and trailing space so that ` no ` matches a word and not `nobody`.
+        let padded = format!(" {sentence} ");
+        if !DENIALS.iter().any(|denial| padded.contains(denial)) {
+            return true;
+        }
+        from = end;
+    }
+    false
+}
+
+/// 🔴 **R38 / `req/513` L-03** — the text of a pack a **reader reads as the pack's own statement
+/// about itself**: its comments, and the string values of its annotations.
+///
+/// # Why this is not the whole source
+///
+/// R37 replaced R36's line-beginning scan with a flatten of the entire file, which was the right
+/// direction — the same words are the same declaration on their own line, at the end of a
+/// statement's line, wrapped across two, or inside a `@doc(...)` a reader sees — and it went one
+/// step too far, because the flatten does not know what a comment is. Audit 37 measured the
+/// sentence being accepted out of ordinary program text (`req/513` §4-6).
+///
+/// R38 measured what that costs when the rest of F3's conjunction is satisfied too: a pack with
+/// **no permit statement** whose only occurrence of the phrase sits inside a `forbid`'s string
+/// literal satisfied the clause (`pack_v0::every_shipped_pack_declares_its_default`, the
+/// `PACK_V0_F3_NON_COMMENT` line). F3 exists so that a pack picks its default *out loud*; a
+/// condition's operand is not a place a reader looks for the pack's statement about itself, and a
+/// pack whose author never wrote a header would have passed.
+///
+/// So the surface is narrowed to the two places that *are* the pack talking about itself, and every
+/// shape R37 opened stays open: comment text is taken from the `//` marker to end of line (own-line
+/// and trailing are the same rule), consecutive fragments are joined with a space (so a sentence a
+/// formatter wrapped is still one sentence), and annotation values are appended.
+///
+/// # 🔴 What this does not do
+///
+/// It does not parse Cedar, and it is wrong in **three** directions rather than one. R38 declared
+/// the first and `req/519` §10-7 recorded that no fixture drove it; audit 38 drove it and found the
+/// other two (`req/533` L-01). All three are now driven, by
+/// `crates/gx-gate/tests/r37_f3_and_reads.rs::r39_the_narrowing_is_wrong_in_three_directions_and_every_one_of_them_is_driven`:
+///
+/// 1. A `//` **inside a string literal** opens a comment as far as this is concerned. `s3://` and
+///    `https://` are ordinary in a locator, so this is the shape an author reaches by accident.
+/// 2. The annotation sweep below walks `source`, **not** the comment surface, so an `@name("…")`
+///    written inside a **string literal** is appended as the pack's own statement about itself.
+/// 3. The same sweep, for the same reason, reads an `@name("…")` out of a **comment body** — a
+///    comment *about* a declaration is taken as a declaration.
+///
+/// All three are wrong *towards* the old behaviour rather than away from it: they widen the surface,
+/// which can only accept a pack a stricter reading would have refused, and F3's job is to refuse a
+/// pack that never picked its default out loud. What bounds the cost is the caller:
+/// [`declares_its_default`] runs over [`SHIPPED_PACKS`], three packs embedded with `include_str!`,
+/// so no third party's text reaches this function — a pack from outside takes `check_pack` and never
+/// passes here.
+///
+/// 🔴 They are declared rather than closed, on purpose. Closing them means knowing where Cedar's
+/// string literals and comments are, which is a second parser beside Cedar's own — the drift
+/// E-M2-12 exists to prevent — and Cedar's parser is not reachable from here, because this runs
+/// before a pack has been accepted. `req/540` R-5c rules the strengthening out of this lane and
+/// leaves the residue measured. What is not allowed is what R38 left: a residue named in a
+/// doc-comment with nothing driving it, and two more not named at all.
+fn declaration_surface(source: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for line in source.lines() {
+        if let Some(at) = line.find("//") {
+            parts.push(&line[at + 2..]);
+        }
+    }
+    // Annotation values: `@name("...")`. Cedar puts them above the statement they annotate and a
+    // reader of the pack sees them, which is why `req/496` M-03 asked for them and why they stay.
+    let mut rest = source;
+    while let Some(at) = rest.find('@') {
+        rest = &rest[at + 1..];
+        let Some(open) = rest.find('(') else { break };
+        // `@` inside prose is not an annotation. The name has to be an identifier sitting directly
+        // on the parenthesis.
+        if open == 0
+            || !rest[..open]
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            continue;
+        }
+        let after = &rest[open + 1..];
+        let Some(first) = after.find('"') else {
+            continue;
+        };
+        let Some(len) = after[first + 1..].find('"') else {
+            continue;
+        };
+        parts.push(&after[first + 1..first + 1 + len]);
+        rest = &after[first + 1 + len..];
+    }
+    parts.join(" ")
+}
+
+/// 🔴 **PACK_FORMAT F3, mechanised** (**R35**, `req/470` M-02).
+///
+/// # What was wrong
+///
+/// `policies/PACK_FORMAT.md` counts F3 among "F2, F3, F5, F6 and F7 … they have machinery behind
+/// them already" and then lists **four** machineries, one per clause except F3. The same omission
+/// sits independently in `tools/gates/pack_format_gate.sh`, whose header lists the clauses it
+/// checks (F8, F1, F4) and the clauses that "have machinery already" (F2, F5, F6, F7) — F3 appears
+/// in neither list. A repository-wide search for a generic checker of the clause returned **one**
+/// hit, and it was a test hard-wired to the postgres pack by name: it reads
+/// `POSTGRES_PACK_POLICY_IDS` and `POSTGRES_PACK_SOURCE` as constants, takes no argument, and is
+/// not parametrised over anything. So a **fifth** pack shipping with neither an explicit permit
+/// default nor a declared deny default would have been stopped by nothing at all, and F3's own
+/// row in the document would have gone on claiming it was.
+///
+/// # What the clause says, and which half of it is checkable here
+///
+/// F3 admits two shapes, and the point of the clause is that a pack must **pick one out loud**
+/// rather than let Cedar's default-deny decide by omission:
+///
+/// 1. an explicit `<substrate>-permit-default` permit; or
+/// 2. no permit statement at all, declared as such in the pack's header, and carrying at least one
+///    conformance case whose expectation is `deny_by_no_policy`.
+///
+/// This function is the half that can be decided from the **pack itself**, which is the half that
+/// belongs in library code: the shape of the statements, the shape of the ids, and — since R36 —
+/// the header's own declaration, which is inside `pack.source` and was being left to nobody. The
+/// remaining half — that a deny-default pack really does ship a `deny_by_no_policy` case — is a
+/// fact about a scenario file on disk, and `gx-gate` does not read the filesystem; `crates/gx-gate/
+/// tests/pack_v0.rs::every_shipped_pack_declares_its_default` drives both halves together and holds
+/// the negative bed (a fifth pack that declares neither, refused by name).
+///
+/// # 🔴 What R36 changed, and why the two changes are one repair (`req/476` M-01)
+///
+/// Shape 2 is a **conjunction of three** and the shipped check tested the first conjunct with a
+/// scan of line beginnings. Both halves of that were wrong in the same direction — towards
+/// accepting:
+///
+/// * the count is now Cedar's (`Effect::Permit`), so a `permit` sharing a line with its `@id`
+///   annotation is a permit;
+/// * the header's declaration is now read, so "this pack has no permit statement" stops being
+///   mistaken for "this pack declared a deny default".
+///
+/// The third conjunct stays where it has to: `pack_v0.rs` reads the scenarios off the disk.
+///
+/// Being on [`shipped_pack_set`] rather than in a test is deliberate: this is what a deployment
+/// calls, so a pack that has not declared its default cannot compose, and therefore cannot start a
+/// CLI. A gate only a test walks past is a gate a release can be cut around.
+///
+/// # Errors
+/// [`crate::Error::PolicySetUnreadable`], the same ⊥ the clause's siblings raise, naming the pack
+/// and which of the two shapes it failed to take.
+pub fn declares_its_default(pack: &ShippedPack) -> Result<()> {
+    // 🔴 **R36 / `req/476` M-01** — the permits are counted from **Cedar's parse of this source**,
+    // not from the spelling at the start of a line.
+    //
+    // What was here until R36:
+    //
+    // ```text
+    // let permits = statements.iter().filter(|line| line.starts_with("permit")).count();
+    // ```
+    //
+    // A pack that writes `@id("fs-quiet") permit ( principal, action, resource ) …` on **one line**
+    // therefore counted **zero** permits, took shape 2, declared no permit default, and was
+    // accepted — while Cedar parsed the same text perfectly and shipped the permit. Audit 35 built
+    // it and measured `f3_accepted=true cedar_parses=true`. F3's whole purpose is that a pack must
+    // pick its default out loud, and a newline is not what should decide whether it has.
+    //
+    // Counting from `Effect::Permit` makes the check about the **statement** rather than about its
+    // typography: an annotation on the same line, extra whitespace, a `permit` inside a string and
+    // a comment that begins with the word are all answered correctly, and none of them needs a rule
+    // of its own here.
+    //
+    // A source Cedar cannot read is refused rather than fallen back on. The old line-scan had an
+    // answer for unparseable text and the answer was worthless — a pack that does not parse cannot
+    // ship at all ([`shipped_pack_set`] is what a deployment composes at start-up), so the honest
+    // reply to "what is this pack's default" is that it has no statements to have one.
+    let parsed = crate::policy::PolicyEngine::parse(pack.source).map_err(|why| {
+        crate::Error::PolicySetUnreadable {
+            detail: format!(
+                "{}: PACK_FORMAT F3 - this pack's default cannot be judged because its source does \
+                 not parse: {why}",
+                pack.path
+            ),
+        }
+    })?;
+    let permits = parsed.permit_count();
+    let permit_default_ids = pack
+        .policy_ids
+        .iter()
+        .filter(|id| id.ends_with("-permit-default"))
+        .count();
+    // 🔴 **R36 / `req/476` M-01, shape 2's second conjunct.** The clause reads "no permit statement
+    // at all, **declared as such in the pack's header**", and until R36 the second half of that
+    // conjunction was checked by nothing. The header is inside `pack.source`, so this is decidable
+    // in library code — this function's own doc draws the line at "the half that can be decided
+    // from the pack itself" and then dropped a half that is on its own side of the line.
+    //
+    // The declaration is a sentence rather than a property, so it has a canonical form and
+    // [`DENY_DEFAULT_DECLARATION`] is it. `policies/postgres/deny-system-catalogs.cedar` already
+    // carries it verbatim: no shipped pack was edited to satisfy this check, which is the point —
+    // a gate that needed the artifacts changed to pass would be measuring the change.
+    let declares_deny_default = declares_deny_default(pack.source);
+
+    if permits == 0 {
+        // Shape 2. The ids must agree with the statements: an id promising a permit over a pack
+        // that has none is the disagreement F4 exists for, one clause along.
+        if permit_default_ids > 0 {
+            return Err(crate::Error::PolicySetUnreadable {
+                detail: format!(
+                    "{}: PACK_FORMAT F3 - this pack ships no permit statement, which is the \
+                     deny-default shape, but its declared ids name a permit default. One of the \
+                     two is wrong and a reader cannot tell which",
+                    pack.path
+                ),
+            });
+        }
+        if !declares_deny_default {
+            return Err(crate::Error::PolicySetUnreadable {
+                detail: format!(
+                    "{}: PACK_FORMAT F3 - this pack ships no permit statement, and shape 2 is not \
+                     that fact alone: it is that fact **declared in the header**. Nothing in this \
+                     pack's comments says {DENY_DEFAULT_DECLARATION:?}, so a reader cannot tell a \
+                     deny-default that was decided from one that was arrived at by leaving the \
+                     permit out. Write the declaration, or name a `<substrate>-permit-default` \
+                     permit (req/476 M-01, req/470 M-02)",
+                    pack.path
+                ),
+            });
+        }
+        return Ok(());
+    }
+
+    // 🔴 **R36 / `req/476` M-01** — and the contradiction in the other direction: a pack that
+    // ships permits while its header declares a deny-default. Audit 35's seventh shape was this
+    // one inverted, and neither direction was looked at.
+    if declares_deny_default {
+        return Err(crate::Error::PolicySetUnreadable {
+            detail: format!(
+                "{}: PACK_FORMAT F3 - this pack's header declares {DENY_DEFAULT_DECLARATION:?} and \
+                 it carries {permits} permit statement(s). One of the two is wrong and a reader \
+                 cannot tell which (req/476 M-01)",
+                pack.path
+            ),
+        });
+    }
+
+    // Shape 1.
+    if permit_default_ids == 0 {
+        return Err(crate::Error::PolicySetUnreadable {
+            detail: format!(
+                "{}: PACK_FORMAT F3 - the default must be declared explicitly. This pack carries \
+                 {permits} permit statement(s) but no id ending `-permit-default`, so what a \
+                 request matching none of its rules gets is decided by Cedar's default rather \
+                 than by the pack saying so. Either name the permit `<substrate>-permit-default`, \
+                 or ship no permit at all and declare the deny default in the header with a \
+                 `deny_by_no_policy` conformance case (req/470 M-02)",
+                pack.path
+            ),
+        });
+    }
+    Ok(())
+}
 
 /// 🔴 **Every shipped pack, as one policy set** -- what a deployment that named no pack decides with.
 ///
-/// **M7 hand 4**, implementing the pair `req/38` §60 ruled: 「既定 policy set と既定 registry は**対**
-/// で決まる(pack を足しても adapter が register されなければ NotFound)」. req/101 §9-1 is the material
-/// the ruling took, and its first change点 is this function: 「`gx_gate::packs` に
-/// **`shipped_pack_set()`**(`SHIPPED_PACKS` 全部を 1 つの `PolicyEngine` に parse する)を足す。
-/// `SHIPPED_PACKS` は既に在るので、これは新しい宣言ではなく既存宣言の消費者である」.
+/// **M7 hand 4**, implementing the pair `req/38` §60 ruled: "the default policy set and the default
+/// registry are decided **as a pair** (adding a pack without the adapter being registered still
+/// yields NotFound)". req/101 §9-1 is the material the ruling took, and its first change point is
+/// this function: "add **`shipped_pack_set()`** to `gx_gate::packs` (parses all of `SHIPPED_PACKS`
+/// into one `PolicyEngine`). `SHIPPED_PACKS` already exists, so this is not a new declaration but a
+/// consumer of an existing one". (sem: SEM-gx-gate-097)
 ///
 /// # Why composing is safe, stated as the property rather than as a hope
 ///
@@ -340,8 +768,8 @@ pub const SHIPPED_PACKS: [ShippedPack; 3] = [
 /// 🔴 What composing **does** change, and the change is the point rather than a side effect: a
 /// request on a substrate whose pack is now in the set stops falling to Cedar's third rule (nothing
 /// satisfied → `Deny`, [`ReasonSource::NoPolicyApplied`]) and starts being **judged by that pack's
-/// rules**. req/101 §9-1: 「それは緩和ではなく『判定されるようになる』であり、拒否面としては
-/// `git-deny-nonbranch-refs` と(手 4 の)mcp forbid が**新たに到達可能になる**」. The two vectors
+/// rules**. req/101 §9-1: "that is not mitigation but 'coming to be judged', and on the refusal face
+/// `git-deny-nonbranch-refs` and (hand 4's) the mcp forbid **become newly reachable**" (sem: SEM-gx-gate-098). The two vectors
 /// `crates/gx-gate/tests/false_admit.rs` gained in this hand are those two refusals, measured.
 ///
 /// # Errors
@@ -354,6 +782,9 @@ pub const SHIPPED_PACKS: [ShippedPack; 3] = [
 pub fn shipped_pack_set() -> Result<PolicyEngine> {
     let mut composed = String::new();
     for pack in SHIPPED_PACKS {
+        // 🔴 **R35 / `req/470` M-02** — F3 is a condition of every pack in the set, checked before
+        // the set exists rather than trusted because the four that ship today happen to hold it.
+        declares_its_default(&pack)?;
         composed.push_str(pack.source);
         // The packs' own texts end in a newline, but a set assembled by concatenation must not
         // depend on that: a file whose last line is a statement would otherwise be glued to the
@@ -365,8 +796,9 @@ pub fn shipped_pack_set() -> Result<PolicyEngine> {
 
 // ---8<--- the one conformance road (G-4) ---8<---
 //
-// 🔴 **G-4** (`req/38_ERRATA_2026-08-07.md` §19, req/98 §3-4): 「第三者 pack を投入した時、conformance
-// 検査が**同じ 1 本の経路**で走る(自社/第三者で分岐しない)」.
+// 🔴 **G-4** (`req/38_ERRATA_2026-08-07.md` §19, req/98 §3-4): "when a third-party pack is dropped
+// in, conformance checking runs down **the same single road** (no branching between ours and a
+// third party's)". (sem: SEM-gx-gate-099)
 //
 // Everything between these two markers is the road. It is library code rather than test code,
 // because a third party cannot call a test: `gx policy test <PATH> --scenario <FILE>` (44 §1.2) is
@@ -375,9 +807,10 @@ pub fn shipped_pack_set() -> Result<PolicyEngine> {
 // where the pack came from, and `ac_074.rs::the_pack_conformance_runner_names_no_pack` scans this
 // region for every word an origin branch would have to be spelled with.
 //
-// The judgement is `Gate::verify`'s and is not repeated here (req/60 §7.2: 「Cedar の決定を gx の
-// test が再実装しない」). What this adds is the comparison with an expectation and the arithmetic
-// AC-028 and AC-074 both ask for -- 「最低1 Admitケース・1 Denyケース」 -- which is a statement about
+// The judgement is `Gate::verify`'s and is not repeated here (req/60 §7.2: "a gx test does not
+// re-implement Cedar's decision"). What this adds is the comparison with an expectation and the
+// arithmetic AC-028 and AC-074 both ask for -- "at least 1 Admit case and 1 Deny case" -- which is a
+// statement about (sem: SEM-gx-gate-100)
 // the case table and not about any one case.
 
 /// What a conformance case expects a gate to answer.
@@ -386,7 +819,7 @@ pub fn shipped_pack_set() -> Result<PolicyEngine> {
 /// `PolicyDecisionRecord` inside `AdmitProof`'s IdentityView: two packs can reach `Admit` for
 /// opposite reasons, and a table that asserted only the arm would pass on a pack whose permit was
 /// deleted and whose deny was widened into an allow. `None` is the weaker form a `--scenario` file
-/// can express (44 §1.2 gives it 「期待Verdict」 and no id), and it is written as an option rather
+/// can express (44 §1.2 gives it an "expected Verdict" and no id) (sem: SEM-gx-gate-101), and it is written as an option rather
 /// than as a second enum so that the weaker expectation is visibly weaker.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PackExpectation {
@@ -509,7 +942,7 @@ impl PackCase {
         self
     }
 
-    /// 42 §3.7's values, passed to the gate 「そのまま」 (AC-016).
+    /// 42 §3.7's values, passed to the gate "as-is" (AC-016). (sem: SEM-gx-gate-102)
     #[must_use]
     pub fn with_evidence(mut self, evidence: Vec<Evidence>) -> Self {
         self.evidence = evidence;
@@ -553,8 +986,8 @@ impl PackCase {
 pub struct PackRow {
     /// The case's name.
     pub name: String,
-    /// The arm the gate reached, or `None` if it could not evaluate the case (**E-M3-3**: 「the
-    /// policy could not be evaluated」 and 「the policy said something else」 are different facts).
+    /// The arm the gate reached, or `None` if it could not evaluate the case (**E-M3-3**: "the
+    /// policy could not be evaluated" and "the policy said something else" are different facts). (sem: SEM-gx-gate-103)
     pub actual: Option<VerdictKind>,
     /// The ids of the statements the gate recorded as deciding, in the order it recorded them.
     /// Empty for a `Deny` nothing decided (`NoPolicyApplied`) and for an `Escalate`.
@@ -582,7 +1015,7 @@ impl PackConformance {
         &self.rows
     }
 
-    /// How many cases **expect** an admission. 「最低1 Admitケース」 is a statement about the table,
+    /// How many cases **expect** an admission. "at least 1 Admit case" is a statement about the table (sem: SEM-gx-gate-104),
     /// so it is counted off the expectations rather than off the answers: a table whose Admit case
     /// silently started being denied would otherwise still report one.
     #[must_use]
@@ -665,6 +1098,12 @@ pub fn check_pack(gate: &Gate, cases: &[PackCase]) -> Result<PackConformance> {
             planned: &planned,
             evidence: &case.evidence,
             invert_available: case.invert_available,
+            // E-DR4627-1. A pack's conformance run is a **hypothetical** and G-4 asks that nothing
+            // here tell a shipped pack from a stranger's; reading a real clock would make the same
+            // case table answer differently on two machines, which is the opposite of what a
+            // conformance runner is for. `hypothetical` declares `created_at: Timestamp(0)`, so the
+            // case's own declared moment is the only moment in scope, and that is the one passed.
+            decided_at: t.created_at,
         });
 
         let (actual, deciding, detail) = match &answered {
@@ -730,7 +1169,7 @@ fn deciding_ids(verdict: &Verdict) -> Vec<String> {
 ///
 /// `DenyByNoPolicy` is checked against the **source** rather than against an empty id list, because
 /// an invariant's refusal also records no policy id: `ReasonSource::NoPolicyApplied` is the value
-/// E-M3-11 introduced for 「nothing in the set applied」 and it is the only thing that means it.
+/// E-M3-11 introduced for "nothing in the set applied" and it is the only thing that means it. (sem: SEM-gx-gate-105)
 fn matches(
     expect: &PackExpectation,
     actual: Option<VerdictKind>,

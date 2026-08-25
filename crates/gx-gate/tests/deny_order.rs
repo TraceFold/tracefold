@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! **I-2** (`req/38_ERRATA_2026-08-07.md` §26) — the `source.id()` component of E-M3-12's key, put
 //! where a test can see it.
 //!
@@ -6,24 +8,26 @@
 //! req/67 §2.1's battery B-4 removed `source.id()` from `Reason::canonical_cmp`'s key and every
 //! suite stayed green (RC=0). The audit's reading:
 //!
-//! > 「**I-2**: E-M3-12 の ruled key の `source.id()` 成分を落としても、どの test も落ちない … 理由は
-//! > E-4 で足した `message` の tie-break が id を実質的に代理しているから——現在の producer
-//! > (`deny_reasons` / `violations`)は message に id を綴り込む。**「裁定した key の 1 成分が観測
-//! > 不能」**という状態で、message の書き方を変えた日に順序が黙って arrival 依存へ戻る」
+//! > "**I-2**: dropping the `source.id()` component of E-M3-12's ruled key breaks no test ... the
+//! > reason is that the `message` tie-break added in E-4 effectively proxies for id -- the current
+//! > producers (`deny_reasons` / `violations`) spell the id into the message. In the state **'one
+//! > component of the ruled key is unobservable'**, the day the message's wording changes, the order
+//! > silently reverts to depending on arrival" (sem: SEM-gx-gate-231)
 //!
 //! `verdict_meet.rs`'s `e_m3_12_a_deny_is_recorded_in_one_order` builds its messages as
 //! `format!("{id} forbids this")`, so the id order and the message order agree in every case it
 //! holds — and an ordering that has lost its third component still answers correctly. The ruling
 //! adopted the fixture that separates them:
 //!
-//! > 「**I-2**(採用=fix批): id 順と message 順が食い違う fixture(`Policy{"b"}`/message "a…" vs
-//! > `Policy{"a"}`/message "z…")で `Verdict::deny` の出力が **id 順**である事を assert」
+//! > "**I-2** (adopted = fix batch): assert that `Verdict::deny`'s output is in **id order** using a
+//! > fixture where id order and message order disagree (`Policy{"b"}`/message "a..." vs
+//! > `Policy{"a"}`/message "z...")" (sem: SEM-gx-gate-232)
 //!
 //! # Why this is about identity and not about presentation
 //!
 //! E-M3-12 exists because M2-10 makes the `Vec<Reason>` the value a `Deny`'s `proof_digest` is taken
 //! over (42 §3.10). An order that depends on which system was consulted first is arrival order
-//! inside a CID — 「決定不変・記録可変」, the defect D-1 was ruled to remove. So the assertions below
+//! inside a CID — "the decision is fixed, the record is mutable" (sem: SEM-gx-gate-233), the defect D-1 was ruled to remove. So the assertions below
 //! are made twice: once on the sequence, and once on the digest, because the second is the one the
 //! rule was written for.
 

@@ -1,18 +1,18 @@
 {
   "id": "S-AI27",
   "kind": "codec-deviation",
-  "statement": "additional-info 27(8 byte 引数)で 4 byte に収まる 4294967295 を書いた byte 列は decode されない",
+  "statement": "A byte string writing 4294967295 -- a value that fits in 4 bytes -- with additional-info 27 (an 8-byte argument) is not decoded",
   "vector": "1b00000000ffffffff",
   "expected": "REJECT",
   "expected_error": "NonMinimal",
   "normative_basis": "IPLD-SHOULD+gx-policy",
   "tier": "Tier2",
-  "deviation": "4294967295(2^32-1)は ai=26 形式 `1a ff ff ff ff` が最短。ai=27 形式は 4 byte 長い。scanner の判定は `v > u32::MAX` で、2^32-1 / 2^32 がその両側。",
+  "deviation": "4294967295 (2^32-1)'s shortest form is the ai=26 form `1a ff ff ff ff`. The ai=27 form is 4 bytes longer. The scanner's judgement is `v > u32::MAX`, with 2^32-1 / 2^32 on either side of it.",
   "spec_anchor": "ipld/ipld@a65340b specs/codecs/dag-cbor/spec.md L55 / RFC 8949 §3 Table 1 / 42 §2.1-1",
   "origin": "gx self-authored for the fix hand (req/38 §16 H6-4)",
   "control": {
     "vector": "1b0000000100000000",
     "expected": "ACCEPT",
-    "note": "2^32 は 4 byte に収まらない最小値なので ai=27 形式が最短=受理"
+    "note": "2^32 is the smallest value that does not fit in 4 bytes, so the ai=27 form is shortest = accepted"
   }
 }

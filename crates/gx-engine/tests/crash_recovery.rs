@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 43 §7's recovery, from the source and from the crashes themselves.
 //!
 //! Spec: 43 §7 (the write-ahead rule and the three-step procedure), 51 §8.1 (the three injection
-//! points), 34 AC-043, req/78 §3.2 Λ4 (the counter-example E-M5-1 closes), req/38 §37 M5-01 採(a),
-//! §40 M5H3-5, §41 M5H4-7.
+//! points), 34 AC-043, req/78 §3.2 Λ4 (the counter-example E-M5-1 closes), req/38 §37 M5-01
+//! adopted (a) (sem: SEM-gx-engine-684), §40 M5H3-5, §41 M5H4-7.
 //!
 //! # The structural probes come first, and one of them is the whole hand
 //!
@@ -17,18 +19,25 @@
 //! same crashed directory, recovered twice — once by this crate, and once by a shim that ignores
 //! `ApplyStarted` and re-runs the CAS the way 43 §7-3c literally says. One reaches `Committed` with
 //! a ledger entry; the other reaches `Aborted(PreconditionChanged)` with an empty ledger and a world
-//! that has already changed. That second outcome is 「適用されたのに記録が無い」 — the thing gx exists
+//! that has already changed. That second outcome is "applied, yet nothing recorded it" (sem:
+//! SEM-gx-engine-685) — the thing gx exists
 //! to make impossible — and it is produced here on purpose so that the difference is measured rather
 //! than argued.
 
 mod support;
 
-use gx_core::{AbortReason, Cid, Fingerprint, SubstrateKind, Timestamp};
+use std::sync::Arc;
+
+use gx_core::{AbortReason, Cid, FailPosture, Fingerprint, SubstrateKind, Timestamp};
 use gx_engine::{
     reconstruct, Engine, EngineJournal, EngineJournalRecord, InjectedEvidence, Lifecycle,
+    UnreachableEvidence,
 };
 
-use support::{copy_tree, kill_at, need, probe, read_repo, record_boundaries, scratch, value};
+use support::{
+    copy_tree, gate, intent, kill_at, need, probe, read_repo, record_boundaries, scratch,
+    signing_key, value, CommitAdapter, PERMIT_ALL,
+};
 
 /// The clock the probe binary runs its pipeline under (`crash_probe`'s `RUN_AT`).
 const RUN_AT: i64 = 1_754_000_000_000_000_000;
@@ -107,10 +116,11 @@ fn the_recovery_is_one_procedure_and_not_a_ninth_transition() {
 // 2. 🔴 Λ4, structurally: the CAS is not reachable from the recovery
 // ---------------------------------------------------------------------------
 
-/// 🔴 **req/78 §3.2 Λ4 / M5-01 採(a)**: the recovery never re-runs the CAS.
+/// 🔴 **req/78 §3.2 Λ4 / M5-01 adopted (a)** (sem: SEM-gx-engine-686): the recovery never re-runs the CAS.
 ///
-/// 43 §7-3c says 「`Fingerprint₁ := adapter.precondition(now)`を再計算し…T-10a以降の手順…を最初から
-/// 再実行」 and Λ4 shows in three lines what that costs when the crash happened *after* a successful
+/// 43 §7-3c says "`Fingerprint₁ := adapter.precondition(now)` is recomputed … the procedure from
+/// T-10a onward … is re-run from the start" (sem: SEM-gx-engine-686) and Λ4 shows in three
+/// lines what that costs when the crash happened *after* a successful
 /// apply: the recomputed fingerprint differs **because of the engine's own write**, T-10a folds it
 /// to `Aborted(PreconditionChanged)`, and INV-S4 then keeps it out of the ledger — a changed world
 /// with no record of the change.
@@ -142,8 +152,9 @@ fn the_recovery_never_re_runs_the_cas() {
 
 /// The second question E-M5-1 added, in the source: the recovery reads `apply_started`.
 ///
-/// 43 §7-3 branches on the ledger alone. This engine asks 「was the adapter asked」 first, and the
-/// field it asks is the one hand 4 wrote and `crate::replay::StateRow` carries.
+/// 43 §7-3 branches on the ledger alone. This engine asks "was the adapter asked" first (sem:
+/// SEM-gx-engine-687), and the field it asks is the one hand 4 wrote and
+/// `crate::replay::StateRow` carries.
 #[test]
 fn the_recovery_reads_the_record_e_m5_1_added() {
     let span = recovery_span();
@@ -204,7 +215,17 @@ fn the_declared_recovery_paths_are_the_variants_in_order() {
         .map(|l| l.trim().trim_end_matches(',').to_string())
         .collect();
     println!("RECOVERY_PATHS={declared:?} VARIANTS={variants:?}");
-    assert_eq!(declared.len(), 4, "43 §7-2 plus §7-3's three answers");
+    assert_eq!(
+        declared.len(),
+        7,
+        "43 §7-2 plus §7-3's three answers, plus R5's refusal (req/227 H-01: a recovery that will \
+         not act on a journal it cannot trust, or on a ledger that has moved past the commit it is \
+         being asked to finish), plus R13's two ways of closing §7-3b's window without asking an \
+         adapter anything (req/244 H-03: `ClosedFromFiledReceipt` writes the record from the \
+         commit receipt the critical section already filed, `ClosedFromLedgerLeaf` writes it from \
+         the leaf alone when no receipt was filed and the substrate cannot be read). The number \
+         moved with the enum in one commit, which is what this probe is for"
+    );
     assert_eq!(declared, variants, "the list and the enum are one thing");
 }
 
@@ -212,7 +233,8 @@ fn the_declared_recovery_paths_are_the_variants_in_order() {
 // 4. The crash binary is declared, and `cargo package` will not see it
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5-13 採(a)**: 51 §8.1's E2E needs a real process, so a second binary exists — and it is
+/// 🔴 **M5-13 adopted (a)** (sem: SEM-gx-engine-688): 51 §8.1's E2E needs a real process, so a
+/// second binary exists — and it is
 /// gated exactly the way AC-030's is, so that `cargo build`, `cargo install` and `cargo package`
 /// never see it.
 #[test]
@@ -225,7 +247,7 @@ fn the_crash_probe_is_a_test_only_binary() {
     println!("MANIFEST_NAMES={bins:?}");
     assert!(
         manifest.contains("name = \"crash_probe\""),
-        "51 §8.1 asks for 実バイナリ・実プロセス"
+        "51 §8.1 asks for a real binary, a real process (sem: SEM-gx-engine-689)"
     );
     let gated = manifest
         .lines()
@@ -242,19 +264,21 @@ fn the_crash_probe_is_a_test_only_binary() {
 }
 
 // ---------------------------------------------------------------------------
-// 5. 規律48 — the crashed state itself, before anything repairs it
+// 5. discipline 48 (sem: SEM-gx-engine-690) — the crashed state itself, before anything repairs it
 // ---------------------------------------------------------------------------
 
-/// 🔴 **規律48** (req/38 §40 M5H3-6): 「終端 record が中間 record の情報を再供給する経路では、中間
-/// 状態で止まる probe を必ず 1 本置く」.
+/// 🔴 **discipline 48** (req/38 §40 M5H3-6, sem: SEM-gx-engine-691): "wherever a terminal
+/// record re-supplies what an intermediate record said, always place one probe that stops at the
+/// intermediate state."
 ///
 /// The recovery's `Committed` record re-supplies everything `ApplyStarted` said, so a probe that
 /// only looked at the repaired journal would pass with the intermediate record broken or missing —
 /// which is precisely the state that decides whether Λ4 happens. This probe stops at the crash and
 /// asserts the three faces **before** any recovery runs.
 ///
-/// Hand 4's report predicted this exact need: 「手 5 の crash 窓は torn tail が偶然当たらない位置
-/// (apply の途中)なので、そこでこの差が効く」.
+/// Hand 4's report predicted this exact need: "hand 5's crash window sits where a torn tail does
+/// not accidentally land (mid-apply), which is exactly where this difference bites" (sem:
+/// SEM-gx-engine-692).
 #[test]
 fn the_crashed_state_is_measured_before_anything_repairs_it() {
     let dir = scratch("recovery_intermediate");
@@ -306,8 +330,9 @@ fn the_crashed_state_is_measured_before_anything_repairs_it() {
 /// 🔴 **req/78 §3.2 Λ4, as an experiment**: a recovery that ignores `ApplyStarted` misreads its own
 /// footprint; this one does not.
 ///
-/// The shim below is 43 §7-3c **as written**: 「`Fingerprint₁ := adapter.precondition(now)`を再計算
-/// し…T-10a以降の手順…を最初から再実行」. It runs against the crashed directory itself (whose
+/// The shim below is 43 §7-3c **as written**: "`Fingerprint₁ := adapter.precondition(now)` is
+/// recomputed … the procedure from T-10a onward … is re-run from the start" (sem:
+/// SEM-gx-engine-693). It runs against the crashed directory itself (whose
 /// `Fingerprint₀` names that directory's world) and gets `Ok(false)` from the CAS — not because
 /// anybody interfered, but because the engine's own successful `apply` changed the digest. T-10a
 /// folds that to `Aborted(PreconditionChanged)`, INV-S4 keeps an aborted transformation out of the
@@ -407,8 +432,9 @@ fn the_recovery_that_ignores_apply_started_reproduces_lambda_4() {
 // 7. 43 §7-3b — the window no adapter seam can reach
 // ---------------------------------------------------------------------------
 
-/// 43 §7-3b: 「ledgerに該当entryが存在する場合 → commitはクラッシュ前に完了していた…既存の
-/// `InclusionProof`からreceiptを（未発行なら）再発行し、journalへ`Committed`を追記」.
+/// 43 §7-3b: "when a matching entry exists in the ledger, the commit had already completed
+/// before the crash … re-issue the receipt from the existing `InclusionProof` (if unissued) and
+/// append `Committed` to the journal" (sem: SEM-gx-engine-694).
 ///
 /// # Why this one is built with a truncation rather than with a kill
 ///
@@ -420,8 +446,9 @@ fn the_recovery_that_ignores_apply_started_reproduces_lambda_4() {
 ///
 /// # 🔴 M5H4-7, measured
 ///
-/// §41 asked hand 5 to measure 「payload/ledger_digest 不変・`issued_at` のみ異なる=冪等な再構成で
-/// あって二重 commit ではない」 explicitly. `payload_matched` is that claim mechanically: the
+/// §41 asked hand 5 to measure "the payload and ledger_digest are unchanged; only `issued_at`
+/// differs — an idempotent reconstruction, not a duplicate commit" (sem: SEM-gx-engine-695)
+/// explicitly. `payload_matched` is that claim mechanically: the
 /// recovery rebuilds the payload from the journal, digests it, and compares it with what the ledger
 /// already holds. A rebuild that had drifted in any field would produce a different digest — and
 /// `gx_log`'s key idempotency would then refuse it as `Conflict` rather than accept it (ASM-43-1),
@@ -478,17 +505,33 @@ fn the_ledger_window_reissues_the_receipt_and_appends_nothing() {
          ({RUN_AT}) -- {reissued}"
     );
     assert_eq!(need(&out, "LEDGER_LEAVES"), "1", "still exactly one entry");
-    // Nine survived the cut and the recovery wrote two: its own `ApplyStarted` and the `Committed`
-    // record 43 §7-3b asks for. The re-application is what supplies the postcondition fingerprint
-    // 42 §3.10 requires and the journal has no seat for -- raised as **M5H5-3**.
+    // Nine survived the cut and the recovery wrote one: the `Committed` record 43 §7-3b asks for.
+    //
+    // 🔴 **R33 / `req/397` H-01** — this number was **11**, and the sentence beside it read "the
+    // Committed record is back, and the re-application was announced". Two records were written
+    // because the road announced an `ApplyStarted` and re-applied the delta, which is how it
+    // obtained the `postcondition_fingerprint` 42 §3.10 requires and the journal has no seat for
+    // (raised as **M5H5-3**).
+    //
+    // `req/397` H-01 measured what the re-application cost: it happens **before** the rebuilt
+    // payload is compared against the leaf, so a run that was about to refuse had already written
+    // to a substrate, and the sentence it refused with said "Nothing was applied". Since R33 the
+    // fingerprint on this road is a *reading* of the world rather than a rewriting of it, so there
+    // is no application to announce and the count is the Committed record alone.
+    //
+    // The assertions above are unchanged and they are the ones that matter here: the payload still
+    // digests to what the ledger witnessed (`payload_matched=Some(true)`), the ledger still gains
+    // nothing (`appended=None`), and the receipt is still re-issued. What moved is one record and
+    // one call to a substrate.
     assert_eq!(
         need(&out, "JOURNAL_RECORDS"),
-        "11",
-        "the Committed record is back, and the re-application was announced"
+        "10",
+        "the Committed record is back, and nothing was applied to announce (R33 / req/397 H-01)"
     );
     assert_eq!(need(&out, "LEDGER_AGREES"), "true");
 
-    // 🔴 **M5 hand 8, §44 ②** — the record *列* the reissue writes, printed rather than counted.
+    // 🔴 **M5 hand 8, §44 ②** — the record *sequence* (sem: SEM-gx-engine-696) the reissue
+    // writes, printed rather than counted.
     //
     // §44 asks whether 43 §3's table needs a row for the road 43 §7-3b walks, and the material for
     // that judgement is the sequence beside the cell. So the journal is read back here and its
@@ -520,8 +563,9 @@ fn the_ledger_window_reissues_the_receipt_and_appends_nothing() {
 // 8. M5H3-5 — what a restart restores, and what the recovery actually needs
 // ---------------------------------------------------------------------------
 
-/// 🔴 **M5H3-5** (req/38 §40): 「`Engine::open` の状態表再構成は**手 5 が「復旧に何が要るか」を実測
-/// してから**決める…見込みで型を増やさない」.
+/// 🔴 **M5H3-5** (req/38 §40, sem: SEM-gx-engine-697): "`Engine::open`'s state-table
+/// reconstruction is decided **only after hand 5 measures "what recovery actually needs"** …
+/// no type is added on a guess."
 ///
 /// The measurement, in one probe. After a crash, `Engine::open` restores the draft phase and the
 /// ledger's own file, and **nothing else**: no state rows, no `Transformation` bodies, no
@@ -566,28 +610,53 @@ fn a_restart_restores_the_drafts_and_the_recovery_needs_no_table() {
         engine.journal().len()
     );
     // What `open` does not rebuild.
-    assert!(engine.transformation_ids().is_empty(), "no state rows");
-    assert_eq!(engine.state(&id), None);
+    //
+    // 🔴 **Narrowed by DR-43-2** (`req/38` §148), and the two halves are now measured separately
+    // rather than as one. M5H3-5's claim was and remains "`open` rebuilds **no bodies**, and the
+    // recovery completes a commit anyway" — that is what `held_ids` and the four `is_none()`
+    // assertions below say, and none of them moved. What did move is the claim this line used to
+    // make by accident: `transformation_ids()` was empty because *nothing* survived, and `req/182`
+    // H-02 measured what that cost a restarted `gx serve` (a `404` for a row its own journal held).
+    // The Σ-shadow now answers the state, so the id is here and the body is not — which is the
+    // distinction M5H3-5 was about in the first place. The old assertion is kept, one accessor
+    // narrower, rather than deleted.
+    assert!(
+        engine.transformation_ids().is_empty(),
+        "no state rows: `open` rebuilds no `Transformation` body, and M5H3-5's measurement is that          the recovery does not need one"
+    );
+    assert!(
+        !engine.shadow().is_empty(),
+        "DR-43-2: the journal's rows are reachable across the restart (req/182 H-02), which is the          same fact `state` below reports"
+    );
+    assert_eq!(
+        engine.state(&id),
+        sigma_from_journal.state_of(&id).and_then(|r| r.state),
+        "the state a restarted engine answers is the journal's own fold and nothing else — no          table, no body, no second reading (req/38 §148 T6 condition ①)"
+    );
     assert!(engine.precondition_fingerprint(&id).is_none());
     assert!(engine.planned_delta(&id).is_none());
     assert!(engine.transformation(&id).is_none());
     assert!(engine.precondition_snapshot(&id).is_none());
     // What it does: the draft phase, the blob bodies and the ledger's own file.
     //
-    // 🔴 **M5H8-12 採(c)→(a)** (`req/38_ERRATA_2026-08-07.md` §45), verbatim:
+    // 🔴 **M5H8-12 adopted (c)→(a)** (`req/38_ERRATA_2026-08-07.md` §45, sem: SEM-gx-engine-698),
+    // verbatim:
     //
-    // > **M5H8-12 採(c)→(a)**: まず gotcha50 の検出(`git diff --stat`)で変異が当たっている事を
-    // > 確認→当たっていれば probe を読み直して撃ち直し=**fix 批**(手 4 (m) の手順)。
+    // > **M5H8-12 adopted (c)→(a)**: first confirm with the gotcha50 detector (`git diff --stat`)
+    // > that the mutation is landing → if it is, re-read the probe and re-fire it = **fix batch**
+    // > (hand 4 (m)'s procedure) (sem: SEM-gx-engine-698).
     //
     // req/86 §3.3 deleted the `DraftCreated` arm from `Engine::open`'s `filter_map` and this probe
-    // stayed green, even though its **name** says 「restores the drafts」. The fix hand ran the
+    // stayed green, even though its **name** says "restores the drafts" (sem:
+    // SEM-gx-engine-699). The fix hand ran the
     // gotcha50 detector first (`MUTATION_DIFF_LINES=2`, so the mutation was landing) and then read
     // the body: every assertion above says what `open` did **not** rebuild, and the three below
     // reached for the blob store, the ledger and a child process. Nothing read the drafts. §30's
     // disease, fourth case — a probe whose name carries a claim its body never makes.
     //
-    // The two lines that make the name true, and why both: `is_drafted` is 「the draft phase's
-    // whole observable surface」 (M5-17 採(b)) and would hold if the *seed* were lost, so Σ's own
+    // The two lines that make the name true, and why both: `is_drafted` is "the draft phase's
+    // whole observable surface" (M5-17 adopted (b), sem: SEM-gx-engine-700) and would hold if
+    // the *seed* were lost, so Σ's own
     // row is compared against the journal's reconstruction as well. The seed is 41 §6's injected
     // randomness; a restart that forgot it would let the same intent be drafted twice with two
     // different seeds, which is the one thing `submit`'s idempotency (`self.drafted.contains_key`)
@@ -612,8 +681,8 @@ fn a_restart_restores_the_drafts_and_the_recovery_needs_no_table() {
     );
     assert!(
         engine.is_drafted(&drafts_from_journal[0].intent_id),
-        "the restored draft is not visible through `is_drafted`, which M5-17 採(b) makes the \
-         draft phase's whole observable surface"
+        "the restored draft is not visible through `is_drafted`, which M5-17 adopted (b) makes \
+         the draft phase's whole observable surface (sem: SEM-gx-engine-701)"
     );
 
     assert!(
@@ -625,4 +694,255 @@ fn a_restart_restores_the_drafts_and_the_recovery_needs_no_table() {
     assert!(out.contains("state=Committed"), "{out}");
     assert_eq!(need(&out, "LEDGER_LEAVES"), "1");
     assert_eq!(value(&out, "RECOVER_REFUSED"), None);
+}
+
+// ---------------------------------------------------------------------------
+// K6 mutant-kill (req/38 §73 priority-9 items, sem: SEM-gx-engine-702; req/159 §B-1): E-M5-11's guard, both halves
+// ---------------------------------------------------------------------------
+
+/// Cut a committed journal back to the middle of its critical section: everything up to and
+/// including `ApplyStarted` survives, minus whatever `keep` refuses on the way.
+///
+/// The stores beside the journal (`*.blobs`, `*.ledger`, …) are left as the finished run wrote
+/// them, which is a shape a real crash can leave too — T-11 appends to the ledger before the
+/// journal's `Committed` record lands, so "ledger ahead of journal" (sem: SEM-gx-engine-703)
+/// is §7-3b's own window, not
+/// a fixture's invention.
+fn cut_after_apply_started(
+    journal_path: &std::path::Path,
+    keep: impl Fn(&EngineJournalRecord) -> bool,
+) {
+    let records: Vec<EngineJournalRecord> = EngineJournal::open(journal_path)
+        .expect("the committed journal reads back")
+        .records()
+        .to_vec();
+    let cut = records
+        .iter()
+        .position(|r| r.kind() == "ApplyStarted")
+        .expect("the commit announced its apply (E-M5-1)")
+        + 1;
+    std::fs::remove_file(journal_path).expect("replace the journal");
+    let mut torn = EngineJournal::open(journal_path).expect("a fresh journal opens");
+    for record in records[..cut].iter().filter(|r| keep(r)) {
+        torn.append(record.clone()).expect("re-append survives");
+    }
+}
+
+/// 🔴 K6 mutant-kill (resume's E-M5-11 guard rewritten to `false`; mutants run e, `req/38`
+/// §73): a crash inside a T-4e commit's critical section is recoverable.
+///
+/// The comment beside the guard has promised this since §41 — "refusing here would make T-4e
+/// the one transition a restart could not finish" (sem: SEM-gx-engine-704) — and run e showed
+/// no probe holds the code to
+/// it: both rewrites of `row.fail_posture_engaged` survived. This is the half that pins the
+/// promise: a `Committing` row whose pair is `(None, None)` **with the posture flag raised**
+/// resumes to `Committed` rather than being refused.
+#[test]
+fn the_recovery_finishes_a_t4e_commit_cut_mid_section() {
+    let dir = scratch("recovery_t4e_guard");
+    let journal_path = dir.join("journal.bin");
+    let key = signing_key();
+
+    // A full T-4e commit (collector down, FailOpen), driven to `Committed` in one session.
+    //
+    // `without_inverse`, so the receipt's `inverse_delta` seat is `None` on both roads: the
+    // finished run escrowed nothing, and the §7-3b rebuild below will hold nothing — the digest
+    // comparison then measures the guard and not the escrow's crash window (whose honest
+    // `Unavailable` fold after a cut-away `ApplyObserved` is `two_phase_escrow.rs`'s subject,
+    // not this probe's).
+    // 🔴 **R33 / `req/397` H-01** — the world the commit left, kept for the restart.
+    //
+    // This binding was `_world` and the recovery below was handed a **fresh** `CommitAdapter` at
+    // `"before"`, which is a fixture saying that the substrate forgot the commit at the same
+    // moment the journal was cut. No crash does that: `Engine::commit` applies the delta and
+    // fsyncs before `ledger.append`, so a `Committing` row whose leaf the ledger holds sits over a
+    // world that is already at the postcondition — which is exactly why R33 can *read* the
+    // fingerprint instead of re-applying to obtain it.
+    //
+    // The old fixture only passed because the re-application put the world back where the
+    // recovery needed it, i.e. the probe was insulated from the world by the very write `req/397`
+    // H-01 is about. `crates/gx-engine/tests/a32_recover_road.rs` (monitoring 32) built its beds
+    // the other way — `CommitAdapter::new(&world_at_restart)` — and that is the shape copied here.
+    let world_at_restart;
+    let id = {
+        let (adapter, _counts, world) = CommitAdapter::new("before");
+        let adapter = adapter.without_inverse();
+        let mut engine = Engine::open(
+            journal_path.clone(),
+            gate(PERMIT_ALL),
+            UnreachableEvidence::new("the collector is down"),
+        )
+        .expect("a fresh journal opens")
+        .with_posture(FailPosture::FailOpen);
+        engine.register_adapter(Arc::new(adapter), "k6-t4e-commit");
+        let i = intent("/tmp/k6-t4e-resume.txt", "after");
+        engine.submit(&i, 42, Timestamp(RUN_AT)).expect("T-1");
+        let id = engine.plan(&i, Timestamp(RUN_AT)).expect("T-2");
+        let state = engine
+            .verify(&id, Timestamp(RUN_AT), &key, None)
+            .expect("T-4e admits it, degraded");
+        assert_eq!(state, Lifecycle::Admitted, "T-4e admits under FailOpen");
+        engine
+            .canonicalize(&id, Timestamp(RUN_AT), None)
+            .expect("T-8 with enforced=false");
+        engine
+            .commit(&id, Timestamp(RUN_AT), &key)
+            .expect("hand 6 commits a degraded admission");
+        world_at_restart =
+            String::from_utf8_lossy(&world.lock().expect("the world").clone()).to_string();
+        id
+    };
+
+    cut_after_apply_started(&journal_path, |_| true);
+    {
+        let torn = EngineJournal::open(&journal_path).expect("the torn journal reads back");
+        let sigma = reconstruct(torn.records());
+        let row = sigma.state_of(&id).expect("the row survived the cut");
+        println!(
+            "T4E_ROW state={:?} verdict={:?} digest={:?} posture={}",
+            row.state, row.verdict, row.verdict_digest, row.fail_posture_engaged
+        );
+        assert_eq!(
+            row.state,
+            Some(Lifecycle::Committing),
+            "the section is open"
+        );
+        assert!(
+            row.verdict.is_none() && row.verdict_digest.is_none(),
+            "no gate ran, so the pair is empty"
+        );
+        assert!(
+            row.fail_posture_engaged,
+            "43 T-4e's flag is the one truth the empty pair has"
+        );
+    }
+
+    println!("T4E_WORLD at_restart={world_at_restart:?}");
+    let (adapter, _counts, _world) = CommitAdapter::new(&world_at_restart);
+    let mut engine = Engine::open(journal_path, gate(PERMIT_ALL), InjectedEvidence::none())
+        .expect("the torn journal replays");
+    engine.register_adapter(Arc::new(adapter), "k6-t4e-recover");
+    let out = engine
+        .recover(Timestamp(RECOVER_AT), &key)
+        .expect("43 §7-3 finishes what T-4e began — the degraded admission is resumable");
+    println!("T4E_RECOVERED n={} state={:?}", out.len(), out[0].state);
+    assert_eq!(out.len(), 1, "one transformation was in flight");
+    assert_eq!(out[0].transformation, id);
+    assert_eq!(
+        out[0].state,
+        Lifecycle::Committed,
+        "the one transition a restart must be able to finish, finished"
+    );
+}
+
+/// 🔴 K6 mutant-kill (resume's guard rewritten to `true`; mutants run e, `req/38` §73), the
+/// other half: the pair with **no** verdict and **no** engaged posture is refused at resume,
+/// for `commit`'s reason and by `commit`'s name.
+///
+/// No live session writes this journal — T-4e raises the very flag the guard reads — so the
+/// fixture hands the recovery a torn journal whose `Verdict` record is gone: the shape a
+/// truncated or tampered journal can present, and the one input that separates
+/// `row.fail_posture_engaged` from `true`.
+#[test]
+fn the_recovery_refuses_a_committing_row_with_no_verdict_and_no_posture() {
+    let dir = scratch("recovery_half_filled_guard");
+    let journal_path = dir.join("journal.bin");
+    let key = signing_key();
+
+    // A normal admitted commit, driven to `Committed` in one session.
+    let id = {
+        let (adapter, _counts, _world) = CommitAdapter::new("before");
+        let mut engine = Engine::open(
+            journal_path.clone(),
+            gate(PERMIT_ALL),
+            InjectedEvidence::none(),
+        )
+        .expect("a fresh journal opens");
+        engine.register_adapter(Arc::new(adapter), "k6-halfpair-commit");
+        let i = intent("/tmp/k6-halfpair.txt", "after");
+        engine.submit(&i, 42, Timestamp(RUN_AT)).expect("T-1");
+        let id = engine.plan(&i, Timestamp(RUN_AT)).expect("T-2");
+        let state = engine
+            .verify(&id, Timestamp(RUN_AT), &key, None)
+            .expect("T-4a");
+        assert_eq!(state, Lifecycle::Admitted);
+        engine
+            .canonicalize(&id, Timestamp(RUN_AT), None)
+            .expect("T-8");
+        engine.commit(&id, Timestamp(RUN_AT), &key).expect("T-11");
+        id
+    };
+
+    // Cut to mid-section AND drop the `Verdict` record: `(None, None)` with the flag down.
+    cut_after_apply_started(&journal_path, |r| {
+        !matches!(r, EngineJournalRecord::Verdict { .. })
+    });
+    {
+        let torn = EngineJournal::open(&journal_path).expect("the torn journal reads back");
+        let sigma = reconstruct(torn.records());
+        let row = sigma.state_of(&id).expect("the row survived the cut");
+        assert_eq!(
+            row.state,
+            Some(Lifecycle::Committing),
+            "the section is open"
+        );
+        assert!(
+            row.verdict.is_none() && row.verdict_digest.is_none() && !row.fail_posture_engaged,
+            "the half-filled pair, on disk"
+        );
+    }
+
+    let (adapter, _counts, _world) = CommitAdapter::new("before");
+    let mut engine = Engine::open(journal_path, gate(PERMIT_ALL), InjectedEvidence::none())
+        .expect("the torn journal replays");
+    engine.register_adapter(Arc::new(adapter), "k6-halfpair-recover");
+    let refused = engine
+        .recover(Timestamp(RECOVER_AT), &key)
+        .expect_err("a receipt with nothing true to put in its verdict seat must not be rebuilt");
+    println!("HALF_PAIR_REFUSAL kind={}", refused.kind());
+    assert!(
+        matches!(refused, gx_engine::Error::Unrepresentable { .. }),
+        "the refusal is E-M5-11's, by name: {refused:?}"
+    );
+}
+
+/// 🔴 K6 mutant-kill (commit's E-M5-11 guard rewritten to `true`, mutants run e, `req/38`
+/// §73), **as a scan** — for Λ4's reason: no input can exercise the difference.
+///
+/// Every in-session road to a `Canonicalized` entry seats either a full pair (T-4a/T-4c/T-5
+/// write kind and digest together) or T-4e's `(None, None)` with the flag **raised**; the
+/// half-filled pair with the flag down exists only on the recovery's side of the door, where
+/// the probe above refuses it behaviourally. So run e caught the guard's `false` rewrite (a
+/// T-4e commit fails under it) and missed the `true` one — behaviourally invisible, exactly
+/// like a recovery that could reach the CAS. The scan is the honest instrument left: both
+/// arms must read their own row's flag, not a constant.
+#[test]
+fn the_half_filled_pair_guards_read_the_posture_flag_and_not_a_constant() {
+    let lines = code("crates/gx-engine/src/pipeline.rs");
+    let commit_guard = lines
+        .iter()
+        .filter(|l| l.contains("(None, None) if entry.fail_posture_engaged"))
+        .count();
+    let resume_guard = lines
+        .iter()
+        .filter(|l| l.contains("(None, None) if row.fail_posture_engaged"))
+        .count();
+    println!("COMMIT_GUARD={commit_guard} RESUME_GUARD={resume_guard}");
+    assert_eq!(
+        commit_guard, 1,
+        "commit's E-M5-11 arm is guarded by the entry's own flag, not by a constant"
+    );
+    // 🔴 **R8 / `req/234` H-01 (b)** — two `row.fail_posture_engaged` guards now, and the
+    // second is `Engine::reissue_receipt`'s. It rebuilds a terminal row's payload from the same Σ
+    // fields `resume` uses, so it meets the same half-filled pair and has to refuse it for the same
+    // reason: a receipt that says a change was allowed and cannot say by what is E-M5-11's
+    // `Unrepresentable`. What differs is the answer — `resume` raises, and `reissue_receipt`
+    // returns `Reissued::NoMaterial`, because it is a diagnosis-and-remedy road rather than a
+    // start-up road and taking a project offline over one unrebuildable receipt would be the
+    // `req/227` M-03 mistake (narrowing the only exit a damaged project has). The scan counts both
+    // so that a constant substituted into **either** shows up here.
+    assert_eq!(
+        resume_guard, 2,
+        "and resume's and reissue_receipt's by the row's own flag, not by a constant"
+    );
 }

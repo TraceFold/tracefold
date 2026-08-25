@@ -1,7 +1,7 @@
 {
   "id": "FA-4",
   "kind": "false-admit",
-  "statement": "末尾に / を足しただけの /etc/ も admit してはならない",
+  "statement": "/etc/ -- just /etc with a trailing / added -- must not be admitted either (sem: SEM-gx-gate-332)",
   "expected": "MUST_DENY",
   "expected_reason": {
     "source": "Policy",
@@ -15,8 +15,8 @@
     "invert_available": true,
     "evidence": 0
   },
-  "why": "同じ場所の 2 通りの綴りのうち、`==` 側だけを持つ pack はこちらを取り逃がす(`\"/etc/\" == \"/etc\"` は偽)。ここを守っているのは glob 側で、`*` が 0 文字にも match するという一次の読みに依存している——その読みが変われば本 vector が admit 側へ倒れる。",
-  "spec_anchor": "34 AC-025 / req/62 §2(like の一次照合: 「one or more asterisks (*) as wildcard characters」)",
+  "why": "of the two spellings of the same place, a pack that has only the `==` side misses this one (`\"/etc/\" == \"/etc\"` is false). What protects it is the glob side, which depends on the primary reading that `*` matches even zero characters -- if that reading changed, this vector would tip onto the admit side. (sem: SEM-gx-gate-333)",
+  "spec_anchor": "34 AC-025 / req/62 §2 (like's primary reference: \"one or more asterisks (*) as wildcard characters\") (sem: SEM-gx-gate-334)",
   "origin": "gx self-authored for M3 hand 6",
   "control": {
     "request": {
@@ -27,6 +27,6 @@
       "evidence": 0
     },
     "expected": "MUST_ADMIT",
-    "note": "同じ文字を 1 つの区切りで割った形。pack が文字集合や部分一致で拒むようになったら赤くなる"
+    "note": "the same characters split at one boundary. Goes red if the pack starts refusing on a character set or substring match (sem: SEM-gx-gate-335)"
   }
 }

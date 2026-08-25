@@ -1,0 +1,32 @@
+{
+  "id": "FA-11",
+  "kind": "false-admit",
+  "statement": "a write into a postgres system catalog must not be admitted, and must be refused by the pack's named statement rather than by the absence of one",
+  "expected": "MUST_DENY",
+  "expected_reason": {
+    "source": "Policy",
+    "policy_id": "postgres-deny-system-catalogs",
+    "code": "POLICY_DENIED"
+  },
+  "request": {
+    "substrate": "postgres",
+    "locator": "postgres://main/pg_catalog.pg_authid?oid=10",
+    "order": 0,
+    "invert_available": true,
+    "evidence": 0
+  },
+  "why": "The postgres pack is the first shipped pack to declare a **deny-default** (req/446 V0-C, ruling 1): it carries a forbid and no permit, so every postgres request that is not a catalog write already falls to Cedar's third rule. That makes this vector's job unusually precise. It is not measuring that the request is denied — an empty policy set would deny it — it is measuring that the request is denied **by `postgres-deny-system-catalogs`**, which is what `expected_reason.source = Policy` pins and what `Deny(None)` could never have distinguished. If the forbid's `custom:` prefix were dropped, or its `postgres://*/` anchor widened, or the statement removed outright, the arm would stay `Deny` and only the reason would change: this vector is the one that sees that.\n\nThe locator is the schema position the anchor argument is about. `is_identifier` admits no `/` in an alias, schema, table or pk column, and `percent_encode` rewrites a `/` in a pk value as `%2F`, so a produced locator holds exactly three `/` and `postgres://*/pg_catalog.` can only be naming the schema.",
+  "spec_anchor": "req/446 V0-C / AC-PP-04 / AC-PP-06 / 32 FR-028 / req/38 §25 H-9",
+  "origin": "gx self-authored for policy pack v0",
+  "control": {
+    "request": {
+      "substrate": "fs",
+      "locator": "postgres://main/pg_catalog.pg_authid?oid=10",
+      "order": 0,
+      "invert_available": true,
+      "evidence": 0
+    },
+    "expected": "MUST_ADMIT",
+    "note": "FA-5's design, applied to the fourth pack: **the control changes only the substrate line, not one character of the locator**. The same string that the postgres forbid refuses is admitted by `fs-permit-default`, because on the fs substrate it is just a path that is not under /etc. So if `resource.substrate` ever drops out of the ASM-60-1 mapping, or the `custom:` prefix stops being produced, the vector and its control become the same request and this pair goes red. 🔴 A control expecting MUST_ADMIT could not have been written on the postgres substrate itself — the pack ships no permit, so nothing there is admissible — and that is the deny-default's shape showing through the suite's own requirement rather than being asserted about it."
+  }
+}

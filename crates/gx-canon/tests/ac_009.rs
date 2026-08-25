@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-009 (FR-009) — encode then decode returns the value, every field intact.
 //!
-//! AC-009 逐語: 「Given: ランダム生成された`Transformation`値x（proptest arbitrary）。When:
-//! `dagcbor::encode(x)`→`dagcbor::decode`。Then: 復元値がxとbit-equal（全フィールド）。」
-//! property（roundtrip, ≥1000ケース/PR）。
+//! AC-009 verbatim: "Given: a randomly generated `Transformation` value x (proptest arbitrary).
+//! When: `dagcbor::encode(x)` → `dagcbor::decode`. Then: the recovered value is bit-equal to x
+//! (all fields)." property (roundtrip, ≥1000 cases/PR) (sem: SEM-gx-canon-023).
 //!
-//! This is the wire face (A-4 面1, `req/38_ERRATA_2026-08-07.md` §1): every field, including the
+//! This is the wire face (A-4 face 1, `req/38_ERRATA_2026-08-07.md` §1): every field, including the
 //! two that the identity face drops. The identity face is AC-011/AC-013 and does not exist yet.
 //!
-//! "bit-equal（全フィールド）" is checked three ways, because value equality alone is weak:
+//! "bit-equal (all fields)" is checked three ways, because value equality alone is weak:
 //! `PartialEq` on the decoded value, a field-by-field comparison that a future `PartialEq`
 //! change cannot quietly loosen, and a re-encode that must reproduce the original bytes. The
 //! third is what catches an encoding that normalises on the way in -- it would still decode to
@@ -94,7 +96,7 @@ fn ac_009_unsupported_input_fails_loudly_rather_than_quietly() {
     );
     // Beyond CBOR's integer range. Major type 0 reaches u64::MAX and major type 1 reaches
     // -1-u64::MAX, and the bignum tag that would carry anything wider is a tag, which 42 §2.1-5
-    // forbids. The "BigInt 級" case of the step-3 instruction.
+    // forbids. The "BigInt tier" case of the step-3 instruction (sem: SEM-gx-canon-024).
     let smallest = -i128::from(u64::MAX) - 1; // -2^64, the last value major type 1 can spell
     let largest = i128::from(u64::MAX);
     assert!(

@@ -1,15 +1,19 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! ASM-43-1 — `ledger.append` is keyed and idempotent (H2-3, ruled onto this hand by req/38 §11).
 //!
-//! ASM-43-1 逐語 (43 §追加ASM案): 「`ledger.append`は`TransformationId`（またはcanonical CID）を
-//! キーとする冪等操作として契約を明文化する（gx-log API契約に追記）」, and req/38 §11 states the
-//! two arms this hand owes: 「同一 key 再 append は同 CID なら no-op・異 CID なら reject」.
+//! ASM-43-1 verbatim (43 §additional-ASM proposal): "`ledger.append` writes into the contract, in
+//! words, that it is an idempotent operation keyed on `TransformationId` (or a canonical CID)
+//! (appended to gx-log's API contract)", and req/38 §11 states the
+//! two arms this hand owes: "a repeat append under the same key is a no-op for the same CID, a
+//! reject for a different CID". (sem: SEM-gx-log-144)
 //!
 //! # Which CID
 //!
 //! Not `leaf_cid`. A leaf hash covers the entry's `index`, and a second append of the same
 //! transformation would be offered at a different index, so comparing leaf hashes would make every
 //! repeat a conflict -- the arm ASM-43-1 exists to prevent. What a caller offers is a
-//! `receipt_digest`, so that is what 「同 CID」 is read as here, and `store.rs` says so in its
+//! `receipt_digest`, so that is what "the same CID" (sem: SEM-gx-log-145) is read as here, and `store.rs` says so in its
 //! documentation rather than leaving the reading in a test.
 //!
 //! # Which type
@@ -38,7 +42,7 @@ fn a_repeat_of_the_same_append_is_a_no_op() {
     assert!(matches!(first, AppendOutcome::Appended(_)));
     let size = fs::metadata(&path).expect("metadata").len();
 
-    // A later clock and the same content: 「同一 key・同 CID」 is about what was recorded, not about
+    // A later clock and the same content: "the same key, the same CID" (sem: SEM-gx-log-146) is about what was recorded, not about
     // when the caller tried again.
     let second = store
         .append(tid(0), cid(1_000), Timestamp(99))

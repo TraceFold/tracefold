@@ -1,22 +1,26 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! AC-030 (FR-030) — two-stage identity: `IntentId` at submit, `TransformationId` at plan.
 //!
-//! 34 AC-030 逐語:
+//! 34 AC-030, verbatim (sem: SEM-gx-engine-403):
 //!
-//! > Given: intent I（`{"kind":"fs.write","path":"/tmp/x","content":"v1"}`）。When: (1)
-//! > `gx_engine::submit(I)`をライブラリ関数として同一プロセス内で2回、および完全に独立した別プロセスで
-//! > 1回呼び出す。Then: 3回とも同一`IntentId`が返る。When: (2) 同一Iに対する同一plan結果（同一
-//! > `PlannedDelta`/`target`）に対し`gx_engine::plan(...)`を同様に同一プロセス内2回・別プロセス1回
-//! > 呼び出す。Then: 3回とも同一`TransformationId`が返る。CLIレベル（`gx submit`/`gx plan`）での
-//! > 再確認はM6のE2E AC（AC-054）で行う。
+//! > Given: intent I (`{"kind":"fs.write","path":"/tmp/x","content":"v1"}`). When: (1)
+//! > `gx_engine::submit(I)` is called as a library function twice in the same process, and once
+//! > from a completely independent second process. Then: all three calls return the same
+//! > `IntentId`. When: (2) the same plan result for the same I (the same `PlannedDelta`/`target`)
+//! > is passed to `gx_engine::plan(...)` the same way -- twice in the same process, once from a
+//! > second process. Then: all three calls return the same `TransformationId`. Re-confirmation at
+//! > the CLI level (`gx submit`/`gx plan`) happens in M6's E2E AC (AC-054).
 //!
 //! # What ASM-11 is, and what would break it quietly
 //!
 //! 42 §3.3 and FR-030 make identity two-stage because a `Transformation` does not know its own
-//! delta until an adapter has planned one. The failure this criterion guards against is not 「the
-//! ids differ」 -- that is loud -- but 「the ids agree because something outside the value made them
-//! agree」: a counter, a memoised table, an allocator address, a hash seed. So the third call is in
+//! delta until an adapter has planned one. The failure this criterion guards against is not "the
+//! ids differ" -- that is loud -- but "the ids agree because something outside the value made them
+//! agree": a counter, a memoised table, an allocator address, a hash seed. So the third call is in
 //! **another process**, started with `env_clear()` in a fresh working directory, which is 34's own
-//! AC-011 row read as a recipe (「別バイナリ・キャッシュ非共有・別ワーキングディレクトリ」).
+//! AC-011 row read as a recipe ("a separate binary, no shared cache, a separate working directory";
+//! sem: SEM-gx-engine-404).
 //!
 //! `tests/bin/engine_id_probe.rs` is that binary. It builds the intent from two strings rather than
 //! deserialising one the parent sent, so the two processes agree on a value and not on a
@@ -148,10 +152,12 @@ fn ac_030_the_same_intent_gets_the_same_two_ids_in_three_calls() {
     );
 }
 
-/// 43 T-1's idempotency, measured as 「副作用なし」 rather than as 「the same value came back」.
+/// 43 T-1's idempotency, measured as "no side effect" rather than as "the same value came back"
+/// (sem: SEM-gx-engine-405).
 ///
-/// 逐語: 「同一canonical encodeのintent再送は同一`IntentId`を返す（**副作用なし**、
-/// create-if-absent）」. A `submit` that returned the right id and appended a second `DraftCreated`
+/// Verbatim: "resubmitting an intent with the same canonical encoding returns the same
+/// `IntentId` (**no side effect**, create-if-absent)" (sem: SEM-gx-engine-405). A `submit` that
+/// returned the right id and appended a second `DraftCreated`
 /// would satisfy the first half and break the second, and only the journal can tell them apart.
 #[test]
 fn ac_030_a_resubmitted_intent_writes_no_second_record() {
@@ -198,7 +204,8 @@ fn ac_030_a_different_intent_gets_different_ids() {
 
 /// A `TransformationId` is the CID of the transformation it names.
 ///
-/// ASM-11's 「以後不変」 and 42 §1.3's exclusion of `id` from the projection, together: recomputing
+/// ASM-11's "immutable thereafter" (sem: SEM-gx-engine-406) and 42 §1.3's exclusion of `id`
+/// from the projection, together: recomputing
 /// the CID of the stored value must give back the id it is stored under. This is what makes the
 /// three-way agreement above a property of the *value* rather than of `plan`'s return path.
 #[test]
@@ -219,8 +226,8 @@ fn ac_030_the_id_is_the_cid_of_the_value_it_names() {
 
 /// `plan` refuses to rewind a transformation that has moved past `Candidate`.
 ///
-/// 43 T-2 is 「安全に再試行可」, which the tests above rely on. It is not 「safe to replay over a
-/// verdict」: a second `plan` on a verified transformation would replace the row with a fresh
+/// 43 T-2 is "safe to retry" (sem: SEM-gx-engine-407), which the tests above rely on. It is not
+/// "safe to replay over a verdict": a second `plan` on a verified transformation would replace the row with a fresh
 /// `Candidate` and forget what the gate said. The guard is what keeps the retry from being a
 /// rewind, and it refuses rather than silently doing nothing (req/29 §4).
 #[test]

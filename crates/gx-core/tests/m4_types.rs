@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The types M4 hand 1 adds to gx-core, and the two rulings that put them here.
 //!
 //! `m2_types.rs` and `m3_types.rs` are the same file one and two milestones back: a milestone that
@@ -5,21 +7,24 @@
 //!
 //! | ruling | what moved | why it is here and not in gx-substrate |
 //! |---|---|---|
-//! | **E-M4-1** | `Fingerprint` (42 §3.5) | `ReceiptPayload.precondition_fingerprint` (42 §3.10) names it, and gx-witness is inside the trust boundary 45 §1 draws while an adapter is outside it. E-M2-1: 「型は下層・計算は上層」 |
-//! | **E-M4-2** | `Intent`, `GoalBytes` (42 §3.3) | 42 §0 already filed `Intent` here; what was missing was the type, and `goal` had to stop being a `serde_json::Value` for 41 §2's 「serde, thiserror 程度」 to hold |
+//! | **E-M4-1** | `Fingerprint` (42 §3.5) | `ReceiptPayload.precondition_fingerprint` (42 §3.10) names it, and gx-witness is inside the trust boundary 45 §1 draws while an adapter is outside it. E-M2-1: "types down, computation up" (sem: SEM-gx-core-181) |
+//! | **E-M4-2** | `Intent`, `GoalBytes` (42 §3.3) | 42 §0 already filed `Intent` here; what was missing was the type, and `goal` had to stop being a `serde_json::Value` for 41 §2's "serde, thiserror and not much more" (sem: SEM-gx-core-182) to hold |
 //!
 //! # What M4 hand 2 changed here (**E-M4-27**)
 //!
 //! Hand 1 raised whether a `substrate` mismatch really is an ordinary `Ok(false)` while a `scope`
-//! mismatch is an error (req/70 §2 M4H1-1), and req/38 §29 ruled case (b):
+//! mismatch is an error (req/70 §2 M4H1-1), and req/38 §29 ruled case (b) (quoted in
+//! SEM-gx-core-183):
 //!
-//! > 「`cas_eq` は **substrate 不一致も `Err`**(scope 不一致と同じ「実装エラー」級——別 adapter の指紋
-//! > 比較は engine 配線 bug であり、`Ok(false)`→「状態が動いた」Abort に化けると bug が隠れる=E-M4-15
-//! > が PartialEq を拒んだのと同じ論法)。42 §3.5 の等価性は「**同一 adapter の産物間でのみ定義**」と
-//! > 読む」
+//! > `cas_eq` returns **`Err` on a substrate mismatch too** (the same "implementation error" class
+//! > as a scope mismatch -- comparing another adapter's fingerprint is an engine wiring bug, and if
+//! > it turned into an `Ok(false)` -> "the state moved" Abort the bug would be hidden; the same
+//! > argument by which E-M4-15 refused PartialEq). 42 §3.5's equality is read as "**defined only
+//! > between the products of one adapter**".
 //!
 //! So the probe that pinned the old answer was reversed rather than deleted, on the precedent
-//! §29 M4H1-9 追認 set for the same operation one hand earlier: same fixture, the answer the ruling
+//! §29 M4H1-9 (confirmed; sem: SEM-gx-core-184) set for the same operation one hand earlier: same
+//! fixture, the answer the ruling
 //! requires, and a name that says which ruling moved it. The pin is not weaker for having moved --
 //! it is what makes E-M4-27 a behaviour rather than a sentence in a ledger.
 //!
@@ -57,7 +62,8 @@ fn a_fingerprint_is_the_three_fields_of_42_3_5() {
     assert_eq!(f.digest(), &cid_of(7));
 }
 
-/// 「まだ同じ名前の状態に居るか」: same scope, same substrate, same digest.
+/// "still in the state of the same name?" (sem: SEM-gx-core-185): same scope, same substrate, same
+/// digest.
 #[test]
 fn cas_eq_is_true_for_two_fingerprints_of_the_same_state() {
     let before = fingerprint("/tmp/x", 7);
@@ -67,7 +73,8 @@ fn cas_eq_is_true_for_two_fingerprints_of_the_same_state() {
         .expect("the scopes agree, so the question has a meaning"));
 }
 
-/// 「動いた」: the scope is the same and the digest is not, which is what CON-2 aborts on.
+/// "it moved" (sem: SEM-gx-core-186): the scope is the same and the digest is not, which is what
+/// CON-2 aborts on.
 #[test]
 fn cas_eq_is_false_when_the_state_under_one_scope_moved() {
     let before = fingerprint("/tmp/x", 7);
@@ -78,7 +85,8 @@ fn cas_eq_is_false_when_the_state_under_one_scope_moved() {
 /// Two adapters answering about the same scope name is not a comparison at all (**E-M4-27**).
 ///
 /// The fixture is hand 1's, and the answer is the one §29 M4H1-1 (b) ruled: an `fs` fingerprint and
-/// a `git` fingerprint that happen to spell their scope the same way are not 「the state moved」,
+/// a `git` fingerprint that happen to spell their scope the same way are not "the state moved"
+/// (sem: SEM-gx-core-187),
 /// they are a wiring bug in whatever handed one to the other. Reported as `Ok(false)` it would
 /// abort a commit with `PreconditionChanged` -- a reason that names a change nobody made -- and the
 /// real defect would leave no trace. That is E-M4-15's argument against `PartialEq` applied to the
@@ -89,9 +97,10 @@ fn cas_eq_refuses_a_comparison_across_substrates() {
     let git = Fingerprint::new(SubstrateKind::Git, "/tmp/x".to_string(), cid_of(7))
         .expect("a short scope is inside M4H1-2's bound");
 
-    let got = fs
-        .cas_eq(&git)
-        .expect_err("E-M4-27: 42 §3.5 の等価性は「同一 adapter の産物間でのみ定義」");
+    let got = fs.cas_eq(&git).expect_err(
+        "E-M4-27: 42 §3.5's equality is 'defined only between the products of one adapter' \
+             (sem: SEM-gx-core-188)",
+    );
     assert_eq!(got.kind(), "FingerprintSubstrateMismatch");
     assert!(ERROR_KINDS.contains(&got.kind()));
 
@@ -106,8 +115,8 @@ fn cas_eq_refuses_a_comparison_across_substrates() {
 ///
 /// Order matters here because the two errors carry different values and an adapter author reads the
 /// first one. Two adapters do not share a scope grammar -- `/tmp/x` and `refs/heads/main` are not a
-/// scope that widened, they are two vocabularies -- so 「別 adapter の指紋を比較した」 is the whole
-/// diagnosis and 「scope が違う」 would be a symptom of it.
+/// scope that widened, they are two vocabularies -- so "another adapter's fingerprint was compared"
+/// is the whole diagnosis and "the scopes differ" would be a symptom of it (sem: SEM-gx-core-189).
 #[test]
 fn cas_eq_names_the_substrate_when_both_fields_disagree() {
     let fs = fingerprint("/tmp/x", 7);
@@ -121,15 +130,17 @@ fn cas_eq_names_the_substrate_when_both_fields_disagree() {
     );
 }
 
-/// 「その比較は意味を持たない」: the third answer, which a `bool` could not carry (**E-M4-15**).
+/// "that comparison has no meaning" (sem: SEM-gx-core-190): the third answer, which a `bool` could
+/// not carry (**E-M4-15**).
 #[test]
 fn cas_eq_refuses_a_comparison_across_scopes() {
     let narrow = fingerprint("/tmp/x", 7);
     let wide = fingerprint("/tmp/x+lockfiles", 7);
 
-    let got = narrow
-        .cas_eq(&wide)
-        .expect_err("42 §3.5: 「`scope`不一致の比較は…adapter実装エラーとして扱う」");
+    let got = narrow.cas_eq(&wide).expect_err(
+        "42 §3.5: 'a comparison across differing `scope`s ... is treated as an adapter \
+             implementation error' (sem: SEM-gx-core-191)",
+    );
     assert_eq!(
         got,
         Error::FingerprintScopeMismatch {
@@ -150,8 +161,9 @@ fn cas_eq_refuses_a_comparison_across_scopes() {
 
 /// A fingerprint whose digest is equal is not, by that alone, the same fingerprint.
 ///
-/// This is the sentence `FingerprintBytes` has carried since M2 -- 「**A receipt whose two
-/// `FingerprintBytes` compare equal has not passed the CAS check**」 -- restated now that the type
+/// This is the sentence `FingerprintBytes` has carried since M2 -- "**A receipt whose two
+/// `FingerprintBytes` compare equal has not passed the CAS check**" (sem: SEM-gx-core-192) --
+/// restated now that the type
 /// with the other two fields exists. `digest()` is public because a receipt carries exactly that
 /// component (42 §3.10), and reading it is not comparing.
 #[test]

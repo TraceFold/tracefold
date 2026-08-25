@@ -1,0 +1,12 @@
+{
+  "issue_write": {
+    "restored_by": "issue_write",
+    "arguments": {
+      "method": { "const": "update" },
+      "owner": { "forward": "owner" },
+      "repo": { "forward": "repo" },
+      "issue_number": { "do_result_number_from": "/url" },
+      "state": { "const": "closed" }
+    }
+  }
+}

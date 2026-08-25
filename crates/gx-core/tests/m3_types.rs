@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! The two types M3 hand 1 moved down here, and the rulings that moved them.
 //!
 //! **E-M3-1** (`PlannedDeltaBytes`) and **E-M3-2** (`VerdictKind`), both from
@@ -24,7 +26,8 @@ where
 
 /// Any byte string is a legal value, including none.
 ///
-/// 42 §3.4 makes `payload` 「adapter のみが解釈する opaque な変更記述」, so this type has no notion
+/// 42 §3.4 makes `payload` "an opaque change description that only the adapter interprets" (sem:
+/// SEM-gx-core-178), so this type has no notion
 /// of a malformed value — that judgement belongs to M4's adapter and to nothing below it.
 #[test]
 fn a_planned_delta_carrier_holds_any_bytes() {
@@ -43,8 +46,9 @@ fn a_planned_delta_carrier_holds_any_bytes() {
 /// Its `Debug` says the length and not the content (P-6).
 ///
 /// The same refusal `FingerprintBytes` makes, and here it is the stronger of the two: a payload is
-/// an adapter's own encoding, so a `{:?}` in a log line would be the one place where 「byte 列と
-/// してのみ扱う」 quietly stopped being true. The length is not the content and a reader debugging
+/// an adapter's own encoding, so a `{:?}` in a log line would be the one place where "handled only
+/// as a byte string" (sem: SEM-gx-core-179) quietly stopped being true. The length is not the
+/// content and a reader debugging
 /// an empty delta needs it.
 #[test]
 fn a_planned_delta_carrier_does_not_print_its_payload() {
@@ -114,7 +118,8 @@ fn the_wire_spelling_is_the_declared_spelling() {
 /// A fourth spelling does not decode.
 ///
 /// H5-8's string check refused these at verification; the type refuses them at decode, which is
-/// what 「文字列検査を型検査へ置換」 buys. Case matters, and so does an exact match.
+/// what "replace the string check by a type check" (sem: SEM-gx-core-180) buys. Case matters, and
+/// so does an exact match.
 #[test]
 fn a_fourth_spelling_is_refused_by_the_decoder() {
     for bad in [
