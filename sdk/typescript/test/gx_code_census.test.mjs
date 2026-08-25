@@ -89,11 +89,11 @@ test("the SDK names every gx_code this server can send, and no others", () => {
   );
 });
 
-test("the count is twenty-six, and the doc comment says so", () => {
+test("the count is thirty-two, and the doc comment says so", () => {
   const source = readRepoFile("sdk/typescript/src/errors.ts");
-  assert.equal(GX_CODES.length, 26, `GX_CODES holds ${GX_CODES.length} words`);
+  assert.equal(GX_CODES.length, 32, `GX_CODES holds ${GX_CODES.length} words`);
   assert.ok(
-    source.includes("Twenty-six"),
+    source.includes("Thirty-two"),
     "the prose above `GX_CODES` is what a reader trusts before they count; `req/240` L-06 (ii) " +
       "is the measurement of it being wrong for four releases",
   );

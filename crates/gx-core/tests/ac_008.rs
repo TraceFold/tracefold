@@ -67,6 +67,12 @@ const SOURCES: &[(&str, &str)] = &[
     ("ledger.rs", include_str!("../src/ledger.rs")),
     ("measure.rs", include_str!("../src/measure.rs")),
     ("object.rs", include_str!("../src/object.rs")),
+    // 🔴 **req/824 A1/A2** — the observation classes and the envset fingerprint codec come down
+    // here by the same rule as every entry above: transformation *objects* live beside
+    // `Transformation`, the data comes down and the computation stays up. Nothing in the module
+    // reads, hashes, signs or performs I/O (the detector and the chain check are pure predicates
+    // over values the caller already holds).
+    ("observation.rs", include_str!("../src/observation.rs")),
     ("planned.rs", include_str!("../src/planned.rs")),
     ("proof.rs", include_str!("../src/proof.rs")),
     // 🔴 **DR-46-26** — two more come down here, and the rule is the one that brought every entry

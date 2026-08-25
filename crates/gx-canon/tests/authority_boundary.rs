@@ -265,6 +265,23 @@ fn verdict_constructions(code: &str) -> usize {
         .count()
 }
 
+/// 🔴 (iv) **`req/824` A1** — lines that construct one of the two observation undo refusals.
+///
+/// `gx_engine::Error::InverseNotExecutableAtSubstrate` and `gx_engine::Error::AppendOnlyClass`
+/// are typed refusals only the engine may raise: a membrane that minted one would be deciding,
+/// with no engine behind it, that an undo can never happen — the same class of second-gate
+/// authority Rule 1 (ii) forbids for `Verdict`. The hunted spelling is the path form
+/// (`::InverseNotExecutableAtSubstrate`), not the bare word: `gx-api`'s own `gx_code.rs`
+/// legitimately carries the bare word as a `kind:` string literal in the refusal map, and a
+/// scanner that read that as a construction would report the map as the violation.
+fn observation_refusal_mints(code: &str) -> usize {
+    code.lines()
+        .filter(|l| {
+            l.contains("::InverseNotExecutableAtSubstrate") || l.contains("::AppendOnlyClass")
+        })
+        .count()
+}
+
 /// (iii) Lines that write a lifecycle.
 ///
 /// Two shapes, because 42 §1.3-3's claim ("state is managed in an external table on the engine
@@ -456,6 +473,31 @@ fn no_secondary_surface_writes_a_lifecycle() {
     );
 }
 
+/// 🔴 **Rule 1 (iv), `req/824` A1** — neither secondary surface constructs an observation undo
+/// refusal.
+///
+/// The engine-side-only property of `InverseNotExecutableAtSubstrate` / `AppendOnlyClass`, as a
+/// counter rather than a review habit — `req/824` A1's negative control, in the file whose whole
+/// subject is that the secondary surfaces hold no semantic authority.
+#[test]
+fn no_secondary_surface_constructs_an_observation_refusal() {
+    let files = sources();
+    let mut offences: Vec<String> = Vec::new();
+    for (rel, source) in &files {
+        let n = observation_refusal_mints(&code_only(source));
+        if n > 0 {
+            offences.push(format!("{rel}:{n}"));
+        }
+    }
+    println!("OBSERVATION_REFUSAL_MINTS={}", offences.len());
+    assert!(
+        offences.is_empty(),
+        "req/824 A1: a secondary surface constructs an observation undo refusal ({offences:?}). \
+         The two kinds are the engine's own statement that an undo can never happen (SS273 / \
+         append-only), and a membrane minting one is a second gate with no engine behind it"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // The instrument, doubted
 // ---------------------------------------------------------------------------
@@ -499,7 +541,33 @@ fn the_scanners_see_the_shapes_they_hunt() {
         0,
         "reading a state the engine handed over is what the read-only surface is for"
     );
-    println!("SCANNER_POSITIVE_CONTROLS=8");
+    // req/824 A1: the fourth counter sees the shapes it hunts, and does not see the refusal map's
+    // bare-word `kind:` string literals (the pipeline is `code_only` first, as for every control
+    // above).
+    assert_eq!(
+        observation_refusal_mints(&code_only(
+            "let e = gx_engine::Error::InverseNotExecutableAtSubstrate { id };"
+        )),
+        1
+    );
+    assert_eq!(
+        observation_refusal_mints(&code_only(
+            "Error::AppendOnlyClass { id: tid.to_string() },"
+        )),
+        1
+    );
+    assert_eq!(
+        observation_refusal_mints(&code_only("kind: \"InverseNotExecutableAtSubstrate\",")),
+        0,
+        "the refusal map's own row is a string literal, not a construction"
+    );
+    assert_eq!(
+        observation_refusal_mints(&code_only(
+            "// gx_engine::Error::AppendOnlyClass is engine-side"
+        )),
+        0
+    );
+    println!("SCANNER_POSITIVE_CONTROLS=12");
 }
 
 /// 🔴 **A2 closed**: a `//` inside a string literal does not blind the scanners.

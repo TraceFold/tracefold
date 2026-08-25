@@ -5,10 +5,11 @@
  * onto named error types (swallowing forbidden)"; sem: SEM-sdk-typescript-007).
  *
  * ~~Thirteen~~ ~~**Twenty-one**~~ ~~**Twenty-two**~~ ~~**Twenty-four**~~ ~~**Twenty-five**~~
- * **Twenty-six** codes on
+ * ~~**Twenty-six**~~ **Thirty-two** codes on
  * the wire, not twelve:
  * 44 §2.3's table lists twelve, and `crates/gx-api/src/gx_code.rs`'s `RULED_ADDITIONS` carries
- * **fourteen** more, each one ruled in `req/38` and each one reachable by a client of this SDK.
+ * **twenty** more, each one ruled in `req/38` or in a reqdef the file cites, and each one
+ * reachable by a client of this SDK.
  *
  * 🔴 **R11 / `req/240` L-06 (ii)** — the struck sentence is kept because it was this file's claim
  * for four releases and a reader who trusted it would look for thirteen. What it cost, measured:
@@ -57,9 +58,20 @@
  * instead — not `JOURNAL_ABSENT` ("is not there" would be false) and not `LAYOUT_BLOCKED` ("is
  * not what the declaration says" would be false of a regular file that is one). `req/38` §337
  * ruled the DR.
+ *
+ * 🔴 **`req/824` A3 (2026-08-26)** — six at once, the platform/comm observation phase's words,
+ * codes twenty-seven through thirty-two: `SOURCE_UNKNOWN` (an unregistered attach-source is not
+ * `NOT_FOUND`'s missing transformation), `SOURCE_KEY_INVALID` (a registered source's bad key is
+ * not `UNAUTHORIZED`'s missing Bearer), `PLAINTEXT_SECRET_REFUSED` (a value field not of the
+ * declared `blake3:<64 hex>` form — Glovrex refuses to become a secrets store),
+ * `OBSERVATION_CLASS_UNKNOWN` (a class outside `req/812` §1's four is refused, never defaulted),
+ * `WINDOW_OVERLAP` (an overlapping attestation window would double-count a deploy), and
+ * `CHAIN_GAP_ESCALATE` — the one code in this list whose status is a **success** (201): a chain
+ * gap is evidence admitted into the third state, reachable at `GET /escalations`, neither an
+ * acceptance we can fake nor a refusal that would discard real evidence.
  */
 
-/** 44 §2.3's twelve, then `gx_code.rs`'s fourteen `RULED_ADDITIONS`, in that file's order. */
+/** 44 §2.3's twelve, then `gx_code.rs`'s twenty `RULED_ADDITIONS`, in that file's order. */
 export const GX_CODES = [
   // 44 §2.3's table, verbatim.
   "VALIDATION_ERROR",
@@ -89,6 +101,12 @@ export const GX_CODES = [
   "HISTORY_LOST",
   "LAYOUT_BLOCKED",
   "JOURNAL_UNREADABLE",
+  "SOURCE_UNKNOWN",
+  "SOURCE_KEY_INVALID",
+  "PLAINTEXT_SECRET_REFUSED",
+  "OBSERVATION_CLASS_UNKNOWN",
+  "WINDOW_OVERLAP",
+  "CHAIN_GAP_ESCALATE",
 ] as const;
 
 export type GxCode = (typeof GX_CODES)[number];

@@ -14,11 +14,19 @@
 //!
 //! | source | refusal kinds |
 //! |---|---|
-//! | `gx_engine::ERROR_KINDS` | 16 |
-//! | `gx_gate::ERROR_KINDS` | 6 |
+//! | `gx_engine::ERROR_KINDS` | 22 |
+//! | `gx_gate::ERROR_KINDS` | 7 |
 //! | `gx_witness::ERROR_KINDS` | 10 |
 //! | `gx_log::ERROR_KINDS` | 5 |
-//! | **total** | **37** |
+//! | **total** | **44** |
+//!
+//! 🔴 **`req/824` A3 (2026-08-26)** — the observation phase grew the denominator by six: five
+//! engine kinds (`PlaintextSecret`, `ObservationClassUnknown`, `WindowOverlap`,
+//! `InverseNotExecutableAtSubstrate`, `AppendOnlyClass`) and one gate kind (`ChainGap`). The two
+//! inverse kinds **fold** onto `INVERSE_UNAVAILABLE` and the folds are written down below (Λ4);
+//! the other four carry their own §2.6 ruled additions. (The table above previously said 16/37
+//! while the arrays held 17/38 — one header increment had been missed; the numbers now printed
+//! are the measured ones.)
 //!
 //! 🔴 **P2 item2** (`req/130` §1, key-at-rest encryption, NFR-010) added two of gx-witness's ten:
 //! `KeyEncrypted` and `WrongPassphrase`. Neither is reachable through the HTTP surface today (no
@@ -26,7 +34,7 @@
 //! gap), so both fold to `INTERNAL` for the same reason [`Origin::Witness`]'s other operational rows
 //! already do.
 //!
-//! onto 44 §2.3's **12**. [`REFUSALS`] carries one row per refusal kind, all thirty-seven, and
+//! onto 44 §2.3's **12**. [`REFUSALS`] carries one row per refusal kind, all forty-four, and
 //! [`folds()`] is the list Λ4 asks to be written down: the rows whose meaning does not survive the
 //! code they land on.
 //!
@@ -506,12 +514,79 @@ pub const JOURNAL_UNREADABLE_STATUS: u16 = 500;
 pub const JOURNAL_UNREADABLE_TITLE: &str =
     "this project's journal is there and this process could not open it";
 
+/// 🔴 **`req/824` A3/A4** — the attach-source id is not in the registry.
+///
+/// Distinct from `NOT_FOUND`, which names a transformation or receipt: folding them would make
+/// "your source is not registered" and "that deploy does not exist" the same sentence, and the
+/// remedies differ (`POST /attach-sources` vs nothing). Exit **6** because it is 44 §1.4's
+/// "target id absent" family — the one addition here whose CLI column is not the standing fold
+/// onto 1.
+pub const SOURCE_UNKNOWN: &str = "SOURCE_UNKNOWN";
+
+/// The status [`SOURCE_UNKNOWN`] carries.
+pub const SOURCE_UNKNOWN_STATUS: u16 = 404;
+
+/// 🔴 **`req/824` A3/A4** — the attach-source's own key failed to verify.
+///
+/// Deliberately **not** folded into `UNAUTHORIZED` (§2.6's membrane Bearer failing): a registered
+/// source with a bad key and an unauthenticated stranger are different events, and one map entry
+/// for both would make an attacker's probe read as a misconfigured token.
+pub const SOURCE_KEY_INVALID: &str = "SOURCE_KEY_INVALID";
+
+/// The status [`SOURCE_KEY_INVALID`] carries.
+pub const SOURCE_KEY_INVALID_STATUS: u16 = 401;
+
+/// 🔴 **`req/824` A2/A3** — a value field is not of the declared digest form (`blake3:<64 hex>`).
+///
+/// A product ruling and not input validation: Glovrex refuses to become a secrets store, so it
+/// refuses the shape that would make it one. `gx_engine::Error::PlaintextSecret` is the kind
+/// behind it; `gx_core::observation::is_digest_form` is the detector.
+pub const PLAINTEXT_SECRET_REFUSED: &str = "PLAINTEXT_SECRET_REFUSED";
+
+/// The status [`PLAINTEXT_SECRET_REFUSED`] carries.
+pub const PLAINTEXT_SECRET_REFUSED_STATUS: u16 = 422;
+
+/// 🔴 **`req/824` A1/A3** — `class` is not one of envset / deploy / config / log-window.
+///
+/// Refused rather than defaulted — a defaulted class would file a deploy as an envset and every
+/// downstream receipt would be quietly wrong. `gx_engine::Error::ObservationClassUnknown` is the
+/// kind behind it.
+pub const OBSERVATION_CLASS_UNKNOWN: &str = "OBSERVATION_CLASS_UNKNOWN";
+
+/// The status [`OBSERVATION_CLASS_UNKNOWN`] carries.
+pub const OBSERVATION_CLASS_UNKNOWN_STATUS: u16 = 422;
+
+/// 🔴 **`req/824` A3 (for A6/A7)** — the requested window overlaps the last committed window.
+///
+/// An overlap would count one deploy or one log line into two attestations, and both would then
+/// look independently true. `409` / CLI **3**: the `PRECONDITION_CHANGED` family — the caller's
+/// correct response is to look at what they sent and start from the last `window_end`.
+pub const WINDOW_OVERLAP: &str = "WINDOW_OVERLAP";
+
+/// The status [`WINDOW_OVERLAP`] carries.
+pub const WINDOW_OVERLAP_STATUS: u16 = 409;
+
+/// 🔴 **`req/824` A2/A3/A5** — `prev_ref` names a record this ledger does not hold, so the
+/// observation was admitted into **ESCALATE** and is reachable at `GET /escalations`.
+///
+/// The one addition whose status is a **success** code, and deliberately so: a gap is neither an
+/// acceptance we can fake nor a refusal that would discard real evidence. It is the third state —
+/// K8s' `ValidatingAdmissionWebhook` has none and we do (`req/765` §3-8) — and pairing this
+/// reason with a 4xx would be the first step to losing it. CLI exit **4** is 44 §1.4's
+/// "escalated" family (`ESCALATION_PENDING`'s), which is exactly what the state is.
+pub const CHAIN_GAP_ESCALATE: &str = "CHAIN_GAP_ESCALATE";
+
+/// The status [`CHAIN_GAP_ESCALATE`] carries.
+pub const CHAIN_GAP_ESCALATE_STATUS: u16 = 201;
+
 /// 🔴 The codes 44 §2.3 does **not** have and a ruling gave this repository.
 ///
 /// ~~Two~~ ~~**Four**~~ (v0.4-l, `req/189`) ~~**Six**~~ (v0.4-n, `req/38` §148/§156) ~~**Seven**~~
 /// (v0.4-v, R9) ~~**Nine**~~ (v0.4-w, R10, `req/238` H-01) ~~**Ten**~~ (v0.4-y, R12, `req/242`
 /// H-01) ~~**Twelve**~~ (v0.4-z, R13, `req/244` H-01 + M-04) ~~**Thirteen**~~ (v0.5-a, R14,
-/// `req/246` M-04) **Fourteen** (v0.5-d, DR-B, `req/38` §337, `req/565` §3),
+/// `req/246` M-04) ~~**Fourteen**~~ (v0.5-d, DR-B, `req/38` §337, `req/565` §3) **Twenty**
+/// (v0.5-s, `req/824` A3 — the six observation-phase words, drafted in
+/// `req/wire/gx_code_additions.json` and transcribed here),
 /// all from 44
 /// §2.6's "backward-compatible addition" clause (sem: SEM-gx-api-072) and each ruled in `req/38`:
 ///
@@ -531,6 +606,12 @@ pub const JOURNAL_UNREADABLE_TITLE: &str =
 /// | `HISTORY_LOST` | 500 | 1 | **R13** (§183 ruling 2) | §2.3 has no word for a project that has used gx and holds no witness of any commit |
 /// | `LAYOUT_BLOCKED` | 500 | 1 | **R14** (§186 ruling 2) | §2.3 has no word for a declared directory whose path holds something that is not one |
 /// | `JOURNAL_UNREADABLE` | 500 | 1 | **DR-B** (§337) | §2.3 has no word for a project's journal that is present, is the right shape, and could not be opened |
+/// | `SOURCE_UNKNOWN` | 404 | 6 | **`req/824` A3** | §2.3's `NOT_FOUND` names a transformation, not an unregistered attach-source |
+/// | `SOURCE_KEY_INVALID` | 401 | 1 | **`req/824` A3** | §2.3's `UNAUTHORIZED` is the membrane Bearer, not a registered source's own key |
+/// | `PLAINTEXT_SECRET_REFUSED` | 422 | 1 | **`req/824` A2/A3** | §2.3 has no word for refusing to become a secrets store |
+/// | `OBSERVATION_CLASS_UNKNOWN` | 422 | 1 | **`req/824` A1/A3** | §2.3 has no word for a class outside `req/812` §1's four |
+/// | `WINDOW_OVERLAP` | 409 | 3 | **`req/824` A3** | §2.3 has no word for a window that would double-count an attestation |
+/// | `CHAIN_GAP_ESCALATE` | 201 | 4 | **`req/824` A2/A3** | §2.3 has no word for evidence admitted into the third state |
 ///
 /// The last four carry CLI exit **1** because 44 §1.4 has no exit for any of them (the same fold
 /// `UNAVAILABLE_CLI_EXIT` documents) ~~and because the CLI never meets them: it does not speak HTTP
@@ -555,7 +636,7 @@ pub const JOURNAL_UNREADABLE_TITLE: &str =
 /// moment it gained a row nobody wrote there. `probes/doubt/tests/m6_gx_code.rs` parses the markdown
 /// and compares it with `GX_CODES`; this list is the place a reader looks for the difference between
 /// "what 44 says" and "what this server sends" (sem: SEM-gx-api-073), which is a difference that has to be findable.
-pub const RULED_ADDITIONS: [GxCode; 14] = [
+pub const RULED_ADDITIONS: [GxCode; 20] = [
     GxCode {
         code: INVALID_STATE,
         status: INVALID_STATE_STATUS,
@@ -640,6 +721,42 @@ pub const RULED_ADDITIONS: [GxCode; 14] = [
         cli_exit: 1,
         meaning: "this project's journal is present, is the regular file req/56 §2 declares, and this process could not open it; the operating system's own refusal is entirely classifiable and was answering INTERNAL (DR-B, req/38 §337, req/565 §3; 44 §2.3 has no row for it)",
     },
+    GxCode {
+        code: SOURCE_UNKNOWN,
+        status: SOURCE_UNKNOWN_STATUS,
+        cli_exit: 6,
+        meaning: "the attach-source id is not in the registry; register it with `POST /attach-sources` before presenting observations against it (req/824 A4). Distinct from NOT_FOUND, which names a transformation or receipt -- folding them would make 'your source is not registered' and 'that deploy does not exist' the same sentence",
+    },
+    GxCode {
+        code: SOURCE_KEY_INVALID,
+        status: SOURCE_KEY_INVALID_STATUS,
+        cli_exit: 1,
+        meaning: "the attach-source's own key failed to verify; rotate the key on the source and re-register (req/824 A4). Deliberately NOT folded into UNAUTHORIZED (44 §2.6's membrane Bearer failing): a registered source with a bad key and an unauthenticated stranger are different events, and one map entry for both would make an attacker's probe read as a misconfigured token",
+    },
+    GxCode {
+        code: PLAINTEXT_SECRET_REFUSED,
+        status: PLAINTEXT_SECRET_REFUSED_STATUS,
+        cli_exit: 1,
+        meaning: "a value field is not of the declared digest form (blake3:<64 hex>); compute digests client-side with `gx observe envset` and resend (req/824 A2). This refusal is a product ruling, not input validation: Glovrex refuses to become a secrets store, so it refuses the shape that would make it one",
+    },
+    GxCode {
+        code: OBSERVATION_CLASS_UNKNOWN,
+        status: OBSERVATION_CLASS_UNKNOWN_STATUS,
+        cli_exit: 1,
+        meaning: "`class` is not one of envset / deploy / config / log-window; the four classes are fixed by req/812 §1 and a fifth needs a class table row before it needs a code (req/824 A1). Refused rather than defaulted -- a defaulted class would file a deploy as an envset and every downstream receipt would be quietly wrong",
+    },
+    GxCode {
+        code: WINDOW_OVERLAP,
+        status: WINDOW_OVERLAP_STATUS,
+        cli_exit: 3,
+        meaning: "the requested window overlaps the last committed window on this scope; start from the last window_end (req/824 A6/A7). An overlap would count one deploy or one log line into two attestations, and both attestations would then look independently true",
+    },
+    GxCode {
+        code: CHAIN_GAP_ESCALATE,
+        status: CHAIN_GAP_ESCALATE_STATUS,
+        cli_exit: 4,
+        meaning: "`prev_ref` names a record this ledger does not hold, so the observation was admitted into ESCALATE and is reachable at `GET /escalations` (req/824 A2/A5). The one addition whose status is a success code, and deliberately so: a gap is neither an acceptance we can fake nor a refusal that would discard real evidence -- it is the third state (req/765 §3-8), and pairing this reason with a 4xx would be the first step to losing it",
+    },
 ];
 
 /// Where a refusal kind came from.
@@ -681,13 +798,14 @@ pub struct Refusal {
     pub fold: Option<&'static str>,
 }
 
-/// 🔴 **The map** — thirty-eight refusal kinds, one row each, in vocabulary order.
+/// 🔴 **The map** — ~~thirty-eight~~ **forty-four** (`req/824` A3) refusal kinds, one row each, in
+/// vocabulary order.
 ///
 /// Read it as Λ4's quotient made explicit. What a reader should be able to do with it is exactly
 /// what a `_` arm prevents: look up a refusal they saw in a log and find the sentence explaining why
 /// it wears the code it wears.
-pub const REFUSALS: [Refusal; 38] = [
-    // ---- gx_engine::ERROR_KINDS (17) -------------------------------------------------
+pub const REFUSALS: [Refusal; 44] = [
+    // ---- gx_engine::ERROR_KINDS (22) -------------------------------------------------
     Refusal {
         origin: Origin::Engine,
         kind: "Canon",
@@ -865,7 +983,64 @@ pub const REFUSALS: [Refusal; 38] = [
              cannot tell a third party's write from a deleted receipt; the sentence can.",
         ),
     },
-    // ---- gx_gate::ERROR_KINDS (6) ----------------------------------------------------
+    Refusal {
+        origin: Origin::Engine,
+        kind: "PlaintextSecret",
+        code: PLAINTEXT_SECRET_REFUSED,
+        fold: None,
+    },
+    Refusal {
+        origin: Origin::Engine,
+        kind: "ObservationClassUnknown",
+        code: OBSERVATION_CLASS_UNKNOWN,
+        fold: None,
+    },
+    Refusal {
+        origin: Origin::Engine,
+        kind: "WindowOverlap",
+        code: WINDOW_OVERLAP,
+        fold: None,
+    },
+    Refusal {
+        origin: Origin::Engine,
+        kind: "InverseNotExecutableAtSubstrate",
+        code: "INVERSE_UNAVAILABLE",
+        // 🔴 req/824 A3 — FOLDED, and the fold is the point of writing it down (Λ4).
+        fold: Some(
+            "`INVERSE_UNAVAILABLE` already means 'the inverse delta for this undo is not \
+             available', and a caller handling that case handles this one identically. What is \
+             LOST in the fold is WHY: the ordinary case is a missing escrow record and could in \
+             principle be repaired, whereas this case can never be repaired for any observation \
+             of any attach-source, because we cannot write to the substrate and canon says we \
+             never will (SS273). The problem+json `detail` carries the distinction; the code \
+             does not (req/824 A3, req/wire/gx_code_additions.json).",
+        ),
+    },
+    Refusal {
+        origin: Origin::Engine,
+        kind: "AppendOnlyClass",
+        code: "INVERSE_UNAVAILABLE",
+        fold: Some(
+            "FOLDED into the same code as the row above, and losing a DIFFERENT thing. Here the \
+             inverse is not absent-and-unreachable but refused-by-design: undoing a log-window \
+             attestation would un-attest history, which the ledger refuses for the same reason \
+             it refuses one of its own rows being rewritten. A caller sees `INVERSE_UNAVAILABLE` \
+             for three distinct situations -- missing escrow, substrate cannot be written, and \
+             this must never be undone -- and only `detail` separates them. Recorded rather than \
+             fixed: three codes where one suffices would be a vocabulary grown for a distinction \
+             no caller acts on differently (req/824 A3).",
+        ),
+    },
+    // ---- gx_gate::ERROR_KINDS (7) ----------------------------------------------------
+    Refusal {
+        origin: Origin::Gate,
+        kind: "ChainGap",
+        code: CHAIN_GAP_ESCALATE,
+        // 🔴 Not a fold, and the point is the status: 201, the one success code in this file's
+        // additions -- a gap is evidence admitted into the third state, not a refusal (req/824
+        // A3, req/765 §3-8).
+        fold: None,
+    },
     Refusal {
         origin: Origin::Gate,
         kind: "EmptyDeny",

@@ -320,6 +320,12 @@ pub struct AppState {
     meta: Option<Arc<dyn ProjectMeta>>,
     /// 🔴 **R11 / `req/240` M-01** — the last answer `GET /v1/healthz` built, and when.
     health: Arc<Mutex<Option<HealthSnapshot>>>,
+    /// 🔴 **`req/824` A4** — the attach-source registry: membrane bookkeeping, so by Rule 1 it
+    /// must **not** live in the engine. One map behind one lock (M6-06 adopted (a)'s
+    /// serialisation discipline, the health snapshot's own shape). See
+    /// [`crate::attach_sources`] for what it holds and for the declared restart-persistence
+    /// deferral.
+    attach_sources: Arc<Mutex<crate::attach_sources::Registry>>,
 }
 
 impl AppState {
@@ -371,6 +377,7 @@ impl AppState {
             startup: serde_json::Value::Null,
             meta: None,
             health: Arc::new(Mutex::new(None)),
+            attach_sources: Arc::new(Mutex::new(crate::attach_sources::Registry::default())),
             idempotency: IdempotencyStore::at(index_dir),
             origin: crate::DEFAULT_ORIGIN.to_string(),
             shutdown: Arc::new(crate::serve::Shutdown::new()),
@@ -750,6 +757,18 @@ impl AppState {
     /// is no torn invariant a poisoned lock is protecting.
     pub fn engine(&self) -> std::sync::MutexGuard<'_, Engine<RequestEvidence>> {
         self.engine.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// 🔴 **`req/824` A4** — the attach-source registry, locked.
+    ///
+    /// The guard is returned rather than a closure taken, for [`AppState::engine`]'s reason one
+    /// field over: `register` reads the replay map and writes the row under one hold, and a lock
+    /// released between the two would let a second retry of the same `Idempotency-Key` mint a
+    /// second source.
+    pub fn attach_sources(&self) -> std::sync::MutexGuard<'_, crate::attach_sources::Registry> {
+        self.attach_sources
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     /// The per-request evidence cell.

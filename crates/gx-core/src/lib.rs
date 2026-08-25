@@ -122,6 +122,7 @@ pub mod intent;
 pub mod ledger;
 pub mod measure;
 pub mod object;
+pub mod observation;
 pub mod planned;
 pub mod proof;
 pub mod reads;
@@ -141,6 +142,10 @@ pub use intent::{GoalBytes, Intent};
 pub use ledger::{Checkpoint, InclusionProof, VerdictCheckpoint, VerdictTally};
 pub use measure::{Lyapunov, MorphismMeasure, ObjectMeasure};
 pub use object::{ObjectId, ObjectSnapshot, ReprKind, SubstrateKind};
+pub use observation::{
+    is_digest_form, EnvsetAdmission, EnvsetEntry, EnvsetFingerprint, EnvsetScope, ObservationClass,
+    ObservationId, ObservationSubstrate, OBSERVATION_CLASSES,
+};
 pub use planned::PlannedDeltaBytes;
 pub use proof::{CheckerResultRef, Proof, ProofRef, TheoremId};
 pub use reads::ReadEntry;

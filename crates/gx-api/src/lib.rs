@@ -44,6 +44,7 @@
 //! shutdown, and M6-05's three list endpoints. This crate declares no `tokio` for that reason: the
 //! hand that writes `#[tokio::main]` declares it (req/38 §38, adopted (a); sem: SEM-gx-api-183).
 
+pub mod attach_sources;
 pub mod auth;
 pub mod extract;
 pub mod gx_code;
@@ -585,6 +586,14 @@ pub fn router(state: AppState) -> axum::Router {
             "/verdict-checkpoints/{window_end}",
             get(verdict_checkpoints::get),
         )
+        // 🔴 **`req/824` A4** (R1): the attach-source registry. Registered inside `guarded` so
+        // that `tests/auth.rs`'s source-derived walk covers all three for free — the single most
+        // valuable property of this router's shape, preserved deliberately (`req/824` §3).
+        .route(
+            "/attach-sources",
+            post(attach_sources::register).get(attach_sources::list),
+        )
+        .route("/attach-sources/{id}", get(attach_sources::get))
         // 🔴 **H-11 ①** (`req/189`): a known path asked with a method it has no handler for was
         // axum's bare `405` with an empty body — the fourth response writer outside 44 §2.3.
         // Named here, on the router that owns the routes, and answered in problem+json.

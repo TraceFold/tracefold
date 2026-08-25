@@ -439,6 +439,57 @@ pub enum Error {
         /// actually do about it.
         remedy: &'static str,
     },
+
+    /// 🔴 **`req/824` A2/A3** — an envset observation carried a value field that is not of the
+    /// declared digest form (`blake3:<64 hex>`).
+    ///
+    /// A product ruling, not input validation: Glovrex refuses to become a secrets store, so it
+    /// refuses the shape that would make it one. The detector is
+    /// `gx_core::observation::is_digest_form` and the surface word is
+    /// `PLAINTEXT_SECRET_REFUSED` (422). The message never carries the value — only the name of
+    /// the entry whose value was refused, which is the whole point of the design.
+    #[error("the value of {name} is not of the declared digest form (blake3:<64 hex>); values never travel this wire -- compute digests client-side and resend (req/824 A2)")]
+    PlaintextSecret { name: String },
+
+    /// 🔴 **`req/824` A1/A3** — an observation named a class outside the four `req/812` §1 fixes.
+    ///
+    /// Refused rather than defaulted: a silently-defaulted class would file a deploy as an envset
+    /// and every downstream receipt would be quietly wrong. Surface word:
+    /// `OBSERVATION_CLASS_UNKNOWN` (422).
+    #[error("{class} is not one of the four observation classes (envset / deploy / config / log-window); a fifth needs a class-table row before it needs a code (req/824 A1)")]
+    ObservationClassUnknown { class: String },
+
+    /// 🔴 **`req/824` A3 (for A6/A7)** — a requested attestation window overlaps the last
+    /// committed window on this scope.
+    ///
+    /// An overlap would count one deploy or one log line into two attestations, and both
+    /// attestations would then look independently true. Surface word: `WINDOW_OVERLAP` (409,
+    /// CLI 3 — the same "look at what you sent" family as `PRECONDITION_CHANGED`).
+    #[error("the requested window overlaps the last committed window on {scope}: {detail}")]
+    WindowOverlap { scope: String, detail: String },
+
+    /// 🔴 **`req/824` A1/A3** — the undo of an observation cannot be executed at the substrate,
+    /// for any observation of any attach-source, ever (SS273).
+    ///
+    /// Distinct from the ordinary missing-escrow case, which could in principle be repaired:
+    /// this one never can, because we cannot write to the platform and canon says we never will.
+    /// The surface **folds** it onto `INVERSE_UNAVAILABLE` and the fold is written down in
+    /// `gx_api::gx_code` (Λ4); the `detail` a handler builds from this message is where the
+    /// distinction survives. Constructible engine-side only — `crates/gx-canon/tests/
+    /// authority_boundary.rs` counts constructions in the secondary surfaces and holds them at 0.
+    #[error("the inverse of {id} cannot be executed at the substrate: an attach-source's platform is not writable by this system and never will be (SS273, req/824 A1); the prior state is record-level escrow only -- inverse-not-executable-at-substrate")]
+    InverseNotExecutableAtSubstrate { id: String },
+
+    /// 🔴 **`req/824` A1/A3** — the undo of a committed log-window observation is refused by
+    /// design: the class is append-only.
+    ///
+    /// Not absent-and-unreachable but refused-on-purpose: undoing an attestation would un-attest
+    /// history, which the ledger refuses for the same reason it refuses one of its own rows being
+    /// rewritten. Folds onto `INVERSE_UNAVAILABLE` beside the row above, losing a *different*
+    /// thing — the fold notes in `gx_api::gx_code` carry both. Constructible engine-side only,
+    /// under the same `authority_boundary.rs` counter.
+    #[error("undoing {id} would un-attest history: a log-window observation is append-only by design (req/824 A1) -- append-only-class")]
+    AppendOnlyClass { id: String },
 }
 
 /// The vocabulary of [`Error`], declared once (**E-M2-23**).
@@ -451,7 +502,7 @@ pub enum Error {
 /// `ADAPTER_ERROR`, `EvidenceUnavailable` → `VerifierUnavailable`'s abort rather than an API code.
 /// The mapping is written here and checked nowhere: 44's surface is M6 (req/78 N-01), and a probe
 /// asserting a correspondence nothing yet consumes would be a probe about a table.
-pub const ERROR_KINDS: [&str; 17] = [
+pub const ERROR_KINDS: [&str; 22] = [
     "Canon",
     "Core",
     "Io",
@@ -469,6 +520,15 @@ pub const ERROR_KINDS: [&str; 17] = [
     "Busy",
     "WorldMoved",
     "WitnessMissing",
+    // 🔴 req/824 A3 — the five observation-phase refusals, in declaration order like every row
+    // above. Three carry their own new codes (PLAINTEXT_SECRET_REFUSED /
+    // OBSERVATION_CLASS_UNKNOWN / WINDOW_OVERLAP) and two fold onto INVERSE_UNAVAILABLE with the
+    // fold written down in gx_api::gx_code (Λ4).
+    "PlaintextSecret",
+    "ObservationClassUnknown",
+    "WindowOverlap",
+    "InverseNotExecutableAtSubstrate",
+    "AppendOnlyClass",
 ];
 
 impl Error {
@@ -495,6 +555,11 @@ impl Error {
             Error::Busy { .. } => "Busy",
             Error::WorldMoved { .. } => "WorldMoved",
             Error::WitnessMissing { .. } => "WitnessMissing",
+            Error::PlaintextSecret { .. } => "PlaintextSecret",
+            Error::ObservationClassUnknown { .. } => "ObservationClassUnknown",
+            Error::WindowOverlap { .. } => "WindowOverlap",
+            Error::InverseNotExecutableAtSubstrate { .. } => "InverseNotExecutableAtSubstrate",
+            Error::AppendOnlyClass { .. } => "AppendOnlyClass",
         }
     }
 }

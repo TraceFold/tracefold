@@ -3445,3 +3445,99 @@ only; the rest is filed rather than silently left.
 > per-directory row is the one still standing (`req/603` §4 filed it as reaching the same "to repair
 > a project this process has to be able to open `.gx/` at all" wall R43 found, and left it a
 > structural-reachability question for a later lane rather than a wire this one could close).
+
+## An observation is evidence that a record was presented, never evidence that the operation happened (2026-08-26, `req/824` A1)
+
+**The claim this qualifies.** That Glovrex governs deploys, env-var changes, config changes and log
+windows on external platforms.
+
+**What is measured.** That a registered attach-source presented a record, that the record was
+schema-valid, that it chained to what we already held, and that it was committed to the ledger at a
+stated sequence. `req/wire/fixtures/observation.jsonl` carries 19 vectors, of which 11 are refusals
+or escalations (10 negative, 1 escalate — counted by the consuming test
+`crates/gx-core/tests/observation_class.rs`, which drives the envset subset against the codec; the
+drafted row in `req/wire/limits_rows.md` said 9 and the measured number is 11, corrected here per
+`req/836`).
+
+**Why.** We never run the workload and we cannot read the platform (SS273, `req/733` §3). Everything
+about the operation reaches us because somebody chose to report it.
+
+**What holds in the meantime.** Coverage is attach-source-**declared** and is rendered as
+numerator/denominator, never as "all". The registry surface itself lands with `req/824` A4;
+`coverage_verified` is declared from A1 so that surface cannot land without carrying it, and it is
+always `false` in this phase — the declaration cannot be mistaken for a measurement.
+
+**What this does not fix, said in the same breath.** Operations that were never reported are invisible,
+and their absence is indistinguishable from there being none. Nothing here detects a source that
+under-reports.
+
+## Glovrex never sees an environment variable's value, and the names it does see are in clear (2026-08-26, `req/824` A2)
+
+**The claim this qualifies.** That env-var change history is governed.
+
+**What is measured.** The ordered set of `(name, value_digest, scope)`, where `value_digest` must match
+`blake3:<64 hex>` client-side-salted form. A value field of any other shape is refused at the gate
+(`PLAINTEXT_SECRET_REFUSED`), with four adversarial vectors covering raw plaintext, wrong-length hex,
+base64-of-plaintext, and empty.
+
+**Why.** Holding values would make Glovrex a secrets store, which is a different product with a
+different threat model. The refusal is a product ruling and not input validation.
+
+**What holds in the meantime.** The salt is computed and held client-side and is never transmitted, so
+we cannot reverse a digest even for values we could otherwise guess.
+
+**What this does not fix, said in the same breath.** Two real gaps, stated rather than left to be
+found. First, **names travel in clear** — deliberately, because the diff is meaningless without them —
+so a variable name that is itself sensitive (`ACME_INTERNAL_PROJECT_KEY` reveals that the project
+exists) is disclosed to anyone who can read the ledger. Second, a digest of a **low-entropy** value
+protects little against a party who obtains the salt and enumerates candidates; the fixture bed accepts
+that case rather than pretending the detector catches it.
+
+## An observation cannot be undone at the substrate, and for log windows it cannot be undone at all (2026-08-26, `req/824` A1)
+
+**The claim this qualifies.** Pillar 2 — the inverse-escrow undo guarantee.
+
+**What is measured.** That the prior observed state is held in **record-level** escrow, and that undo
+of an observation returns a typed refusal rather than a success.
+
+**Why.** Substrate-level invertibility requires a substrate we can write to. For an attach-source there
+is none and there never will be (SS273). For log windows the refusal is stronger and deliberate: undoing
+an attestation would un-attest history.
+
+**What holds in the meantime.** The two refusals are **typed** — `inverse-not-executable-at-substrate`
+and `append-only-class`, `gx_engine::Error`'s own kinds, constructible engine-side only
+(`crates/gx-canon/tests/authority_boundary.rs` counts constructions in the secondary surfaces and
+holds them at 0) — so the absence is declared at the exact point a caller would otherwise assume a
+capability. The one class where a real invert does hold is config in `adapter` mode, where the blob
+lives in a repo the git/fs adapter covers and AC-050's bit-equal round-trip applies as it does for any
+file; the `substrate: {adapter|declared}` field exists so the two are never conflated.
+
+**What this does not fix, said in the same breath.** Both refusals currently fold onto the single
+`INVERSE_UNAVAILABLE` code, together with the ordinary missing-escrow case. Three situations, one code;
+only `detail` separates them. That fold is written down in `req/wire/gx_code_additions.json` and in
+`gx_code.rs`'s two fold rows rather than repaired, because three codes for a distinction no caller acts
+on differently would be vocabulary grown for its own sake.
+
+## The registry records what a source declares it covers, and Glovrex does not verify the declaration (2026-08-26, `req/824` A4)
+
+**The claim this qualifies.** That registered attach-sources are "covered" by Glovrex.
+
+**What is measured.** That a source registered, what family it named (`vercel` / `github-actions` /
+`generic-ci`), what it **declared** it reports, and — when it presented one — that its public key is
+a decodable ed25519 key. `req/wire/fixtures/attach_source.jsonl` carries 10 vectors (5 positive,
+5 negative), driven by `crates/gx-api/tests/attach_sources.rs`.
+
+**Why.** `declared_coverage` is the source's own claim; verifying it would require reading the
+platform, which SS273 rules out permanently. `coverage_verified` is present on every registry
+response and is always `false` in this phase, so the declaration cannot be mistaken for a
+measurement.
+
+**What holds in the meantime.** Every response carries a non-empty `limits` array (P-12), and a
+source registered without a public key has "membrane Bearer only" stated in that array rather than
+being silently presented as a signed one.
+
+**What this does not fix, said in the same breath.** A registration does not survive a server
+restart in this atom: the registry is membrane state behind the lock, not a `.gx/` file — a disk
+home is deferred, with its reasoning, in `crates/gx-api/src/attach_sources.rs`'s declared delta 1.
+And a registered key proves the source *can* sign; nothing signs or verifies against it until the
+observation ingest route (`req/824` A5) exists to present signed observations.

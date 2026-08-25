@@ -183,7 +183,10 @@ pub const REASON_CODES: [&str; 3] = [INVARIANT_VIOLATED, INVERSE_UNAVAILABLE, PO
 /// is C-5's (hand 2) and `RegistryUnusable` is D-3's (hand 3). Both map to 44 §2.3's `POLICY_ERROR`
 /// (500) at the API boundary; **44 has no code for the invariant side**, and that gap is req/64 §4's
 /// erratum rather than a name invented here.
-pub const ERROR_KINDS: [&str; 6] = [
+pub const ERROR_KINDS: [&str; 7] = [
+    // 🔴 req/824 A3 — the chain-gap third state's origin row. First because the table is sorted
+    // (`error_vocabulary.rs` compares the enum's variants sorted against this array).
+    "ChainGap",
     "EmptyDeny",
     "NotDigestible",
     "PolicySetUnreadable",
@@ -295,6 +298,24 @@ pub enum Error {
         /// gx-canon's own account of which clause of 42 §2.1 the value broke.
         detail: String,
     },
+
+    /// 🔴 **`req/824` A2/A3** — an observation's chain reference names a record the caller's
+    /// ledger does not hold: a **gap**.
+    ///
+    /// Deliberately neither ⊥ nor a refusal-to-record: the evaluation ran and what it found is
+    /// the third state. The surface word is `CHAIN_GAP_ESCALATE` and its status is a success
+    /// code (201) on purpose — a gap is neither an acceptance we can fake nor a refusal that
+    /// would discard real evidence, and pairing it with a 4xx would be the first step to losing
+    /// the third state (`req/765` §3-8: K8s' admission webhook has none and we do). The codec's
+    /// classification lives in `gx_core::observation::EnvsetFingerprint::admit`; this variant is
+    /// what the gate's road answers with where a caller sees an `Err` rather than the escalation.
+    #[error("the chain reference {claimed:?} names a record this ledger does not hold (ledger holds {held:?}): a gap, admitted into ESCALATE rather than accepted or denied (req/824 A2)")]
+    ChainGap {
+        /// What the source claimed as its predecessor (`None` = claimed first).
+        claimed: Option<String>,
+        /// What the ledger actually holds for the scope (`None` = nothing).
+        held: Option<String>,
+    },
 }
 
 impl Error {
@@ -308,6 +329,7 @@ impl Error {
     #[must_use]
     pub const fn kind(&self) -> &'static str {
         match self {
+            Error::ChainGap { .. } => "ChainGap",
             Error::EmptyDeny => "EmptyDeny",
             Error::NotDigestible { .. } => "NotDigestible",
             Error::PolicySetUnreadable { .. } => "PolicySetUnreadable",
