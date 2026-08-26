@@ -39,19 +39,14 @@ becomes a receipt anyone can verify offline, without trusting whoever issued it.
 ![Verify a receipt, flip one byte, verify again](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.gif)
 
 Three files are on that terminal: a receipt, a signed checkpoint, a public key. No project
-directory, no account, no network call. The receipt verifies and the command exits `0`. One
-byte of its payload is then flipped in place, `cmp -l` prints the single line that proves
-exactly one byte moved, and the same command exits `7`.
+directory, no account, no network call. The receipt verifies and exits `0`. One byte of its
+payload is flipped in place, `cmp -l` prints the single line proving exactly one byte moved,
+and the same command exits `7`.
 
-That is the whole claim, and the rest of this page is about how far it does and does not go.
-
-**About the recording.** It is a real terminal captured with `script(1)` against a fresh
-anonymous clone at commit `177141e3` on 26 August 2026, WSL2 Ubuntu 24.04, dev profile. No
-output was retyped or staged. One thing is deliberately outside it: `cargo build --workspace`,
-measured at **64 seconds** on that run. The demo starts after the binary exists, because a
-minute of compiler output is not the thing worth showing. The same run is published as
-[asciicast v2](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.cast)
-for anyone who would rather replay the bytes than watch a picture of them.
+Real terminal, captured with `script(1)` against a fresh anonymous clone at commit `177141e3`
+on 26 August 2026, WSL2 Ubuntu 24.04. Nothing retyped or staged. Outside the recording on
+purpose: `cargo build --workspace`, 64 seconds on that run. Also published as
+[asciicast v2](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.cast).
 
 ## Try it yourself
 
@@ -114,18 +109,17 @@ gx receipt verify tampered.json --offline \
 Exit `7`. Every command on this page was run in that order on a fresh clone before being
 printed here.
 
-**Pass `--checkpoint-key`.** Without it the check still runs and still exits `0`, but the
-answer comes back with `"anchor_authenticated":false`: the checkpoint was read and not
-authenticated, so you have verified the receipt against a file you took on faith. With the
-flag it reads `true`. Drop the `--checkpoint` argument entirely and the result is `7` with
-`"inclusion":"unanchored"`, which is the tool refusing to call a receipt verified when it
-cannot place it in a log.
+**Pass `--checkpoint-key`.** Without it the check still exits `0`, but the answer says
+`"anchor_authenticated":false`: the checkpoint was read and not authenticated, so you
+verified against a file you took on faith. Drop `--checkpoint` entirely and you get `7` with
+`"inclusion":"unanchored"`, the tool refusing to call a receipt verified when it cannot place
+it in a log.
 
 Exit codes are the contract a script branches on without parsing JSON: `0` valid, `7` does
-not verify or is unanchored, `6` not found, `1` bad input, `2` refused by policy. The full
-table is `crates/gx-cli/src/exit.rs`. The subcommands that exist today are `submit`, `plan`,
-`verify`, `commit`, `undo`, `cancel`, `escalation`, `receipt`, `replay`, `log`, `key`,
-`policy` and `serve`; `gx limits` prints the gaps below at a terminal.
+not verify or is unanchored, `6` not found, `1` bad input, `2` refused by policy. Full table
+in `crates/gx-cli/src/exit.rs`. The subcommands that exist today: `submit`, `plan`, `verify`,
+`commit`, `undo`, `cancel`, `escalation`, `receipt`, `replay`, `log`, `key`, `policy`,
+`serve`. `gx limits` prints the gaps below at a terminal.
 
 **Free forever for one person.** Receipt generation, offline verification and self-hosting
 are unlimited and unexpiring for a single person using this alone, which is a promise rather
@@ -164,10 +158,10 @@ and it still holds in someone else's hands.
 ![An agent acts, a receipt is issued, three files travel, a stranger verifies offline, a tampered copy fails](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-30s.gif)
 
 An agent changes a file through `gx`. The change is described, planned, judged and committed,
-and it leaves a signed receipt. Three files travel to somebody who was not there and does not
-trust the sender: receipt, checkpoint, public key. They verify offline and get `0`. They
-tamper with one byte and get `7`. Nothing else moved, and no service was asked to vouch for
-anything. Same recording conditions as above, and the build is outside this one too.
+and leaves a signed receipt. Three files travel to somebody who was not there and does not
+trust the sender: receipt, checkpoint, public key. They verify offline and get `0`, tamper
+with one byte, and get `7`. Nothing else moved, and no service was asked to vouch for
+anything. Same recording conditions as above.
 
 > [!IMPORTANT]
 > **Not released.** The names `tracefold` on npm and on crates.io are ours and are taken,
@@ -197,8 +191,8 @@ anything. Same recording conditions as above, and the build is outside this one 
 
 | | measured | under what conditions |
 |:--|--:|:--|
-| Test floor | **2,602** | probes across 454 suites, plus the SDK's 36 passed, 0 failed, 7 skipped · frozen harness · fresh clone · one machine · single run · 25 August 2026. Earlier printings ran 1,838 across 324, then 2,073, 2,089, 2,211, 2,224, 2,229, 2,235, 2,240, 2,253, 2,254, 2,256, 2,257, 2,258, 2,261, 2,318, 2,326, 2,333, 2,348, 2,363, 2,381, 2,405, 2,415, 2,439, 2,443, 2,445, 2,449, 2,451, 2,483, 2,498, 2,509, 2,511, 2,519, 2,521, 2,525, 2,532, 2,538, 2,549, 2,553, 2,558, 2,562, 2,587, 2,595, 2,601, each correct on the day and each overtaken since. This floor moves with every repair round |
-| Machine-checked | **117** | theorems in Lean, 12 of them counterexamples, out of 118 line-initial declarations in the Lean sources. The remaining one is an `axiom`, a statement assumed rather than proved, and it is named in the report. No `sorry`, the keyword standing in for a proof nobody wrote, so there are none. Proof rather than bounded model checking: nothing here is true only up to a scope · re-counted on a fresh clone 26 August 2026 |
+| Test floor | **2,602** | probes across 454 suites, plus the SDK's 36 passed / 0 failed / 7 skipped. Frozen harness, fresh clone, one machine, single run, 25 August 2026. This floor has moved more than forty times in a month; it moves with every repair round |
+| Machine-checked | **117** | theorems in Lean, 12 of them counterexamples, out of 118 line-initial declarations. The remaining one is an `axiom`, a statement assumed rather than proved, and it is named in the report. No `sorry`, the keyword standing in for a proof nobody wrote, so there are none. Proof rather than bounded model checking: nothing here is true only up to a scope · re-counted on a fresh clone 26 August 2026 |
 | Open holes | **0** | high severity, open as of 25 August 2026, counted as accepted findings whose repair has not been accepted. This number was 3, then 0, then 1, then 0 again inside a week, so read a zero here as the state of one afternoon rather than a property of the system. Forty-four adversarial rounds have landed, plus independent B-band and S(1) audits, all at zero as recorded |
 | Not measured | **3** | Windows native, OneDrive, SMB. Zero runs out of the three, as of 25 August 2026 |
 
@@ -215,19 +209,23 @@ grep -rcE '^axiom' lean/GxSpec.lean lean/GxSpec/*.lean
 grep -n "Windows, OneDrive" docs/LIMITS.md
 ```
 
-Those greps are anchored to the start of the line on purpose. A looser pattern that allows
-leading whitespace returns 119 and 2, because it also matches the words `theorem` and `axiom`
-where they appear in prose inside doc comments. The stricter count is the one that matches
-the declarations, and it is the number printed above.
+Those greps are anchored to the start of the line on purpose. Allowing leading whitespace
+returns 119 theorems and 2 axioms, but the three extra hits are English sentences wrapped
+inside doc comments, where a line happens to begin with the word:
 
-**The third row has no command, and that is not an oversight.** An open-hole count is read
-off the audit ledger, findings accepted as high severity whose repair has not been accepted,
-and no single invocation produces it. Printing a command that did not really generate the
-number would be the exact failure this table exists to avoid, so the row says where the
-number comes from instead and you are taking that one on our word.
+```
+lean/GxSpec/Attribution.lean:49:  theorem below asserts that gx's running implementation ...
+lean/GxSpec/MinimalityF0.lean:41:  theorem here strengthens, weakens or restates any frozen ...
+lean/GxSpec/MinimalityF0.lean:32:  axiom set stays `{propext, Quot.sound, GxSpec.composeId}` ...
+```
 
-The third row is also the one worth reading twice. A count that only ever falls is a count
-someone is managing rather than measuring.
+None is a declaration. Counting the loose way would add a theorem the prover never saw and a
+second unproved assumption that does not exist, so 117 and 1 are the numbers above.
+
+**The third row has no command, and that is not an oversight.** An open-hole count is read off
+the audit ledger, and no single invocation produces it. So that row says where the number
+comes from and you are taking it on our word. A count that only ever falls is a count someone
+is managing rather than measuring.
 
 **What would show this is wrong.** Two things, and either one is enough. Produce a receipt
 that `gx receipt verify` accepts while the inverse it names does not restore the state it
@@ -241,14 +239,12 @@ thing works.
 
 ## What it does
 
-Four behaviours, and the first thing worth knowing is that they are not four settings you
-configure separately. One declaration in the catalogue names an object and what may happen to
-it; the gate that runs before the action, the rule enforced while it runs, and the fields
-attested after it are all read out of that same declaration. Nothing about that shape is a
-discovery of ours, and it is being arrived at independently elsewhere. The narrower
-difference is worth stating plainly: a receipt here carries an inverse that was constructed
-and checked *before* the change landed, which is not the same thing as a field reporting
-afterwards that an action was reversible.
+Four behaviours, and they are not four settings you configure separately. One declaration
+names an object and what may happen to it; the gate that runs before the action, the rule
+enforced while it runs, and the fields attested after it all read out of that declaration.
+That shape is not a discovery of ours and is being arrived at independently elsewhere. The
+narrower difference: a receipt here carries an inverse constructed and checked *before* the
+change landed, which is not a field reporting afterwards that an action was reversible.
 
 **Escrow before commit.** Where an inverse can be constructed it is constructed, checked, and
 stored durably *before* the change is applied. Undo is a checked property, not an assumption
@@ -261,8 +257,8 @@ described by the same process that did it.
 **Offline-verifiable receipts.** Every verdict, admit or deny or escalate, is signed and
 anchored in an append-only log, and re-checks with no network and no trust in the issuer.
 
-**Declared coverage.** What is not covered ships beside what is, with equal weight. A skip
-prints its name rather than passing quietly.
+**Declared coverage.** What is not covered ships beside what is. A skip prints its name
+rather than passing quietly.
 
 ## Figures you can re-derive
 
@@ -280,17 +276,14 @@ cargo tree --depth 1 -e normal
 ```
 
 On 26 August 2026, at commit `177141e3`, the first printed 80,647 and the second 139,966,
-across 142 and 362 files in 13 crates. On 18 August the same two commands printed 68,855 and
-96,873 across 147 and 282 files, and our own ledger recorded 89,018 test lines for that
-second tree on that day, because it also excludes files merely named for tests. The tests are
-larger than the thing they test under either counting rule, and that is the only claim these
-figures support. Two rules on one repository on one day disagreed by eight per cent, which is
-why the command sits above the number and the date sits beside it. A figure without its
-method is decoration.
+across 142 and 362 files in 13 crates. The tests are larger than the thing they test, and
+that is the only claim these figures support. Our own ledger counts test lines a second way,
+excluding files merely named for tests, and on 18 August the two rules disagreed by eight per
+cent on the same tree on the same day. That is why the command sits above the number and the
+date sits beside it.
 
-This project is not small. It does not fit in an afternoon of reading, and the dependency
-surface is real: the third command lists it, and every entry is code you would be trusting on
-our recommendation.
+The dependency surface is real: the third command lists it, and every entry is code you would
+be trusting on our recommendation.
 
 ## Read further
 
