@@ -127,6 +127,12 @@ gx receipt verify tampered.json --offline \
 Exit `7`. Every command on this page was run in that order on a fresh clone before being
 printed here.
 
+**If it exits `0` instead, that is a finding, and we would rather have it than not.** The same
+goes for anywhere the tool turns out to claim more than it actually checked. You are now
+holding the three files a verification needs and the binary that reads them, which is
+everything required to attack the claim: open an issue with what you ran, and it gets recorded
+here whatever it costs us.
+
 **Pass `--checkpoint-key`.** Without it the check still exits `0`, but the answer says
 `"anchor_authenticated":false`: the checkpoint was read and not authenticated, so you
 verified against a file you took on faith. Drop `--checkpoint` entirely and you get `7` with
