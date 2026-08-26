@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TraceFold — verify a receipt</title>
+<style>
+:root{color-scheme:light dark;--fg:#111;--bg:#fff;--mut:#555;--line:#d8d8d8}
+@media (prefers-color-scheme:dark){:root{--fg:#e8e8e8;--bg:#101010;--mut:#a0a0a0;--line:#333}}
+body{margin:0;padding:3rem 1.25rem;background:var(--bg);color:var(--fg);
+font:16px/1.6 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:42rem;margin:0 auto}
+h1{font-size:1.5rem;margin:0 0 .5rem;letter-spacing:-.01em}
+p{color:var(--mut);margin:.75rem 0}
+a.go{display:inline-block;margin-top:1.25rem;padding:.7rem 1.15rem;border:1px solid var(--line);
+border-radius:.5rem;color:var(--fg);text-decoration:none;font-weight:600}
+a.go:hover{border-color:var(--fg)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
+</style>
+<main>
+<h1>Verify a TraceFold receipt</h1>
+<p>The verifier runs entirely in your browser. Nothing is uploaded, no toolchain
+is installed, and the page makes no network requests once it has loaded.</p>
+<p>It reports a three-valued verdict — a receipt can verify, fail, or be
+something this build cannot decide — and it says which.</p>
+<a class="go" href="./verify.html">Open the verifier</a>
+<p style="margin-top:2rem;font-size:.875rem">Source: <code>web_verify/public/verify.html</code>.
+Built and gated by <code>req/874</code>.</p>
+</main>
