@@ -2,16 +2,16 @@
 
 <img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold, the inverse is sealed before the action" width="880">
 
-### Undo, but proven.
+### It asks before the changes it can't put back.
 
-**Tracefold** is verified undo and offline-verifiable receipts for AI agent actions, in Rust.
-An agent's change is held with a checked inverse **before** it lands, and every verdict
-becomes a receipt anyone can verify offline, without trusting whoever issued it.
+**Tracefold** holds a checked inverse for an agent's change **before** it lands, in Rust. When the
+inverse is in hand the change goes through and you are never asked; when one cannot be built, the
+agent stops and the question comes to you. Every verdict also becomes a receipt that verifies
+offline, without trusting whoever issued it.
 
 <p>
 <a href="#what-you-cannot-take-from-this"><img alt="the limits first" src="https://img.shields.io/badge/the%20limits%20first-0b0a09?style=for-the-badge&labelColor=0b0a09"></a>
 <a href="https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md"><img alt="technical report" src="https://img.shields.io/badge/technical%20report-0b0a09?style=for-the-badge&labelColor=0b0a09"></a>
-<a href="https://discord.gg/bFBvvg7AG"><img alt="discord" src="https://img.shields.io/badge/discord-0b0a09?style=for-the-badge&labelColor=0b0a09&logo=discord&logoColor=ece7da"></a>
 </p>
 
 <p>
@@ -29,7 +29,6 @@ becomes a receipt anyone can verify offline, without trusting whoever issued it.
 [What it does](#what-it-does) ·
 [Report](https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md) ·
 [Contributing](https://github.com/TraceFold/tracefold/blob/main/.github/CONTRIBUTING.md) ·
-[Discord](https://discord.gg/bFBvvg7AG) ·
 [Glovrex](https://glovrex.com)
 
 ---
@@ -51,7 +50,26 @@ purpose: `cargo build --workspace`, 64 seconds on that run. Also published as
 ## Try it yourself
 
 Not released. There is nothing to install from a registry, so this starts from a clone.
-Rust stable; the toolchain is pinned in `rust-toolchain.toml`.
+
+**What that costs you today, stated plainly.** You need a Rust toolchain (stable, pinned in
+`rust-toolchain.toml`) and roughly a minute of compile time. On Windows the documented path is
+WSL, and a WSL install is not free: the virtual disk grows with the build tree, and on this
+project's own machine it reached hundreds of gigabytes. If that is more than you want to spend
+to check one receipt, that is a reasonable place to stop, and it is the honest state today.
+
+Two routes out of that requirement are being built, and neither is finished, so treat both as
+in progress rather than as a plan you can use. `sdk/wasm-verify/` is the verifier compiled to
+WebAssembly, which is what browser-side checking with no toolchain at all would be built on.
+Prebuilt binaries per platform would remove the compile step. When they land, verification
+becomes the thing you do without installing a compiler; until then it is not, and this page
+will not pretend otherwise.
+
+**Signing, when binaries exist.** macOS builds are intended to be codesigned and notarized, so
+a Mac user gets a double-clickable binary and no unidentified-developer dialog; the developer
+account for it is in hand. Windows is not the same story. An EV certificate is a real recurring
+cost that is not being paid yet, so a Windows binary would raise a SmartScreen warning, and the
+honest options there are to document that warning and how to proceed past it, or to build from
+source. No Windows signing is being promised.
 
 ```sh
 git clone https://github.com/TraceFold/tracefold
@@ -311,7 +329,8 @@ description. Silently bounded is the failure this project guards against hardest
 Good first things to pick up: a limit that is true but badly worded, a platform in the
 "not measured" row above, or a self red-team probe that breaks something we believe holds.
 
-Questions and half-formed ideas are welcome on [Discord](https://discord.gg/bFBvvg7AG).
+Questions and half-formed ideas belong in an issue. There is no chat channel to point at that
+will still be there next month, so this page does not point at one.
 
 ## Sponsors
 
