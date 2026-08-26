@@ -1,0 +1,18 @@
+{
+  "note": "The domain NOT_DRAWN is computed against. Only members read in the crate are listed; response bodies assembled in handlers.rs were not read, and that hole is declared here rather than filled from a second-hand list. The ledger therefore reports a real denominator that is smaller than the eventual one, which is the honest shape: a domain that looks complete and is not would make NOT_DRAWN look small for the wrong reason.",
+  "hole": "gx-api/src/handlers.rs response bodies unread; receipts, transformation views, verify outcomes and undo outcomes contribute no fields to this domain yet. Narrowed req/822_c6: the LIST-ROW members of get_candidates/get_transformations (transformation/state/verdict/enforced/created_at/actor/scope, + superseded_by/inverse_status/rollback) were dumped from a live engine and are carried through the declared projection in src/vocabulary.mjs; they are still not entries in this route.field domain, which stays page-level -- extending the domain to item members is a design of its own and is named in req/822_c6 rather than done quietly here",
+  "fields": [
+    { "route": "get_candidates", "field": "items", "source": "gx-api/src/list.rs:151" },
+    { "route": "get_candidates", "field": "next_cursor", "source": "gx-api/src/list.rs:156" },
+    { "route": "get_transformations", "field": "items", "source": "gx-api/src/list.rs:151" },
+    { "route": "get_transformations", "field": "next_cursor", "source": "gx-api/src/list.rs:156" },
+    { "route": "get_escalations", "field": "items", "source": "gx-api/src/list.rs:151" },
+    { "route": "get_escalations", "field": "next_cursor", "source": "gx-api/src/list.rs:156" },
+    { "route": "get_verdict_checkpoints", "field": "items", "source": "gx-api/src/verdict_checkpoints.rs:249" },
+    { "route": "get_verdict_checkpoints", "field": "next_cursor", "source": "gx-api/src/verdict_checkpoints.rs:250" },
+    { "route": "get_verdict_checkpoints", "field": "total", "source": "gx-api/src/verdict_checkpoints.rs:253" },
+    { "route": "get_ledger_consistency", "field": "consistent", "source": "gx-api/src/list.rs:498" },
+    { "route": "get_ledger_consistency", "field": "checked_from", "source": "gx-api/src/list.rs:504" },
+    { "route": "get_ledger_consistency", "field": "checked_to", "source": "gx-api/src/list.rs:505" }
+  ]
+}

@@ -1,0 +1,407 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * The one physical stylesheet of record for this app tree -- from zero, owned
+ * in-repo, not a pointer into TraceFold_App/ui_proto (req/03 SS635, glovrex/
+ * req/38 -- pointing a live dependency at a retired reference tree violates
+ * the SS24 retirement methodology: the whole point of retiring that tree is
+ * that nothing in this project may still need it to run). Every colour and
+ * every size below was derived from the written design canon
+ * (glovrex/req/38 SS551 Docker-IA chrome, SS553 36px tap targets + glyph-
+ * first controls, SS558 14px body floor + light-default), computed fresh
+ * against the WCAG 2.x relative-luminance formula (the same formula
+ * parts/src/tokens.mjs's contrastRatio() re-implements to check this file at
+ * test time) -- not read or copied from the retired file's own hex values.
+ * parts/src/tokens.mjs still holds every name a part is allowed to spell
+ * (CONSUMED); this file is the only place any of those names is given a
+ * value.
+ *
+ * Location: this directory sits outside parts/, shell/kernel/, shell/demo/
+ * and every per-face tree under faces/ on purpose. Each of those already
+ * carries its own "no colour literal / no second token roster" gate that
+ * walks its own directory (parts/test/tokens.test.mjs's declaring-file walk;
+ * shell/tools/gates.mjs's "the frame writes no colour" gate over
+ * shippedFiles(); each face's own tools/gate.mjs's shippedSources() over
+ * FACE_ROOT) -- a stylesheet
+ * that declares --bg/--ink/etc. would trip every one of those gates were it
+ * placed inside the tree any of them walks. A dedicated top-level directory
+ * is the one place in this app a real colour declaration can live without
+ * being mistaken, by a gate built to look for exactly that, for a second
+ * roster smuggled into a package that is supposed to hold none.
+ */
+
+:root {
+  /* dark palette (bare :root -- parts/src/tokens.mjs's palettes() reads an
+     un-qualified :root block as the dark bucket; this is a parser contract
+     this file honours, not a claim that dark is the shipped default -- see
+     the light-default note below). */
+  /* Owner #388 (「theme無し・味気ない」, req/822_c7 §3): the dark page is no longer a
+     neutral near-black. #0a0a0c was exactly the generic-dark-devtool ground the design
+     memory forbids (feedback_design_not_generic_dark_devtool); every reference the Owner
+     handed over that reads as having an identity carries a hue in its ground (deep
+     ink-blue in four of the five dark references, req/822_c7 §1 E11). The identity this
+     app claims is its own: a witness ledger -- warm paper by day (the light bucket
+     below), night-audit ink by night. So the ground takes a blue-black ink cast, and
+     two elevation steps join it: --bg-raised (a panel one step off the page) and
+     --bg-inset (a well sunk into it). Every stated ratio below was re-measured against
+     the new ground with the same formula as before. */
+  --bg: #0d1016;
+  --bg-raised: #141926;  /* --ink on it: 14.32:1, --ink-2 on it: 6.63:1 */
+  --bg-inset: #090b10;
+  --ink: #e8e8e8;    /* measured 15.54:1 against --bg -- the subject: basename, a settled value */
+  --ink-2: #9f9f9f;  /* measured 7.19:1 -- the attendant: time, parent dir, disclosure body */
+  --ink-3: #838383;  /* measured 5.02:1 -- the aside: counts, an undone row. Forbidden for text
+                         use (parts/src/tokens.mjs FORBIDDEN_TOKENS) -- see the light side's
+                         measurement below for why. */
+  --line: #232a38;   /* one rule only, and it is the crease between sections -- carries the
+                         same ink cast as the ground it creases */
+  --deny: #e04a36;   /* measured 4.72:1 -- see the standing-hue block below for what this
+                         ink now sits inside (Owner #340 superseded the one-hue rule; the
+                         part of it that survives is that a verdict is never told apart by
+                         colour ALONE -- every mark still draws its own shape and prints
+                         its own word). */
+
+  /* Owner #340: 「単調でつまらない」. The rule this replaces was one hue for the whole
+     application (Deny) and grey for everything else, which is why a stranger at arm's
+     length could not tell an admitted row from a denied one from a held one: the three
+     differ by a 14px glyph and nothing else. What replaces it is not decoration. Each
+     standing this application can be in gets exactly one ink and one bed to sit that
+     ink on, so a filled chip is legible as a class before any word inside it is read,
+     and one further ink -- --act -- marks the things a hand may press, which nothing on
+     these screens marked at all.
+
+     Every figure below is measured with the same WCAG relative-luminance formula
+     parts/src/tokens.mjs re-implements, and every bed states the ratio of ITS OWN ink
+     against ITSELF, which is the number that matters for a filled chip (an ink measured
+     against the page is not the ink you are reading when it sits on a bed).
+     parts/test/tokens.test.mjs re-computes all of them at test time. */
+  --act: #63b8e8;         /* 8.66:1 against --bg -- pressable */
+  --act-bed: #0d1f28;     /* --act on it: 7.68:1 */
+  --admit: #52d18a;       /* 9.83:1 */
+  --admit-bed: #0e2417;   /* --admit on it: 8.45:1 */
+  --deny-bed: #1e0b08;    /* --deny on it: 4.70:1 */
+  --escalate: #e8a83c;    /* 9.16:1 */
+  --escalate-bed: #2a1e08; /* --escalate on it: 7.84:1 */
+  --held: #8ea6ff;        /* 8.21:1 */
+  --held-bed: #14192f;    /* --held on it: 7.48:1 */
+
+  /* SS553: 36px is the minimum tap target this app draws; a row is also
+     something a hand can land on (the note under it opens on click), so the
+     row pitch is unified with that same floor rather than carrying its own
+     smaller number. */
+  --row: 36px;
+
+  /* Declared for parity with the retired file's shape (a note-beside-row
+     layout axis) but consumed by nothing: parts/src/tokens.mjs's own
+     DETAIL_X_CONTRACT states plainly that no part in this tree positions a
+     note beside its row at any width -- every note stacks under its row
+     instead. The value is cosmetic until a part reads it; the collapse rule
+     below exists so the axis is honest about going to zero under 1000px
+     regardless. */
+  --detail-x: 700px;
+  --pad-x: 20px;
+  --spine-x: 64px;
+
+  /* Owner #349: corners. The application drew every edge square, or drew a radius
+     picked at the call site -- 2px on a rail item, 3px on a chip, 4px on a band, 8px
+     on a count pill -- which is four decisions nobody made once. Square reads harsh at
+     this density, and the reference idiom this project measures itself against
+     (req/784 I-2, I-5, I-10) rounds its cards at 6-8px.
+     Three tiers, and the tier is chosen by what the thing IS, not by taste: a mark-sized
+     thing that sits inside a line, a control a hand lands on, and a container that holds
+     other things. A fourth tier would be a tier nobody could name. */
+  --radius-1: 4px;   /* chips, count pills, badges -- inside a line of text */
+  --radius-2: 6px;   /* controls -- buttons, control rows, selects */
+  --radius-3: 8px;   /* containers -- boxes, bands, panes, cards */
+
+  /* Owner #348: motion, declared once so that every element moves the same way.
+     Two durations and one easing, because a system with five durations is a system
+     where nobody can say what the durations mean. `--motion-quick` is for a state a
+     finger is holding right now (press, hover) and must not lag behind the hand;
+     `--motion-settle` is for something arriving or leaving (a panel, a pane).
+     The curve decelerates: things arrive at rest rather than stopping dead, and nothing
+     in this application overshoots, because an overshoot on a ledger row is a row that
+     appears to move after it has settled. Both sit inside the 120-200ms band a reader
+     perceives as immediate-but-not-instant. */
+  --motion-quick: 120ms;
+  --motion-settle: 180ms;
+  --motion-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Two families, chosen by what the text IS, not by taste: mono for
+     anything typed or hashed (a path, a digest, a clock reading), sans for
+     anything read as language. Named families first, because a generic
+     fallback resolving to something else is a fact worth catching rather
+     than assuming away -- Cascadia Mono and Segoe UI Variable Text are both
+     present on the platform this app ships to first; the remaining names
+     are real fallbacks, not decoration. */
+  --mono: "Cascadia Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+          "DejaVu Sans Mono", "Liberation Mono", "Noto Sans Mono", monospace;
+  --sans: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, -apple-system, "SF Pro Text",
+          "Noto Sans", "DejaVu Sans", sans-serif;
+
+  /* One scale, every step at or above SS558's 14px body floor ("small text
+     is a defect", stated as a hard requirement, not a preference) -- the
+     retired file's --t-time (13px) and --t-meta (12px) both sat under that
+     floor; this derivation raises both to the floor rather than reproducing
+     a number the current canon calls a defect. Differentiation between
+     meta/time/record now comes from colour, family and line-height, not
+     from three different sizes squeezed under 14px. */
+  --t-meta: 14px;   --lh-meta: 18px;
+  --t-time: 14px;   --lh-time: 19px;
+  --t-record: 14px; --lh-record: 20px;
+  --t-head: 17px;   --lh-head: 24px;
+
+  /* Owner #388 (req/822_c7 §3): the 単調 root cause was a scale with exactly two sizes,
+     14 and 17 -- a stat number drew at the same optical weight as its own caption, so
+     nothing on the page led the eye. Two steps join the scale, both OUTSIDE the body
+     band, so the SS558 floor is untouched:
+     --t-stat is for a counted fact standing alone in a stat cell (mono, so 6 and 0
+     hold their width while the count moves); --t-label is for an UPPERCASE small-caps
+     label riding above or under such a number -- never for sentence text, which keeps
+     the 14px floor exactly as SS558 states it: small READING text is a defect; a
+     tracked-out uppercase caption is a different organ. */
+  --t-stat: 26px;   --lh-stat: 30px;
+  /* --t-label is DECLARED AND DORMANT: parts/test/surface.test.mjs pins on-screen
+     labels to the record size (req/38 SS693 -- the 14px floor is hard, and the figure
+     above a label is what carries the hierarchy). The token stands only for a future
+     surface that is not read at arm's length (print, export); nothing on screen may
+     consume it while SS693 stands. */
+  --t-label: 12.5px; --lh-label: 16px; --track-label: 0.08em;
+
+  /* One spacing rhythm (req/822_c7 §3) -- gaps were picked per call site; four names,
+     chosen by what the gap separates: inside a chip, between siblings, between organs,
+     between sections. */
+  --space-1: 4px; --space-2: 8px; --space-3: 16px; --space-4: 24px;
+
+  /* ================================================================================
+     req/884 (Owner #423/#424, seat=Opus, 2026-08-26, 暫定 -- 再審査可)
+     ONE TOKEN SET FOR EVERY INTERACTION.
+
+     Everything from here down was, until this document, either a literal at a call
+     site or a private roster in another file. Both are the same defect wearing two
+     hats: a value nobody can retune from the roster. The families below are named so
+     the machine check (tools/protocol_gate.mjs) can say, of any literal it finds,
+     "there is a token for this" -- which is the only form of this rule that holds.
+
+     Derivation is stated per family. Where a value is unchanged from what the tree
+     already drew, it is PROMOTED, not invented, and the promotion is said so that
+     nobody re-derives it later (feedback_dont_rederive_settled_env_facts).
+     ================================================================================ */
+
+  /* ---- ground steps ---------------------------------------------------------------
+     PROMOTED from shell/kernel/shell.css:26-30, where they were declared on `.shell`.
+     That file's own header says "Not one colour is written here", and it was telling
+     the truth about hex literals -- but a color-mix() of two tokens under a NEW name
+     is a new value, and the name was reachable only from the frame. The faces could
+     not spell it, which is exactly why shell chrome and face interiors disagreed about
+     what a hover looks like. Same mixtures, same numbers; one roster now owns them. */
+  --surface-0: var(--bg);
+  --surface-1: color-mix(in srgb, var(--ink) 4%, var(--bg));  /* hover bed */
+  --surface-2: color-mix(in srgb, var(--ink) 8%, var(--bg));  /* pressed / open bed */
+  --crease: var(--line);
+  --tension: color-mix(in srgb, var(--ink) 22%, var(--bg));   /* the edge under a pointer */
+
+  /* ---- interaction states ---------------------------------------------------------
+     Owner #423: pointer, left click, right click, drag, hover, focus, keyboard and the
+     effect each produces are ONE layer. The census (req/884 §2) found the effect half
+     scattered across nine literal sites and the pointer half across fifteen.
+
+     `--press-y` is the whole of what a press looks like: 1px, a compositor transform,
+     nothing around it moves. It was already 1px in two independent places
+     (shell.css:109 and parts/src/surface.mjs:145) which agreed by luck, not by rule. */
+  --press-y: 1px;
+
+  /* The focus ring. Width and offset were literal at three sites; the colour was
+     already tokenised, which is how a half-tokenised value hides. `--focus-offset-in`
+     is the act-gutter's tighter variant (parts/src/surface.mjs:161) -- a real second
+     case, so it gets a real second name rather than being rounded into the first. */
+  --focus-w: 2px;
+  --focus-offset: -2px;
+  --focus-offset-in: 1px;
+  --focus-ink: var(--act);
+
+  /* Two opacities, and the tree had four. 0.4 (shell.css:789 button[disabled]), 0.6
+     (shell.css:719 .strip-step:disabled), 0.55 and 1 (shell.css:650-651, tab-close and
+     pane-tool idle vs revealed). 0.6 and 0.4 were two spellings of "this control will
+     not answer", so they collapse to one: a reader cannot be expected to read 0.4 as
+     more-disabled than 0.6. 0.55 is a DIFFERENT fact -- the control will answer, it is
+     simply not being asked for yet -- so it keeps its own name. */
+  --disabled-opacity: 0.4;
+  --idle-opacity: 0.55;
+
+  /* Pointers. Every cursor in the tree was a literal, which is defensible only until
+     you want to know how many kinds of pointer this application has. It has six, and
+     they are named by what the pointer PROMISES, not by the CSS keyword, so a call
+     site that writes `var(--cursor-refuse)` cannot quietly mean "default". */
+  --cursor-act: pointer;        /* this will answer a press */
+  --cursor-refuse: not-allowed; /* this exists and will not answer -- and says why */
+  --cursor-inert: default;      /* not a control (a solo tab is its pane's title) */
+  --cursor-text: text;          /* a field */
+  --cursor-size-x: col-resize;  /* a vertical sash moves along x */
+  --cursor-size-y: row-resize;  /* a horizontal sash moves along y */
+
+  /* Drag and drop. The sash was the only draggable thing in the window and it carried
+     its own timing (shell.css:579, `90ms ease-out` -- the ONE motion literal that
+     bypassed --motion-quick/--motion-ease entirely) and its own idle thickness
+     (scaleX(0.34)). Both are named here; the timing now joins the shared route. */
+  --drag-bar-scale: 0.34;   /* the sash's resting thickness, as a fraction of its hit area */
+  --drag-ghost-opacity: 0.6;
+  --drop-bed: var(--act-bed);
+  --drop-edge: var(--act);
+
+  /* ---- scrollbar (Owner #423追記1) -------------------------------------------------
+     The Owner finds the web scrollbar hard to see. It is hard to see for two reasons
+     and this file fixes both.
+
+     (1) It was declared TWICE -- shell/kernel/shell.css:68-75 and parts/src/surface.mjs
+     -- with the numbers written out at both sites (8px, radius 4px). Two declarations
+     of one thing is how a surface ends up with a scrollbar that does not match the
+     surface beside it.
+     (2) The thumb was --crease, which is the SAME token as the rule between sections.
+     A thumb the colour of a hairline is a thumb you cannot find. 凌駕, not 踏襲: the
+     thumb takes --tension (ink at 22%, the token that already means "an edge under a
+     pointer"), which is roughly five times the contrast against the page that --crease
+     carries, and the track goes transparent so the thumb is the only thing drawn.
+     Width goes 8px -> 10px: still slim, but above the 8px at which a thumb on a
+     high-DPI panel reads as a hairline.
+
+     Named for adoption, not just for us: req/885's landing pages were told to consume
+     these rather than invent a local fix, so the names say `scrollbar`, not `sash` or
+     `rail` or any noun private to this window. */
+     MEASURED, not asserted (req/884 §2-4a, and this is the second draft). The first draft
+     of this block gave the thumb `--tension` (ink at 22%), which measures 1.58:1 light /
+     1.83:1 dark against the page -- better than the 1.12:1 / 1.32:1 the hairline gave, and
+     STILL UNDER the 3:1 WCAG non-text floor. req/885 independently measured the old thumb
+     at 1.23:1 / 1.15:1 and reached the same diagnosis from the other end, which is the
+     only reason to believe either reading. "Better" is not a floor, so the thumb takes its
+     own step at ink 50%: 3.20:1 on the light page, 4.56:1 on the dark one. One percentage
+     clears both, so there is one value and not a per-theme pair. */
+  --scrollbar-w: 10px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: color-mix(in srgb, var(--ink) 50%, var(--bg));       /* 3.20:1 light, 4.56:1 dark */
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--ink) 65%, var(--bg)); /* 5.09:1 light, 7.0:1 dark */
+  --scrollbar-radius: var(--radius-1);
+
+  /* ---- glyph sizing ---------------------------------------------------------------
+     Owner #424. A glyph arrived at whatever size its container implied, which is how
+     req/04a's unsized-glyph defect happened (a second builder assembled its own <svg>
+     and the sizing rule had been written for the first builder's container). Two
+     sizes, chosen by the same rule the radius tiers use -- what the thing IS: a mark
+     inside a line of text, or a mark a hand lands on. Stroke is stated once so a glyph
+     drawn at either size has the same optical weight. */
+     Stroke and opacity are PROMOTED from shell.css:784 (`.mark`), not chosen here. The
+     first draft of this block declared 1.5 because that is a common glyph weight, and
+     the tree draws 1.25 -- inventing a value where the roster's whole job is to hold the
+     one already in use would have silently re-weighted every mark in the window on the
+     commit that claimed to change nothing. Caught by reading the call site the gate
+     pointed at, which is the argument for having the gate point at call sites. */
+  --glyph-1: 14px;      /* inside a line -- beside a word, in a chip */
+  --glyph-2: 16px;      /* a control a hand lands on */
+  --glyph-stroke: 1.25;
+  --glyph-opacity: 0.8; /* a mark reads a step lighter than the text it stands beside */
+
+  /* ---- elevation ------------------------------------------------------------------
+     The two floating surfaces carried literal shadows (shell.css:812 palette,
+     shell.css:882 chrome menu). Two names, because there genuinely are two heights:
+     a menu sits just off the thing it belongs to, a palette sits over the whole window.
+     Stated as complete shadows rather than as offsets a call site reassembles. */
+  --shadow-menu: 0 12px 32px color-mix(in srgb, var(--ink) 18%, transparent);
+  --shadow-palette: 0 18px 48px color-mix(in srgb, var(--ink) 24%, transparent);
+
+  /* ---- the accent that fires once (req/851 hue budget, resolved by #425) -----------
+     req/851 extracted a constitution rule this tree has never applied: ONE accent,
+     bound to ONE meaning, firing exactly once per screen. Taken flat, that rule
+     contradicts Owner #340, which is recorded 60 lines above this one and deliberately
+     spent FIVE hues so a stranger could tell an admitted row from a denied one. Both
+     rulings are live and neither is being overruled here, so the contradiction has to
+     be dissolved rather than voted on.
+
+     It dissolves because the two rules govern different axes. #340's five hues are a
+     CLASSIFICATION -- they say what standing a row is in, and a table of forty rows is
+     supposed to be legible as forty standings. req/851's single accent is an ALARM --
+     it is not classifying anything, it fires at most once, and #425 names the moment it
+     fires for: "this change cannot be undone, proceed?" (invert.rs E-M3-4, statutory in
+     spec 44 section 338). #425 calls that the single most prominent moment in the whole
+     UI, and it is the product.
+
+     So the alarm gets a ROLE, not a sixth hue. Spending a new hue on a palette the
+     Owner has already called both monotone (#340) and repainted (#424) would be the
+     wrong answer twice over. The alarm IS the deny ink, reserved -- and what makes it
+     an alarm rather than another red chip is that it is the one place the ink is spent
+     filled, at full bed, and that tools/protocol_gate.mjs counts its sites and holds
+     the count at one per screen. A budget nobody counts is a preference. */
+  --alarm: var(--deny);
+  --alarm-bed: var(--deny-bed);
+  --alarm-edge: var(--deny);
+}
+
+:root {
+  /* light palette, declared under the --l- prefix parts/src/tokens.mjs's
+     palettes() reads as the light bucket. Measured against its own --l-bg,
+     not derived from the dark side by a formula -- a page is read on its
+     own page, not translated from the other one. */
+  --l-bg: #f6f5f2;
+  --l-bg-raised: #fffdf9;  /* --l-ink on it: 16.59:1 -- the paper's card, one step brighter */
+  --l-bg-inset: #efede8;   /* --l-ink on it: 14.41:1, --l-ink-2 on it: 6.47:1 */
+  --l-ink: #1d1d1d;    /* measured 15.46:1 against --l-bg */
+  --l-ink-2: #545454;  /* measured 6.95:1 */
+  --l-ink-3: #717171;  /* measured 4.48:1 -- within half a step of the 4.5:1 normal-text floor,
+                           and weaker here than on the dark side: too close to the line to set
+                           text in on this app's own default page, which is exactly why
+                           parts/src/tokens.mjs forbids it rather than leaving the judgement to
+                           whoever reaches for a third ink next. */
+  --l-line: #e8e8e8;
+  --l-deny: #c8321e;   /* measured 4.90:1 */
+
+  /* The standing hues again, derived against the light page rather than translated
+     from the dark one -- the same discipline the inks above already follow, and the
+     reason it matters here is that a hue bright enough to read on #0a0a0c is close to
+     unreadable on #f6f5f2. Each figure is its own measurement. */
+  --l-act: #1d5f8a;        /* 6.30:1 against --l-bg */
+  --l-act-bed: #e2eef6;    /* --l-act on it: 5.82:1 */
+  --l-admit: #176b3d;      /* 6.01:1 */
+  --l-admit-bed: #e3f2e8;  /* --l-admit on it: 5.65:1 */
+  --l-deny-bed: #fdf0ee;   /* --l-deny on it: 4.80:1 */
+  --l-escalate: #8a5a06;   /* 5.43:1 */
+  --l-escalate-bed: #fbeed4; /* --l-escalate on it: 5.16:1 */
+  --l-held: #3f4fae;       /* 6.55:1 */
+  --l-held-bed: #e7eaf9;   /* --l-held on it: 5.96:1 */
+}
+
+/* Explicit theme choice wins over anything else. */
+:root[data-theme="light"] {
+  --bg: var(--l-bg); --bg-raised: var(--l-bg-raised); --bg-inset: var(--l-bg-inset);
+  --ink: var(--l-ink); --ink-2: var(--l-ink-2); --ink-3: var(--l-ink-3);
+  --line: var(--l-line); --deny: var(--l-deny);
+  --act: var(--l-act); --act-bed: var(--l-act-bed);
+  --admit: var(--l-admit); --admit-bed: var(--l-admit-bed);
+  --deny-bed: var(--l-deny-bed);
+  --escalate: var(--l-escalate); --escalate-bed: var(--l-escalate-bed);
+  --held: var(--l-held); --held-bed: var(--l-held-bed);
+}
+
+/* SS551/SS558: this app's stated default is light (a standing rejection of
+   the generic-dark-devtool look), not "whichever the OS prefers" -- but
+   nailing data-theme="light" onto the document itself, so no reader's OS
+   preference can ever move it, is an open item this stylesheet alone cannot
+   settle (parts/README.md already files it: light-default and "do not nail
+   the theme to the page" do not both hold under a bare :root that is dark by
+   parser contract, and settling it needs a shell-level ruling, req/02). What
+   this rule can honestly do is answer an explicit light preference without
+   requiring data-theme to be set by hand. Dark stays the parser-contract
+   default (bare :root, above) until that shell-level ruling lands. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: var(--l-bg); --bg-raised: var(--l-bg-raised); --bg-inset: var(--l-bg-inset);
+    --ink: var(--l-ink); --ink-2: var(--l-ink-2); --ink-3: var(--l-ink-3);
+    --line: var(--l-line); --deny: var(--l-deny);
+    --act: var(--l-act); --act-bed: var(--l-act-bed);
+    --admit: var(--l-admit); --admit-bed: var(--l-admit-bed);
+    --deny-bed: var(--l-deny-bed);
+    --escalate: var(--l-escalate); --escalate-bed: var(--l-escalate-bed);
+    --held: var(--l-held); --held-bed: var(--l-held-bed);
+  }
+}
+
+@media (max-width: 1000px) {
+  :root { --detail-x: 0px; }
+}

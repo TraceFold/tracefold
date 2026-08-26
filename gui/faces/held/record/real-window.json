@@ -1,0 +1,82 @@
+{
+  "what": "evidence that the held face has been mounted in a real, non-headless window -- not only in the headless renderer tools/shoot.mjs and tools/browser-mount-smoke.mjs drive",
+  "why": "req/02 W15 clause 3: a face must carry proof of having mounted in a real window a person could look at. tools/browser-mount-smoke.mjs and tools/real-window-smoke.mjs in this same faces/held/tools/ directory were written from zero for this face, following the same shape faces/ledger and faces/notice already established (fixture served over http + shell/tools/real_window.ps1, the shell's own real-window instrument, reused rather than duplicated) -- not by opening either face's own tool files.",
+  "how": "tools/real-window-smoke.mjs starts a static file server rooted at the repo (answering /s-common/tokens.css from the one stylesheet of record), then shells out to shell/tools/real_window.ps1 with the fixture's URL. That script opens Chrome in app mode at 1440x900, waits, reads the window's own title back through the Win32 window list, and screenshots the on-screen window rectangle. This face's mount fixture (fixtures/browser-mount-entry.mjs + fixtures/browser-mount.html) imports index.mjs directly and calls mount(host, stubPort, []) against two held candidates spelled out inline in the fixture, and writes the element/row counts into document.title so the numbers below are the numbers the page itself computed, not typed by hand.",
+  "environment_gap": "on this machine, parts/tools/token-source.mjs resolves the stylesheet of record to a path in the retired reference tree (ui_proto's tokens.css), which does not exist here (confirmed absent on C:, D: and E: -- searched at capture time). This is a pre-existing gap unrelated to this face: the same three parts/test/tokens*.test.mjs failures this repo already carries (461 tests run tree-wide, 458 pass, 3 fail, all three in that suite, none touching faces/held) come from the identical missing path. Every capture below -- fixtures/shots/*.png, fixtures/shots/browser-mount-smoke.png, and both real_window_*.png -- was taken with tokens.css unreachable, so the stylesheet-of-record's actual colour is not evidenced in this record; what is evidenced is the structural reading (no overlap, no double-draw, no oversize/filled glyph, no unsealed row, correct fail-closed wording), which does not depend on the stylesheet resolving. Regenerating a colour-faithful capture needs either the reference tree restored at that path on the capturing machine, or parts/tools/token-source.mjs repointed at a location this repo carries -- both out of this lane's scope (shared infra, not faces/held).",
+  "runs": [
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex held face -- dark -- elements 227 rows 2",
+      "elements": 227,
+      "rows": 2,
+      "reachedBy": "http://127.0.0.1:<port>/faces/held/fixtures/browser-mount.html (no query)",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 84118
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex held face -- light -- elements 227 rows 2",
+      "elements": 227,
+      "rows": 2,
+      "reachedBy": "?theme=light, read by the fixture's own entry script off its own URL and applied as document.documentElement.setAttribute('data-theme','light')",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 83860
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "headless (Chrome DevTools Protocol, tools/rig/renderer.mjs, 900x700)",
+      "elements": 227,
+      "rows": 2,
+      "note": "tools/browser-mount-smoke.mjs's own run against the identical fixture, kept because the headless and real-window runs agreeing on element/row counts (227/2 both times) is worth having; neither figure alone would be"
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex held face -- dark -- elements 333 rows 2",
+      "elements": 333,
+      "rows": 2,
+      "capturedRect": "47,40 1426x893",
+      "note": "the environment_gap above (tokens.css unreachable, colours not evidenced) is STALE as of this run: tokens self-ownership landed on this repo (parts/tokens.css) between the 2026-08-24 capture and this one, and this capture shows the real palette applied (warm dark ground, muted attendant tone, red reserved to Deny/deny-adjacent marks only) -- not overwritten above, per no-delete; corrected here with a dated entry instead. elements rose 227 -> 333 from this lane's retrofit (face-header, control-row, counted mark-tally legend, withheld-count badges), by design.",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 89782
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex held face -- light -- elements 333 rows 2",
+      "elements": 333,
+      "rows": 2,
+      "capturedRect": "47,40 1426x893",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 92070
+    }
+  ],
+  "readByEye": {
+    "byWhom": "the implementing agent, looking at both real-window pictures and all seven tools/shoot.mjs captures at full resolution",
+    "held": [
+      "no text sits on top of other text in either real-window capture; every row, its note, and the claims/omitted sections below are each legible with visible spacing between them",
+      "no row is cut off mid-character -- both rows' notes carry every value in full, and the third fixture row's deliberately-long path (excluded from this real-window fixture's 2-row population, present in fixtures/shots/held_*.png instead) is confirmed clipped-with-full-copy there, not here",
+      "the seal column reads as a declared hole ('this has not happened yet, so there is no record of it to check') on every row in every capture, with zero exceptions -- the one property this face exists to hold",
+      "the window itself is a real OS window in both captures: native Windows title bar with minimize/maximize/close controls is visible, which neither a headless dump nor a maximized full-bleed screenshot would show",
+      "the two themes agree on layout -- same row order, same act buttons, same disclosure state (why/legend folded shut, order folded shut) -- consistent with a token/CSS-driven palette difference being the only thing that should differ, though see environment_gap: no palette difference is actually evidenced by these two captures on this machine",
+      "no interactive control (commit/cancel/escalate/undo buttons, the peripheral <summary> triangles) is smaller than a clearly-tappable size at a glance; tools/shoot.mjs's own underTapBudget reading is 0 on all seven captures, corroborating this",
+      "2026-08-25 SS657 retrofit re-shoot: colour IS now evidenced (see the dated note on the 2026-08-25 runs above) -- warm cream ground in light, near-black in dark, ink/attendant tones distinct, red reserved to Deny",
+      "2026-08-25: compact face-header (\"held  2 of 2 candidates\") leads the screen in both themes; why/legend are bordered controls side by side with plain-language hints, closed by default; every row states the count of what its disclosure withholds (\"9 more fields\")",
+      "2026-08-25: no background bleed at the capture edges in either theme, consistent with capturedRect narrower than the requested window size"
+    ],
+    "notHeld": [
+      "colour fidelity was not evidenced on 2026-08-24 -- see environment_gap above and the 2026-08-25 correction on the runs list; that specific gap is closed as of this lane, everything else in this notHeld list still stands",
+      "no narrow-width real-window capture was taken -- real_window.ps1 opens at a fixed 1440x900; tools/shoot.mjs's headless narrow (720px) and wide (1280px) captures are the only other-viewport evidence for this face",
+      "negative controls (deliberately breaking a seal cell, an overlap, or an oversize glyph and confirming tools/shoot.mjs or the real-window picture goes red) were not performed against these specific capture files -- the gate.mjs source/tree checks were fired red via their own planted-string tests (test/gate.test.mjs) instead; see README for the honest split between the two kinds of negative control",
+      "no second, independent agent has re-run this capture -- this record is this lane's own first pass (2026-08-24) plus this lane's own re-shoot (2026-08-25, same discipline: retrofit is not independent re-verification), not an independently re-verified [●]",
+      "the first capture of these two files (shotBytes 83344/83209) drew the withheld undo reason with the word 'membrane' in it (declaration.mjs's ACTS entry), an internal-layer leak the rubric's own hard rule bars (req/96 Axis B). Caught by self-review before this record was written, fixed in declaration.mjs, and both real-window pictures were recaptured (shotBytes 84118/83860, the numbers this record now carries) -- named here so the fix is not silently absorbed into a first-pass claim"
+    ]
+  }
+}

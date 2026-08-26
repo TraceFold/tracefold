@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0
+     The smallest real window this shell has. One page, no bundler, no framework, no
+     dependency: modules are loaded as modules and the DOM is the DOM.
+
+     The policy is stated here rather than assumed. `default-src 'none'` means nothing
+     loads unless this page named it; there is no eval and no `new Function`; and the only
+     thing this document is permitted to connect to is its own origin, which is the
+     membrane's bed. A face cannot widen any of that, because a face imports nothing.
+
+     Colour arrives from one stylesheet and one only. /s-common/tokens.css is served
+     straight off the canonical file -- tools/serve.mjs resolves it and prints its digest
+     at start-up -- so this project has no second palette to drift from. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- style-src carries 'unsafe-inline' for the reason stated at length in app.html: every
+     face draws with inline style attributes and one injected rule set, and `style-src
+     'self'` forbids both, so a face in this window rendered with none of its own styling
+     at all. The half that carries the risk is untouched -- script-src stays 'self' with
+     no 'unsafe-inline' and no 'unsafe-eval', default-src stays 'none', connect-src stays
+     'self' -- and tools/gates.mjs W10 holds all of it, including that this page's own
+     styling is permitted, so neither half can drift back unnoticed. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>glovrex shell</title>
+<link rel="stylesheet" href="/s-common/tokens.css">
+<link rel="stylesheet" href="/kernel/shell.css">
+<link rel="stylesheet" href="/demo/demo.css">
+</head>
+<body>
+<div id="shell-root"></div>
+<ul id="check-report" hidden></ul>
+<script type="module" src="/demo/boot.mjs"></script>
+</body>
+</html>

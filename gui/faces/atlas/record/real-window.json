@@ -1,0 +1,60 @@
+{
+  "what": "evidence that the atlas face has been mounted in a real, non-headless window -- not only in the headless renderer tools/shoot.mjs and tools/browser-mount-smoke.mjs drive",
+  "why": "req/02 W15 clause 3: a face must carry proof of having mounted in a real window a person could look at. tools/browser-mount-smoke.mjs and tools/real-window-smoke.mjs in this same faces/atlas/tools/ directory were written from zero for this face, following the same shape faces/ledger, faces/notice, faces/held, faces/receipt and faces/graph already established (fixture served over http + shell/tools/real_window.ps1, the shell's own real-window instrument, reused rather than duplicated).",
+  "how": "tools/real-window-smoke.mjs starts a static file server rooted at the repo (answering /s-common/tokens.css from tokens/tokens.css, the one in-repo stylesheet of record), then shells out to shell/tools/real_window.ps1 with the fixture's URL. That script opens Chrome in app mode at 1440x900, waits, reads the window's own title back through the Win32 window list, and screenshots the window's own visible bounds (this lane's own fix: DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS), not the legacy GetWindowRect -- see capture_bleed_fix below). This face's mount fixture (fixtures/browser-mount-entry.mjs + fixtures/browser-mount.html) imports index.mjs directly and calls mount(host, stubPort, []) against a folded list envelope of three transformations spelled out inline in the fixture -- two paths, one touched twice (deck.pdf) and one touched once (budget.xlsx, drawn as a subject here even though faces/graph would not draw it at all). The entry script writes the element/subject counts into document.title so the numbers below are the numbers the page itself computed, not typed by hand.",
+  "colour_status": "RESOLVED. This face reuses the tokens self-ownership atom faces/receipt's lane already landed (tokens/tokens.css, in-repo, no dependency on any retired tree) -- both real-window captures below show the derived palette actually applied (light page / dark page, read by eye in the pictures and corroborated by tools/shoot.mjs's own tokensResolved reading), not a placeholder colour.",
+  "capture_bleed_fix": "Owner eye-judgment correction (2026-08-25): shell/tools/real_window.ps1's own captures were bleeding a sliver of whatever sat behind the window at its edges. Root cause: GetWindowRect on modern Windows includes several pixels of invisible DWM resize/drop-shadow border outside the window's actual painted content, and CopyFromScreen against that rect copies those pixels too. Fixed in shell/tools/real_window.ps1 (this lane, patched in place, not duplicated) by reading DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS) instead, with GetWindowRect kept as a fallback if the DWM call fails. Evidence this actually took effect on this run: the captured rect below (47,40 1426x893) is narrower than the requested --window-size=1440,900 at --window-position=40,40 -- the legacy GetWindowRect path would have reported a rect at or slightly larger than the requested window size (the invisible border adds to it, not subtracts), so a rect smaller than the request is direct, measured evidence the DWM path ran, not merely a code-level claim.",
+  "runs": [
+    {
+      "at": "2026-08-25",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless)",
+      "title": "glovrex atlas face -- dark -- elements 243 subjects 2",
+      "elements": 243,
+      "subjects": 2,
+      "capturedRect": "47,40 1426x893",
+      "reachedBy": "http://127.0.0.1:<port>/faces/atlas/fixtures/browser-mount.html (no query)",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 148716
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless)",
+      "title": "glovrex atlas face -- light -- elements 243 subjects 2",
+      "elements": 243,
+      "subjects": 2,
+      "capturedRect": "47,40 1426x893",
+      "reachedBy": "?theme=light, read by the fixture's own entry script off its own URL and applied as document.documentElement.setAttribute('data-theme','light')",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 151610
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "dark",
+      "surface": "headless (Chrome DevTools Protocol, tools/rig/renderer.mjs, 900x900)",
+      "elements": 243,
+      "subjects": 2,
+      "note": "tools/browser-mount-smoke.mjs's own run against the identical fixture, kept because the headless and real-window runs agreeing on every count (243 elements / 2 subjects, all three runs) is worth having; no single figure alone would be"
+    }
+  ],
+  "readByEye": {
+    "byWhom": "the implementing agent, looking at both real-window pictures at full resolution and all 7 tools/shoot.mjs captures",
+    "held": [
+      "no text sits on top of other text in either real-window capture; the header line, the two control pills, each subject's own summary line and the claims/omitted sections are all legible with visible spacing between them",
+      "both disclosures ('why', 'legend') are drawn as bordered, compact controls sitting side by side in one row directly under the header line, each with a fold glyph and a plain-language hint next to its label, closed by default -- not two full-width empty bands",
+      "both subject lines (deck.pdf, 2 touches; budget.xlsx, 1 touch) are drawn closed by default, each a single compact row -- no expanded touch-history dump is visible anywhere on either capture",
+      "no glyph is oversized or filled; every glyph in both pictures reads as a small, consistently-stroked line drawing at the same visual weight",
+      "the window itself is a real OS window in both captures: native Windows title bar with minimize/maximize/close controls is visible, and no sliver of a background window or the desktop is visible at any edge -- the specific defect this lane's real_window.ps1 fix targeted",
+      "the two themes agree on layout -- same header, same controls, same subjects, same section order -- and the palette genuinely differs between them (light background / dark background, both visibly the derived tokens palette and not a hard-coded placeholder)",
+      "every value long enough to be clipped in a cell either wraps in full (the path cell) or is a deliberate, complete, non-overflowing short form with the full value in its own title attribute (the time cell) -- tools/shoot.mjs's own clippedWithoutFull reading is 0 on all 7 captures after this lane's fix, corroborating this by measurement, not only by eye",
+      "no interactive control is smaller than a clearly-tappable size at a glance; tools/shoot.mjs's own underTapBudget reading is 0 on all 7 captures"
+    ],
+    "notHeld": [
+      "no narrow-width real-window capture was taken -- real_window.ps1 opens at a fixed 1440x900; tools/shoot.mjs's headless narrow (720px) and wide (1280px) captures are the only other-viewport evidence for this face",
+      "no interaction pass (req/38 SS24k, pressing every visible control and screenshotting after each act) was performed for this face -- this screen's interactive controls (two disclosures, every subject's own fold) were not individually pressed and re-screenshotted; stated as an open item rather than silently assumed to still hold",
+      "no second, independent agent has re-run this capture -- this record is this lane's own first pass, not an independently re-verified [*]",
+      "the forced-open (pathologically-long-path) subject case is exercised only in tools/shoot.mjs's headless fixture and the unit-test suite, not in this real-window capture's own fixture data (which uses two ordinary, closed-by-default subjects)"
+    ]
+  }
+}

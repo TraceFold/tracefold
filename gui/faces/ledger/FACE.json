@@ -1,0 +1,18 @@
+{
+  "id": "ledger",
+  "title": "Ledger",
+  "place": "stage",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [
+    "get_transformations",
+    "get_candidates",
+    "get_ledger_consistency",
+    "post_candidates_id_commit",
+    "post_candidates_id_cancel",
+    "post_candidates_id_escalation",
+    "post_transformations_id_undo"
+  ],
+  "condition": "plain",
+  "leastWidth": 320
+}

@@ -1,0 +1,15 @@
+{
+  "note": "faces/notice row-render ms -- median time for face.view(state) (notice.mjs) to build the full entry tree for 1,000 entries across the 4 outcome shapes. read() is untimed setup (sync, trivial); mount ms and real paint are separate, unmeasured axes (see README [ ] list).",
+  "measuredAt": "2026-08-25T06:45:55.059Z",
+  "entries": 1000,
+  "samplesMs": [
+    8.2585,
+    9.0806,
+    12.2939,
+    14.3985,
+    22.8983
+  ],
+  "medianMs": 12.2939,
+  "budgetMs": 300,
+  "ok": true
+}

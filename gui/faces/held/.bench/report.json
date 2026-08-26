@@ -1,0 +1,15 @@
+{
+  "note": "faces/held row-render ms -- median time for view(state) (held.mjs, exported alongside read/mount) to build the full screen tree for 1,000 held candidates. I/O (read) is untimed setup; mount ms and real paint are separate, unmeasured axes.",
+  "measuredAt": "2026-08-25T05:45:11.344Z",
+  "rows": 1000,
+  "samplesMs": [
+    80.4197,
+    94.3063,
+    95.4245,
+    100.344,
+    135.5292
+  ],
+  "medianMs": 95.4245,
+  "budgetMs": 300,
+  "ok": true
+}

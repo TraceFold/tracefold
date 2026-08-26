@@ -1,0 +1,13 @@
+{
+  "id": "receipt",
+  "title": "Receipt",
+  "place": "stage",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [
+    "get_transformations_id",
+    "get_receipts_tid"
+  ],
+  "condition": "plain",
+  "leastWidth": 320
+}

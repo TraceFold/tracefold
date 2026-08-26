@@ -1,0 +1,85 @@
+{
+  "what": "evidence that the receipt face has been mounted in a real, non-headless window -- not only in the headless renderer tools/shoot.mjs and tools/browser-mount-smoke.mjs drive",
+  "why": "req/02 W15 clause 3: a face must carry proof of having mounted in a real window a person could look at. tools/browser-mount-smoke.mjs and tools/real-window-smoke.mjs in this same faces/receipt/tools/ directory were written from zero for this face, following the same shape faces/ledger, faces/notice and faces/held already established (fixture served over http + shell/tools/real_window.ps1, the shell's own real-window instrument, reused rather than duplicated) -- not by opening any of those faces' own tool files beyond the pattern already documented in req/99.",
+  "how": "tools/real-window-smoke.mjs starts a static file server rooted at the repo (answering /s-common/tokens.css from the one stylesheet of record -- now tokens/tokens.css, in-repo, per this lane's own tokens-self-ownership atom), then shells out to shell/tools/real_window.ps1 with the fixture's URL. That script opens Chrome in app mode at 1440x900, waits, reads the window's own title back through the Win32 window list, and screenshots the on-screen window rectangle. This face's mount fixture (fixtures/browser-mount-entry.mjs + fixtures/browser-mount.html) imports index.mjs directly, sets data-receipt-id='t-201' on the host, and calls mount(host, stubPort, []) against one delta and its matching receipt spelled out inline in the fixture; the entry script writes the element/section counts into document.title so the numbers below are the numbers the page itself computed, not typed by hand.",
+  "colour_status": "RESOLVED, not an open gap for this face. This lane found and fixed two independent defects in the shared tokens infrastructure: (1) the stylesheet-of-record pointer (parts/tools/token-source.mjs's TOKEN_SOURCE_RELATIVE, shell/tools/serve.mjs's TOKENS_DEFAULT) pointed at the retired TraceFold_App/ui_proto tree -- replaced with an in-repo, from-zero tokens/tokens.css (req/03 SS635); (2) a genuine CSS parse bug this lane discovered while verifying the fix: the new stylesheet's own header comment contained the literal substring 'faces/*/' in prose, which is also the CSS comment-close token ('*/'), silently truncating the whole stylesheet to zero parsed rules in every renderer (Chrome does not error on this -- it just drops everything after the accidental close). Fixed by rewording the prose. Both real-window captures below show the actual derived palette (light #F6F5F2/#1D1D1D, dark #0A0A0C/#E8E8E8), confirmed against getComputedStyle in a standalone check before this record was written -- see the F-3 lane's own report for the full before/after trail.",
+  "runs": [
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex receipt face -- dark -- elements 136 sections 6",
+      "elements": 136,
+      "sections": 6,
+      "reachedBy": "http://127.0.0.1:<port>/faces/receipt/fixtures/browser-mount.html (no query)",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 101803
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex receipt face -- light -- elements 136 sections 6",
+      "elements": 136,
+      "sections": 6,
+      "reachedBy": "?theme=light, read by the fixture's own entry script off its own URL and applied as document.documentElement.setAttribute('data-theme','light')",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 103657
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "headless (Chrome DevTools Protocol, tools/rig/renderer.mjs, 900x700)",
+      "elements": 136,
+      "sections": 6,
+      "note": "tools/browser-mount-smoke.mjs's own run against the identical fixture, kept because the headless and real-window runs agreeing on element/section counts (136/6 both times) is worth having; neither figure alone would be"
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex receipt face -- dark -- elements 215 sections 5",
+      "elements": 215,
+      "sections": 5,
+      "capturedRect": "47,40 1426x893",
+      "note": "sections dropped 6 -> 5 because the old data-section=\"legend\" band is now a bordered controlToggle() control (data-role=control, not data-section) -- a deliberate structural change, not a lost section; elements rose 136 -> 215 from the face-header, control-row, and counted mark-tally legend this lane adds.",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 91605
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex receipt face -- light -- elements 215 sections 5",
+      "elements": 215,
+      "sections": 5,
+      "capturedRect": "47,40 1426x893",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 93414
+    }
+  ],
+  "interaction_pass": {
+    "what": "req/38 SS24k: static screenshots are not design verification. Every visible control was pressed -- this face has no act buttons (ACTS = [], read-only by declaration), so the population is its two native <details> disclosures ('why', 'legend').",
+    "record": "record/interaction-pass.json (4 acts, 4 screenshots: receipt_act_0_initial.png through receipt_act_3_why-closed.png)",
+    "result": "both disclosures open/close independently with no layout defect across all 4 captures -- full account in interaction-pass.json's own readByEye"
+  },
+  "readByEye": {
+    "byWhom": "the implementing agent, looking at both real-window pictures, all 7 tools/shoot.mjs captures, and all 4 interaction-pass captures at full resolution",
+    "held": [
+      "no text sits on top of other text in either real-window capture; the delta row, its note, and the (a)/(b)/(c) sections below are each legible with visible spacing between them",
+      "the delta row's path cell clips at narrow width with the full value confirmed present in the note below (clippedWithoutFull=0 on all 7 tools/shoot.mjs captures, corroborating this by measurement, not just by eye)",
+      "the seal claim reads 'unsealed' in every capture, with the drawn mark (structure/unsealed) agreeing with the printed standing every time -- the one property this face exists to hold, and the genuine (not planted) negative control performed mid-lane (rawSealed field added, verifySection made to trust it, then reverted byte-for-byte) confirmed 3 independent detectors go red on that break: the behavioural unit test, the no-boolean-sealed-claim source gate, and the seal-claim-mark-matches-standing tree gate",
+      "the window itself is a real OS window in both captures: native Windows title bar with minimize/maximize/close controls is visible",
+      "the two themes agree on layout -- same sections, same order, same disclosure state (why/legend folded shut on the static mount) -- and this time the palette genuinely differs between them (light #F6F5F2 page / dark #0A0A0C page, confirmed by getComputedStyle, not assumed)",
+      "no interactive control is smaller than a clearly-tappable size at a glance; tools/shoot.mjs's own underTapBudget reading is 0 on all 7 captures",
+      "2026-08-25 SS657 retrofit re-shoot: compact face-header (\"receipt  delta answered, receipt answered\") leads the screen in both themes; why/legend are bordered controls side by side with a plain-language hint, closed by default; the delta row states the count of what its disclosure withholds (\"7 more fields\")",
+      "2026-08-25: no background bleed at the capture edges in either theme, consistent with capturedRect narrower than the requested window size"
+    ],
+    "notHeld": [
+      "no narrow-width real-window capture was taken -- real_window.ps1 opens at a fixed 1440x900; tools/shoot.mjs's headless narrow (720px) and wide (1280px) captures are the only other-viewport evidence for this face",
+      "the interaction pass captured light theme only -- dark-theme mid-interaction frames were not taken, filed as an honest gap (see interaction-pass.json). Not re-run by this lane -- the retrofit's own row-disclosure control (openableRow) is structurally proven by parts/test/receipt-row.test.mjs and faces/receipt/test/receipt.test.mjs's own SS657 pin tests, not by a fresh interaction-pass capture.",
+      "no second, independent agent has re-run this capture -- this record is this lane's own first pass (2026-08-24) plus this lane's own re-shoot (2026-08-25, retrofit is not independent re-verification), not an independently re-verified [●]",
+      "the digest-mismatch fixture (receipt-mismatch) was not captured in a real (non-headless) window -- only in tools/shoot.mjs's headless narrow/dark captures; the real-window fixture uses the agreeing-digest happy path only"
+    ]
+  }
+}

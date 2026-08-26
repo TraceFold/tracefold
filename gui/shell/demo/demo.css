@@ -1,0 +1,28 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * What the placeholder faces look like. Not the frame's business: a face draws its own
+ * inside, and the frame does not know what is in there. Kept in the demo folder for the
+ * same reason -- the frame's stylesheet must stay free of anything a face needs, or the
+ * next face needs an edit to the frame.
+ *
+ * No colour here either. The tokens are the only palette in the project. */
+
+html, body { margin: 0; height: 100%; background: var(--bg); }
+
+.demo-face { display: flex; flex-direction: column; gap: 6px; }
+
+.demo-said {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--ink-2);
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+}
+
+.demo-seen, .demo-asked {
+  margin: 0;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: var(--t-meta);
+  line-height: var(--lh-meta);
+}

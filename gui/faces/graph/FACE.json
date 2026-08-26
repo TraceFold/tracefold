@@ -1,0 +1,12 @@
+{
+  "id": "graph",
+  "title": "Graph",
+  "place": "stage",
+  "purpose": "find",
+  "rail": true,
+  "consumes": [
+    "get_transformations"
+  ],
+  "condition": "plain",
+  "leastWidth": 320
+}

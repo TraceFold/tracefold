@@ -1,0 +1,10 @@
+{
+  "id": "sheet-a",
+  "title": "Sheet A",
+  "place": "stage",
+  "purpose": "read",
+  "rail": true,
+  "consumes": ["get_healthz"],
+  "condition": "plain",
+  "leastWidth": 200
+}

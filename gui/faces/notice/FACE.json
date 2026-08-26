@@ -1,0 +1,11 @@
+{
+  "id": "notice",
+  "title": "Notice",
+  "place": "bottom",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [],
+  "condition": "plain",
+  "leastWidth": 320,
+  "leastHeight": 260
+}

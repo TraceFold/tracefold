@@ -1,0 +1,15 @@
+{
+  "note": "faces/ledger row-render ms -- median time for view(state) (ledger.mjs, exported alongside read/mount) to build the full section tree for 1,000 settled rows. I/O (read) is untimed setup; mount ms and real paint are separate, unmeasured axes (see README [ ] list).",
+  "measuredAt": "2026-08-25T06:24:02.607Z",
+  "rows": 1000,
+  "samplesMs": [
+    84.1556,
+    86.709,
+    103.8603,
+    158.5348,
+    196.8726
+  ],
+  "medianMs": 103.8603,
+  "budgetMs": 300,
+  "ok": true
+}

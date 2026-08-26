@@ -1,0 +1,33 @@
+{
+  "note": "The declared mount set. The T2 tier runs on this list and not on whatever it happens to find, so a face that vanishes is a failure rather than a smaller denominator. Today the list is the fixture set, because the app's own faces are not written yet -- that is a statement about how far the harness has been pointed, not a claim that any face is covered. When faces land they are added here and the fixtures stay, because the fixtures are the pixel tier's live rounds.",
+  "faces": [
+    {
+      "id": "fixture:clean-sheet",
+      "source": "fixtures/clean-baseline.html",
+      "role": "positive control for the pixel tier",
+      "expects": { "minElements": 12, "glyphs": 3 },
+      "baseline": true
+    },
+    {
+      "id": "fixture:rt07-note-overlap",
+      "source": "fixtures/rt07-note-overlap.html",
+      "role": "live round: a margin note painted over the row text",
+      "expects": { "minElements": 12, "glyphs": 3 },
+      "baseline": false
+    },
+    {
+      "id": "fixture:rt08-unsized-glyph",
+      "source": "fixtures/rt08-unsized-glyph.html",
+      "role": "live round: a glyph on the replaced-element default",
+      "expects": { "minElements": 12, "glyphs": 3 },
+      "baseline": false
+    },
+    {
+      "id": "fixture:rt08-double-draw",
+      "source": "fixtures/rt08-double-draw.html",
+      "role": "live round: the sheet painted twice",
+      "expects": { "minElements": 24, "glyphs": 6 },
+      "baseline": false
+    }
+  ]
+}

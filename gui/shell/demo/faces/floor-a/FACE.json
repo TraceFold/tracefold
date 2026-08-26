@@ -1,0 +1,10 @@
+{
+  "id": "floor-a",
+  "title": "Floor A",
+  "place": "bottom",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [],
+  "condition": "plain",
+  "leastWidth": 200
+}

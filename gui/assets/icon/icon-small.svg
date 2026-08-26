@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Small-size variant of icon.svg for 16px and 32px rasters only. Same grid, same
+       silhouette (torn-bottom slip), simplified where a 3x downscale would smear the
+       master: 2 tear teeth instead of 5, 2 body lines instead of 3, stroke 2.2 instead
+       of 1.7. Every other convention (grid, caps, tokens, no-red) is the canon's. -->
+  <rect x="0" y="0" width="48" height="48" rx="10.5" fill="#0a0a0c"/>
+  <g transform="translate(-2.4 -2.4) scale(2.2)" fill="none" stroke="#e8e8e8"
+     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3.5H17V18.5l-2.5 1.8-2.5-1.8-2.5 1.8L7 18.5Z"/>
+    <path d="M9.6 8h4.8"/>
+    <path d="M9.6 11.2h4.8"/>
+  </g>
+</svg>

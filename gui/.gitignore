@@ -1,0 +1,29 @@
+# Run artifacts. `.run/report.json` states `citable as evidence: false` about itself;
+# it is a scratch verdict, never a record.
+.run/
+
+# Capture evidence from design-critique cycles. These are review material, not source:
+# 393 PNGs / ~49 MB at the last count. The tools that write them are shipped; the output
+# of one afternoon's review is not.
+**/record/critique_*/
+**/record/*.png
+
+# Screenshot-tool output. Each of these embeds the ABSOLUTE local path of every PNG it
+# wrote, which is how the operator's home directory ends up in a published tree.
+# Regenerate with the relevant `tools/shoot.mjs`; never commit.
+**/fixtures/shots/measurements.json
+**/fixtures/shots/browser-mount-smoke.json
+**/record/shots.json
+
+# D5's reference corpus is local configuration: absolute paths to the older asset trees
+# this module's code must not have inherited from. Committing them would leak one
+# machine's layout AND the names of unpublished sibling projects, which is exactly what
+# req/883 took out of discipline.test.mjs. Configure via this file or GX_REFERENCE_ROOTS.
+membrane/test/reference-roots.local.json
+
+# Editor / OS / transient
+*.log
+*.bak-*
+node_modules/
+.DS_Store
+Thumbs.db

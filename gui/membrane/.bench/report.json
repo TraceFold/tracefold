@@ -1,0 +1,15 @@
+{
+  "note": "membrane request-path ms -- in-process cost of one createMembrane().port call, mocked transport, real URL/header/idempotency/notice assembly. Excludes real network latency; that is a separate measurement (wire smoke).",
+  "measuredAt": "2026-08-24T04:02:55.980Z",
+  "route": "GET /candidates/{id}",
+  "samplesMs": [
+    0.026,
+    0.0374,
+    0.0391,
+    0.0496,
+    0.4318
+  ],
+  "medianMs": 0.0391,
+  "budgetMs": 15,
+  "ok": true
+}

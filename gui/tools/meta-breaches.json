@@ -1,0 +1,82 @@
+{
+  "note": "Live rounds fired at the harness itself. Each one is a small edit that makes the rig fail open in a specific way; verify-self applies it, puts the fixed situation in rig/self_probe.mjs through the edited rig, and demands the answer change. A round that leaves the answer untouched means the harness is blind at that point, and the run leaves as SELF-BLIND with every other number declared void. This is a floor and not a proof: it covers the ways of going blind that were thought of. The drift line on the report is the standing admission of that.",
+  "meta_breaches": [
+    {
+      "id": "MB-1",
+      "breaks": "an empty population with no recorded reason is reported as a pass",
+      "edits": [
+        {
+          "file": "tools/rig/runner.mjs",
+          "find": "return { verdict: VERDICT.EMPTY, note: RIG_MESSAGES.EMPTY_UNEXPLAINED };",
+          "replace": "return { verdict: VERDICT.PASS, note: RIG_MESSAGES.EMPTY_UNEXPLAINED };"
+        }
+      ],
+      "expect": "SP-EMPTY-UNEXPLAINED stops reading EMPTY"
+    },
+    {
+      "id": "MB-2",
+      "breaks": "a reading whose requirement is absent is folded into the passes",
+      "edits": [
+        {
+          "file": "tools/rig/runner.mjs",
+          "find": "verdict: VERDICT.SKIP, population: 0, failures: [],",
+          "replace": "verdict: VERDICT.PASS, population: 0, failures: [],"
+        }
+      ],
+      "expect": "SP-REQUIREMENT-ABSENT stops reading SKIP"
+    },
+    {
+      "id": "MB-3",
+      "breaks": "the report digest stops depending on the report, so two different runs look identical",
+      "edits": [
+        {
+          "file": "tools/rig/report.mjs",
+          "find": "body.digest = crypto.createHash('sha256').update(canonical).digest('hex').slice(0, 16);",
+          "replace": "body.digest = 'aaaaaaaaaaaaaaaa';"
+        }
+      ],
+      "expect": "the probe digest stops tracking the probe"
+    },
+    {
+      "id": "MB-4",
+      "breaks": "a run that never reached a real server becomes eligible for green",
+      "edits": [
+        {
+          "file": "tools/rig/report.mjs",
+          "find": "else if (tally.skip > 0 || !wire) { outcome = OUTCOME.PARTIAL; exit = EXIT.PARTIAL; }",
+          "replace": "else if (tally.skip > 0) { outcome = OUTCOME.PARTIAL; exit = EXIT.PARTIAL; }"
+        }
+      ],
+      "expect": "the wireless gate stops reading PARTIAL"
+    },
+    {
+      "id": "MB-5",
+      "breaks": "a reading nothing has ever been fired at stops making the run red",
+      "edits": [
+        {
+          "file": "tools/rig/report.mjs",
+          "find": "|| unarmed.length > 0",
+          "replace": "|| false"
+        }
+      ],
+      "expect": "the unarmed gate stops reading RED"
+    },
+    {
+      "id": "MB-6",
+      "breaks": "an assay may be registered without declaring a tier, so the ladder becomes a suggestion",
+      "edits": [
+        {
+          "file": "tools/rig/catalogue.mjs",
+          "find": "if (!tier) throw new Error(`${RIG_MESSAGES.TIER_MISSING}: ${id}`);",
+          "replace": "if (false) throw new Error(`${RIG_MESSAGES.TIER_MISSING}: ${id}`);"
+        },
+        {
+          "file": "tools/rig/catalogue.mjs",
+          "find": "if (!TIERS.includes(tier)) throw new Error(`${RIG_MESSAGES.TIER_UNKNOWN}: ${id} declared ${tier}`);",
+          "replace": "if (false) throw new Error(`${RIG_MESSAGES.TIER_UNKNOWN}: ${id} declared ${tier}`);"
+        }
+      ],
+      "expect": "registration stops refusing an assay with no tier -- and it takes two edits to get there, which is why the edits array has no ceiling"
+    }
+  ]
+}

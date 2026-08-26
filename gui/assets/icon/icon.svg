@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- App mark: the canon receipt slip (glyph_sheet v4 g-receipt) on the product's own
+       ground. Derivation, not invention: same 24 grid, stroke 1.7, round caps/joins,
+       identical path data, scaled 2.2x onto a 48 tile. Colours are the tokens of record
+       (tokens/tokens.css): tile = dark --bg #0a0a0c, strokes = --ink #e8e8e8. No red:
+       the canon rules one-point red = deny and an app icon denies nothing. -->
+  <rect x="0" y="0" width="48" height="48" rx="10.5" fill="#0a0a0c"/>
+  <g transform="translate(-2.4 -2.4) scale(2.2)" fill="none" stroke="#e8e8e8"
+     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.2 3.4H17.8V19l-1.93 1.6-1.93-1.6-1.94 1.6-1.93-1.6-1.93 1.6L6.2 19Z"/>
+    <path d="M9 8.2h6"/>
+    <path d="M9 11.6h6"/>
+    <path d="M9 15h4"/>
+  </g>
+</svg>

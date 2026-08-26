@@ -1,0 +1,1113 @@
+{
+  "schema": "glovrex_app.sem_registry/0.1",
+  "source": "req/99_SEMANTICS_REGISTRY.md",
+  "source_sha256": "c9c537a0ef722f5e36260849e1c6604e44239ea21f114987cdb36028c6f942fa",
+  "generated_at": "2026-08-24T04:11:32.720Z",
+  "row_count": 184,
+  "rows": [
+    {
+      "path": "membrane/coverage.json",
+      "role": "Declares what each face has committed to call/draw; the source the three NOT_CONSUMED/NOT_DRAWN/NOT_A_ROUTE ledgers are computed against, not written into.",
+      "defining_req": "req/01a §4-7",
+      "consumed_by": "`membrane/src/membrane.mjs`"
+    },
+    {
+      "path": "membrane/README.md",
+      "role": "Directory doc: membrane's role, file map, run commands.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "(doc; no code consumer)"
+    },
+    {
+      "path": "membrane/route-table.json",
+      "role": "Route contract: wire half (base_path/verb/path) extracted from the gx-api crate, declared half (effect/idempotency/cursor) hand-authored with its own source citation, held in bijection by a gate.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "`membrane/src/membrane.mjs`, `membrane/tools/route_table_from_crate.mjs`"
+    },
+    {
+      "path": "membrane/src/address.mjs",
+      "role": "Single function that assembles every request URL (base path + escaped id), so address construction has one place to be forgotten in.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "`membrane/src/index.mjs`, `membrane/src/membrane.mjs`"
+    },
+    {
+      "path": "membrane/src/idempotency.mjs",
+      "role": "Derives the idempotency-key header from method+row only (never clock, never body), for the two cached routes.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "`membrane/src/index.mjs`, `membrane/src/membrane.mjs`"
+    },
+    {
+      "path": "membrane/src/index.mjs",
+      "role": "The membrane's single public entry; a shell imports only this, a face imports nothing and is handed a port.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "faces/ledger + faces/notice fixtures/tools/gate, membrane test suite, `shell/demo/modules.gen.mjs`, `shell/test/gates.test.mjs`, `shell/tools/{gen_manifest,gen_routes,negative}.mjs`"
+    },
+    {
+      "path": "membrane/src/ledgers.mjs",
+      "role": "Computes NOT_CONSUMED/NOT_DRAWN/NOT_A_ROUTE as set differences against declared coverage (never a hand-kept literal), gated both ways: an unexplained member is red and a stale explanation is red.",
+      "defining_req": "req/01a §4-3 / §4-7",
+      "consumed_by": "`membrane/src/index.mjs`, `membrane/src/membrane.mjs`, `membrane/test/ledgers.test.mjs`"
+    },
+    {
+      "path": "membrane/src/membrane.mjs",
+      "role": "The one module in the app that touches a network; every callable is derived mechanically from a `route-table.json` row, never a hand-written method name.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "`membrane/src/index.mjs`, `membrane/test/{discipline,ledgers,route_table}.test.mjs`"
+    },
+    {
+      "path": "membrane/src/pages.mjs",
+      "role": "Walks a paginated list to its end and reports the true denominator (request count, stop reason: end/cursor-repeat/budget) instead of an item count alone.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "`membrane/src/index.mjs`, `membrane/src/membrane.mjs`"
+    },
+    {
+      "path": "membrane/src/transport.mjs",
+      "role": "Performs one HTTP request and classifies the reply into the four wire outcomes, telling an engine refusal (`application/problem+json`) apart from a transport failure.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "`membrane/src/membrane.mjs`"
+    },
+    {
+      "path": "membrane/src/wire.mjs",
+      "role": "Frozen vocabulary read out of the crate (outcome/failure/absence shapes); anything not read is named in `HOLES` rather than guessed.",
+      "defining_req": "req/01a §4-2",
+      "consumed_by": "`membrane/src/{index,membrane,pages,transport}.mjs`, `membrane/test/wire_contract.test.mjs`, `membrane/tools/smoke_serve.mjs`"
+    },
+    {
+      "path": "membrane/test/discipline.test.mjs",
+      "role": "Red-fired gates on the membrane's own structural shape (no hand-written method, module-boundary discipline).",
+      "defining_req": "req/38 §497 / req/08 §6-2",
+      "consumed_by": "(test entry; no further consumer)"
+    },
+    {
+      "path": "membrane/test/ledgers.test.mjs",
+      "role": "Tests the three uncovered-range ledgers and both directions of their stale-reason gate.",
+      "defining_req": "req/01a §4-3",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "membrane/test/route_table.test.mjs",
+      "role": "Asserts the route count against the crate's own router output, never a written number.",
+      "defining_req": "req/01a §4-3",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "membrane/test/wire_contract.test.mjs",
+      "role": "Contract tests driven from raw wire byte fixtures (never post-transform, face-facing shapes), closing the gap where the reference tree's suite never ran the transform against a real server input.",
+      "defining_req": "req/01a §4-1 / §4-7",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "membrane/tools/bench.mjs",
+      "role": "Measures in-process request-assembly cost (URL/header/idempotency/serialisation) via a microtask-resolving fetch stub, closing the `§3c②` bench gap; explicitly excludes network latency.",
+      "defining_req": "req/98 (five-principles audit)",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "membrane/tools/discipline.mjs",
+      "role": "The discipline predicates written once, so a rule is not spelled out separately per test site.",
+      "defining_req": "req/38 §109 / §497",
+      "consumed_by": "`membrane/test/discipline.test.mjs`"
+    },
+    {
+      "path": "membrane/tools/route_table_from_crate.mjs",
+      "role": "Extracts base_path/verb/path rows from the gx-api crate source text; `--write` rewrites `route-table.json`'s wire half only.",
+      "defining_req": "req/01a §4-3",
+      "consumed_by": "`membrane/test/route_table.test.mjs`"
+    },
+    {
+      "path": "membrane/tools/serve_bed.sh",
+      "role": "Stands a real gx server up under WSL so contract tests run against a live server, not only fixtures.",
+      "defining_req": "req/01a §4-1",
+      "consumed_by": "(shell entry)"
+    },
+    {
+      "path": "membrane/tools/smoke_serve.mjs",
+      "role": "Runs the membrane against a running server (base-path requirement, wrong-token refusal, page-shape agreement); exits 0 only if every wire check holds.",
+      "defining_req": "req/01_MEMBRANE.md",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "membrane/wire-fields.json",
+      "role": "Declares the NOT_DRAWN field domain (route+field+crate source line); the domain is honestly smaller than the eventual one — handler response bodies are unread.",
+      "defining_req": "req/01a §4-7",
+      "consumed_by": "`membrane/test/discipline.test.mjs`"
+    },
+    {
+      "path": "shell/demo/boot.mjs",
+      "role": "The demo's one script: mounts the shell with a manifest, a module set and a membrane stand-in, writes the check count into both the title and the strip.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/index.html`"
+    },
+    {
+      "path": "shell/demo/checks.mjs",
+      "role": "In-window checks that read the live mounted document after boot (never the source file); several perform an act and assert the shell went back.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/demo/boot.mjs`"
+    },
+    {
+      "path": "shell/demo/demo.css",
+      "role": "Demo page stylesheet.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/index.html`"
+    },
+    {
+      "path": "shell/demo/faces/floor-a/FACE.json",
+      "role": "Placeholder demo-face declaration (id/place/purpose/rail/consumes/condition) for a bottom-dock rail face.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/tools/gen_manifest.mjs`"
+    },
+    {
+      "path": "shell/demo/faces/floor-a/index.mjs",
+      "role": "Placeholder face module that imports nothing, so the frame can be shown carrying content while the rebuilt faces (req/03) are elsewhere.",
+      "defining_req": "req/03",
+      "consumed_by": "`shell/demo/modules.gen.mjs` (generated)"
+    },
+    {
+      "path": "shell/demo/faces/margin-a/FACE.json",
+      "role": "Placeholder demo-face declaration for a right-dock rail face.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(declared but not read by an included consumer beyond the generator)"
+    },
+    {
+      "path": "shell/demo/faces/margin-a/index.mjs",
+      "role": "Placeholder face module, imports nothing (same contract as floor-a).",
+      "defining_req": "req/03",
+      "consumed_by": "`shell/demo/modules.gen.mjs` (generated)"
+    },
+    {
+      "path": "shell/demo/faces/probe-a/FACE.json",
+      "role": "Placeholder demo-face declaration for a left-dock \"find\" face.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(generator input)"
+    },
+    {
+      "path": "shell/demo/faces/probe-a/index.mjs",
+      "role": "Placeholder face module, imports nothing.",
+      "defining_req": "req/03",
+      "consumed_by": "`shell/demo/modules.gen.mjs` (generated)"
+    },
+    {
+      "path": "shell/demo/faces/probe-b/FACE.json",
+      "role": "Placeholder demo-face declaration, second left-dock \"find\" face.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(generator input)"
+    },
+    {
+      "path": "shell/demo/faces/probe-b/index.mjs",
+      "role": "Placeholder face module, imports nothing.",
+      "defining_req": "req/03",
+      "consumed_by": "`shell/demo/modules.gen.mjs` (generated)"
+    },
+    {
+      "path": "shell/demo/faces/sheet-a/FACE.json",
+      "role": "Placeholder demo-face declaration for a stage face that consumes `get_healthz`.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(generator input)"
+    },
+    {
+      "path": "shell/demo/faces/sheet-a/index.mjs",
+      "role": "Placeholder face module, imports nothing.",
+      "defining_req": "req/03",
+      "consumed_by": "`shell/demo/modules.gen.mjs` (generated)"
+    },
+    {
+      "path": "shell/demo/faces/sheet-b/FACE.json",
+      "role": "Placeholder demo-face declaration, stage face with `condition:\"held\"`.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(generator input)"
+    },
+    {
+      "path": "shell/demo/faces/sheet-b/index.mjs",
+      "role": "Placeholder face module, imports nothing.",
+      "defining_req": "req/03",
+      "consumed_by": "`shell/demo/modules.gen.mjs` (generated)"
+    },
+    {
+      "path": "shell/demo/faces/sheet-c/FACE.json",
+      "role": "Placeholder demo-face declaration, third stage face.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(generator input)"
+    },
+    {
+      "path": "shell/demo/faces/sheet-c/index.mjs",
+      "role": "Placeholder face module, imports nothing.",
+      "defining_req": "req/03",
+      "consumed_by": "`shell/demo/modules.gen.mjs` (generated)"
+    },
+    {
+      "path": "shell/demo/port.mock.mjs",
+      "role": "Stand-in membrane port for the demo; every reply is marked `standIn:true` and method names are taken from `routes.gen.mjs` (crate-derived), so a callable method is a method that exists.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/demo/boot.mjs`, `shell/tools/w12_baseline.mjs`"
+    },
+    {
+      "path": "shell/index.html",
+      "role": "Demo host page (browser entry point).",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(browser entry; no in-tree consumer)"
+    },
+    {
+      "path": "shell/kernel/acts.mjs",
+      "role": "Registry of every reversible state change (act = change + inverse closure); shell-track acts hold their own inverse locally, face-track acts hold `invert:null` because that inverse belongs to the backend.",
+      "defining_req": "req/38 §470",
+      "consumed_by": "`shell/kernel/{keys,state}.mjs`, `shell/test/registry.test.mjs`, `shell/tools/{ac_population,gates,inverse_census}.mjs`"
+    },
+    {
+      "path": "shell/kernel/digest.mjs",
+      "role": "BLAKE3 (hash mode, no key/context) used to fingerprint a layout line, checked against published test vectors rather than against itself.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/layout.mjs`, `shell/test/digest.test.mjs`"
+    },
+    {
+      "path": "shell/kernel/dismiss.mjs",
+      "role": "Single table of dismiss-layer order (what closes first); registering a layer twice throws so order cannot depend on load order.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/shell.mjs`, `shell/test/registry.test.mjs`"
+    },
+    {
+      "path": "shell/kernel/keys.mjs",
+      "role": "Sole keyboard/IME-composition table in the app; every chord must name a verb that exists in the act registry, refused at load time otherwise.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/shell.mjs`, `shell/test/registry.test.mjs`, `shell/tools/{ac_population,gates}.mjs`"
+    },
+    {
+      "path": "shell/kernel/layout.mjs",
+      "role": "The shell's entire held state serialised to one line; `serialise`/`parse` are asserted true inverses, which is what keeps unrepresentable state (focus/scroll/hover) out by construction.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/{acts,manifest,render,shell,slots,state}.mjs`, `shell/test/{layout,mount}.test.mjs`, `shell/tools/{ac_population,inverse_census}.mjs`"
+    },
+    {
+      "path": "shell/kernel/manifest.mjs",
+      "role": "Schema for what a face may declare about itself; the shell learns a face exists only through this schema, never a hand-kept name list.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/{acts,render,shell}.mjs`, `shell/test/{history,layout,manifest,mount}.test.mjs`, `shell/tools/{ac_population,gates,inverse_census,w12_baseline}.mjs`"
+    },
+    {
+      "path": "shell/kernel/marks.mjs",
+      "role": "The shell's structural glyph set (frame marks, a separate namespace from face record marks); every mark is drawn at a declared size, never the SVG default box.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/render.mjs`"
+    },
+    {
+      "path": "shell/kernel/mount.mjs",
+      "role": "The `mount(host,port,notices)->unmount` contract plus per-host mount/unmount tally counters; a face that fails to return `unmount` is refused loudly at mount time.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/{render,shell}.mjs`, `shell/test/{mount,w8-remount-isolation}.test.mjs`, `shell/tools/bench.mjs`"
+    },
+    {
+      "path": "shell/kernel/render.mjs",
+      "role": "Incremental drawing: the frame is built once, only the parts that differ are touched per redraw, and every external string is set via `textContent` (no markup injection).",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/shell.mjs`"
+    },
+    {
+      "path": "shell/kernel/shell.css",
+      "role": "Kernel frame stylesheet.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/index.html`, `shell/tools/negative.mjs`"
+    },
+    {
+      "path": "shell/kernel/shell.mjs",
+      "role": "Assembly point wiring the whole shell together with zero face-id literals anywhere under `kernel/`; the starting layout is derived purely from face declarations (W1).",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/demo/boot.mjs`, `shell/test/{history,layout,mount}.test.mjs`, `shell/tools/{ac_population,inverse_census}.mjs`"
+    },
+    {
+      "path": "shell/kernel/slots.mjs",
+      "role": "Registry of the shell's place names; a slot knows nothing about what stands in it, held by a gate rather than by convention.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/test/registry.test.mjs`"
+    },
+    {
+      "path": "shell/kernel/state.mjs",
+      "role": "The one road every state transition passes through (`#commit`, a private field, one assignment site), so \"state changed\" and \"went through an act\" are the same count by construction.",
+      "defining_req": "req/02_SHELL_WLAYER.md (W4)",
+      "consumed_by": "`shell/kernel/shell.mjs`, `shell/test/{history,layout}.test.mjs`, `shell/tools/inverse_census.mjs`"
+    },
+    {
+      "path": "shell/kernel/tree.mjs",
+      "role": "Persistent split/leaf tree; every operation returns a new tree, so an inverse costs the removed branch, never a full-state snapshot.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/{acts,layout,render,shell}.mjs`, `shell/test/{layout,tree}.test.mjs`"
+    },
+    {
+      "path": "shell/kernel/viewpoint.mjs",
+      "role": "Holds \"where a person is looking\" (focus/scroll/hover) as a type the layout line and undo cannot reach, by construction.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/kernel/shell.mjs`, `shell/test/mount.test.mjs`, `shell/tools/ac_population.mjs`"
+    },
+    {
+      "path": "shell/README.md",
+      "role": "Directory doc: shell's role (names no face, dock/space from declarations only), zero-dependency stance, run commands.",
+      "defining_req": "req/02_SHELL_WLAYER.md / req/38 §470",
+      "consumed_by": "(doc; no code consumer)"
+    },
+    {
+      "path": "shell/record/real-window.json",
+      "role": "Hand-authored evidence the shell mounted in a real (non-headless) Chrome app-mode window, check count read from the page's own computed title.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "(evidence record; no code consumer)"
+    },
+    {
+      "path": "shell/test/digest.test.mjs",
+      "role": "Checks `digest.mjs` against BLAKE3's published test vectors (literal expected bytes), so a wrong implementation cannot self-confirm.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/gates.test.mjs",
+      "role": "Runs the source/tree gates as part of the ordinary suite, not only via the separate negative-control command.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/history.test.mjs",
+      "role": "200 arbitrary acts undone to the start and redone to the end, with the layout digest as the sole witness of round-trip correctness.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/layout.test.mjs",
+      "role": "Asserts `serialise`/`parse` are true inverses in both directions, not a plausible-looking one-way encoding.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/manifest.test.mjs",
+      "role": "Tests the face-declaration schema's refusals: a rail grown past its stated size, and a declared field nothing reads.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/mount.test.mjs",
+      "role": "Tests the mount contract without a browser (host = anything with `ownerDocument`), asserting return value and counters.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/registry.test.mjs",
+      "role": "Tests the shell's four tables plus a fresh inverse census measured on this project's own act set, not transcribed from another system.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/tree.test.mjs",
+      "role": "Asserts the persistent tree's core property: no operation mutates a node that already exists.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/w12-baseline.test.mjs",
+      "role": "Red-first diff of the live face-declaration schema against a committed baseline, asserting extension stays additive-only.",
+      "defining_req": "req/02_SHELL_WLAYER.md (W12)",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/w13-ac-population.test.mjs",
+      "role": "Asserts every AC row in req/02 §4 quantifies over a non-empty static-tree population, so a gate cannot pass by holding over nothing.",
+      "defining_req": "req/02_SHELL_WLAYER.md §4 (W13)",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/test/w8-remount-isolation.test.mjs",
+      "role": "Red-first test of the `changing()` mount guard: a tab switch inside one pane must not remount another pane, and an unrelated redraw must not touch any mount.",
+      "defining_req": "req/02_SHELL_WLAYER.md (W8)",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "shell/tools/ac_population.mjs",
+      "role": "For each of the 15 AC rows in req/02 §4, reads the real static-tree population it quantifies over and reports the count, so an always-empty population is caught rather than assumed non-zero.",
+      "defining_req": "req/02_SHELL_WLAYER.md §4",
+      "consumed_by": "`shell/test/w13-ac-population.test.mjs`"
+    },
+    {
+      "path": "shell/tools/bench.mjs",
+      "role": "Measures `Mounted.raise()`/`lower()` kernel dispatch cost across representative faces/hosts with no real DOM, closing the `§3c②` bench gap for the mount path; explicitly excludes full real-DOM mount timing.",
+      "defining_req": "req/98 / req/02 W8",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "shell/tools/gates.mjs",
+      "role": "Source/tree gate predicates (rail-literal count, `isComposing` duplication, etc.), each reporting its population size beside its finding.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/test/gates.test.mjs`, `shell/tools/ac_population.mjs`"
+    },
+    {
+      "path": "shell/tools/gen_manifest.mjs",
+      "role": "Reads `faces/` and writes the generated manifest + module map (`--check`/`--drop` negative control), replacing a hand-written face list.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(CLI entry; writes excluded `manifest.gen.mjs`)"
+    },
+    {
+      "path": "shell/tools/gen_routes.mjs",
+      "role": "Writes the demo's membrane-method name list from the membrane's own `tableRows` (crate-derived), so the stand-in cannot invent a method.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(CLI entry; writes excluded `routes.gen.mjs`)"
+    },
+    {
+      "path": "shell/tools/inverse_census.mjs",
+      "role": "Measures this shell's own act set for inverse-capture classification and post-walk retained-object cost, replacing a transcribed reference-system number.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/test/registry.test.mjs`"
+    },
+    {
+      "path": "shell/tools/negative.mjs",
+      "role": "Fires one fault injection per gate into a temporary tree copy (never the working tree) and requires every gate to catch its own injection.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "shell/tools/real_window.ps1",
+      "role": "Opens the demo in a real Chrome app-mode window, reads the check count back through the Win32 window-title list, photographs the window rectangle.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "`faces/{ledger,notice}/tools/real-window-smoke.mjs`, `shell/record/real-window.json`"
+    },
+    {
+      "path": "shell/tools/serve.mjs",
+      "role": "Minimal `node:http` static server for the demo; serves `/s-common/tokens.css` resolved from the one stylesheet of record, so no second copy of colour exists.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "shell/tools/w12_baseline.json",
+      "role": "Committed baseline (requiredFields/portMethods) that `w12-baseline.test.mjs` diffs the live schema against.",
+      "defining_req": "req/02_SHELL_WLAYER.md (W12)",
+      "consumed_by": "`shell/tools/w12_baseline.mjs`"
+    },
+    {
+      "path": "shell/tools/w12_baseline.mjs",
+      "role": "Computes the additive-only diff (growing requiredFields / shrinking portMethods = breaking) against the committed baseline, with an explicit `--write` regeneration path.",
+      "defining_req": "req/02_SHELL_WLAYER.md (W12)",
+      "consumed_by": "`shell/test/w12-baseline.test.mjs`"
+    },
+    {
+      "path": "shell/tools/walk.mjs",
+      "role": "One shared arbitrary-walk generator over the act registry, used identically by the in-window checks and the node history test so the two cannot drift apart.",
+      "defining_req": "req/02_SHELL_WLAYER.md",
+      "consumed_by": "`shell/demo/checks.mjs`, `shell/test/history.test.mjs`, `shell/test/layout.test.mjs`, `shell/tools/inverse_census.mjs`"
+    },
+    {
+      "path": "parts/README.md",
+      "role": "Directory doc: two part kinds, zero-from-scratch/COPY-BAN provenance, per-part ledger.",
+      "defining_req": "req/04_PARTS_REBUILD.md",
+      "consumed_by": "(doc; no code consumer)"
+    },
+    {
+      "path": "parts/src/checkable.mjs",
+      "role": "M3: returns every checkable claim including the failing ones (never filtered to passing-only); compares gap sets as sets, not lengths, so a wrong-record withholding is caught.",
+      "defining_req": "req/04a M3",
+      "consumed_by": "`faces/ledger/binding.mjs`, `parts/test/checkable.test.mjs`"
+    },
+    {
+      "path": "parts/src/element.mjs",
+      "role": "Shared tree substrate every drawing part returns instead of touching DOM directly; the one tree description both serialises to the photographed fixture and mounts into a live document.",
+      "defining_req": "req/03 N-1",
+      "consumed_by": "`faces/{ledger,notice}/binding.mjs`, `parts/src/{glyph-sheet,provenance-fold,receipt-row,serial,verdict-badge}.mjs`, parts tests, `parts/tools/fixtures.mjs`"
+    },
+    {
+      "path": "parts/src/glyph-sheet.mjs",
+      "role": "C2: sole sprite sheet and only door a mark is drawn through; a mark refuses to draw without an explicit size (closes N-2), and the safety sentence lives as a greppable `<desc>` node inside the sprite.",
+      "defining_req": "req/03 AC-F3 / req/04a C2, C3",
+      "consumed_by": "`faces/{ledger,notice}/binding.mjs`, `parts/src/{provenance-fold,receipt-row,verdict-badge}.mjs`, parts tests, `parts/tools/fixtures.mjs`"
+    },
+    {
+      "path": "parts/src/provenance-fold.mjs",
+      "role": "C5: settled/held halves rendered with different words and marks, never omitted when empty; `withoutFolds` structurally asserts fold removal cannot delete claims.",
+      "defining_req": "req/04 C5 / req/04a C5",
+      "consumed_by": "`faces/ledger/binding.mjs`, `parts/test/provenance-fold.test.mjs`, `parts/tools/fixtures.mjs`"
+    },
+    {
+      "path": "parts/src/receipt-row.mjs",
+      "role": "C4: one ledger row plus its note, built with zero `position:absolute` (closes N-1's overlap) and an opaque note background as a second line of defence.",
+      "defining_req": "req/03 N-1 / req/04a C4, C1",
+      "consumed_by": "`faces/ledger/binding.mjs`, `parts/test/receipt-row.test.mjs`, `parts/tools/fixtures.mjs`"
+    },
+    {
+      "path": "parts/src/row-order.mjs",
+      "role": "M2: order is a required argument (no default); falls back to arrival order with a stated substitution reason when string-sort preconditions fail, and drops undrawable rows with a named reason, never a boolean.",
+      "defining_req": "req/04a M2",
+      "consumed_by": "`faces/{ledger,notice}/binding.mjs`, `parts/test/row-order.test.mjs`"
+    },
+    {
+      "path": "parts/src/seal-claim.mjs",
+      "role": "M1: decides whether a window may say \"sealed\", never trusts the payload's own `sealed:true`; requires both a comparison-based basis and a present verifier, reporting six distinct basis words.",
+      "defining_req": "req/04a M1",
+      "consumed_by": "`faces/ledger/binding.mjs`, `parts/test/{boundary,receipt-row,seal-claim}.test.mjs`, `parts/tools/fixtures.mjs`"
+    },
+    {
+      "path": "parts/src/serial.mjs",
+      "role": "C6: shortened-digest display whose truncation caveat is read off the digest's real length (no stale literal); has no mode that emits the characters without their two accompanying sentences.",
+      "defining_req": "req/04a C6",
+      "consumed_by": "`faces/ledger/binding.mjs`, `parts/src/receipt-row.mjs`, `parts/test/serial.test.mjs`, `parts/tools/fixtures.mjs`"
+    },
+    {
+      "path": "parts/src/tokens.mjs",
+      "role": "C1: consumption-only token module (zero hex literals) pointing at the one physical stylesheet of record; computes contrast ratios at test time and reads the build-time-generated mirror instead of touching `node:fs` at import time.",
+      "defining_req": "req/04 T-1 / req/04a C1 / req/02 W15",
+      "consumed_by": "`faces/{ledger,notice}/binding.mjs`, `parts/src/{provenance-fold,receipt-row,serial,verdict-badge}.mjs`, parts tests, `parts/tools/{boundary,fixtures,generate-tokens,token-source}.mjs`"
+    },
+    {
+      "path": "parts/src/verdict-badge.mjs",
+      "role": "C3: draws a verdict as a shape without comparing it — `boundary.mjs` holds the verdict-comparison count in drawing parts at zero; colour alone never distinguishes a verdict, keeping the single-red-site rule checkable.",
+      "defining_req": "req/04 AC-P0 / T-5",
+      "consumed_by": "`faces/ledger/binding.mjs`, `parts/src/receipt-row.mjs`, `parts/test/verdict-badge.test.mjs`, `parts/tools/fixtures.mjs`"
+    },
+    {
+      "path": "parts/test/boundary.test.mjs",
+      "role": "Fires each draws-vs-decides gate red before trusting its silence; two gates run against files written to disk since the shipped gate walks a directory.",
+      "defining_req": "req/04 §1 (AC-P0)",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/checkable.test.mjs",
+      "role": "Tests the checkable-claims contract of `checkable.mjs`.",
+      "defining_req": "req/04a M3",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/element.test.mjs",
+      "role": "Tests the shared tree substrate `element.mjs` (tree-vs-DOM contract).",
+      "defining_req": "req/03 N-1",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/glyph-sheet.test.mjs",
+      "role": "Tests the glyph sheet's size-required and safety-description contract.",
+      "defining_req": "req/04a C2, C3",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/provenance-fold.test.mjs",
+      "role": "Tests the settled/held fold's non-omission and structural-survival contract.",
+      "defining_req": "req/04 C5 / req/04a C5",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/receipt-row.test.mjs",
+      "role": "Tests the receipt row for the N-1 overlap regression and the zero-`position:absolute` invariant.",
+      "defining_req": "req/03 N-1 / req/04a C4",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/row-order.test.mjs",
+      "role": "Tests the required-order and named-drop-reason contract of `row-order.mjs`.",
+      "defining_req": "req/04a M2",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/seal-claim.test.mjs",
+      "role": "Tests the sealed-claim basis/verifier contract and its six basis words.",
+      "defining_req": "req/04a M1",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/serial.test.mjs",
+      "role": "Tests the serial digest's length-derived caveat and no-bare-emission contract.",
+      "defining_req": "req/04a C6",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/tokens.test.mjs",
+      "role": "Tests the token module's zero-literal, build-time-mirror contract.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/tokens-generated.test.mjs",
+      "role": "Drift gate: re-reads the canonical stylesheet at test time and re-derives the digest, failing the moment `tokens.generated.mjs`'s stamped SHA-256 stops matching it.",
+      "defining_req": "req/02 W15 / req/04 boundary",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/test/verdict-badge.test.mjs",
+      "role": "Tests the verdict badge's draws-not-compares contract and single-red-site rule.",
+      "defining_req": "req/04 AC-P0 / T-5",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "parts/tools/bench.mjs",
+      "role": "Measures `receipt-row.mjs`'s `row()` tree-construction cost over 1,000 representative records (no document touch, real product-path function), closing the `§3c②` gap named in `parts/README.md:61`.",
+      "defining_req": "req/98 V-1",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "parts/tools/boundary.mjs",
+      "role": "Gate predicates enforcing req/04 §1's draws-vs-decides split, each checked against a non-empty population first.",
+      "defining_req": "req/04 §1 / Q4 / T-2 / T-5",
+      "consumed_by": "`parts/test/boundary.test.mjs`"
+    },
+    {
+      "path": "parts/tools/fixtures.mjs",
+      "role": "Generates fixture HTML from the parts themselves (never hand-written) at the narrow 720px width — the hostile width is the shipping width.",
+      "defining_req": "req/04a C1",
+      "consumed_by": "`parts/tools/shoot.mjs`"
+    },
+    {
+      "path": "parts/tools/generate-tokens.mjs",
+      "role": "Build-time reader of the stylesheet of record; writes `tokens.generated.mjs` with a stamped SHA-256 so the drift test can detect a stale mirror.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "`parts/tools/token-source.mjs` (build entry)"
+    },
+    {
+      "path": "parts/tools/shoot.mjs",
+      "role": "Photographs the fixtures with a real renderer and measures overlap/repeat/oversize/fill defects; the measurement is explicitly not the verdict, the picture is.",
+      "defining_req": "req/03 §4-2",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "parts/tools/token-source.mjs",
+      "role": "Sole filesystem-touching module for the one physical stylesheet (path resolution, junction/copy detection, fixture `<link>` href), kept out of every browser-loaded import graph.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "face browser-mount-smoke/fixture tools (both faces), `parts/src/tokens.mjs`, `parts/test/{tokens,tokens-generated}.test.mjs`, `parts/tools/{fixtures,generate-tokens}.mjs`"
+    },
+    {
+      "path": "faces/ledger/binding.mjs",
+      "role": "Seam object handing the ledger face its drawing parts (never imported directly); one direction only (face reaches down, parts never reach up); excludes `tokenHref` (a Node-only fixture-writer helper) to keep the runtime import graph `node:*`-free.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "`faces/ledger/ledger.mjs`, `faces/ledger/test/ledger.test.mjs`, `faces/ledger/tools/{fixture,gate}.mjs`"
+    },
+    {
+      "path": "faces/ledger/declaration.mjs",
+      "role": "Self-declaration of every server method this face may call (`consumes` upper bound / `sends` / `withheld` with reason / `undrawn`); the sole place a method name is spelled out.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/ledger/{index,ledger}.mjs`, `faces/ledger/test/{declaration,gate,ledger}.test.mjs`, `faces/ledger/tools/{fixture,gate}.mjs`, `membrane/test/discipline.test.mjs`"
+    },
+    {
+      "path": "faces/ledger/index.mjs",
+      "role": "Single mount door: a shell mounts only this, the face learns nothing about the shell.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/ledger/tools/browser-mount-smoke.mjs` (+ excluded generated entry)"
+    },
+    {
+      "path": "faces/ledger/ledger.mjs",
+      "role": "Draws the settled/held two-halves ledger screen: an unreadable list is never drawn as an empty one, and a written row is never edited (rebuilt fresh from each read).",
+      "defining_req": "req/38 SS549 / req/09 SS528 / req/97 RC-2",
+      "consumed_by": "`faces/ledger/index.mjs`, `faces/ledger/test/{gate,ledger}.test.mjs`, `faces/ledger/tools/{fixture,gate}.mjs`, `tools/verify-all.mjs`"
+    },
+    {
+      "path": "faces/ledger/README.md",
+      "role": "Status/origin doc: 61 tests / 0 fail, 7 real-renderer captures, COPY-BAN provenance record.",
+      "defining_req": "req/03_FACES_REBUILD.md / req/04_PARTS_REBUILD.md",
+      "consumed_by": "(doc)"
+    },
+    {
+      "path": "faces/ledger/record/real-window.json",
+      "role": "Hand-authored evidence the ledger face mounted in a real Chrome window, element/row counts computed in-page.",
+      "defining_req": "req/02 W15 clause 3",
+      "consumed_by": "(evidence record)"
+    },
+    {
+      "path": "faces/ledger/test/declaration.test.mjs",
+      "role": "Checks the declaration against the two things it can misstate: server method names, and named test files.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "faces/ledger/test/dom-stand-in.mjs",
+      "role": "Fast fake-document mount test (fill/empty/double-unmount only); explicitly proves nothing about drawing — `shoot.mjs` against a real renderer does that.",
+      "defining_req": "req/02 W15 / req/03 N-1",
+      "consumed_by": "`faces/ledger/test/ledger.test.mjs`, `faces/notice/test/notice.test.mjs`"
+    },
+    {
+      "path": "faces/ledger/test/gate.test.mjs",
+      "role": "Runs every gate against shipped source and again against a deliberately broken planted string, proving each gate fires.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "faces/ledger/test/ledger.test.mjs",
+      "role": "Behavioural tests for the two load-bearing properties: unreadable-list-not-drawn-empty, and written-row-never-edited.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "faces/ledger/test/stub-port.mjs",
+      "role": "No-network port stub spelling out the membrane's four outcomes/list envelope explicitly (not imported), so disagreement with the real membrane surfaces via the declaration test instead of silently passing.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/ledger/test/{gate,ledger}.test.mjs`, `faces/ledger/tools/browser-mount-smoke.mjs`"
+    },
+    {
+      "path": "faces/ledger/tools/bench.mjs",
+      "role": "Measures `view(state)` (ledger.mjs's exported pure paint function, the same one `mount()` calls) building its element tree for 1,000 settled records, timing only the tree-build and not the untimed `read(port)` I/O half; statistics/persistence delegate to `tools/rig/bench.mjs`.",
+      "defining_req": "req/98 V-1 / req/38 §227",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "faces/ledger/tools/browser-mount-smoke.mjs",
+      "role": "Real-browser (headless-renderer) mount smoke: imports `index.mjs` natively via `<script type=module>` against a stub port; a lingering `node:fs` import fails the module graph in-page instead of passing silently.",
+      "defining_req": "req/02 W15 clause 2, 3",
+      "consumed_by": "`faces/{ledger,notice}/tools/real-window-smoke.mjs`"
+    },
+    {
+      "path": "faces/ledger/tools/fixture.mjs",
+      "role": "Serialises the same tree the unit tests read into two fixture pages (happy path + unanswered read) for a real renderer to photograph.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/{ledger,notice}/tools/shoot.mjs`"
+    },
+    {
+      "path": "faces/ledger/tools/gate.mjs",
+      "role": "Node-only source+tree gate predicates for this face (network-reach check on shipped source; drawn-mark check refuses an empty population); comment-stripped before source checks run.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "`faces/{ledger,notice}/test/gate.test.mjs`"
+    },
+    {
+      "path": "faces/ledger/tools/real-window-smoke.mjs",
+      "role": "Drives `shell/tools/real_window.ps1` against this face's fixture in both light and dark themes, reusing the one real-window instrument rather than a second capture path.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "faces/ledger/tools/shoot.mjs",
+      "role": "Photographs the fixtures and measures the four negative-truth-ledger defects (overlaps, repeated rows, oversize/filled glyphs) as pointers to look, not as the verdict.",
+      "defining_req": "req/03 N-1",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "faces/notice/binding.mjs",
+      "role": "Seam object for this face's parts; draws no checkable-claim part (no receipt row/badge/fold/seal) because nothing on this screen is a checkable claim, only a call record.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/notice/notice.mjs`, `faces/notice/test/notice.test.mjs`, `faces/notice/tools/fixture.mjs`"
+    },
+    {
+      "path": "faces/notice/declaration.mjs",
+      "role": "C-7 declaration: `CONSUMES` is empty by construction — this face reports on the window's own call record and never asks the server about its own failures.",
+      "defining_req": "req/03_FACES_REBUILD.md (C-7)",
+      "consumed_by": "`faces/notice/{index,notice}.mjs`, `faces/notice/test/{declaration,gate,notice}.test.mjs`, `faces/notice/tools/{fixture,gate}.mjs`, `membrane/test/discipline.test.mjs`"
+    },
+    {
+      "path": "faces/notice/index.mjs",
+      "role": "Single mount door (same contract as `faces/ledger/index.mjs`).",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/notice/tools/browser-mount-smoke.mjs` (+ excluded generated entry)"
+    },
+    {
+      "path": "faces/notice/notice.mjs",
+      "role": "Draws what this window itself did (method/layer/outcome), not a route's answer; tells \"nothing asked yet\" apart from \"not given anything to read\" in different words, and never edits a drawn entry.",
+      "defining_req": "req/97 real-window row",
+      "consumed_by": "`faces/notice/declaration.mjs`, `faces/notice/{index,test/gate,test/notice}.{mjs,test.mjs}`, `faces/notice/tools/{fixture,gate}.mjs`"
+    },
+    {
+      "path": "faces/notice/README.md",
+      "role": "Status doc: 47 tests / 0 fail, 7 captures, `membrane/test/discipline` 17/17; records the dispatching-brief face-id naming mismatch (F-2 vs F-5, resolved to `notice`/F-5).",
+      "defining_req": "req/03_FACES_REBUILD.md / req/01_MEMBRANE.md",
+      "consumed_by": "(doc)"
+    },
+    {
+      "path": "faces/notice/record/real-window.json",
+      "role": "Independent re-verification real-window evidence, authored fresh without opening the ledger version, from a 9-entry inline fixture covering every outcome word.",
+      "defining_req": "req/02 W15 clause 3",
+      "consumed_by": "(evidence record)"
+    },
+    {
+      "path": "faces/notice/test/declaration.test.mjs",
+      "role": "Checks the declaration against the C-7 property and its named test files.",
+      "defining_req": "req/03_FACES_REBUILD.md (C-7)",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "faces/notice/test/dom-stand-in.mjs",
+      "role": "Fast fake-document mount test; proves nothing about drawing.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "`faces/ledger/test/ledger.test.mjs`, `faces/notice/test/notice.test.mjs`"
+    },
+    {
+      "path": "faces/notice/test/gate.test.mjs",
+      "role": "Runs every gate against shipped source and a deliberately broken planted string.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "faces/notice/test/notice.test.mjs",
+      "role": "Tests what the face draws, what it never touches, and its behaviour on a growing/malformed/absent window record.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "faces/notice/test/sample-notices.mjs",
+      "role": "Spelled-out (not membrane/shell-built) entries in the two real shapes this face is handed, so a passing test that disagrees with the real producers is meaningful.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/notice/test/{gate,notice}.test.mjs`, `faces/notice/tools/browser-mount-smoke.mjs`"
+    },
+    {
+      "path": "faces/notice/tools/bench.mjs",
+      "role": "Measures `face.view(state)` (notice.mjs's exported pure paint function) building its element tree for 1,000 entries, timing only the tree-build and not the untimed, sync `face.read(notices)` half; statistics/persistence delegate to `tools/rig/bench.mjs`.",
+      "defining_req": "req/98 V-1 / req/38 §227",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "faces/notice/tools/browser-mount-smoke.mjs",
+      "role": "Real-browser mount smoke, simpler than a route-reading face's — there is no port to stub because C-7's `notice.mjs` never calls the port it is handed.",
+      "defining_req": "req/02 W15 clause 2",
+      "consumed_by": "`faces/{ledger,notice}/tools/real-window-smoke.mjs`"
+    },
+    {
+      "path": "faces/notice/tools/fixture.mjs",
+      "role": "Three fixture pages (representative / empty / overflow-truncated), serialised from the same tree the tests read.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "`faces/{ledger,notice}/tools/shoot.mjs`"
+    },
+    {
+      "path": "faces/notice/tools/gate.mjs",
+      "role": "Node-only source+tree gate predicates for this face.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "`faces/{ledger,notice}/test/gate.test.mjs`"
+    },
+    {
+      "path": "faces/notice/tools/real-window-smoke.mjs",
+      "role": "Drives `shell/tools/real_window.ps1` against this face's fixture in light and dark.",
+      "defining_req": "req/02 W15",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "faces/notice/tools/shoot.mjs",
+      "role": "Photographs fixtures and measures six defect readings, including \"no full copy exists anywhere on the page\" — this face draws no clipped-without-full values by design.",
+      "defining_req": "req/03 §4-2 / §4-3",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "faces/README.md",
+      "role": "Directory doc: faces principle (1 face = 1 question; `mount(host,port,notices) -> unmount` is the only membrane contract) and per-face status table.",
+      "defining_req": "req/03_FACES_REBUILD.md",
+      "consumed_by": "(doc)"
+    },
+    {
+      "path": "tools/assays.mjs",
+      "role": "Catalogue of every registered reading with its declared tier and backed acceptance criteria; touches no filesystem itself.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/baseline.mjs",
+      "role": "CRUD for the committed pixel baseline ledger (list/commit/retire); each commit is written down with a reason so a baseline cannot be quietly replaced.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/baselines/LEDGER.json",
+      "role": "Committed baseline data: digest + dimensions + ink-pixel count + reason per face; digest-only, no stored mask, to avoid a second copy of the truth.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/baseline.mjs`, `tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/breaches.json",
+      "role": "Live-round registry: every negative-control edit fired at a reading, with its fired-by/result record; the edits array has no per-round ceiling.",
+      "defining_req": "req/06 §8-2",
+      "consumed_by": "`tools/probes/ledger_json_red_first.mjs`, `tools/verify-self.mjs`"
+    },
+    {
+      "path": "tools/faces.json",
+      "role": "Declared mount set the T2 tier runs against — today the fixture set, honestly labelled as \"harness not yet pointed at real faces\".",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/baseline.mjs`, `tools/probes/{ledger_json_red_first,tier_red_first}.mjs`, `tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/fixtures/clean-baseline.html",
+      "role": "Positive-control pixel fixture (no injected defect).",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "referenced by `tools/faces.json`'s fixture entry; loaded by the renderer at test time"
+    },
+    {
+      "path": "tools/fixtures/rt07-note-overlap.html",
+      "role": "Live-round fixture: a margin note painted over row text (RT-07).",
+      "defining_req": "req/06 §8-2",
+      "consumed_by": "referenced by `tools/breaches.json`; loaded by the renderer at test time"
+    },
+    {
+      "path": "tools/fixtures/rt08-double-draw.html",
+      "role": "Live-round fixture: RT-08 double-draw defect.",
+      "defining_req": "req/06 §8-2",
+      "consumed_by": "loaded by the renderer at test time"
+    },
+    {
+      "path": "tools/fixtures/rt08-unsized-glyph.html",
+      "role": "Live-round fixture: RT-08 unsized-glyph defect.",
+      "defining_req": "req/06 §8-2",
+      "consumed_by": "loaded by the renderer at test time"
+    },
+    {
+      "path": "tools/ledger_dash.mjs",
+      "role": "Deterministic machine census across all known ledgers, classifying `[]`/`[◐]`/`[●]`/`[退役●]` states; a `[●]` row lacking a verification pointer in its own text is a lint failure, and any unclassifiable row or missing ledger is surfaced, never dropped.",
+      "defining_req": "req/92 / req/08",
+      "consumed_by": "`tools/ledger_dash.test.mjs`"
+    },
+    {
+      "path": "tools/ledger_dash.test.mjs",
+      "role": "Tests for the ledger-census parser.",
+      "defining_req": "req/90 / req/07 / req/01 / req/05",
+      "consumed_by": "(test entry)"
+    },
+    {
+      "path": "tools/meta-breaches.json",
+      "role": "Live rounds fired at the harness itself (`verify-self`'s edit/run/restore corpus), covering the known ways of \"going blind\".",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/probes/ledger_json_red_first.mjs`, `tools/verify-self.mjs`"
+    },
+    {
+      "path": "tools/probes/bench_budget_red_first.mjs",
+      "role": "Live round for AC-I11: lowers the static bench budget to zero so every real static stage deterministically exceeds it, fires the real harness fresh, restores the file byte-for-byte.",
+      "defining_req": "req/06 (bench-常設)",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/probes/cdp_reach.mjs",
+      "role": "Time-boxed reachability probe for KA-I3: can a renderer be driven with node builtins alone, in one CDP round trip.",
+      "defining_req": "req/06 §8-2",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/probes/ledger_json_red_first.mjs",
+      "role": "Live round for AC-I40: corrupts an in-memory JSON string (not a checked-out file) so the `JSON.parse` failure path is proven without risking a malformed real ledger.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/probes/pixel_determinism.mjs",
+      "role": "Measures KA-I1 at three levels (same page x5, same renderer x5 loads, three renderers x1 load each) to establish pixel-capture reproducibility before any pixel assay is trusted.",
+      "defining_req": "req/06 §1-2",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/probes/rt_red_first.mjs",
+      "role": "Fires the negative-truth-ledger fixtures through the pixel tier and prints both directions, so a detector that flags everything is visible.",
+      "defining_req": "req/06 §4-3",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/probes/tier_red_first.mjs",
+      "role": "Edit/run/restore live rounds for the non-pixel tiers, matching the shape `breaches.json` records until an automated breach runner exists.",
+      "defining_req": "req/06 §8-2",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/README.md",
+      "role": "Directory doc: harness overview, zero-dependency stance, entry-point command table.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "(doc)"
+    },
+    {
+      "path": "tools/rig/ac_ledger.mjs",
+      "role": "Denominator source for the whole harness: the acceptance criteria written in the requirement files, growing when a requirement is written, printing unbacked criteria rather than omitting them.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/rig/catalogue.mjs",
+      "role": "Assay registration/retirement store; refuses a duplicate id, a missing/unknown tier, or a reading with no backed criteria; records retirement as a row, never a silent delete.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/assays.mjs`, `tools/rig/self_probe.mjs`"
+    },
+    {
+      "path": "tools/rig/bench.mjs",
+      "role": "Shared bench harness (median-of-N, `.bench/report.json` persistence, hard-red on budget) extracted after `req/38 §227` sibling-sweep caught five near-identical inline bench bodies across membrane/parts/shell/faces-ledger/faces-notice tripping the D5 copy gate; each module's own `tools/bench.mjs` supplies only its measured function.",
+      "defining_req": "req/98 V-1 / req/38 §227",
+      "consumed_by": "`membrane/tools/bench.mjs`, `parts/tools/bench.mjs`, `shell/tools/bench.mjs`, `faces/{ledger,notice}/tools/bench.mjs`"
+    },
+    {
+      "path": "tools/rig/cdp.mjs",
+      "role": "Chrome DevTools Protocol client on top of the hand-built WebSocket wire (request/response by id, named events, flat sessions).",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/rig/renderer.mjs`"
+    },
+    {
+      "path": "tools/rig/lint-patterns.json",
+      "role": "T0 text patterns kept as data, not code literals, so the linter's own source cannot match itself (closes RT-10/RT-11).",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/rig/manifest.mjs",
+      "role": "The one place the tree is read; assays receive a manifest snapshot never a filesystem, and the tree is re-read at run-end to detect movement mid-run.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/rig/raster.mjs",
+      "role": "Minimal PNG decoder (8-bit, colour types 0/2/6, no interlace) that raises rather than guessing outside scope, so two captures are compared as decoded pixels, not base64 text.",
+      "defining_req": "req/06 §4-3",
+      "consumed_by": "`tools/probes/pixel_determinism.mjs`, `tools/tiers/pixel.mjs`"
+    },
+    {
+      "path": "tools/rig/renderer.mjs",
+      "role": "Stands up and pins a renderer, handing back a page whose every wait is an in-page settling predicate, never a millisecond sleep.",
+      "defining_req": "req/06 §3-3",
+      "consumed_by": "face browser-mount-smoke/shoot tools (both faces), `parts/tools/shoot.mjs`, `tools/baseline.mjs`, `tools/probes/{cdp_reach,pixel_determinism,rt_red_first}.mjs`, `tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/rig/report.mjs",
+      "role": "Assembles the report in fixed order (counts first) and computes the headline word from the counts, with no branch where an author picks a different word.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/rig/self_probe.mjs`, `tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/rig/runner.mjs",
+      "role": "Owns the denominator, the empty-population meaning, and single-write-per-id enforcement, so an assay cannot build its own population, redefine empty, or overwrite a result.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/rig/self_probe.mjs`, `tools/verify-all.mjs`"
+    },
+    {
+      "path": "tools/rig/self_probe.mjs",
+      "role": "Fixed corpus run through the real, imported rig modules (not a re-description), so breaking the shipped rig by one line changes the probe's answer.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/verify-self.mjs` (spawned as a subprocess)"
+    },
+    {
+      "path": "tools/rig/verdict.mjs",
+      "role": "The five reading-verdict words and six run-exit codes, enumerated rather than folded, so two distinct states cannot collapse onto one number.",
+      "defining_req": "req/06_INSTRUMENTS.md (INHERITED §3e)",
+      "consumed_by": "`tools/rig/{catalogue,report,runner}.mjs`, `tools/{verify-all,verify-self}.mjs`"
+    },
+    {
+      "path": "tools/rig/wire_ws.mjs",
+      "role": "WebSocket client written against RFC 6455 with node builtins only (client-side text/continuation/ping-pong/close), handling all three CDP frame-length widths for multi-megabyte screenshots.",
+      "defining_req": "req/06 §3-4",
+      "consumed_by": "`tools/rig/cdp.mjs`"
+    },
+    {
+      "path": "tools/sem_registry_gate.mjs",
+      "role": "Census-diff gate for this registry itself: every source file under the five scanned directories has exactly one row, every row points at a file that still exists, no path has two rows, and `docs/sem_registry.json` is FRESH; `--self-test` fires all four failure directions (MISSING/STALE/DUPLICATE-adjacent/JSON-drift) red-first before the real run is trusted.",
+      "defining_req": "req/38 §547 (Owner #281)",
+      "consumed_by": "(CLI entry)"
+    },
+    {
+      "path": "tools/sem_registry_generate.mjs",
+      "role": "Parses this registry's four-column tables into `docs/sem_registry.json`, stamping the registry text's SHA-256 as `source_sha256` so `tools/sem_registry_gate.mjs` can report FRESH/STALE/ABSENT without re-deriving the parse by hand.",
+      "defining_req": "req/38 §547 (Owner #281)",
+      "consumed_by": "`tools/sem_registry_gate.mjs`"
+    },
+    {
+      "path": "tools/tiers/lint.mjs",
+      "role": "T0 tier: text-only evidence readings over rig-supplied entries (never touches the filesystem itself); patterns come from `lint-patterns.json`, never inline literals.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/assays.mjs`, `tools/probes/ledger_json_red_first.mjs`"
+    },
+    {
+      "path": "tools/tiers/load.mjs",
+      "role": "T1 tier: proves a module is live by evaluating (importing) it, not by pattern-matching its text.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/assays.mjs`"
+    },
+    {
+      "path": "tools/tiers/mount.mjs",
+      "role": "T2 tier: mounts on a real DOM and asks \"did anything appear at all\" before asking whether it broke.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/assays.mjs`"
+    },
+    {
+      "path": "tools/tiers/pixel.mjs",
+      "role": "T3 tier: three independent pixel readings (ink-box overlap, used glyph size, baseline-ink diff against a committed picture); none reads the stylesheet.",
+      "defining_req": "req/06 §4-3",
+      "consumed_by": "`tools/assays.mjs`, `tools/baseline.mjs`, `tools/probes/rt_red_first.mjs`"
+    },
+    {
+      "path": "tools/verify-all.mjs",
+      "role": "The sole entry point allowed to print a verdict for the whole tree; runs self-check first, then every stage in fixed order, writes one JSON report; exit code is the `rig/verdict.mjs` state machine.",
+      "defining_req": "req/06 §11 (+ req/01 AC-M0-M12, req/02 W1-W15, req/03 AC-F0-F5, req/04 AC-P0-)",
+      "consumed_by": "(top-level CLI)"
+    },
+    {
+      "path": "tools/verify-self.mjs",
+      "role": "Fires `meta-breaches.json`'s edit/run/restore rounds at the harness itself before anything it reports can be trusted; exit 5 (SELF-BLIND) if any round leaves the answer unchanged.",
+      "defining_req": "req/06_INSTRUMENTS.md",
+      "consumed_by": "`tools/verify-all.mjs` (spawned as a subprocess)"
+    }
+  ]
+}

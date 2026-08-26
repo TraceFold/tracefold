@@ -1,0 +1,17 @@
+{
+  "note": "shell mount ms -- median time for Mounted.raise()/lower() (kernel/mount.mjs) across 4 hosts x 100 cycles = 400 mount/unmount pairs. Kernel dispatch only: no real document, no face body beyond a no-op mount. Full real-DOM mount timing is open work (see note in this file).",
+  "measuredAt": "2026-08-24T04:02:59.249Z",
+  "hosts": 4,
+  "cyclesPerHost": 100,
+  "pairs": 400,
+  "samplesMs": [
+    0.1657,
+    0.191,
+    0.2138,
+    0.625,
+    0.8787
+  ],
+  "medianMs": 0.2138,
+  "budgetMs": 50,
+  "ok": true
+}

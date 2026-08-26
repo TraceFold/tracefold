@@ -1,0 +1,79 @@
+{
+  "what": "independent re-verification evidence that the notice face has been mounted in a real, non-headless window -- not only in the headless renderer tools/shoot.mjs and tools/browser-mount-smoke.mjs already drive",
+  "why": "req/02 W15 clause 3, applied to this face as part of an independent re-verification lane: a face must carry proof of having mounted in a real window a person could look at. This record and the two capture files beside it were produced fresh by the re-verification lane (2026-08-24), authored from zero -- tools/browser-mount-smoke.mjs and tools/real-window-smoke.mjs in this same faces/notice/tools/ directory were written without opening faces/ledger's versions, following only the shape the dispatching brief described (fixture served over http + shell/tools/real_window.ps1, the shell's own real-window instrument, reused rather than duplicated).",
+  "how": "tools/real-window-smoke.mjs starts a static file server rooted at the repo (answering /s-common/tokens.css from the one stylesheet of record, the same route name shell/tools/serve.mjs answers), then shells out to shell/tools/real_window.ps1 with the fixture's URL. That script opens Chrome in app mode at 1440x900, waits, reads the window's own title back through the Win32 window list, and screenshots the on-screen window rectangle. This face's mount fixture (fixtures/mount-entry.mjs + fixtures/mount.html) imports index.mjs directly and calls mount(host, {}, notices) with nine notice entries spelled out inline in the fixture -- one of every outcome word this face draws plus one non-record string -- and writes the element/data-entry counts into document.title so the numbers below are the numbers the page itself computed, not typed by hand. The script itself only returns numbers and writes the two PNGs; it does not overwrite this file -- the JSON below is this record, written once by the agent that looked at the pictures.",
+  "runs": [
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex notice face -- dark -- elements 75 entries 8",
+      "elements": 75,
+      "dataEntry": 8,
+      "reachedBy": "http://127.0.0.1:<port>/faces/notice/fixtures/mount.html (no query -- tokens.css declares dark on a bare :root, so this is the default)",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 121817
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex notice face -- light -- elements 75 entries 8",
+      "elements": 75,
+      "dataEntry": 8,
+      "reachedBy": "?theme=light, read by the fixture's own entry script off its own URL and applied as document.documentElement.setAttribute('data-theme','light'), which tokens.css's :root[data-theme=\"light\"] rule keys on",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 123039
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "headless (Chrome DevTools Protocol, tools/rig/renderer.mjs, 900x700)",
+      "elements": 75,
+      "dataEntry": 8,
+      "note": "tools/browser-mount-smoke.mjs's own run against the identical fixture, kept because the headless and real-window runs agreeing on element/data-entry counts (75/8 both times) is worth having; neither figure alone would be"
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex notice face -- dark -- elements 218 entries 8",
+      "elements": 218,
+      "dataEntry": 8,
+      "capturedRect": "47,40 1426x893",
+      "note": "the 2026-08-24 notHeld item below (a thin vertical strip of desktop content bleeding into the capture's far right edge) is CORRECTED here, not overwritten: this run used the DWM-extended-frame-bounds fix faces/atlas's own lane made to shell/tools/real_window.ps1 -- capturedRect (47,40 1426x893) is narrower than the requested 1440x900 window, and no bleed is visible in either picture below. elements rose 75 -> 218 from this lane's retrofit (face-header, control-row with three controls -- why/legend/tally -- and the zero-inclusive counted mark table inside the legend), by design.",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 91854
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex notice face -- light -- elements 218 entries 8",
+      "elements": 218,
+      "dataEntry": 8,
+      "capturedRect": "47,40 1426x893",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 93520
+    }
+  ],
+  "readByEye": {
+    "byWhom": "the independent re-verification agent, looking at both real-window pictures and the seven tools/shoot.mjs captures at full resolution",
+    "held": [
+      "the stylesheet of record is applied in the real window, not a placeholder: dark reads as a near-black ground with a warm off-white ink and a dimmer secondary tone for the detail lines under each entry; light reads as a warm ivory ground with dark ink, not a flat inversion of dark",
+      "no text sits on top of other text in either capture; every entry row, its detail line, and the summary counts below are each on their own line with visible spacing between rows",
+      "no row is cut off mid-character in either capture -- the visible entries (through 'partially_answered, status 207') are complete including their indented detail lines",
+      "the window itself is a real OS window in both captures: native Windows title bar with minimize/maximize/close controls and the browser tab icon are visible, which neither a headless dump nor a maximized full-bleed screenshot would show",
+      "the two themes agree on layout -- same row order, same entry count, same indentation for the two 'through the membrane' rows that carry an extra detail line -- only the palette differs, which is the expected shape for a token-driven stylesheet",
+      "2026-08-25 SS657 retrofit re-shoot: compact face-header (\"notice  8 of 9 entries drawn\") leads the screen in both themes; three bordered controls (why/legend/tally) sit side by side with plain-language hints, closed by default",
+      "2026-08-25: no bleed strip at the capture edges in either theme, corroborating the corrected note on the 2026-08-25 runs above"
+    ],
+    "notHeld": [
+      "a thin vertical strip of desktop content was visible along the far right edge of both real-window captures on 2026-08-24, outside the browser's own chrome -- CORRECTED as of the 2026-08-25 re-shoot (see that run's own note): the DWM-extended-frame-bounds fix from faces/atlas's lane resolves this. Kept here, not deleted, as the record of what the defect was.",
+      "no narrow-width capture was taken through real_window.ps1 -- it opens at a fixed 1440x900 and neither this re-verification lane nor the SS657 retrofit lane modified it to take a second size; tools/shoot.mjs's headless narrow (720px) captures are the only narrow-viewport evidence for this face",
+      "clippedWithoutFull, oversizeGlyphs and overlaps were not re-measured against these real-window captures the way tools/shoot.mjs's in-page probe measures the headless fixtures -- these are photographs judged by eye only, per W15's own text",
+      "the fixture's nine entries were authored fresh for this smoke and are not the same fixture population fixtures/notice.html or fixtures/notice-overflow.html use, so the element/entry counts in this record are not directly comparable to the counts tools/shoot.mjs reports for those files",
+      "no second, independent agent has re-run the 2026-08-25 capture -- that re-shoot is this retrofit lane's own first pass, same-turn self-read, not an independently re-verified [●]"
+    ]
+  }
+}

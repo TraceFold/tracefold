@@ -1,0 +1,15 @@
+{
+  "note": "faces/receipt row-render ms -- median time for view(state) (receipt.mjs, exported alongside read/mount) to build the full screen tree for one receipt state, cycled across 1,000 distinct synthetic states. I/O (read) is untimed setup; mount ms and real paint are separate, unmeasured axes.",
+  "measuredAt": "2026-08-25T07:00:53.483Z",
+  "states": 1000,
+  "samplesMs": [
+    0.8147,
+    0.8667,
+    1.7135,
+    1.7673,
+    7.2062
+  ],
+  "medianMs": 1.7135,
+  "budgetMs": 300,
+  "ok": true
+}

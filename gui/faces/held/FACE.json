@@ -1,0 +1,16 @@
+{
+  "id": "held",
+  "title": "Held",
+  "place": "right",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [
+    "get_candidates",
+    "post_candidates_id_commit",
+    "post_candidates_id_cancel",
+    "post_candidates_id_escalation",
+    "post_transformations_id_undo"
+  ],
+  "condition": "held",
+  "leastWidth": 320
+}

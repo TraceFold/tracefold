@@ -1,0 +1,10 @@
+{
+  "id": "margin-a",
+  "title": "Margin A",
+  "place": "right",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [],
+  "condition": "plain",
+  "leastWidth": 200
+}

@@ -1,0 +1,15 @@
+{
+  "note": "parts row-render ms -- median time to build the element tree (row() from src/receipt-row.mjs, no document, no paint) for 1,000 records. Paint/layout is a separate, unmeasured axis (see note above).",
+  "measuredAt": "2026-08-24T04:03:02.968Z",
+  "rows": 1000,
+  "samplesMs": [
+    25.896,
+    30.7837,
+    31.4097,
+    43.4484,
+    65.4479
+  ],
+  "medianMs": 31.4097,
+  "budgetMs": 200,
+  "ok": true
+}

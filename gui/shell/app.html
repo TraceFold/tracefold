@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0
+     The same window as index.html, carrying the six faces this repository builds
+     rather than the seven demo placeholders (req/97 gap-list item 2). The policy is
+     the policy stated there, unchanged: nothing loads unless this page named it, no
+     eval, and the only origin this document may connect to is its own. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- style-src carries 'unsafe-inline', and the reason is measured rather than assumed.
+     Every face in this application draws with inline style attributes and one injected
+     rule set -- there is no build step and no class framework, by design (req/02 W15: a
+     face is loaded straight into a window). `style-src 'self'` forbids both of those, so
+     in this window every face was completely unstyled, and had been since this page
+     existed. Measured through CDP against this exact page on 2026-08-25: a stat band's
+     style attribute present at 200 characters and computing to `display:block` instead
+     of grid, its border 0px, the injected rule set present with **0 applied rules**, and
+     .gx-figure rendering at 14px instead of 22px. Fixtures carry no CSP at all, so every
+     capture and every measurement ever taken of a face was of a strictly better surface
+     than the one that shipped -- the same fixture-hides-the-shipped-defect shape req/97
+     Pass 1 recorded once already.
+     What is NOT relaxed is the half that carries the risk: script-src stays 'self' with
+     no 'unsafe-inline' and no 'unsafe-eval', default-src stays 'none', connect-src stays
+     'self'. shell/tools/gates.mjs W10 now holds all four of those AND holds that this
+     page's own styling is permitted, so neither half can drift back. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>glovrex app</title>
+<link rel="stylesheet" href="/s-common/tokens.css">
+<link rel="stylesheet" href="/kernel/shell.css">
+</head>
+<body>
+<p id="stand-in-said"></p>
+<div id="shell-root"></div>
+<ul id="check-report" hidden></ul>
+<script type="module" src="/app/boot.mjs"></script>
+</body>
+</html>

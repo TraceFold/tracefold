@@ -1,0 +1,42 @@
+{
+  "what": "evidence that the six faces this repository builds have stood inside this shell, on a screen",
+  "why": "req/97 gap-list item 2. The shell's only generated manifest named seven demo placeholders and none of the six real faces, so the machinery for req/768 AC-1 existed with nothing real wired into it and there was no surface anywhere in this tree from which a viewer could reach a second real face. That finding was made by grep; this record is the picture.",
+  "how": "tools/serve.mjs on 127.0.0.1, then tools/real_window.ps1 opens Chrome in app mode at /app.html, reads the window's own title back through the Win32 window list, and photographs the DWM extended-frame-bounds rectangle off the screen. The face census is computed inside the page from the live document after mounting and written into the title, so the number in this record is the number the page computed.",
+  "runs": [
+    {
+      "at": "2026-08-25",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, 1426x893, not headless)",
+      "title": "glovrex app -- 3/3 mounted drew, 6 real faces declared",
+      "picture": "record/real_window_app_light.png"
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, 1426x893, not headless)",
+      "title": "glovrex app -- 3/3 mounted drew, 6 real faces declared",
+      "reachedBy": "?theme=dark, which performs the same theme:set act the rail and the keyboard perform",
+      "picture": "record/real_window_app_dark.png"
+    }
+  ],
+  "facesThatStood": [
+    { "id": "atlas", "where": "stage:", "note": "the stage's opening tab" },
+    { "id": "held", "where": "dock:right:held" },
+    { "id": "notice", "where": "dock:bottom:notice" }
+  ],
+  "facesDeclaredAndReachable": ["atlas", "graph", "held", "ledger", "notice", "receipt"],
+  "readByEye": {
+    "byWhom": "the agent that wired it, looking at both pictures at full size",
+    "held": [
+      "the rail carries all six real faces by name -- Atlas, Graph, Held, Ledger, Notice, Receipt -- plus the theme act, and no demo placeholder appears anywhere in the window",
+      "the stage carries four tabs (Atlas, Graph, Ledger, Receipt), the right dock carries Held and the bottom dock carries Notice, which is the placement each face's own FACE.json declared",
+      "every mounted face drew its own honest not-read state rather than an empty list: 'the list of transformations could not be read', 'outcome: absent', 'no_membrane_in_this_window', and held's own 'this list was not read ... the two are different facts'",
+      "both themes draw; no text is printed over other text in either"
+    ],
+    "notHeld": [
+      "no face draws a row here. There is no membrane in this window, so this is evidence that the six faces mount, draw and are reachable -- not evidence that any of them renders data correctly inside the shell. That needs the membrane in front of a bed and is a different lane's work; it is stated in shell/app/port.stand-in.mjs as well as here.",
+      "three of the six are mounted at any moment, because the stage is a tab strip. The title states both numbers for that reason.",
+      "the stage face's header reads 'atlasnot yet read' -- a missing separator between the face name and its denominator in every face's headerLine(). Seen in this capture, not repaired by this lane, and not in req/97's gap list."
+    ]
+  }
+}

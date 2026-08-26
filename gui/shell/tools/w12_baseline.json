@@ -1,0 +1,35 @@
+{
+  "requiredFields": [
+    "consumes",
+    "id",
+    "place",
+    "purpose",
+    "rail",
+    "title"
+  ],
+  "portMethods": [
+    "get_candidates",
+    "get_candidates_id",
+    "get_escalations",
+    "get_healthz",
+    "get_ledger_checkpoint",
+    "get_ledger_consistency",
+    "get_ledger_proof",
+    "get_receipts_tid",
+    "get_stream",
+    "get_transformations",
+    "get_transformations_id",
+    "get_verdict_checkpoints",
+    "get_verdict_checkpoints_window_end",
+    "ledgers",
+    "post_candidates",
+    "post_candidates_id_cancel",
+    "post_candidates_id_commit",
+    "post_candidates_id_escalation",
+    "post_candidates_id_verify",
+    "post_transformations_id_replay",
+    "post_transformations_id_undo",
+    "post_verdict_checkpoints",
+    "routes"
+  ]
+}

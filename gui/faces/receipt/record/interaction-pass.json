@@ -1,0 +1,97 @@
+{
+  "what": "req/38 SS24k interaction pass: every visible control on faces/receipt pressed, screenshot after each act",
+  "why": "this face declares zero acts (read-only by design); its interactivity is two native <details> disclosures and, since r5, a context menu whose one entry hands a value over, and SS24k requires those be exercised and judged from pixels rather than assumed static",
+  "how": "tools/rig/renderer.mjs against the same browser-mount fixture the W15 smoke drives, real module load, real click events, real contextmenu MouseEvents dispatched on real elements",
+  "acts": [
+    {
+      "act": "initial",
+      "shot": "receipt_act_0_initial.png"
+    },
+    {
+      "act": "why:open",
+      "open": true,
+      "shot": "receipt_act_1_why-open.png"
+    },
+    {
+      "act": "legend:open",
+      "open": true,
+      "whyStillOpen": true,
+      "shot": "receipt_act_2_legend-open.png"
+    },
+    {
+      "act": "legend:measure the mark column",
+      "fit": {
+        "measured": 12,
+        "overflowing": [],
+        "wrappedToTwoLines": []
+      }
+    },
+    {
+      "act": "why:close",
+      "whyClosedAgain": false,
+      "legendStillOpen": true,
+      "shot": "receipt_act_3_why-closed.png"
+    },
+    {
+      "act": "menu:open on the delta id",
+      "menus": 1,
+      "words": "copy",
+      "shot": "receipt_act_4_menu-open.png"
+    },
+    {
+      "act": "menu:second right-click on the fingerprint cell",
+      "menus": 1,
+      "stacked": false,
+      "words": "copythe whole value, not the shortened form drawn here",
+      "shot": "receipt_act_5_menu-second.png"
+    },
+    {
+      "act": "menu:copy pressed",
+      "outcome": {
+        "copied": "false",
+        "failed": "true",
+        "said": "the clipboard refused, so nothing was taken"
+      },
+      "shot": "receipt_act_6_menu-acted.png"
+    },
+    {
+      "act": "menu:Escape",
+      "menus": 0,
+      "shot": "receipt_act_7_menu-escaped.png"
+    },
+    {
+      "act": "menu:click away",
+      "reopened": 1,
+      "menus": 0,
+      "shot": "receipt_act_8_menu-clicked-away.png"
+    }
+  ],
+  "menu": {
+    "question": "does the menu open, act, say whether the act worked, dismiss two ways, and refuse to stack",
+    "pinned": [
+      "open",
+      "act with a stated outcome",
+      "Escape",
+      "click away",
+      "no stacking"
+    ],
+    "stackedEver": false
+  },
+  "openState": {
+    "question": "does a disclosure a reader opened survive a repaint",
+    "answer": "not applicable on this face, and here is the mechanism rather than the assurance",
+    "mechanism": "mount() paints exactly twice and never again: once with the waiting screen, once when the two reads answer. This face declares no acts, holds no state a control can change, and has nothing that asks for a redraw -- the only thing a reader can do to this screen is fold one of the two disclosures, which the browser does in place. Nothing rebuilds the tree, so there is no repaint for an open state to be lost to.",
+    "witnessSurvivedEveryAct": true,
+    "openAfterEveryAct": [
+      false,
+      true,
+      true
+    ]
+  },
+  "readByEye": {
+    "held": [],
+    "notHeld": [
+      "not yet judged by a person -- screenshots written, judged separately and recorded in README.md"
+    ]
+  }
+}

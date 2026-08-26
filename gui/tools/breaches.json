@@ -1,0 +1,99 @@
+{
+  "note": "Live rounds. A reading nothing has ever been fired at is a reading nobody has reason to trust, so this file is what the unarmed count on the headline is computed against. The edits array has no ceiling: the retired instrument budgeted one edit per round and one of its readings therefore went a whole session with no ammunition at all. Rounds whose form is a fixture rather than an edit carry a fixture field and record the run that fired them.",
+  "breaches": [
+    {
+      "id": "RT-07",
+      "targets": ["PX-INK-OVERLAP", "PX-BASELINE"],
+      "fixture": "fixtures/rt07-note-overlap.html",
+      "expect": "PASS->FAIL",
+      "rationale": "A margin note pulled back over the row text. Every element rect is what the stylesheet asks for, so this round is only answerable at the pixel tier.",
+      "added": "2026-08-24",
+      "fired": {
+        "by": "tools/probes/rt_red_first.mjs",
+        "on": "2026-08-24",
+        "result": "P-a red, 3 overlapping pairs, largest 1061.59px2; P-c red, 1961 ink px differ"
+      }
+    },
+    {
+      "id": "RT-08a",
+      "targets": ["PX-GLYPH-SIZE", "PX-BASELINE"],
+      "fixture": "fixtures/rt08-unsized-glyph.html",
+      "expect": "PASS->FAIL",
+      "rationale": "A glyph with no width, height or rule reaching it, landing on the SVG replaced-element default while the markup still declares 20x20.",
+      "added": "2026-08-24",
+      "fired": {
+        "by": "tools/probes/rt_red_first.mjs",
+        "on": "2026-08-24",
+        "result": "P-b red, declared 20x20 used 345.828x345.828; P-c red, 8987 ink px differ"
+      }
+    },
+    {
+      "id": "RT-08b",
+      "targets": ["PX-BASELINE", "PX-INK-OVERLAP"],
+      "fixture": "fixtures/rt08-double-draw.html",
+      "expect": "PASS->FAIL",
+      "rationale": "The sheet painted twice, the ghost a pixel off. Nothing in the box tree is wrong, which is why neither a rect reading nor a size reading can see it.",
+      "added": "2026-08-24",
+      "fired": {
+        "by": "tools/probes/rt_red_first.mjs",
+        "on": "2026-08-24",
+        "result": "P-a red, 7 pairs; P-c red, 3850 ink px differ"
+      }
+    },
+    {
+      "id": "TB-LOAD",
+      "targets": ["LD-EVALUATES"],
+      "edits": [{ "file": "membrane/src/address.mjs", "find": "export", "replace": "const = ; export" }],
+      "expect": "PASS->FAIL",
+      "rationale": "A module in the tree stops parsing. A text reading cannot see this, which is the reason the load tier exists at all.",
+      "added": "2026-08-24",
+      "fired": {
+        "by": "tools/probes/tier_red_first.mjs",
+        "on": "2026-08-24",
+        "result": "LD-EVALUATES PASS -> FAIL, 3 of 23 members; no other reading moved"
+      }
+    },
+    {
+      "id": "TB-MOUNT",
+      "targets": ["MT-FACE"],
+      "edits": [{
+        "file": "tools/faces.json",
+        "find": "\"expects\": { \"minElements\": 12, \"glyphs\": 3 },\n      \"baseline\": true",
+        "replace": "\"expects\": { \"minElements\": 12, \"glyphs\": 9 },\n      \"baseline\": true"
+      }],
+      "expect": "PASS->FAIL",
+      "rationale": "The declared shape and the produced shape are made to disagree, so an empty or partial host cannot read as a pass.",
+      "added": "2026-08-24",
+      "fired": {
+        "by": "tools/probes/tier_red_first.mjs",
+        "on": "2026-08-24",
+        "result": "MT-FACE PASS -> FAIL, 1 of 4 faces; no other reading moved"
+      }
+    },
+    {
+      "id": "TB-PIXEL",
+      "targets": ["PX-INK-OVERLAP", "PX-BASELINE"],
+      "edits": [{
+        "file": "tools/fixtures/clean-baseline.html",
+        "find": ".row .note { width: 200px; color: #5d666e; font-size: 12px; }",
+        "replace": ".row .note { width: 200px; color: #5d666e; font-size: 12px; margin-left: -180px; }"
+      }],
+      "expect": "PASS->FAIL",
+      "rationale": "The positive control acquires the RT-07 defect. If the tier still calls it clean, the tier is decoration.",
+      "added": "2026-08-24",
+      "fired": {
+        "by": "tools/probes/tier_red_first.mjs",
+        "on": "2026-08-24",
+        "result": "PX-INK-OVERLAP and PX-BASELINE both PASS -> FAIL; no other reading moved"
+      }
+    }
+  ],
+  "unarmed_declaration": {
+    "note": "Readings with no round yet. Listed so the count on the headline has somewhere to point, and so nobody has to read the catalogue to find out what is undefended. Every entry here is a debt, not an exemption. The text readings are on this list too: they are not counted as assays, so they do not reach the headline's unarmed number, and that is the more reason to write them down here.",
+    "ids": ["L-SPDX", "L-DEPENDENCY", "L-DISK-REACH", "L-CLOCK-WAIT", "L-VOCABULARY", "MT-DECLARED-SET"]
+  },
+  "runner_status": {
+    "note": "There is no breach runner yet -- req/06 §8-2 puts it at stage I5. Until it exists the rounds above are fired by two probes, by hand, and their results are written into the fired field of each row. That is weaker than a runner in exactly one way, and it is named here rather than left to be discovered: nothing re-fires these rounds on every run, so a row's fired field can go stale without anything saying so.",
+    "fired_by": ["tools/probes/rt_red_first.mjs", "tools/probes/tier_red_first.mjs"]
+  }
+}

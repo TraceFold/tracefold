@@ -1,0 +1,17 @@
+{
+  "note": "Committed ink for each face carrying a baseline. Every row records who moved it and why. The mask itself is not stored -- the digest is what a comparison needs, and a stored mask is a second copy of the truth that can drift from the first.",
+  "baselines": {
+    "fixture:clean-sheet": {
+      "digest": "ac4c8885896df6de",
+      "width": 720,
+      "height": 320,
+      "inkPixels": 6981,
+      "viewport": "720x320",
+      "renderer": "Chrome/151.0.7922.172",
+      "updated": "2026-08-23",
+      "reason": "first committed picture of the positive control, taken with the pinned renderer flags measured deterministic in probes/pixel_determinism.mjs",
+      "replaces": null
+    }
+  },
+  "retired": {}
+}

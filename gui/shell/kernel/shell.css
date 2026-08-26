@@ -1,0 +1,924 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * The frame's surface. Not one colour is written here.
+ *
+ * Every value below is either a token from the single stylesheet that owns colour, or a
+ * mixture of two of those tokens. A second place that writes a colour is a second palette
+ * the moment either one is edited, and both will look right on the day they are written.
+ * tools/gates.mjs counts hexes, rgb() and named colours in this file and expects none.
+ *
+ * The frame was achromatic, and Owner #340 read the result as monotone. What survives
+ * of that rule is the half that was doing real work: the frame does not invent hues of
+ * its own, and it never colours a record -- a record's standing is drawn by the parts
+ * that draw records, from the one measured table in parts/src/verdict-badge.mjs. What
+ * the frame now spends, and spends on one thing only, is the accent: it marks what a
+ * hand may do. So on this chrome a coloured thing is an invitation, on a face a
+ * coloured thing is a standing, and there is no third meaning anywhere.
+ *
+ * Not one colour is written here. Every value is a token from the single stylesheet
+ * that owns colour, or a mixture of two of them, and tools/gates.mjs counts hexes,
+ * rgb() and named colours in this file and expects none.
+ *
+ * Light is the default. Dark is reachable and is not the ground state.
+ */
+
+.shell {
+  --surface-0: var(--bg);
+  --surface-1: color-mix(in srgb, var(--ink) 4%, var(--bg));
+  --surface-2: color-mix(in srgb, var(--ink) 8%, var(--bg));
+  --crease: var(--line);
+  --tension: color-mix(in srgb, var(--ink) 22%, var(--bg));
+  /* SS558 body-text floor (14px, var(--t-record)) needs a taller bar than the
+   * 30px this used to be a private literal for; var(--row) (34px) is the same
+   * token the rail's own items already size themselves to, so a tab and a rail
+   * item now agree on their own row height instead of each picking one. */
+  --bar-h: var(--row);
+
+  position: fixed;
+  inset: 0;
+  display: grid;
+  /* req/867 (Owner #416追記3): there is no sidebar column. The derivation is in
+   * render.mjs `#build`; the arithmetic is that 196px x full height of permanent left
+   * chrome became 34px x full width of permanent top chrome, which hands the faces back
+   * about 71% of what the column was holding, on the axis (width) that a table of
+   * fixed-width columns actually suffers on.
+   *
+   * SS551's rule is untouched -- the rail carries space nouns only, a face never stands
+   * in it, and shell/demo/checks.mjs still counts non-space items in .rail and expects
+   * zero. SS551 said nothing about which way the rail runs. */
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 'topbar' 'middle' 'strip';
+  background: var(--surface-0);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  overflow: hidden;
+}
+
+/* ---- the slim scrollbar, owned here as well as in parts ----------------------------
+ * Owner #335 (2). parts/src/surface.mjs installs the same rules into a document, but it
+ * does so from a face's mount() -- so between this page loading and the first face
+ * standing, and on any surface of the frame no face is mounted into (the sidebar, the
+ * dock head, the tab strip, the stage's own scroll boxes), the platform's own 17px grey
+ * chrome was what a reader saw. A frame that depends on a face having mounted to look
+ * like itself is a frame with a gap in it, so the rules are stated here too, over the
+ * same tokens and the same numbers. */
+.shell *,
+.shell { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+.shell *::-webkit-scrollbar, .shell::-webkit-scrollbar { width: var(--scrollbar-w); height: var(--scrollbar-w); }
+.shell *::-webkit-scrollbar-track, .shell::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+.shell *::-webkit-scrollbar-thumb, .shell::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: var(--scrollbar-radius); }
+.shell *::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+.shell *::-webkit-scrollbar-corner { background: transparent; }
+.shell *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* Owner #340 (5), operability: a keyboard reader had no visible focus anywhere in this
+ * frame. The accent is the one hue the frame spends and it means "a hand may act". */
+.shell :focus-visible { outline: var(--focus-w) solid var(--focus-ink); outline-offset: var(--focus-offset); }
+
+/* ---- motion: the same route the faces are on (Owner #348, confirmed #349) -------------
+ * One declaration for the whole frame rather than a transition beside each control, and
+ * the same two tokens parts/src/surface.mjs uses -- a frame that moved on its own timing
+ * would be a second motion system, which is the thing the route exists to prevent.
+ *
+ * Only ground, ink and edge move. No width, no height: a dock's sash changes a flex
+ * basis, and animating that is a layout pass per frame on every element beside it, which
+ * is precisely the jank a person notices. It snaps, and it snaps in one frame. A press
+ * answers with a 1px transform, which is a compositor property and moves nothing around
+ * it. Reduced motion removes all of it, including the press.
+ *
+ * req/867: `.launcher-item` and `.side-toggle` leave these lists with the elements they
+ * named. A selector for a class nothing draws is dead weight that still reads as a live
+ * rule to the next person. */
+.shell .rail-item,
+.shell .tab,
+.shell .pane-tool,
+.shell .dock-name,
+.shell .crumb,
+.shell .command-copy,
+.shell .side-count {
+  transition: background-color var(--motion-quick) var(--motion-ease),
+              color var(--motion-quick) var(--motion-ease),
+              border-color var(--motion-quick) var(--motion-ease),
+              opacity var(--motion-quick) var(--motion-ease);
+}
+
+.shell .rail-item:active,
+.shell .command-copy:active { transform: translateY(var(--press-y)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shell .rail-item, .shell .tab,
+  .shell .pane-tool, .shell .dock-name, .shell .crumb, .shell .command-copy,
+  .shell .side-count, .sash::after { transition: none; }
+  .shell .rail-item:active, .shell .command-copy:active { transform: none; }
+}
+
+/* ---- the window bar: one row, spanning the window it modifies (req/867) --------------
+ *
+ * SS551 is untouched: space nouns only, a face never stands here. What changed is the
+ * axis. The bar carries exactly what a global control has to be reachable from every
+ * face at once -- the SPACE mode, the way in to anything (find), and theme -- and
+ * nothing that names a single face, because the tab strip names those. */
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  min-height: var(--bar-h);
+  /* req/822_c7 (Owner #388 theme): the chrome is a well, one step INTO the page, so the
+   * stage reads as the lit surface -- the elevation grammar the reference set carries
+   * (req/822_c7 §1 E11). The token is the roster's; this file still writes no colour.
+   * It was a border-right on a column; it is a border-bottom on a bar. */
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--crease);
+}
+
+/* find sits between the nav and the chrome acts, and `margin-left: auto` pushes it and
+ * everything after it to the right -- so the bar reads left-to-right as "which mode am I
+ * in" then, at the far end, "act on the window". */
+.topbar .bar-find { margin-left: auto; }
+
+/* The group label. `verify` and `inspect` are verbs, and two bare verbs on a bar read as
+ * things to press to DO rather than as the two modes the window can be in -- this word is
+ * what makes a mode look like a mode. 811 §5's finding is that nothing here carries
+ * hierarchy, so this is a real step above the 14px floor everything else sits at. */
+.rail-label-head {
+  flex: none;
+  padding: 0 2px;
+  color: var(--ink-2);
+  font-size: var(--t-time);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.rail {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  height: var(--row);
+  border: 0;
+  border-radius: var(--radius-2);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  /* SS558 body-text floor: was var(--t-time) (13px). */
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  text-align: left;
+  /* Owner #340 (5): this frame's own convention was cursor:default on every control,
+   * which is the convention that left a screen where nothing announced itself as
+   * pressable. A thing that acts says so. */
+  cursor: var(--cursor-act);
+}
+
+.rail-item:hover { background: var(--surface-2); color: var(--ink); }
+/* Fill AND an accent bar, never one alone (req/784 A-31: selection is fill plus position,
+ * never underline-only). The bar is drawn transparent on an unselected item so the row's
+ * own geometry does not move when the selection does. req/867: it was a left border on a
+ * vertical rail; on a horizontal one the edge that reads as "position" is the bottom, so
+ * it moves there. The rule -- fill AND position -- is unchanged. */
+.rail-item { border-bottom: 3px solid transparent; }
+.rail-item.on { background: var(--surface-2); color: var(--ink); border-bottom-color: var(--act); }
+.rail-item.on .mark { opacity: 1; }
+.rail-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The count a destination carries because it names a collection (req/784 A-02). A
+ * number that was read sits in a filled slot; the dash that means "not standing here,
+ * so nothing has been read" is drawn quieter and in italic, so the difference between a
+ * measurement and the absence of one is visible and not only readable. */
+.side-count {
+  flex: none;
+  min-width: 1.6rem;
+  padding: 0 5px;
+  border-radius: var(--radius-1);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  text-align: right;
+}
+
+/* req/811 §10-2 C-3: this rule used --ink-3 for text, which tokens.css puts on an explicit
+ * forbidden-for-text list and measures at 4.48:1, under the 4.5:1 floor the same file
+ * enforces everywhere else -- and it was doing it on the very slot that was already
+ * telling the reader something false. --ink-2 is the quietest ink that clears the floor. */
+.side-count[data-read='false'] { background: transparent; color: var(--ink-2); font-style: italic; }
+
+/* req/822_c7 (Owner #395-2), carried onto the bar by req/867: the finder is drawn as the
+ * field it opens -- a bordered, raised slot, not one more nav item -- so the way in to
+ * anything looks like a way in. #395-2's own eye-read of the 31 reference images is what
+ * puts it here: every surface with a finder draws it at the TOP of its chrome (top bar 3,
+ * sidebar head 2, foot 0). The variant it declined at the time was a top bar built FOR
+ * this one control; the bar exists now regardless, carrying the SPACE mode, so the finder
+ * rides a row that is already paid for. */
+.bar-find { flex: none; }
+.bar-find .chrome-act {
+  min-width: 12rem;
+  border: 1px solid var(--crease);
+  border-radius: var(--radius-2);
+  background: var(--bg-raised);
+}
+.bar-find .chrome-act:hover { border-color: var(--act); color: var(--act); background: var(--bg-raised); }
+
+/* ---- chrome acts: outside every navigation landmark (req/811 B-6) ------------------- */
+
+.chrome-acts,
+/* req/884: the dock presses are the same kind of thing as the other window controls, so
+ * they lay out the same way. Stated rather than assumed: `.chrome-act` is itself
+ * `display:flex`, which makes it block-level, so two of them inside a plain div stack
+ * VERTICALLY and take the bar to two rows. That is exactly what shipped in the first
+ * after-shot of this lane -- the presses were correct and the bar was wrong, and only
+ * looking at the picture showed it. The mechanism gates were all green for it. */
+.chrome-docks {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+}
+
+.chrome-act {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  height: var(--row);
+  border: 0;
+  border-radius: var(--radius-2);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  text-align: left;
+  cursor: var(--cursor-act);
+}
+
+.chrome-act:hover { background: var(--surface-2); color: var(--ink); }
+.chrome-act-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* `.side-toggle` (`narrow`) is gone with the width it was the only control of. The
+ * reasoning is in render.mjs, above `#sash`, rather than repeated here. */
+
+/* ---- the middle: docks around a stage ---------------------------------------------- */
+
+.middle { grid-area: middle; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.across { display: flex; flex: 1; min-height: 0; }
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-1);
+  /* Not `auto`. A dock that scrolls as a whole scrolls its own chrome out of the window:
+   * measured at 1440x900, the right dock's breadcrumb row was 426px wide inside a 320px
+   * dock, which put its `copy command` control at x=1546 -- outside the window entirely,
+   * with the dock's own horizontal scrollbar as the only way to reach it. The scroller is
+   * `.dock-host` and only `.dock-host`, so the bar and the breadcrumb stay put and the
+   * face's own content is what moves. */
+  overflow: hidden;
+}
+
+/* `--least-w` is the width the face standing here declared it needs (FACE.json
+ * leastWidth, put on this node by render.mjs). It was written and never read, so a dock
+ * drew whatever the dock rules said and a face asking for 320px got 190 -- measured in
+ * the real app window, where that face's stat band collapsed into a column of dashes and
+ * its controls wrapped three words to a line. `max()` makes the declaration mean
+ * something: the dock is as wide as the reader has dragged it, or as wide as the face
+ * says it needs, whichever is larger. A dock with no face in it falls back to 0 and
+ * keeps its own rule. */
+.dock-left { width: max(var(--dock-w, 240px), var(--least-w, 0px)); border-right: 1px solid var(--crease); }
+.dock-right { width: max(var(--dock-w, 280px), var(--least-w, 0px)); border-left: 1px solid var(--crease); }
+/* `--least-h` is the height a bottom-docked face declared it needs (FACE.json
+ * leastHeight, put on this node by render.mjs), and it is the height axis of the same
+ * rule the two side docks got: the dock is as tall as the reader has dragged it, or as
+ * tall as the face says it needs, whichever is larger. Without it a saved layout could
+ * hand a face 38px of content area under 83px of chrome, which is what it was doing. */
+.dock-bottom { height: max(var(--dock-h, 180px), var(--least-h, 0px)); border-top: 1px solid var(--crease); }
+.dock.shut { display: none; }
+.dock.shut + .sash, .sash + .dock.shut { display: none; }
+
+.dock-face { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.dock-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  height: var(--bar-h);
+  padding: 0 6px 0 0;
+  border-bottom: 1px solid var(--crease);
+  color: var(--ink-3);
+}
+
+.dock-names { display: flex; align-items: stretch; overflow-x: auto; scrollbar-width: none; }
+
+.dock-name {
+  border: 0;
+  background: transparent;
+  padding: 0 10px;
+  color: var(--ink-3);
+  font: inherit;
+  /* SS558 body-text floor: was var(--t-meta) (12px). */
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: var(--cursor-act);
+}
+
+.dock-name.on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--act); }
+.dock-name:not(.on):hover { color: var(--ink-2); }
+
+/* A held face is gripped, not badged: the edge of the dock takes the tension. */
+.dock-face[data-condition='held'] { box-shadow: inset 2px 0 0 var(--tension), inset -2px 0 0 var(--tension); }
+.dock-host {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  /* [B7] The scroller said nothing about being one. The right dock hid 1372px of
+   * content below a 517px fold behind an overlay scrollbar that only appears once you
+   * are already scrolling -- so the reader had to guess there was more. A thin,
+   * always-drawn track plus the shadow below says it without costing a row. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--tension) transparent;
+  /* KNOWN COST, measured, not fixed: the pinned terminal act (see `[data-pin]` below)
+   * stands over the foot of this scroller, so a control that happens to lie in that
+   * band is behind it -- `btn_verify` reports `escalate` at 1223,525 landing on the
+   * row above it, one finding that did not exist before the pin. Both
+   * `scroll-padding-bottom` and `padding-bottom` were tried at 6rem: the first changed
+   * nothing and the second added a SECOND occlusion (`cancel`, at a scrolled offset),
+   * so neither is kept. The honest trade is stated rather than papered over -- `commit`
+   * went from y=1168 and unreachable to y=468 and visible on arrival, and one gate row
+   * became occluded to buy it. */
+  /* [C4] The band, reserved -- but only while it exists, and only at its measured height.
+   *
+   * c2's 6rem was rejected because 96px is not 179px: a flat guess under-reserves and
+   * buys a second occlusion at a scrolled offset. So the number is not written here at
+   * all. The frame measures the engaged pin's own box on every draw and whenever a
+   * `disabled` attribute changes (`Frame.reservePins()`, one observer, same shape as
+   * `#watchCounts`), and puts it on this host as `--pin-h`. When no pin is engaged the
+   * property is absent and both lines below compute to the plain 8px this host always
+   * paid -- the empty bed reserves NOTHING, so the 41%-scroller-for-nothing defect this
+   * reservation was twice rejected over cannot come back.
+   *
+   * Two lines because the band costs in two currencies: `padding-bottom` grows the
+   * scroll range so the tail of the content can be scrolled clear ABOVE the band
+   * rather than exactly to its edge, and `scroll-padding-bottom` makes every
+   * programmatic reveal (scrollIntoView, focus scrolling -- the way btn_verify found
+   * `escalate` landing behind the pin) target the visible foot above the band instead
+   * of the band itself. The arrival is a measured, predictable layout shift: the
+   * scroller's scrollHeight grows by exactly the pin's height, announced by the
+   * always-drawn bottom shadow, instead of a silent overlay. */
+  padding-bottom: calc(8px + var(--pin-h, 0px));
+  scroll-padding-bottom: calc(8px + var(--pin-h, 0px));
+  /* `local` layers scroll with the content and so vanish at each end; `scroll` layers
+   * stay pinned to the edge. Together the shadow is drawn only while there is
+   * something past that edge -- a cue that is true by construction rather than by a
+   * listener that can fall out of date. */
+  background:
+    linear-gradient(var(--surface-1) 30%, transparent) top / 100% 18px no-repeat local,
+    linear-gradient(transparent, var(--surface-1) 70%) bottom / 100% 18px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, var(--tension), transparent) top / 100% 7px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, var(--tension), transparent) bottom / 100% 7px no-repeat scroll;
+}
+
+/* [C2-2] The terminal act, kept reachable.
+ *
+ * Measured at 1440x900: `commit` was drawn at y=1149 in a dock whose fold is y=599 --
+ * 550px below it, inside a 517px scroller with no cue that it scrolled. Compacting the
+ * gate ladder (C2-1: 205px per row down to 76px) was the prerequisite, because a
+ * sticky region is inert while the region is taller than its host; it is not the whole
+ * fix, because the ladder is still taller than the fold.
+ *
+ * The face may not write this rule. `faces/held/tools/gate.mjs` enforces
+ * `nothing-out-of-flow` -- `/position\s*:\s*(absolute|fixed|sticky)/` is rejected in
+ * face source, with a red-first test asserting the ban bites. So the face only NAMES
+ * the row whose act is terminal (`data-pin="terminal-act"`) and the shell places it.
+ * The division is the point: a face that could pin itself could pin anything.
+ *
+ * [C3] The pin is conditional, and the condition is whether there is anything to press.
+ *
+ * Two numbers from the c2 round did not survive re-measurement in this bed, and the rule
+ * is written against the measured ones. At 1440x900 the right dock's `.dock-host` is
+ * 433px tall (not 517), every gate row is 176-179px (not 76 -- C2-1's compaction bought
+ * a row that still carries a wrapped refusal reason, and at this dock width all four
+ * reasons wrap), and the pinned row is 179px. So an unconditional pin stands over
+ * **41% of the scroller**, and it does not even land where it was reported to: sticky is
+ * clamped by its containing block, and the ladder's own top is y=415 at scrollTop=0, so
+ * the pin settles at 416..595 with its bottom 80px BELOW the 515 fold rather than
+ * flush against it.
+ *
+ * What that band cost, measured: `escalate` -- the act of the first gate -- lays out at
+ * 506..544, entirely inside the pinned band, and `btn_verify` reported it as the one
+ * finding the pin itself created.
+ *
+ * `:has(...)` is the fix and it is not a trick to quiet the gate. The pin exists to keep
+ * a **pressable** terminal act reachable. When every act in the row is `disabled` there
+ * is nothing to reach: the row is a refusal and its reason, which req/811 §8-7 wants
+ * read in flow beside its control, not floated over four other gates. Paying 41% of a
+ * scroller to keep a button visible that cannot be pressed is a straight loss, so the
+ * rule buys the band only when the band is worth something.
+ *
+ * KNOWN COST, stated rather than papered over: this means the empty bed -- the only bed
+ * a lane without the WSL-built `gx` can run -- never draws the pin, so `btn_verify`
+ * GREEN does not vouch for the live-pin case. Measured separately by lifting `disabled`
+ * in the live window: the pin engages, `commit` becomes visible on arrival, and the band
+ * still overlays content beneath it. Reserving that band (`--pin-h` on the host, so the
+ * tail of the content can always be scrolled clear of it) is NOT landed -- c2 tried a
+ * flat `padding-bottom: 6rem` against a pin that is really 179px and bought a second
+ * occlusion for it. A reservation has to equal the measured height or it is guessing.
+ *
+ * [C4] Landed. `--pin-h` IS the measured height now -- `Frame.reservePins()` reads the
+ * engaged pin's offsetHeight per draw and per `disabled` flip and writes it onto the
+ * host; the `.dock-host` rule above turns it into padding and scroll-padding while the
+ * pin stands and into nothing when it does not. What is NOT fixed, measured and stated:
+ * the 80px sticky clamp on arrival. At scrollTop=0 the ladder's own top (y=415) is the
+ * pin's containing block ceiling, so the pin settles at 416..595 with 80px below the 515
+ * fold, and no reservation can move a sticky element outside its containing block. The
+ * clamp self-resolves after 80px of scroll, and every occluded control can now be
+ * scrolled clear of the band, which the unreserved band did not guarantee. */
+.dock-host [data-pin='terminal-act']:has(button[data-act]:not([disabled])) {
+  position: sticky;
+  /* [C4] Not `bottom: 0`. Chrome insets the sticky constraint rectangle by the
+   * scroller's `scroll-padding` (per spec) -- measured: with the host's
+   * `scroll-padding-bottom` at 187px, `bottom: 0` moved the pin's stick line 187px
+   * above the fold and top-clamped the pin over `escalate` in the MIDDLE of the
+   * ladder (pin at 200..379 while its flow position was 794..973). This offset is the
+   * exact negation of the host's reservation, so the pin's stick line stays at the
+   * true fold (measured 515) in every state: both calcs read the same `--pin-h`, and
+   * with no engaged pin both collapse to the plain 8px. */
+  bottom: calc(-8px - var(--pin-h, 0px));
+  z-index: 2;
+  background: var(--surface-1);
+  box-shadow: 0 -1px 0 var(--crease);
+}
+
+/* ---- object meta: breadcrumb + copyable command block, one per object view (SS551) -- */
+
+.object-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--crease);
+  background: var(--surface-1);
+}
+
+.breadcrumb {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  white-space: nowrap;
+}
+
+/* req/97 Pass 2 worst-defect: a crumb was static text with no way back to its
+ * container -- now a control, in the same reset as .rail-item/.launcher-item/
+ * .dock-name (border:0, transparent, font:inherit, cursor:default -- this
+ * codebase's own convention for a clickable label, not the browser's pointer). */
+.crumb {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  font: inherit;
+  cursor: var(--cursor-act);
+}
+.crumb[disabled] { cursor: var(--cursor-refuse); }
+.crumb:not([disabled]):hover { color: var(--act); text-decoration: underline; }
+.crumb-sep { color: var(--ink-3); flex: none; }
+
+.command {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  /* Shrinkable, not fixed. `flex: none` here meant a command block whose text is capped
+   * at 22rem (352px) would not give back a pixel inside a 320px dock -- so it overhung
+   * the dock's own edge and carried its copy button out with it, measured at x=1528 in
+   * a 1440px window. The text already ellipsizes; it was never given the chance. The
+   * copy control keeps `flex: none` of its own below, so what gives way is the part
+   * that can be abbreviated without being lost. */
+  flex: 0 1 auto;
+}
+
+.command-text {
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: var(--radius-2);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: var(--t-record);
+}
+
+.command-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* SS553: every interactive control is at least 36x36px -- this is a new
+   * control introduced by this lane, so it is built to the floor from the
+   * start rather than retrofitted, the same reading `tapTargets()` in the
+   * faces' own `tools/shoot.mjs` already performs. */
+  min-width: 36px;
+  min-height: 36px;
+  /* And it does not give that floor back when the row runs short of room: the whole
+   * point of the shrink above is that the abbreviatable half yields and the pressable
+   * half does not. */
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-2);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: var(--cursor-act);
+}
+
+.command-copy:hover { background: var(--act-bed); color: var(--act); }
+/* Hue is reserved for a record's verdict (shell.css header comment); a copy
+ * succeeding is not one, so success is opacity, not colour -- only failure
+ * borrows --deny, the same ink a refused act already uses on this strip. */
+.command[data-copied='true'] .command-copy { color: var(--ink); opacity: 1; }
+.command[data-copy-failed='true'] .command-copy { color: var(--deny); }
+
+/* ---- sashes: a boundary with tension, drawn with thickness and never with colour ---- */
+
+.sash {
+  flex: 0 0 3px;
+  background: transparent;
+  position: relative;
+  cursor: var(--cursor-size-x);
+  touch-action: none;
+}
+
+.sash-bottom { flex-basis: 3px; cursor: var(--cursor-size-y); }
+.sash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--crease);
+  transition: transform var(--motion-quick) var(--motion-ease),
+              background-color var(--motion-quick) var(--motion-ease);
+}
+.sash-bottom::after, .split.down > .sash::after { transform: scaleY(var(--drag-bar-scale)); }
+.sash:not(.sash-bottom)::after { transform: scaleX(var(--drag-bar-scale)); }
+.split.down > .sash { flex-basis: 3px; cursor: var(--cursor-size-y); }
+.split.down > .sash::after { transform: scaleY(var(--drag-bar-scale)); }
+.sash:hover::after, .sash.held::after { transform: none; background: var(--tension); }
+
+/* ---- stage ------------------------------------------------------------------------- */
+
+.stage { flex: 1; display: flex; min-width: 0; min-height: 0; }
+.stage > * { flex: 1; }
+.split { display: flex; min-width: 0; min-height: 0; }
+.split.down { flex-direction: column; }
+
+.pane {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  /* SS551: a third row for the breadcrumb + command block ("flat tabs on detail
+   * views" -- the tabs row stays exactly the flat style it already had; this
+   * adds a second, distinct row under it rather than crowding one row with
+   * both jobs). auto rather than a fixed height, so the object-meta row never
+   * clips the command text at a narrow pane width. */
+  grid-template-rows: var(--bar-h) auto 1fr;
+  grid-template-areas: 'tabs tools' 'meta meta' 'host host';
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-0);
+  border: 1px solid var(--crease);
+  margin: 0;
+}
+
+.pane.looked { border-color: var(--tension); }
+.tabs { grid-area: tabs; display: flex; align-items: stretch; overflow-x: auto; scrollbar-width: none; }
+.pane-tools { grid-area: tools; display: flex; align-items: center; padding-right: 4px; }
+.pane .object-meta { grid-area: meta; }
+.pane-host { grid-area: host; min-height: 0; overflow: auto; padding: 10px 12px; border-top: 1px solid var(--crease); }
+
+.tab, .tab-close, .pane-tool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  /* SS558 body-text floor: was var(--t-time) (13px). Flat tabs, unchanged shape. */
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  cursor: var(--cursor-act);
+}
+
+/* [C3 / B2] The tab is a slot of two sibling buttons, not one button wearing a span.
+ * The close was a `span` inside the tab: no census entry, no keyboard route, and a
+ * nested button would have been invalid markup. So the border, the `on` paint and the
+ * hover -- everything that used to be a property of the whole tab shape -- moves up to
+ * the slot, and `.tab` keeps only what belongs to the label half. The visual result is
+ * the flat tab that was there before; it is the addressability that changed. */
+.tab-slot {
+  display: flex;
+  align-items: stretch;
+  border-right: 1px solid var(--crease);
+}
+.tab-slot.on { color: var(--ink); background: var(--surface-0); box-shadow: inset 0 -2px 0 var(--act); }
+.tab-slot.on .tab { color: var(--ink); }
+.tab-slot:not(.on):hover { background: var(--surface-1); }
+.tab-slot:not(.on):hover .tab { color: var(--ink-2); }
+
+.tab { padding: 0 8px 0 12px; white-space: nowrap; }
+.tab .side-count { min-width: 0; }
+.tab[data-condition='held'] .tab-label { font-style: italic; }
+.tab-close, .pane-tool { padding: 0 4px; opacity: var(--idle-opacity); }
+.tab-slot:hover .tab-close, .tab-close:focus-visible, .pane-tool:hover { opacity: 1; }
+.pane.bare .tabs::after {
+  content: 'no face here';
+  align-self: center;
+  padding-left: 12px;
+  color: var(--ink-3);
+  font-size: var(--t-record);
+}
+
+/* req/822_c7 (Owner #367追記1/#395-1): a strip holding ONE tab has no choice to
+ * offer, and a lone tab drawn in chooser costume was the visible half of the
+ * sidebar/tab duplication -- the same face, pressable twice, dressed the same way
+ * twice. The ruling (req/822_c7 §5): the launcher answers WHERE every face stands,
+ * a tab strip answers WHICH of several this pane shows; with one tab there is no
+ * WHICH, so the tab is drawn as the pane's title -- ink weight, no active
+ * underline, no hover invite, no trailing crease. The control keeps its class,
+ * role and click (six instruments select `.tab`, and #372 forbids removing a
+ * working act); only the costume changes. */
+.tabs[data-count='1'] .tab-slot { border-right: 0; }
+.tabs[data-count='1'] .tab-slot.on { background: transparent; box-shadow: none; }
+.tabs[data-count='1'] .tab { color: var(--ink); font-weight: 600; cursor: var(--cursor-inert); }
+.tabs[data-count='1'] .tab-slot:not(.on):hover { background: transparent; }
+
+/* ---- what the shell says ------------------------------------------------------------ */
+
+.bare-said, .face-absent, .face-broke { margin: 0; color: var(--ink-3); font-size: var(--t-record); line-height: var(--lh-record); }
+.face-broke { color: var(--deny); }
+.face-absent { font-style: italic; }
+
+.strip {
+  grid-area: strip;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* [B3] A floor, not a ceiling. `height` + `overflow: hidden` meant a refusal that
+   * needed two lines got one and lost the rest; the grid row this sits in is `auto`,
+   * so growing costs the stage a line and costs the reader nothing. */
+  min-height: var(--bar-h);
+  padding: 0 12px;
+  border-top: 1px solid var(--crease);
+  background: var(--surface-1);
+  color: var(--ink-2);
+  /* SS558 body-text floor: was var(--t-meta) (12px). */
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  overflow-x: hidden;
+}
+
+.strip-counts { color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+
+/* req/822_c7 S5: a measurement slot is one fact and stays one line -- the c6 capture
+ * showed the mount census wrapping into a four-line column inside the strip. The
+ * fuller sentences ride each slot's title now, so nothing is lost to the nowrap. */
+.strip-checks, .strip-suite, .strip-bench, .strip-serve { white-space: nowrap; }
+
+/* [B6] The depth counts, now pressable. Quiet by default -- this is a status bar, not
+ * a toolbar -- and only the live ones take the pointer. */
+.strip-step {
+  border: 0;
+  background: transparent;
+  padding: 0 6px;
+  color: var(--ink-2);
+  font: inherit;
+  border-radius: var(--radius-1);
+  cursor: var(--cursor-act);
+}
+
+.strip-step:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.strip-step:disabled { color: var(--ink-3); cursor: var(--cursor-inert); opacity: var(--disabled-opacity); }
+.strip-dropped { color: var(--ink-3); }
+.strip-digest { font-family: var(--mono); color: var(--ink-2); }
+/* [B3] `min-width: 4rem` is 64px, and with `nowrap` + `ellipsis` that is where a
+ * refusal reason went to die: the one sentence saying WHY the window would not do what
+ * was asked was the most truncated text on the surface, competing on a single flex line
+ * with a digest, three counts and three measurement slots. A reason you cannot finish
+ * reading is a reason that was not given. The floor is now 16rem. */
+.strip-said { flex: 1; min-width: min(16rem, 100%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A refusal is the one outcome allowed to take a second and third line. The strip's
+ * grid row is `auto` (see `grid-template-rows: 1fr auto`), so the bar grows into it
+ * rather than clipping -- the height below is a floor, not a ceiling. */
+.strip-said[data-outcome='refused'] {
+  color: var(--deny);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  padding: 2px 0;
+}
+.strip-said[data-outcome='elsewhere'] { font-style: italic; }
+/* [B3] Announced, not drawn. The strip already shows these words to anyone who can see
+ * them; this carries the same words to a screen reader. Clipped to a 1px box rather
+ * than `display: none` or `visibility: hidden`, either of which would take it out of
+ * the accessibility tree and make it announce nothing at all. */
+.strip-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.strip-checks { font-family: var(--mono); }
+.strip-checks[data-ok='false'] { color: var(--deny); }
+
+/* ---- strip: LIVE measured numbers (SS551) -- suite / bench / serve state ------------ */
+
+.strip-suite, .strip-bench, .strip-serve {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  color: var(--ink-3);
+}
+
+/* A number that arrived reads plain; a slot that is honestly "not wired" (never a
+ * fabricated number) is the one case this strip marks, so the difference between
+ * "measured and fine" and "not reachable from here" is visible, not just readable. */
+.strip-suite[data-ok='null'], .strip-bench[data-ok='null'], .strip-serve[data-ok='null'] { font-style: italic; }
+.strip-suite[data-ok='false'], .strip-bench[data-ok='false'] { color: var(--deny); }
+
+/* req/822_c5 item 1: a suite reading about ANOTHER tree. The stale mark rides inline
+ * ahead of the counts; the slot drops to the attendant ink because the one thing a
+ * stale reading must not do is wear this tree's green or red (measures.mjs sets
+ * data-ok to null for exactly that reason -- this rule only aligns the mark). */
+.strip-suite[data-stale='true'] { color: var(--ink-2); }
+.strip-suite[data-stale='true'] .mark { vertical-align: -1px; margin-right: 4px; }
+
+/* ---- marks -------------------------------------------------------------------------- */
+
+.mark { fill: none; stroke: currentColor; stroke-width: var(--glyph-stroke); stroke-linecap: square; opacity: var(--glyph-opacity); flex: none; }
+.mark-unnamed { stroke-dasharray: 2 2; opacity: 1; }
+
+/* An unavailable thing is dimmed where it stands. Hiding it reads as "there is no such
+ * thing", and a person then looks for it somewhere else forever. */
+button[disabled] { opacity: var(--disabled-opacity); }
+
+/* ---- the palette: invoked, never resident (req/811 §8-5) ----------------------------
+ * A permanent search bar spends chrome characters on every frame where nobody is
+ * searching. This costs nothing at rest and takes the width it needs when summoned. The
+ * facet legend is drawn rather than hidden in a tooltip -- §7 gate 7 makes semantics
+ * reachable only through `title=` a failure of "understood at a glance". */
+
+.palette {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(720px, 82vw);
+  max-height: 70vh;
+  padding: 12px;
+  border: 1px solid var(--tension);
+  border-radius: var(--radius-2);
+  background: var(--surface-1);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--ink) 22%, transparent);
+  overflow: hidden;
+}
+
+.palette-field {
+  height: var(--row);
+  padding: 0 10px;
+  border: 1px solid var(--crease);
+  border-radius: var(--radius-1);
+  background: var(--surface-0);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--t-head);
+}
+
+.palette-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.palette-facet { display: flex; align-items: baseline; gap: 6px; }
+.palette-facet-name { color: var(--act); font-family: var(--mono); font-size: var(--t-time); }
+.palette-facet-said { color: var(--ink-2); font-size: var(--t-time); }
+.palette-said { margin: 0; color: var(--ink-2); font-size: var(--t-time); }
+
+.palette-results { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
+
+.palette-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 8rem) minmax(4rem, 6rem) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-1);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--t-record);
+  text-align: left;
+  cursor: var(--cursor-act);
+}
+
+.palette-row:hover { background: var(--surface-2); }
+.palette-row[disabled] { cursor: var(--cursor-inert); color: var(--ink-2); }
+.palette-row-box { color: var(--ink-2); font-family: var(--mono); font-size: var(--t-time); }
+/* The address is the result. It is drawn in full and never clipped to an ellipsis: a
+ * command a reader cannot finish reading is the one string whose whole purpose is to be
+ * taken (req/811 §6-4 O-4). */
+.palette-row-address {
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: var(--t-time);
+  overflow-wrap: anywhere;
+}
+
+/* ---- the chrome menu: right-click on the frame itself (req/810 GAP-3) ---------------
+ * Owner #366 asked for right-click 全域. r4 gave one to all six faces; the chrome had
+ * none, so the sidebar rows, tabs, dock heads, strip and sash were bare. A row that
+ * cannot act is drawn with its reason and disabled, never hidden -- the same `why` the
+ * outcome itself now requires, rendered. */
+
+.chrome-menu {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 280px;
+  padding: 4px;
+  border: 1px solid var(--tension);
+  border-radius: var(--radius-2);
+  background: var(--surface-1);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--ink) 20%, transparent);
+}
+
+.chrome-menu-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-1);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--t-record);
+  line-height: var(--lh-record);
+  text-align: left;
+  cursor: var(--cursor-act);
+}
+
+.chrome-menu-row:hover:not([disabled]) { background: var(--surface-2); }
+.chrome-menu-row[disabled] { cursor: var(--cursor-inert); color: var(--ink-2); }
+.chrome-menu-label { font-weight: 500; }
+/* The reason, drawn under the label rather than parked in a tooltip: §7 gate 7 makes
+ * semantics reachable only through `title=` a failure of "understood at a glance". */
+.chrome-menu-said { color: var(--ink-2); font-size: var(--t-time); }
+
+/* A `hidden` element that a class gives a `display` to is a visible element.
+ *
+ * Both overlays below set `display: flex`, and `[hidden]`'s `display: none` comes from the
+ * user-agent stylesheet at the same specificity a class carries -- so the author rule wins
+ * and `hidden = true` draws. The first capture of this lane showed the palette open over
+ * the stage with nobody having pressed anything, which is how this was found: by looking
+ * at the window rather than at the attribute, which said `hidden` and was believed. */
+.palette[hidden],
+.chrome-menu[hidden] { display: none; }

@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>fixture: rt08 unsized glyph</title>
+<!--
+  SPDX-License-Identifier: Apache-2.0
+  KA-I2 live round, defect two: the second glyph carries no width/height and no rule
+  reaches it, so it lands on the SVG replaced-element default of 300x150. The markup
+  still says data-glyph-size="20x20". P-b must go red on the gap between what the
+  page declares and what the renderer used.
+  Diff against clean-baseline.html: width/height dropped from the invert glyph, and
+  the selector narrowed so no rule sizes it.
+-->
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Consolas, "Courier New", monospace; font-size: 14px; line-height: 22px; color: #101418; }
+  .sheet { width: 640px; padding: 24px; }
+  h1 { font-size: 18px; line-height: 26px; margin: 0 0 16px 0; font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 12px; height: 34px; border-bottom: 1px solid #e4e7ea; }
+  .row .name { width: 300px; overflow: hidden; white-space: nowrap; }
+  .row .note { width: 200px; color: #5d666e; font-size: 12px; }
+  svg[data-glyph="escrow"], svg[data-glyph="receipt"] { display: block; flex: none; }
+</style>
+<div class="sheet">
+  <h1>reversible transformations</h1>
+
+  <div class="row">
+    <svg data-glyph="escrow" data-glyph-size="20x20" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+      <rect x="3" y="5" width="14" height="10" fill="none" stroke="#101418" stroke-width="1.5"></rect>
+    </svg>
+    <span class="name">write ledger row 41</span>
+    <span class="note">prior held</span>
+  </div>
+
+  <div class="row">
+    <svg data-glyph="invert" data-glyph-size="20x20" viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M4 10 L10 4 L16 10" fill="none" stroke="#101418" stroke-width="1.5"></path>
+    </svg>
+    <span class="name">replace configuration block</span>
+    <span class="note">invert checked</span>
+  </div>
+
+  <div class="row">
+    <svg data-glyph="receipt" data-glyph-size="20x20" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+      <circle cx="10" cy="10" r="6" fill="none" stroke="#101418" stroke-width="1.5"></circle>
+    </svg>
+    <span class="name">emit signed receipt</span>
+    <span class="note">offline verifiable</span>
+  </div>
+</div>

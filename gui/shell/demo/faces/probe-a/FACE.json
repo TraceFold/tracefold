@@ -1,0 +1,10 @@
+{
+  "id": "probe-a",
+  "title": "Probe A",
+  "place": "left",
+  "purpose": "find",
+  "rail": true,
+  "consumes": [],
+  "condition": "plain",
+  "leastWidth": 200
+}

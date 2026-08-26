@@ -1,0 +1,10 @@
+{
+  "id": "sheet-b",
+  "title": "Sheet B",
+  "place": "stage",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [],
+  "condition": "held",
+  "leastWidth": 200
+}

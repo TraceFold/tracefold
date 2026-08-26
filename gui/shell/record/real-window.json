@@ -1,0 +1,59 @@
+{
+  "what": "evidence that this shell has been on a screen, not only through a headless dump",
+  "why": "W15. A face can be declared, imported, syntactically perfect and still draw nothing; twenty-nine checks over a dead face passed in the system this was derived from, because every one of them read a file and none of them put it on a screen.",
+  "how": "tools/serve.mjs on 127.0.0.1:8788, then tools/real_window.ps1 opens Chrome in app mode, reads the window's own title back through the Win32 window list, and photographs the window rectangle off the screen. The check count is computed inside the page and written into the title, so the number in the record is the number the page computed and not one typed here.",
+  "runs": [
+    {
+      "at": "2026-08-24",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex shell — 16/16 checks",
+      "checks": "16/16",
+      "restingDigest": "blake3:f2c7d1d810debe70acb42e42afd3bab927331e2c38dd4e726e56828538ac9ec7",
+      "restingDigestIsOpening": true,
+      "picture": "record/real_window_light.png"
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex shell — 16/16 checks",
+      "checks": "16/16",
+      "reachedBy": "?theme=dark, which performs the same theme:set act the rail and the keyboard perform",
+      "picture": "record/real_window_dark.png"
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "light",
+      "surface": "headless (Chrome --headless --dump-dom)",
+      "checks": "16/16",
+      "note": "kept because the two agreeing is worth having; the headless run alone would not have been"
+    }
+  ],
+  "facesThatStood": [
+    { "id": "floor-a", "where": "dock:bottom:floor-a", "charactersDrawn": 108 },
+    { "id": "margin-a", "where": "dock:right:margin-a", "charactersDrawn": 107 },
+    { "id": "probe-a", "where": "dock:left:probe-a", "charactersDrawn": 99 },
+    { "id": "probe-b", "where": "dock:left:probe-b", "charactersDrawn": 110 },
+    { "id": "sheet-a", "where": "stage:", "charactersDrawn": 130 },
+    { "id": "sheet-b", "where": "stage:", "charactersDrawn": 107 },
+    { "id": "sheet-c", "where": "stage:", "charactersDrawn": 93 }
+  ],
+  "readByEye": {
+    "byWhom": "the agent that built it, looking at the two pictures",
+    "held": [
+      "light is the ground state and the frame is achromatic; nothing on the screen carries a hue",
+      "every mark is drawn at the size it was given; none fell back to the format's default box",
+      "no text is printed over other text, in either theme",
+      "the held face's tab is set in italic, which is the frame drawing a face's own declaration without knowing what it means",
+      "the strip carries the digest, the depth of history and the check count, and the digest shown is the opening digest"
+    ],
+    "notHeld": [
+      "the window's chrome is the browser's, not the shell's. The design asks for the rail to run to the window's edge with the OS decoration removed, which a page in a browser cannot do; that requirement belongs to a native shell and is not met here.",
+      "the rail draws spaces and faces in one undifferentiated column; the two groups should be told apart by more than their marks."
+    ],
+    "explained": [
+      "an earlier capture showed the digest one act away from the opening state, with the strip saying the last act would have changed nothing. The cursor was resting where the window opened, and a pointer on a sash is a real drag. The capture now parks the cursor first; the pointer-entry counters on every face read 0, which is how the explanation was confirmed rather than assumed."
+    ]
+  }
+}

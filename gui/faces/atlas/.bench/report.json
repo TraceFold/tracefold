@@ -1,0 +1,17 @@
+{
+  "note": "faces/atlas row-render ms -- median time for view(state) (atlas.mjs, exported alongside read/mount) to build the full screen tree for one read of 20 paths x 3 touches (60 transformations, every path a subject), cycled across 1,000 distinct synthetic states. I/O (read) is untimed setup; mount ms and real paint are separate, unmeasured axes.",
+  "measuredAt": "2026-08-25T06:27:51.485Z",
+  "states": 1000,
+  "paths": 20,
+  "touchesPerPath": 3,
+  "samplesMs": [
+    4.2872,
+    4.4609,
+    7.0094,
+    8.0434,
+    26.809
+  ],
+  "medianMs": 7.0094,
+  "budgetMs": 300,
+  "ok": true
+}

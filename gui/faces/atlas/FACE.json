@@ -1,0 +1,12 @@
+{
+  "id": "atlas",
+  "title": "Atlas",
+  "place": "stage",
+  "purpose": "read",
+  "rail": true,
+  "consumes": [
+    "get_transformations"
+  ],
+  "condition": "plain",
+  "leastWidth": 320
+}

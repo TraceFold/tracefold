@@ -1,0 +1,78 @@
+{
+  "what": "evidence that the ledger face has been on a screen, not only through a headless dump",
+  "why": "req/02 W15 clause 3: each face must carry a record of having mounted in a real window (headless is not the window). §495 landed the module-graph fix (tokens.mjs's runtime node:fs read moved to build time) and proved a headless mount, but left the non-headless run, the styled screenshot, and this record as the residual work under F-1.",
+  "how": "faces/ledger/tools/browser-mount-smoke.mjs's fixture (browser-mount.html + browser-mount-entry.mjs) is served over http by a static server rooted at the project, now also answering /s-common/tokens.css from the one stylesheet of record (parts/tools/token-source.mjs), the same route name shell/tools/serve.mjs answers. faces/ledger/tools/real-window-smoke.mjs starts that server, then shells out to shell/tools/real_window.ps1 -- the shell's own real-window instrument, reused rather than duplicated -- which opens Chrome in app mode, reads the window's own title back through the Win32 window list, and photographs the window rectangle off the screen. The element/row count and theme are computed inside the page by browser-mount-entry.mjs and written into document.title, so the numbers in this record are the numbers the page computed, not ones typed here.",
+  "runs": [
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex ledger face -- dark -- elements 267 rows 3",
+      "elements": 267,
+      "dataRow": 3,
+      "reachedBy": "http://127.0.0.1:<port>/faces/ledger/fixtures/browser-mount.html (no query -- tokens.css declares dark on a bare :root, so this is the default)",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 138535
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, 1440x900, not headless)",
+      "title": "glovrex ledger face -- light -- elements 267 rows 3",
+      "elements": 267,
+      "dataRow": 3,
+      "reachedBy": "?theme=light, read by browser-mount-entry.mjs off its own URL and applied as document.documentElement.dataset.theme = 'light', which is what tokens.css's :root[data-theme=\"light\"] rule keys on",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 139851
+    },
+    {
+      "at": "2026-08-24",
+      "theme": "dark",
+      "surface": "headless (Chrome DevTools Protocol, tools/rig/renderer.mjs, 900x700)",
+      "elements": 267,
+      "note": "faces/ledger/tools/browser-mount-smoke.mjs's own run against the identical fixture, kept because the headless and real-window runs agreeing on element/row counts is worth having; neither alone would be"
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "dark",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex ledger face -- dark -- elements 425 rows 3",
+      "elements": 425,
+      "dataRow": 3,
+      "capturedRect": "47,40 1426x893",
+      "note": "capturedRect narrower than the requested 1440x900 window is the DWM-extended-frame-bounds fix (faces/atlas's own lane) holding for this face's own capture too -- the legacy GetWindowRect path would have reported a rect at or larger than the request, never smaller. elements rose from 267 to 425 because this lane's retrofit adds the face-header line, the control-row (why/legend, each a bordered <details>), the zero-inclusive counted mark table inside the legend, and the withheld-count badge on every disclosure -- more structure per screen by design (density target), not a regression.",
+      "picture": "record/real_window_dark.png",
+      "shotBytes": 84793
+    },
+    {
+      "at": "2026-08-25",
+      "theme": "light",
+      "surface": "real window (Chrome app mode, requested 1440x900, not headless) -- SS657 5-face retrofit lane re-shoot",
+      "title": "glovrex ledger face -- light -- elements 425 rows 3",
+      "elements": 425,
+      "dataRow": 3,
+      "capturedRect": "47,40 1426x893",
+      "picture": "record/real_window_light.png",
+      "shotBytes": 86834
+    }
+  ],
+  "readByEye": {
+    "byWhom": "the agent that wrote this record, looking at both pictures at full resolution",
+    "held": [
+      "the stylesheet of record is applied, not the smoke page's old inline #0B0C0D/#E8EAEC placeholder: dark reads as a near-black ground with a warm off-white ink and a muted secondary tone for the meta lines; light reads as a warm ivory ground with dark ink, not a flat colour-inversion of dark",
+      "the Deny badge is drawn in the same red in both themes, and 'undo' keeps its own bordered box in both -- a token, not a hand-picked colour per theme",
+      "no text is printed over other text anywhere in either capture",
+      "no row and no glyph is cut off mid-character; the two rows visible in the 900px-tall window (write/Admit, delete/Deny) are shown in full including their open notes, and the page's own vertical scrollbar is the only sign more content exists below the fold, which is the row layout behaving as declared (fixed-pitch rows that do not reflow) rather than a clipping defect",
+      "the window itself is a real OS window: native title bar with minimize/maximize/close controls and the browser's own tab-loading icon are visible in both captures, which a headless dump cannot show and a screenshot of a maximized full-bleed page could be mistaken for",
+      "2026-08-25 SS657 retrofit re-shoot: the compact face-header line (\"ledger  2 of 2 settled, 1 of 1 held\") is the first thing on screen in both themes, before anything else",
+      "2026-08-25: why/legend are drawn as two bordered controls sitting side by side in one row, each with a fold glyph, a bold label, and a plain-language hint (\"-- about this screen\" / \"-- symbols and counts\") -- not a bare word in a full-width empty band, in either theme",
+      "2026-08-25: every row's disclosure states the count of what it withholds (\"8 more fields\", \"9 more fields\") in the row's own line, visible in both themes at a size legible without zooming",
+      "2026-08-25: no background bleed at the capture edges in either theme -- consistent with capturedRect being narrower than the requested window size, above"
+    ],
+    "notHeld": [
+      "no dedicated width-constrained/narrow capture was taken through this instrument (the headless suite's ledger_narrow.png already covers narrow-viewport behaviour; this real-window run only exercises the size real_window.ps1 opens at, matching shell's own precedent)",
+      "clippedWithoutFull, oversizeGlyphs and filledGlyphs were not measured against these two captures the way tools/shoot.mjs's PROBE measures the headless fixtures -- this run is a photograph judged by eye, per W15's own text ('the evidence is a picture a person looked at'), not a re-run of the pixel-probe suite against a real window",
+      "2026-08-25: this lane's own re-shoot, like the 2026-08-24 run before it, is a same-turn self-read -- no second, independent session's eye has looked at these two pictures"
+    ]
+  }
+}

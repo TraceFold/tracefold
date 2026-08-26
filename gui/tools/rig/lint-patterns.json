@@ -1,0 +1,21 @@
+{
+  "note": "The text patterns the T0 tier looks for. They live in data and not in code for one reason: a rule written as a literal inside the module that applies it matches itself, and the retired instrument spent two incidents (RT-10, RT-11) on exactly that mimic hit. Keeping them here means the linter's own source is not a witness against itself.",
+  "clockWait": [
+    "setTimeout\\s*\\(",
+    "setInterval\\s*\\(",
+    "Atomics\\.wait\\s*\\(",
+    "virtual-time-budget"
+  ],
+  "diskReach": [
+    "from\\s+['\"]node:fs['\"]",
+    "require\\(\\s*['\"](node:)?fs['\"]\\s*\\)"
+  ],
+  "retiredVocabulary": [
+    "BROWSER_CHECKS",
+    "EXCLUDED_DIRS",
+    "treeHash",
+    "SLEPT",
+    "guardRemovalFailures",
+    "apiSeen"
+  ]
+}
