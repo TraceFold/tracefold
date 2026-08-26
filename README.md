@@ -12,6 +12,7 @@ offline, without trusting whoever issued it.
 <p>
 <a href="#what-you-cannot-take-from-this"><img alt="the limits first" src="https://img.shields.io/badge/the%20limits%20first-0b0a09?style=for-the-badge&labelColor=0b0a09"></a>
 <a href="https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md"><img alt="technical report" src="https://img.shields.io/badge/technical%20report-0b0a09?style=for-the-badge&labelColor=0b0a09"></a>
+<a href="https://discord.gg/rtvXqYEQzr"><img alt="discord" src="https://img.shields.io/badge/discord-0b0a09?style=for-the-badge&labelColor=0b0a09&logo=discord&logoColor=ece7da"></a>
 </p>
 
 <p>
@@ -29,6 +30,7 @@ offline, without trusting whoever issued it.
 [What it does](#what-it-does) ·
 [Report](https://github.com/TraceFold/tracefold/blob/main/docs/TRACEFOLD_TR.md) ·
 [Contributing](https://github.com/TraceFold/tracefold/blob/main/.github/CONTRIBUTING.md) ·
+[Discord](https://discord.gg/rtvXqYEQzr) ·
 [Glovrex](https://glovrex.com)
 
 ---
