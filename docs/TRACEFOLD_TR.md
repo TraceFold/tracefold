@@ -1,10 +1,11 @@
 # Tracefold Technical Report (v0.1)
 
-**A technical report. Draft v2 — not peer reviewed.**
+**A technical report. Draft v2.1 — not peer reviewed.**
 
-Glovrex · Apache-2.0 · drafted 2026-08-13
+Glovrex · Apache-2.0 · drafted 2026-08-13 · revised 2026-08-26
 
 > v2 is a prose revision of v1. No claim, number, condition, citation, or scope changed. v1 is kept beside this file.
+> **v2.1 (2026-08-26)**: the sentence above no longer describes the current file. Claims and numbers *have* been updated in place since the v2 draft — on 2026-08-25 and 2026-08-26 — and every such change is enumerated in **Appendix D (Changelog)**. Nothing was changed silently; where a claim was corrected, the correction is listed there with its source.
 
 <!-- src: req/112 §7.6 (the report's standing and outline) / §2 (naming) / 45 §4 (the language of promises) -->
 
@@ -14,10 +15,12 @@ Glovrex · Apache-2.0 · drafted 2026-08-13
 
 | Field | Value |
 |---|---|
+| Version | v2.1, 2026-08-26. v2 was drafted 2026-08-13; in-place claim updates of 2026-08-25 and 2026-08-26 are enumerated in Appendix D. |
 | Kind | Technical report accompanying a public source repository. Not a submission to a refereed venue, and not a specification. |
+| Availability | The repository `github.com/TraceFold/tracefold` is public. As of 2026-08-26, a fresh anonymous clone builds with zero errors and passes its full public test floor — 1,986 tests across 375 suites, 0 failures — at commit `cd001fa`. The TypeScript SDK is published on npm as `@mahirhir/tracefold` (0.1.0). |
 | Audience | Developers who run agents or MCP servers against systems that change, and engineers who build verification and audit machinery. |
 | Software described | The `gx-*` crate workspace (17 workspace members; as of 2026-08-25, 13 are shipped in the public repository, the remaining 4 — the two database adapters and two internal-plumbing crates — are private), a Rust implementation of what the internal specification calls a *verified transformation calculus*. CLI binary: `gx`. |
-| Specification baseline | Internal specification v0.2.3; implementation tag `req0.09` (milestone M7 complete). All quantitative claims are pinned to named commits in §5. |
+| Specification baseline | Internal specification v0.2.3; implementation tag `req0.09` (milestone M7 complete). All quantitative claims are pinned to named commits in §5. *(v2.1 note: the specification and implementation have continued to advance since this baseline — as of 2026-08-26 the implementation additionally carries an observation/attach-source layer and further refusal kinds that this report does not describe. The pinned claims stand as dated; this report is a snapshot, not a live status page.)* |
 | Licence | Apache-2.0. |
 | Product name | **Tracefold** is the selected name, in operational use since the 2026-08-13 publication of `github.com/TraceFold/tracefold` (confirmed still current as of 2026-08-25). The company name, Glovrex, is fixed. (A same-named `.dev` domain held by an unrelated third party was found during the survey that produced §6.9; that is a distinct, still-open naming-collision item, not a trademark-clearance blocker on the repository name itself.) |
 | Formal-methods status | As of 2026-08-25, `lean/` holds 117 theorems (12 named counterexamples) and 1 carried axiom across 13 files, 0 `sorry`. A differential test (1,500 conformance vectors, six kinds) compares the Rust implementation against it on every push. A comparison is a difference check, not a proof — no refinement theorem connects the two — and the release gates that would license unqualified present tense (`lean-current`, `difftest-nightly`) have not yet run green against a real release tag. See §7.4. |
@@ -727,6 +730,8 @@ Every measurement in this report is single-node and single-process. Throughput t
 
 As of 2026-08-25, Tracefold has been in public use as the repository and product name since 2026-08-13. What we do not claim is that the name is free of collision: an adjacent, unrelated product holds a same-named `.dev` domain, detected during the same survey that produced §6.9. We have not pursued a registrar or trademark clearance action on it, and this report makes no claim about how that collision resolves.
 
+To state the consequence explicitly rather than leave it to inference: **this project is not affiliated with, endorsed by, or in any relationship with the product operating at the `tracefold.dev` domain**, and nothing in this report describes that product. The only web presence this report speaks for is the repository named in the frontmatter.
+
 ---
 
 ## Appendix A — Disclosure of AI use
@@ -843,4 +848,40 @@ The most useful reply to this report, in descending order of value: a counter-ex
 
 ---
 
-*End of draft v2. Publication is gated on the author, on the trademark and registrar check for the name, and on promoting the citations in §6 from [PB] to [PV].*
+## Appendix D — Changelog (v2 → v2.1)
+
+This appendix exists because the v2 frontmatter promised "no claim changed" between versions, and in-place claim updates were later applied to this file without a version bump. v2.1 retroactively versions those edits and lists every change. Nothing below was, or is, a silent rewrite: each entry names what changed and its source.
+
+### D.1 — 2026-08-25 batch (applied in commit `9aa01789`; measurement ledger `req/754`, diff draft `req/693`, gap ledger `req/692`)
+
+Twelve edit sites, all correcting claims that had gone stale between the 2026-08-13 draft and the 2026-08-25 tree:
+
+1. Frontmatter, *Software described*: "13 crates" → 17 workspace members, 13 shipped publicly, 4 private.
+2. Frontmatter, *Product name*: provisional/trademark-pending wording retired; the third-party `.dev` domain collision recorded as a distinct open item.
+3. Frontmatter, *Formal-methods status*: "no Lean model, no differential-test corpus" → the Lean model and differential test exist (117 theorems, 12 counterexamples, 1 carried axiom, 13 files, 0 `sorry`; 1,500-vector differential test per push), with the difference-check-not-proof caveat retained.
+4. §2.5: "Three adapters ship" → three public + two workspace-only database adapters, with their distinct undo mechanics.
+5. §2.6: workspace intro and crate table extended to all 17 crates, private ones tagged.
+6. §3.5: split-view limitation updated — the `Equivocation` detector for pooled checkpoints now exists; the pooling gap remains open.
+7. §4.2: Lean row and CI row updated; new row added disclosing kani `gx-canon` round-trip as BLOCKED-TERMINAL (6 failed attempts, root cause in the generic CBOR codec; `gx-core` kani coverage 381/0 unaffected).
+8. §5.5: CI scope "2 of 13 crates" → 16 of 17 (`gx-adapter-mysql` hand-run; TypeScript SDK outside CI).
+9. §6.8: "none of the five propositions proven" → named Lean theorems T1–T5 exist, refinement-theorem gap kept explicit.
+10. §7.4: rewritten from "no Lean model, progress zero" to the qualified present tense, with the release-gate condition for unqualified present tense stated.
+11. §7.5: CI coverage figure updated to match §5.5.
+12. §7.7: trademark-provisional wording retired; `.dev` collision kept as the open item.
+
+Also on 2026-08-25 (commit `d068795f`): three lines of CJK inside an HTML comment removed as part of a repo-wide hygiene pass (`req/835`). No claim content changed.
+
+### D.2 — 2026-08-26 batch (v2.1, this revision; ledger `req/847`)
+
+1. Header: "Draft v2" → "Draft v2.1"; revision date added; the v2 "no claim changed" note annotated rather than deleted.
+2. Frontmatter: *Version* row added; *Availability* row added — public repository fully green from a fresh anonymous clone (1,986 tests / 375 suites / 0 failures at `cd001fa`, per `req/38` SS790) and the TypeScript SDK live on npm as `@mahirhir/tracefold` 0.1.0.
+3. Frontmatter, *Specification baseline*: snapshot-not-live-status note appended (the implementation has since gained an observation/attach-source layer and further refusal kinds not described here).
+4. §7.7: explicit non-affiliation statement added for the `tracefold.dev` product.
+5. End-of-draft line: annotated — the name-check gate is restated by §7.7; formal publication (preprint/DOI, venue) remains author-gated.
+6. Verified unchanged on 2026-08-26 and deliberately **not** edited: workspace crate count (17, re-counted), CI scope 16/17 (re-read from `.github/workflows/ci.yml`), `lean/` file count 13 and `sorry` count 0 (re-run; a same-day recount reads 119 `theorem` declarations against the dated 117 — the dated claim stands as of its date and was not restated), §5.2 floor table (a deliberately pinned M7 snapshot; the live floor stays in `README.md`, currently larger), and the kani BLOCKED-TERMINAL disclosure.
+
+License note: this file's licence line (Apache-2.0) is unchanged in v2.1. A separate document-licence decision for the report itself is pending with the author and is not made here.
+
+---
+
+*End of draft v2.1. Formal publication (preprint, DOI, venue) is gated on the author, and on promoting the citations in §6 from [PB] to [PV]. (v2.1 note: the trademark/registrar clause that stood here in v2 is restated by §7.7 — the repository and name have been in public use since 2026-08-13; the third-party `.dev` collision remains open and unclaimed either way.)*
