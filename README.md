@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold, the inverse is sealed before the action" width="880">
+<a href="https://github.com/TraceFold/tracefold#try-it-yourself"><img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold, the inverse is sealed before the action" width="880"></a>
 
 ### It asks before the changes it can't put back.
 
@@ -400,8 +400,9 @@ description. Silently bounded is the failure this project guards against hardest
 Good first things to pick up: a limit that is true but badly worded, a platform in the
 "not measured" row above, or a self red-team probe that breaks something we believe holds.
 
-Questions and half-formed ideas belong in an issue. There is no chat channel to point at that
-will still be there next month, so this page does not point at one.
+Questions and half-formed ideas belong in an issue, or in [Discord](https://discord.gg/rtvXqYEQzr) if you would rather
+think out loud. The invite above is the one we intend to keep; if you find it expired, that is a
+bug in this page and an issue about it is welcome.
 
 ## Sponsors
 
