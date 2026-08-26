@@ -49,19 +49,79 @@ purpose: `cargo build --workspace`, 64 seconds on that run. Also published as
 
 ## Try it yourself
 
-Not released. There is nothing to install from a registry, so this starts from a clone.
+The CLI is not released. There is no `gx` binary to install from a registry, so running the tool
+starts from a clone. Checking a receipt somebody hands you is a separate question with a shorter
+answer, and that one installs nothing.
 
-**What that costs you today, stated plainly.** You need a Rust toolchain (stable, pinned in
+**In a browser, with nothing installed:** <https://tracefold.github.io/tracefold/verify.html>
+
+Paste or drop in a receipt and the key it should verify against, plus a checkpoint if you were
+given one. The check runs in your tab, on the same WebAssembly build of the same function
+`gx receipt verify --offline` calls, so what comes back is the engine's answer rather than a
+second opinion about it. If you have no receipt yet, four buttons load real files out of the test
+suite. Nothing you paste leaves the page, and you are not asked to take that on trust: the page
+wraps `fetch`, `XMLHttpRequest`, `WebSocket` and `sendBeacon` and prints the running count of
+requests its own code has made, on screen, where it stays at zero. Save the file, disconnect and
+reopen it if you would rather check it that way.
+
+**It answers in three values, not two.** *Verified*, *Refuted*, and a third for a check that did
+not conclude, meaning the signature held but no ledger claim was checked, or this build cannot read
+that receipt. The third is the one worth having. A two-valued verifier must file "I could not read
+this" as either a pass or an accusation, and the command line still collapses it: exit `7` covers
+both a tampered receipt and one too new to parse, and the field that separates them sits in the
+JSON body an exit code cannot carry. The page reads that body, so it does not call a document
+forged when the truth is that it failed to read it.
+
+What the page cannot do is make a receipt. It checks one. Producing one is still the clone below.
+
+**What the clone costs you today, stated plainly.** You need a Rust toolchain (stable, pinned in
 `rust-toolchain.toml`) and roughly a minute of compile time. On Windows the documented path is
 WSL, and a WSL install is not free: the virtual disk grows with the build tree, and on this
 project's own machine it reached hundreds of gigabytes. If that is more than you want to spend
 to check one receipt, that is a reasonable place to stop, and it is the honest state today.
 
-Two routes out of that requirement are being built, and neither is finished, so treat both as
-in progress rather than as a plan you can use. `sdk/wasm-verify/` is the verifier compiled to
-WebAssembly, which is what browser-side checking with no toolchain at all would be built on.
-Prebuilt binaries per platform would remove the compile step. When they land, verification
-becomes the thing you do without installing a compiler; until then it is not, and this page
+**If you write JavaScript, there is a second shipped route.** `@mahirhir/tracefold` is on npm under
+Apache-2.0 and carries that same WebAssembly verifier, so checking a receipt costs a package
+install and six lines, with no Rust toolchain and no WSL. It also talks to a running `gx serve`,
+which the browser page does not.
+
+```sh
+npm i @mahirhir/tracefold
+F=https://raw.githubusercontent.com/TraceFold/tracefold/main/crates/gx-cli/tests/fixtures/attach_face_frozen/issued_2026_08_22
+curl -sO $F/commit_receipt.json -O $F/key.pub.json -O $F/checkpoint.json
+```
+
+```js
+import { readFileSync } from "node:fs";
+import { verifyReceiptOffline } from "@mahirhir/tracefold";
+
+const key = JSON.parse(readFileSync("key.pub.json", "utf8"));
+const result = verifyReceiptOffline(
+  readFileSync("commit_receipt.json", "utf8"),
+  key.key_id,
+  key.public_key,
+  readFileSync("checkpoint.json", "utf8"),
+  key.key_id,
+  key.public_key,
+);
+
+console.log(result.valid, result.checks.inclusion, result.anchor_authenticated);
+// true verified true
+```
+
+It never throws. A bad signature, a wrong key, a malformed document and an argument that is not a
+string all arrive as `{valid: false, error: "..."}`, because whether a receipt is good is an
+answer, not an exception. Drop the last three arguments and you get `valid: false` with
+`inclusion: "unanchored"`, the CLI's own refusal to call a receipt verified when it cannot place
+it in a log.
+
+The module it loads declares exactly one host import, and that import is a table initialiser, so
+there is no socket and no clock inside it. It is 423,910 bytes, sha256 `8f7064b675cc89e5...`, the
+same bytes `sdk/wasm-verify/` builds in this tree. Offline is a property of the artifact you can
+check rather than a promise on this page.
+
+One route is still unfinished: prebuilt binaries would remove the compile step for the CLI itself.
+That has not landed, so treat it as in progress rather than as a plan you can use, and this page
 will not pretend otherwise.
 
 **Signing, when binaries exist.** macOS builds are intended to be codesigned and notarized, so
@@ -188,11 +248,14 @@ with one byte, and get `7`. Nothing else moved, and no service was asked to vouc
 anything. Same recording conditions as above.
 
 > [!IMPORTANT]
-> **Not released.** The names `tracefold` on npm and on crates.io are ours and are taken,
-> but what sits behind both is an empty 0.0.1 placeholder holding the name, published on
-> 12 and 13 August 2026. Installing it gets you nothing. What you can actually run today is
-> a build from source, and nothing above should be read otherwise. The download counters on
-> those pages are mirrors and scanners fetching a new name once: 110 of the 125 npm
+> **Not released, with one exception named here.** The bare names `tracefold` on npm and on
+> crates.io are ours and are taken, but what sits behind both is an empty 0.0.1 placeholder
+> holding the name, published on 12 and 13 August 2026. Installing either gets you nothing.
+> The exception is the scoped `@mahirhir/tracefold` 0.1.0, published 25 August 2026, which is
+> a real package and the one the JavaScript above installs: it verifies receipts and does not
+> contain the engine. There is no released `gx` binary anywhere, the tool itself is still a
+> build from source, and nothing above should be read otherwise. The download counters on the
+> two placeholder pages are mirrors and scanners fetching a new name once: 110 of the 125 npm
 > downloads landed on the day of publication, and the last two days are zero.
 >
 > **Who this is for.** Someone who will later have to show a third party what an agent
