@@ -1,0 +1,33 @@
+name: RFC / Architectural proposal
+description: Propose a substantive change or extension to the calculus, log format, or policy engine.
+labels: ["rfc"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An RFC proposes a structural change to the calculus, the receipt/tile format, or the policy model.
+        Every RFC must state what it deliberately does not solve alongside what it proposes.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem this addresses
+      description: The structural limitation or use case that the current architecture does not handle.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Design
+      description: Concrete types, state transitions, or interface changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals and tradeoffs
+      description: What this proposal deliberately does not solve, and what complexity it introduces.
+    validations:
+      required: true

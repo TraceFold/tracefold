@@ -411,8 +411,7 @@ Open an issue before a large change, and bring a measurement. The rules are shor
 which lowers a count, skips a suite or narrows an assertion has to say so in its own
 description. Silently bounded is the failure this project guards against hardest.
 
-Good first things to pick up: a limit that is true but badly worded, a platform in the
-"not measured" row above, or a self red-team probe that breaks something we believe holds.
+Good first things to pick up: connecting an agent framework via an adapter ([#1](https://github.com/TraceFold/tracefold/issues/1)), Python bindings ([#2](https://github.com/TraceFold/tracefold/issues/2)), a limit that is true but badly worded, or a platform in the "not measured" row above. Open RFCs and adapter proposals sit in [Issues](https://github.com/TraceFold/tracefold/issues).
 
 Questions and half-formed ideas belong in an issue, or in [Discord](https://discord.gg/rtvXqYEQzr) if you would rather
 think out loud. The invite above is the one we intend to keep; if you find it expired, that is a

@@ -1,0 +1,50 @@
+name: Propose an agent framework adapter
+description: Connect pre-commit inverse escrow or receipt verification to a new AI agent framework or harness.
+labels: ["adapter", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tracefold implements pre-commit inverse escrow and offline DSSE receipts for tool mutations.
+        An adapter connects this state machine to an agent harness (e.g. OpenHands, Claude Code hooks, LangGraph, Cline).
+
+  - type: input
+    id: framework
+    attributes:
+      label: Target Framework / Harness
+      description: Name and URL of the agent framework.
+      placeholder: "OpenHands (https://github.com/All-Hands-AI/OpenHands)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: integration_point
+    attributes:
+      label: Integration Surface
+      options:
+        - Tool execution middleware / hook
+        - Worktree / filesystem lifecycle interceptor
+        - Subprocess / CLI wrapper
+        - REST / RPC plugin
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: mechanics
+    attributes:
+      label: Execution Mechanics
+      description: How the target framework executes mutating actions and where the pre-commit inverse can be captured.
+      placeholder: "Before the agent calls `write_file`, the hook computes the reverse patch..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: implementation
+    attributes:
+      label: Who will implement this
+      options:
+        - I am submitting a PR / working on an implementation
+        - I am proposing this for the community / maintainers to pick up
+    validations:
+      required: true
