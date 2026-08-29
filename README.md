@@ -102,6 +102,16 @@ ightarrow$ **Action lands** |
 
 ---
 
+## System Context: Glovrex Digital World (Target Architecture)
+
+TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws)** and the **Receipt & Escrow Substrate (Layer 8: Provenance & Receipt)** within the broader [Glovrex Digital World](https://github.com/Glovrex) computing architecture.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/TraceFold/tracefold/main/assets/glovrex_target_architecture_vision.png" alt="Glovrex Target Architecture Vision" width="100%">
+</div>
+
+---
+
 ## Formal Status & Scope Boundaries
 
 | Dimension | Measured Value | Conditions & Scope |
