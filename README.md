@@ -2,7 +2,11 @@
 
 <a href="https://github.com/TraceFold/tracefold"><img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold" width="900"></a>
 
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=20&pause=1200&color=00DFD8&background=0B0A0900&center=true&vCenter=true&width=650&lines=It+asks+before+the+changes+it+can't+put+back.;Reversibility+is+a+property.+Undo+is+a+feature.;Offline-verifiable+verdicts+with+zero+network+trust." alt="TraceFold Hero" />
+# TraceFold
+
+### It asks before the changes it can't put back.
+
+**Tracefold** holds a checked inverse for an AI agent's change **before** it lands, in Rust. If the inverse cannot be built, the agent stops and the decision escalates to human approval. Every verdict becomes a tamper-evident receipt verifiable offline.
 
 <p>
 <a href="https://www.npmjs.com/package/@mahirhir/tracefold"><img src="https://img.shields.io/badge/npm-SDK%20v0.1-0070f3?style=for-the-badge&logo=npm&logoColor=ffffff" alt="npm SDK"></a>
@@ -70,7 +74,9 @@ console.log(result.valid, result.checks.inclusion); // true "verified"
 
 | Dimension | Traditional Post-Hoc Audit Logs | TraceFold Pre-Fact Provenance |
 | :--- | :--- | :--- |
-| **Execution Order** | Action executes first $ightarrow$ Logged afterwards | Inverse constructed & checked $ightarrow$ **Action lands** |
+| **Execution Order** | Action executes first $
+ightarrow$ Logged afterwards | Inverse constructed & checked $
+ightarrow$ **Action lands** |
 | **Irreversible Damage** | Discovered only after system corruption | **Blocked at the gate**; escalates to human approval |
 | **Verification Trust** | Must trust the host/server that produced the log | **Zero-trust offline verification** via standalone WASM |
 | **Verdict Precision** | Binary (Pass/Fail) conflates errors with attacks | **Tri-state**: `Verified`, `Refuted`, `Unknown/Unparseable` |
