@@ -2,17 +2,15 @@
 
 <a href="https://github.com/TraceFold/tracefold"><img src="https://github.com/TraceFold/tracefold/releases/download/brand-assets/banner.png" alt="Tracefold" width="900"></a>
 
-# TraceFold
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=20&pause=1200&color=00DFD8&background=0B0A0900&center=true&vCenter=true&width=650&lines=It+asks+before+the+changes+it+can't+put+back.;Reversibility+is+a+property.+Undo+is+a+feature.;Offline-verifiable+verdicts+with+zero+network+trust." alt="TraceFold Hero" />
 
-### It asks before the changes it can't put back.
-
-**Tracefold** holds a checked inverse for an AI agent's change **before** it lands, in Rust. If the inverse cannot be built, the agent stops and the decision escalates to human approval. Every verdict becomes a tamper-evident receipt verifiable offline.
-
-[![npm version](https://img.shields.io/npm/v/@mahirhir/tracefold?style=flat-square&color=26231f&label=npm%20SDK)](https://www.npmjs.com/package/@mahirhir/tracefold)
-[![Rust 1.97.1](https://img.shields.io/badge/rust-1.97.1-3a3128?style=flat-square&logo=rust)](rust-toolchain.toml)
-[![Lean 4 Proofs](https://img.shields.io/badge/lean%204-117%20theorems-26231f?style=flat-square)](lean/)
-[![License Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-3a3128?style=flat-square)](LICENSE)
-[![Discord](https://img.shields.io/badge/community-Discord-4a3e31?style=flat-square&logo=discord&logoColor=ece7da)](https://discord.gg/rtvXqYEQzr)
+<p>
+<a href="https://www.npmjs.com/package/@mahirhir/tracefold"><img src="https://img.shields.io/badge/npm-SDK%20v0.1-0070f3?style=for-the-badge&logo=npm&logoColor=ffffff" alt="npm SDK"></a>
+<a href="rust-toolchain.toml"><img src="https://img.shields.io/badge/Rust-1.97.1-7928ca?style=for-the-badge&logo=rust&logoColor=ffffff" alt="Rust 1.97.1"></a>
+<a href="lean/"><img src="https://img.shields.io/badge/Lean%204-117%20Theorems-00dfd8?style=for-the-badge&logoColor=090a0f" alt="Lean 4 Proofs"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-26231f?style=for-the-badge&logoColor=ffffff" alt="License"></a>
+<a href="https://discord.gg/rtvXqYEQzr"><img src="https://img.shields.io/badge/Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=ffffff" alt="Discord"></a>
+</p>
 
 </div>
 
@@ -20,7 +18,14 @@
 
 ## Flip one byte, and the verifier says no
 
-![Verify a receipt, flip one byte, verify again](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.gif)
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 🔴 🟡 🟢  tracefold-demo-session — 10s Verification Probe                   │
+├────────────────────────────────────────────────────────────────────────────┤
+```
+<div align="center">
+<img src="https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.gif" alt="Verify a receipt, flip one byte, verify again" width="100%" />
+</div>
 
 Three files on that terminal: a receipt, a signed checkpoint, a public key. No account, no network call.
 - **Valid receipt**: verifies instantly and exits `0`.
@@ -32,13 +37,19 @@ Three files on that terminal: a receipt, a signed checkpoint, a public key. No a
 
 ## Quickstart
 
-### Route A: In Your Browser (Zero Install, Zero Network)
-Open **<https://tracefold.github.io/tracefold/verify.html>** to paste a receipt and key. Verification runs 100% via in-tab WebAssembly (`fetch` and `sendBeacon` requests remain strictly at 0).
-
-### Route B: TypeScript / Node.js (3 Lines)
-```sh
-npm i @mahirhir/tracefold
-```
+<table width="100%">
+<tr>
+<td width="50%" valign="top">
+<h4>🌐 Route A: In Your Browser (Zero Install)</h4>
+<p>Open <b><a href="https://tracefold.github.io/tracefold/verify.html">tracefold.github.io/tracefold/verify.html</a></b></p>
+<p>Paste a receipt and key. Runs 100% via in-tab WebAssembly (network requests strictly 0).</p>
+</td>
+<td width="50%" valign="top">
+<h4>📦 Route B: Node.js / TypeScript (3 Lines)</h4>
+<pre><code>npm i @mahirhir/tracefold</code></pre>
+</td>
+</tr>
+</table>
 
 ```js
 import { readFileSync } from "node:fs";
@@ -58,6 +69,7 @@ console.log(result.valid, result.checks.inclusion); // true "verified"
 ## Architecture Flow
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#7928ca', 'edgeLabelBackground':'#0d1117', 'tertiaryColor': '#0070f3'}}}%%
 graph LR
   Agent[AI Agent Action] --> Gate{Checked Inverse Handled?}
   Gate -->|Yes: Inverse Sealed| Land[Action Lands + Receipt Issued]
@@ -69,7 +81,7 @@ graph LR
 
 ---
 
-## Formal Status & Measured Status
+## Formal Status & Scope Boundaries
 
 | Dimension | Measured Value | Conditions & Scope |
 | :--- | --: | :--- |
@@ -86,7 +98,7 @@ graph LR
 | **Policies encoding the wrong intent** | Enforced faithfully; intent correctness is external |
 
 <details>
-<summary><b>▶ Expand Environment, Verification & Technical Specifications (100% Lossless)</b></summary>
+<summary><b>▶ Expand Environment, Verification & Technical Specifications</b></summary>
 <br>
 
 - **Formal Technical Report**: Complete mathematical proof and receipt encoding: [docs/TRACEFOLD_TR.md](docs/TRACEFOLD_TR.md).
