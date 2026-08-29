@@ -70,9 +70,7 @@ console.log(result.valid, result.checks.inclusion); // true "verified"
 
 | Dimension | Traditional Post-Hoc Audit Logs | TraceFold Pre-Fact Provenance |
 | :--- | :--- | :--- |
-| **Execution Order** | Action executes first $
-ightarrow$ Logged afterwards | Inverse constructed & checked $
-ightarrow$ **Action lands** |
+| **Execution Order** | Action executes first $ightarrow$ Logged afterwards | Inverse constructed & checked $ightarrow$ **Action lands** |
 | **Irreversible Damage** | Discovered only after system corruption | **Blocked at the gate**; escalates to human approval |
 | **Verification Trust** | Must trust the host/server that produced the log | **Zero-trust offline verification** via standalone WASM |
 | **Verdict Precision** | Binary (Pass/Fail) conflates errors with attacks | **Tri-state**: `Verified`, `Refuted`, `Unknown/Unparseable` |
@@ -81,32 +79,9 @@ ightarrow$ **Action lands** |
 
 ## Architecture Flow
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e1e24', 'primaryTextColor': '#00dfd8', 'primaryBorderColor': '#7928ca', 'lineColor': '#0070f3', 'secondaryColor': '#090a0f', 'tertiaryColor': '#13111c'}}}%%
-flowchart LR
-    subgraph Execution ["Runtime Phase"]
-        A["🤖 Agent Action<br><code>State S(t)</code>"] --> B{"⚡ Deterministic Gate<br><b>Inverse S⁻¹ computable?</b>"}
-    end
-
-    subgraph Decision ["Gate Outcome"]
-        B -->|"✓ YES (Sealed)"| C["🟢 Action Lands<br><code>Receipt Emitted</code>"]
-        B -->|"✕ NO (Halt)"| D["🔴 Agent Halted<br><code>Human Escalation</code>"]
-    end
-
-    subgraph Verification ["Air-Gapped Audit"]
-        C --> E["🔍 Standalone Verifier<br><code>0 Network WASM</code>"]
-        E -->|"Untampered"| F["Exit 0: Verified"]
-        E -->|"1-Byte Diff"| G["Exit 7: Refuted"]
-    end
-
-    classDef default font-family:-apple-system,BlinkMacSystemFont,sans-serif,font-size:12px;
-    classDef gate fill:#1c1326,stroke:#7928ca,stroke-width:2px,color:#ece7da;
-    classDef pass fill:#0f2b1d,stroke:#00dfd8,stroke-width:1.5px,color:#00dfd8;
-    classDef fail fill:#2d1115,stroke:#ff4757,stroke-width:1.5px,color:#ff4757;
-    class B gate;
-    class C,F pass;
-    class D,G fail;
-```
+<div align="center">
+<img src="https://raw.githubusercontent.com/TraceFold/tracefold/main/assets/tracefold_architecture_pipeline.png" alt="TraceFold Architecture Pipeline" width="100%" />
+</div>
 
 ---
 
