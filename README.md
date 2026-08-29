@@ -66,6 +66,19 @@ console.log(result.valid, result.checks.inclusion); // true "verified"
 
 ---
 
+## The Paradigm Shift: Pre-Fact Provenance
+
+| Dimension | Traditional Post-Hoc Audit Logs | TraceFold Pre-Fact Provenance |
+| :--- | :--- | :--- |
+| **Execution Order** | Action executes first $
+ightarrow$ Logged afterwards | Inverse constructed & checked $
+ightarrow$ **Action lands** |
+| **Irreversible Damage** | Discovered only after system corruption | **Blocked at the gate**; escalates to human approval |
+| **Verification Trust** | Must trust the host/server that produced the log | **Zero-trust offline verification** via standalone WASM |
+| **Verdict Precision** | Binary (Pass/Fail) conflates errors with attacks | **Tri-state**: `Verified`, `Refuted`, `Unknown/Unparseable` |
+
+---
+
 ## Architecture Flow
 
 ```mermaid
