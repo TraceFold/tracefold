@@ -79,9 +79,20 @@ console.log(result.valid, result.checks.inclusion); // true "verified"
 
 ## Architecture Flow
 
-<div align="center">
-<img src="https://raw.githubusercontent.com/TraceFold/tracefold/main/assets/tracefold_architecture_pipeline.png" alt="TraceFold Architecture Pipeline" width="100%" />
-</div>
+```text
+[ 01. AI Agent Action ]
+         │
+         ▼
+[ 02. Deterministic Gate ] ──(Cannot build inverse S⁻¹)──► [ 🔴 Halt & Escalate to Human ]
+         │
+    (Inverse S⁻¹ sealed)
+         │
+         ▼
+[ 03. Action Lands & Receipt Issued ]
+         │
+         ▼
+[ 04. Offline WASM Verifier ] ──► Exit 0 (Verified) / Exit 7 (Refuted)
+```
 
 ---
 
