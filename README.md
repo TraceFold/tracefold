@@ -218,8 +218,10 @@ it in a log.
 Exit codes are the contract a script branches on without parsing JSON: `0` valid, `7` does
 not verify or is unanchored, `6` not found, `1` bad input, `2` refused by policy. Full table
 in `crates/gx-cli/src/exit.rs`. The subcommands that exist today: `submit`, `plan`, `verify`,
-`commit`, `undo`, `cancel`, `escalation`, `receipt`, `replay`, `log`, `key`, `policy`,
-`serve`. `gx limits` prints the gaps below at a terminal.
+`commit`, `wrap`, `attach`, `demo`, `limits`, `confine`, `verdict-checkpoint`, `receipt`,
+`log`, `checkpoint`, `key`, `undo`, `cancel`, `escalation`, `policy`, `repair`, `replay`,
+`draft`, `serve` — the list is `enum Command` in `crates/gx-cli/src/main.rs`, minus one
+hidden internal helper. `gx limits` prints the gaps below at a terminal.
 
 **Free forever for one person.** Receipt generation, offline verification and self-hosting
 are unlimited and unexpiring for a single person using this alone, which is a promise rather
@@ -294,7 +296,7 @@ anything. Same recording conditions as above.
 
 | | measured | under what conditions |
 |:--|--:|:--|
-| Test floor | **2,602** | probes across 454 suites, plus the SDK's 36 passed / 0 failed / 7 skipped. Frozen harness, fresh clone, one machine, single run, 25 August 2026. This floor has moved more than forty times in a month; it moves with every repair round |
+| Test floor | **2,639** | probes across 464 suites, plus the SDK's 36 passed / 0 failed / 7 skipped. The SDK line and the fresh-clone conditions are 25 August 2026's frozen-harness run; the probe and suite counts are 26 August 2026's, reconstructed from the tree by `floor_doubt` f1 rather than re-measured on a fresh clone, and the two halves are dated separately because they were taken separately. This floor has moved more than forty times in a month; it moves with every repair round |
 | Machine-checked | **117** | theorems in Lean, 12 of them counterexamples, out of 118 line-initial declarations. The remaining one is an `axiom`, a statement assumed rather than proved, and it is named in the report. No `sorry`, the keyword standing in for a proof nobody wrote, so there are none. Proof rather than bounded model checking: nothing here is true only up to a scope · re-counted on a fresh clone 26 August 2026 |
 | Open holes | **0** | high severity, open as of 25 August 2026, counted as accepted findings whose repair has not been accepted. This number was 3, then 0, then 1, then 0 again inside a week, so read a zero here as the state of one afternoon rather than a property of the system. Forty-four adversarial rounds have landed, plus independent B-band and S(1) audits, all at zero as recorded |
 | Not measured | **3** | Windows native, OneDrive, SMB. Zero runs out of the three, as of 25 August 2026 |
@@ -336,9 +338,14 @@ claims to restore. Or land a change through the gate that leaves no receipt. Bot
 checkable by someone who does not trust us, which is the point; if you find either, open an
 issue and it will be recorded here whatever it costs us.
 
-**Deliberately absent:** no build badge, because continuous integration is switched off and a
-green tick would be a lie. No download counts, no star totals; neither measures whether the
-thing works.
+**Deliberately absent:** no build badge, and the honest reason is worse than not having one.
+`ci.yml` is configured to run on every push, but no job has actually started since
+2026-08-15: GitHub rejects them before execution with "recent account payments have failed
+or your spending limit needs to be increased". The runs last two to five seconds and produce
+no logs. So there is no signal here at all -- not a green one, not a red one -- for the 2,245
+commits since. `cargo check --workspace --all-targets` passes locally, which is a person's
+run, not a machine's. No download counts, no star totals; neither measures whether the thing
+works.
 
 ## What it does
 
@@ -411,7 +418,12 @@ Open an issue before a large change, and bring a measurement. The rules are shor
 which lowers a count, skips a suite or narrows an assertion has to say so in its own
 description. Silently bounded is the failure this project guards against hardest.
 
-Good first things to pick up: connecting an agent framework via an adapter ([#1](https://github.com/TraceFold/tracefold/issues/1)), Python bindings ([#2](https://github.com/TraceFold/tracefold/issues/2)), a limit that is true but badly worded, or a platform in the "not measured" row above. Open RFCs and adapter proposals sit in [Issues](https://github.com/TraceFold/tracefold/issues).
+Good first things to pick up: connecting an agent framework via an adapter
+([#1](https://github.com/TraceFold/tracefold/issues/1)), Python bindings
+([#2](https://github.com/TraceFold/tracefold/issues/2)), a limit that is true but badly
+worded, a platform in the "not measured" row above, or a self red-team probe that breaks
+something we believe holds. Open RFCs and adapter proposals sit in
+[Issues](https://github.com/TraceFold/tracefold/issues).
 
 Questions and half-formed ideas belong in an issue, or in [Discord](https://discord.gg/rtvXqYEQzr) if you would rather
 think out loud. The invite above is the one we intend to keep; if you find it expired, that is a
