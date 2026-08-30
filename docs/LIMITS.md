@@ -121,6 +121,29 @@ the source rather than restating this page's own authority.
    > macOS runners) was run separately and is not what this note is about; it does not change what
    > the live sentence above says about the public, continuously-running gate itself.
 
+   > 🔴 **2026-08-31 correction, in three parts** (`req/921_artifacts/paper/rerun_2026-08-31.md`
+   > divergence D4; `req/00-LOOP_STATE_2026-08-18.md`, 2026-08-30 heading; `req/909`). The B8
+   > correction directly above is itself now stale in three ways, and this is the paragraph whose
+   > whole job is disclosing a weakness, so a stale word here costs more than a stale word
+   > elsewhere.
+   >
+   > *The elapsed figures moved again.* Recounted 2026-08-31T04:45 local against the same
+   > starting point: **15 days**, and **2,496 commits** on one count -- moving between counts
+   > taken minutes apart because other work lands on this branch continuously, so read the commit
+   > figure as approximate rather than exact.
+   >
+   > *The premise above was withdrawn.* The B8 correction reads as an outage awaiting payment. It
+   > is not: on 2026-08-30 the decision was recorded that restoring the paid service is **not
+   > required**, and that the locally-run substitute is the standing arrangement, not a stopgap
+   > (`req/00-LOOP_STATE_2026-08-18.md`, 2026-08-30 heading). Every condition that read "blocked
+   > until CI returns" now reads "met locally".
+   >
+   > *"No machine signal" needs its scope.* That phrase is true of the public, continuously-running
+   > gate, which is what the surrounding sentence is about. It is not true without qualification:
+   > a local substitute ran on 2026-08-29 and produced real signal, including **two red stages**
+   > (`req/909`). Writing "no signal" where the accurate statement is "no *public, continuous*
+   > signal" hides two failures inside a sentence whose whole job is to disclose weakness.
+
    > v0.4-l (2026-08-15, `req/189` H-13 -- three faces, req/38 §120): **theory** = eight Lean
    > theorems + five counterexamples, kernel-checked; **mechanised, not proven** = the Rust <->
    > Lean differential test (1,500 vectors, six kinds, every push -- a comparison finds
