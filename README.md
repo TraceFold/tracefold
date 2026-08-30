@@ -4,9 +4,12 @@
 
 # TraceFold
 
-### It asks before the changes it can't put back.
+**AI agents should not make irreversible changes.**
+**TraceFold escrows the inverse before an effect lands — or refuses the effect — and issues receipts anyone can verify offline.**
 
-**Tracefold** holds a checked inverse for an AI agent's change **before** it lands, in Rust. If the inverse cannot be built, the agent stops and the decision escalates to human approval. Every verdict becomes a tamper-evident receipt verifiable offline.
+Not an observability tool. It sits before the effect.
+
+See the Scope Exclusions table below and [docs/LIMITS.md](docs/LIMITS.md) for what this does not cover.
 
 <p>
 <a href="https://doi.org/10.5281/zenodo.22168558"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22168558-00dfd8?style=for-the-badge&logo=doi&logoColor=090a0f" alt="Zenodo DOI"></a>

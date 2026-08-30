@@ -14,6 +14,7 @@
       "get_attach_sources": { "tag": "undesigned", "note": "attach-source registry (req/824 A4, crate commit 16863593, absorbed req/822_c6); no face is built" },
       "post_attach_sources": { "tag": "undesigned", "note": "as above; and the membrane's body-less idempotency key would collide two different register bodies -- named in route-table.json's idempotency_source before any face may consume this" },
       "get_attach_sources_id": { "tag": "undesigned", "note": "attach-source registry; no face is built" },
+      "post_attach_sources_id_observations": { "tag": "undesigned", "note": "observation ingest (req/824 A5); no face is built" },
       "post_candidates": { "tag": "undesigned", "note": "no face proposes a change yet" },
       "get_candidates_id": { "tag": "undesigned", "note": "no face is built" },
       "post_candidates_id_verify": { "tag": "undesigned", "note": "asking twice is not ruled on; whether a second verify is a new question is open" },

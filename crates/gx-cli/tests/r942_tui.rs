@@ -30,12 +30,12 @@ use std::time::Instant;
 
 use gx_cli::tui::acts::{self, Act, View};
 use gx_cli::tui::layout::{
-    self, Priority, Recoverable, RegionRole, LAYOUT_ROLES, LEDGER_ADDRESS, LEDGER_COLUMNS,
-    LEDGER_PAGE_KEYS, NO_ADDRESS_PHRASE, REGIONS,
+    self, LAYOUT_ROLES, LEDGER_ADDRESS, LEDGER_COLUMNS, LEDGER_PAGE_KEYS, NO_ADDRESS_PHRASE,
+    Priority, REGIONS, Recoverable, RegionRole,
 };
 use gx_cli::tui::renderer::{self, Tier};
 use gx_cli::tui::tokens;
-use gx_cli::tui::wire::{self, Coverage, Nothing, Screen, NOTHING_COVERAGE};
+use gx_cli::tui::wire::{self, Coverage, NOTHING_COVERAGE, Nothing, Screen};
 
 // ---------------------------------------------------------------------------------------------
 // A server made of canned answers, and a record of what it was actually asked.
@@ -1854,7 +1854,13 @@ fn g16_every_role_takes_the_value_it_was_declared_to_take() {
     use gx_cli::tui::tokens::{Role, Token};
 
     /// The map, spelled. Sorted the way `tokens::ROLES` is, so the two can be read side by side.
-    const DECLARED: [(Role, Token); 14] = [
+    ///
+    /// 🔴 **Fifteenth pair added 2026-08-31 by `req/38` SS974 queue row Q4** — the ruling that gave
+    /// an empty string a word of its own. The fourteen above it are untouched: a pin grows by a row
+    /// when the declaration grows by a role, and the gate refusing to run until it does is the whole
+    /// mechanism. This one landed red first (`DECLARED.len()` 14 against fifteen roles) and the red
+    /// is what asked for this line.
+    const DECLARED: [(Role, Token); 15] = [
         (Role::Head, Token::Accent),
         (Role::Quiet, Token::Thin),
         (Role::Body, Token::Plain),
@@ -1865,6 +1871,7 @@ fn g16_every_role_takes_the_value_it_was_declared_to_take() {
         (Role::MarkFalse, Token::Thin),
         (Role::MarkZero, Token::Plain),
         (Role::MarkDeleted, Token::Refuse),
+        (Role::MarkEmpty, Token::Thin),
         (Role::VerdictAdmit, Token::Affirm),
         (Role::VerdictDeny, Token::Refuse),
         (Role::VerdictEscalate, Token::Accent),
@@ -1918,6 +1925,16 @@ fn g16_every_role_takes_the_value_it_was_declared_to_take() {
         Role::MarkDeleted.token(),
         Role::MarkAbsent.token(),
         "🔴 g16: a line that was written and struck is not a line that was never written"
+    );
+    // 🔴 The reason `req/38` SS974 row Q4 exists, one rung below the symbol. Repairing `cell` and
+    // then giving the new mark `mark.zero`'s appearance would have moved the collapse rather than
+    // removed it: two marks that differ only in their glyph are one mark to a reader scanning a
+    // column.
+    assert_ne!(
+        Role::MarkEmpty.token(),
+        Role::MarkZero.token(),
+        "🔴 g16: a value that arrived with nothing in it is not a count of nought, and the two are \
+         told apart in the appearance as well as in the symbol"
     );
     assert_ne!(
         Role::VerdictNone.token(),
@@ -2298,4 +2315,820 @@ fn p15_the_apparatus_head_is_wrapped_and_never_silently_clipped() {
              {narrow}"
         );
     }
+}
+
+// =============================================================================================
+// `req/38` SS974 — the three rows this lane was sent for: the subscription the round-2 audit
+// named as this face's one gap against the browser (`Rust BEHIND: RT`), the queue row Q4
+// collapse inside the classifier that exists to refuse collapses, and the reducer that
+// disagreed with the screen about what opening means.
+// =============================================================================================
+
+use gx_cli::tui::live::{self, Link, LinkReport, Pulse};
+
+/// A subscription report to draw with, spelled in one place so a probe does not become a second
+/// declaration of what one looks like.
+fn report(link: Link, events: u64, reconnects: u64) -> LinkReport {
+    LinkReport {
+        link,
+        events,
+        unreadable: 0,
+        reconnects,
+    }
+}
+
+/// An `std::io` result of the shape a socket read produces.
+fn read_error(kind: std::io::ErrorKind) -> std::io::Result<usize> {
+    Err(std::io::Error::new(kind, "a read window that passed"))
+}
+
+// ---------------------------------------------------------------------------------------------
+// g19 / P16 — the subscription. Four states, and the one of them that must never wear `zero`.
+// ---------------------------------------------------------------------------------------------
+
+/// 🔴 **The gate the round-2 audit asked for by name.** `req/38` SS971 recorded the one place this
+/// face was behind the browser one: `Rust BEHIND = RT purchase, no equivalent of the browser's g14`.
+/// The browser face's version measures that the subscription's declaration is complete and that its
+/// four states are four. This is the same question asked of this face's own declaration.
+///
+/// The load-bearing half is the third block. A subscription that has fallen over does not know
+/// whether the ledger is moving, so it wears `unknown`; drawing `zero` there would say *nothing is
+/// happening* about a question this process can no longer ask. That collapse is the one this
+/// product exists to refuse, and a face that committed it in its own status line would be refuting
+/// its own first principle on screen.
+#[test]
+fn g19_the_subscription_declares_four_states_and_closed_never_wears_zero() {
+    // 1. Four states, named once each.
+    let names: BTreeSet<&str> = live::LINKS.iter().map(|link| link.name()).collect();
+    println!("G19_STATES={names:?}");
+    assert_eq!(live::LINKS.len(), 4, "the declared set is four states");
+    assert_eq!(
+        names.len(),
+        live::LINKS.len(),
+        "🔴 g19: a state is declared twice: {names:?}"
+    );
+
+    // 2. Four marks, all different from each other. Four states drawn with three marks is three
+    //    states with a footnote.
+    let marks: BTreeSet<&str> = live::LINKS.iter().map(|link| link.mark()).collect();
+    println!("G19_MARKS={marks:?}");
+    assert_eq!(
+        marks.len(),
+        live::LINKS.len(),
+        "🔴 g19: two of the four states of the connection are drawn the same: {marks:?}"
+    );
+
+    // 3. 🔴 The one that matters. `closed` is `unknown`, and no state anywhere in the map resolves
+    //    to `zero`.
+    assert_eq!(
+        Link::Closed.nothing(),
+        Some(Nothing::Unknown),
+        "🔴 g19: a dropped subscription does not know what has happened since it dropped"
+    );
+    let zeroed: Vec<&str> = live::LINKS
+        .iter()
+        .filter(|link| link.nothing() == Some(Nothing::Zero))
+        .map(|link| link.name())
+        .collect();
+    assert!(
+        zeroed.is_empty(),
+        "🔴 g19: {zeroed:?} would be drawn with the mark for a count of nought. `no events have \
+         arrived` is a measurement and this state cannot make it: the answer is that nothing can \
+         be measured, which is a different word"
+    );
+    assert_ne!(
+        Link::Closed.mark(),
+        Nothing::Zero.mark(),
+        "🔴 g19: the symbol layer, checked separately from the map above it"
+    );
+
+    // 4. `open` is not a kind of nothing, and the mark it therefore needs collides with none of the
+    //    seven words that are.
+    assert_eq!(
+        Link::Open.nothing(),
+        None,
+        "🔴 g19: being connected is not an absence, so it does not borrow one of the words for one"
+    );
+    let words: BTreeSet<&str> = Nothing::ALL.into_iter().map(Nothing::mark).collect();
+    assert!(
+        !words.contains(live::OPEN_MARK),
+        "🔴 g19: {} is already the mark for one of the kinds of nothing, so a connection that is up \
+         would be drawn as an absence: {words:?}",
+        live::OPEN_MARK
+    );
+    // The budget P6 measures over a frame, asserted here over the declaration so that a mark chosen
+    // outside it is a red gate rather than a box on somebody's terminal.
+    assert!(
+        live::OPEN_MARK.chars().all(|c| (' '..='~').contains(&c)),
+        "🔴 g19: {:?} leaves the declared codepoint budget",
+        live::OPEN_MARK
+    );
+
+    // 5. The three states that **are** absences borrow the wire's vocabulary rather than spelling a
+    //    second one. A parallel table of marks drifts from the first the day either is edited, and
+    //    it drifts silently, because nothing compares them.
+    for link in live::LINKS {
+        if let Some(nothing) = link.nothing() {
+            assert_eq!(
+                link.mark(),
+                nothing.mark(),
+                "🔴 g19: {} spells its own mark instead of taking {}'s, which is a second vocabulary \
+                 of absence",
+                link.name(),
+                nothing.word()
+            );
+        }
+    }
+
+    // 6. One sentence per state. A single sentence covering four states is where two of them go.
+    let sentences: BTreeSet<&str> = live::LINKS.iter().map(|link| link.sentence()).collect();
+    assert_eq!(
+        sentences.len(),
+        live::LINKS.len(),
+        "🔴 g19: two states say the same sentence: {sentences:?}"
+    );
+
+    // 7. 🔴 What an event is allowed to do, as a word something can read. `apply` here would mean the
+    //    stream had become a second source of truth beside the four routes.
+    assert_eq!(
+        live::ON_EVENT,
+        "reread",
+        "🔴 g19: an event says `go and look again`. Any other word here is a second thing on this \
+         machine that claims to know what is true"
+    );
+
+    // 8. The wake is what notices that the debounce has expired, so it has to be shorter than it.
+    assert!(
+        renderer::WAKE < live::DEBOUNCE,
+        "🔴 g19: the loop wakes every {:?} and the debounce is {:?}, so the debounce is really the \
+         wake's period",
+        renderer::WAKE,
+        live::DEBOUNCE
+    );
+
+    // 9. 🔴 A read that returns nothing is not a disconnection. Measured against the live engine on
+    //    `:8842`, which replays its history in one burst and then says nothing for as long as the
+    //    connection is held; a classifier that read that silence as a close would report a broken
+    //    engine twice a second.
+    assert_eq!(live::pulse(&Ok(0)), Pulse::Ended);
+    assert_eq!(live::pulse(&Ok(7)), Pulse::Bytes(7));
+    for kind in [
+        std::io::ErrorKind::WouldBlock,
+        std::io::ErrorKind::TimedOut,
+        std::io::ErrorKind::Interrupted,
+    ] {
+        assert_eq!(
+            live::pulse(&read_error(kind)),
+            Pulse::Idle,
+            "🔴 g19: {kind:?} is how a read timeout arrives, and it means the window passed"
+        );
+    }
+    assert_eq!(
+        live::pulse(&read_error(std::io::ErrorKind::ConnectionReset)),
+        Pulse::Ended
+    );
+
+    // 10. The route, spelled the way the wire spells it rather than the way the specification does.
+    assert!(
+        live::STREAM_ROUTE.starts_with("/v1/"),
+        "🔴 g19: 44 §2.2 spells the stream `/stream` because it is declared inside the `/v1` nest. \
+         Asking the running engine for `/stream` answers 404. {} is what the socket wants",
+        live::STREAM_ROUTE
+    );
+}
+
+/// The four states, on the screen rather than in the declaration — at every width this face can be
+/// drawn at.
+///
+/// 🔴 The property is that **the mark is never the thing that falls off the edge**. A terminal cuts
+/// from the right, and the provenance region gets exactly one row, so anything at the front of that
+/// row survives every width. That is why the connection's mark leads the line and its counts trail
+/// it: at a width where something has to go, the thing that goes is the count and not the state.
+#[test]
+fn g19b_the_state_of_the_connection_is_told_apart_at_every_width() {
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    let mut cut: Vec<(u16, &str)> = Vec::new();
+    for width in 20u16..=200 {
+        for link in live::LINKS {
+            let measured = renderer::measured_with_link(&screen, report(link, 14, 2));
+            let plan = gx_cli::tui::layout::resolve(width, 24, &measured, false);
+            assert!(
+                plan.provenance.starts_with(link.mark()),
+                "🔴 g19b: at {width} cells the provenance line for {} is {:?}, which does not lead \
+                 with the mark. The mark leading is the whole of why the state survives a narrow \
+                 screen",
+                link.name(),
+                plan.provenance
+            );
+            // The ladder's contract: the line fits the row it was given, or it is the shortest rung
+            // there is and the screen has nothing smaller to fall back to.
+            let fits = gx_cli::tui::layout::rows_needed(&plan.provenance, width) <= 1;
+            if !fits && plan.provenance != measured.bare() {
+                cut.push((width, link.name()));
+            }
+        }
+    }
+    assert!(
+        cut.is_empty(),
+        "🔴 g19b: the provenance line was cut at a width where a shorter rung was available: \
+         {cut:?}"
+    );
+
+    // And on a real buffer, through the same `draw` a live frame goes through.
+    for width in [40u16, 80, 140] {
+        let mut drawn: BTreeSet<String> = BTreeSet::new();
+        for link in live::LINKS {
+            drawn.insert(renderer::buffer_text(&renderer::render_live_to_buffer(
+                &screen,
+                width,
+                24,
+                Tier::Mono,
+                false,
+                &View::default(),
+                report(link, 14, 2),
+            )));
+        }
+        assert_eq!(
+            drawn.len(),
+            live::LINKS.len(),
+            "🔴 g19b: at {width} cells two of the four states of the connection draw the same frame"
+        );
+    }
+
+    // The words, at a width that carries them. Four states, four sentences on screen.
+    for link in live::LINKS {
+        let report = report(link, 14, 2);
+        let text = renderer::buffer_text(&renderer::render_live_to_buffer(
+            &screen,
+            160,
+            24,
+            Tier::Mono,
+            false,
+            &View::default(),
+            report,
+        ));
+        println!("G19B {} ---\n{text}", link.name());
+        assert!(
+            flat(&text).contains(&report.long()),
+            "🔴 g19b: {} says {:?} and the screen does not carry it:\n{text}",
+            link.name(),
+            report.long()
+        );
+    }
+
+    // 🔴 The negative half of the load-bearing claim, on the frame rather than in the table: a
+    // closed connection draws `14 events` nowhere, because it does not know.
+    let closed = flat(&renderer::buffer_text(&renderer::render_live_to_buffer(
+        &screen,
+        160,
+        24,
+        Tier::Mono,
+        false,
+        &View::default(),
+        report(Link::Closed, 14, 2),
+    )));
+    assert!(
+        closed.contains("closed after 14 events, 2 reconnects"),
+        "🔴 g19b: the closed frame does not say what it counted before it closed: {closed}"
+    );
+    assert!(
+        !closed.contains("| 14 events"),
+        "🔴 g19b: a closed connection is reporting a live count: {closed}"
+    );
+}
+
+/// 🔴 The plants. Every claim g19 makes, made again against a declaration with the defect in it, so
+/// that the green above is a measurement rather than a comparison that cannot fail.
+#[test]
+fn p16_plant_the_collapses_the_subscription_exists_to_refuse() {
+    // (a) `closed` wearing the mark for a count of nought. Written as a predicate over a map, so the
+    //     check is the one g19 runs rather than a second one that resembles it.
+    fn honest(map: impl Fn(Link) -> Option<Nothing>) -> bool {
+        map(Link::Closed) != Some(Nothing::Zero)
+    }
+    assert!(
+        honest(Link::nothing),
+        "the shipped map fails the predicate its own plant is measured against"
+    );
+    let planted = |link: Link| {
+        if link == Link::Closed {
+            Some(Nothing::Zero)
+        } else {
+            link.nothing()
+        }
+    };
+    assert!(
+        !honest(planted),
+        "🔴 P16(a): the predicate did not fire on a map that draws a dropped subscription as `no \
+         events`. A gate that cannot refuse the defect is not watching it"
+    );
+
+    // (b) the mark for `open` colliding with one of the seven words for nothing.
+    fn is_new(mark: &str) -> bool {
+        !Nothing::ALL
+            .into_iter()
+            .any(|nothing| nothing.mark() == mark)
+    }
+    assert!(is_new(live::OPEN_MARK));
+    assert!(
+        !is_new(Nothing::Zero.mark()),
+        "🔴 P16(b): the collision check does not detect a collision"
+    );
+    assert!(!is_new(Nothing::Unknown.mark()));
+
+    // (c) a classifier that reads a read timeout as a close — the defect measured on the browser
+    //     face, where one timeout meant for a list read was applied to a subscription and the
+    //     subscription reported a broken engine every six seconds.
+    fn as_a_close(result: &std::io::Result<usize>) -> Pulse {
+        match result {
+            Ok(0) | Err(_) => Pulse::Ended,
+            Ok(count) => Pulse::Bytes(*count),
+        }
+    }
+    let window = read_error(std::io::ErrorKind::WouldBlock);
+    assert_eq!(as_a_close(&window), Pulse::Ended);
+    assert_ne!(
+        live::pulse(&window),
+        as_a_close(&window),
+        "🔴 P16(c): the shipped classifier and the planted one agree, so the plant is planting \
+         nothing and the arm above proves nothing"
+    );
+    assert_eq!(live::pulse(&window), Pulse::Idle);
+}
+
+/// 🔴 The framing, at every boundary a socket can put one at.
+///
+/// Measured first, then written: `GET /v1/stream` answers `application/x-ndjson` **and**
+/// `transfer-encoding: chunked`, so there are two layers of framing between the bytes and an event,
+/// and neither layer's boundaries line up with a `read`. An implementation that dropped a line
+/// straddling a boundary would pass almost every test and lose events in the field at a rate nobody
+/// could reproduce — the worst schedule a defect can have — so the split is swept rather than
+/// sampled.
+#[test]
+fn p17_no_event_is_lost_at_a_chunk_or_a_line_boundary() {
+    let events = [
+        r#"{"event":"candidate.created","cursor":"f39cc060"}"#,
+        r#"{"event":"verdict.issued","cursor":"dad64121"}"#,
+        r#"{"event":"committed","cursor":"ce730181"}"#,
+    ];
+    let expected: Vec<String> = events.iter().map(|event| (*event).to_string()).collect();
+
+    // The framing the engine actually produces: one chunk per line, then the zero chunk.
+    let mut sent: Vec<u8> = Vec::new();
+    for event in events {
+        let payload = format!("{event}\n");
+        sent.extend_from_slice(format!("{:X}\r\n", payload.len()).as_bytes());
+        sent.extend_from_slice(payload.as_bytes());
+        sent.extend_from_slice(b"\r\n");
+    }
+    sent.extend_from_slice(b"0\r\n\r\n");
+
+    // Every split, one at a time.
+    for split in 0..=sent.len() {
+        let mut frames = live::Frames::chunked();
+        let mut lines: Vec<String> = Vec::new();
+        for part in [&sent[..split], &sent[split..]] {
+            for line in frames.push(part) {
+                lines.push(String::from_utf8(line).expect("the fixture is text"));
+            }
+        }
+        assert_eq!(
+            lines,
+            expected,
+            "🔴 P17: split at byte {split} of {} loses or invents a line",
+            sent.len()
+        );
+        assert_eq!(
+            frames.partial(),
+            0,
+            "🔴 P17: bytes stranded at split {split}"
+        );
+        assert!(frames.finished(), "🔴 P17: the zero chunk was not read");
+    }
+
+    // One byte at a time, which is the worst a socket can do.
+    let mut frames = live::Frames::chunked();
+    let mut lines: Vec<String> = Vec::new();
+    for byte in &sent {
+        let one = [*byte];
+        for line in frames.push(&one) {
+            lines.push(String::from_utf8(line).expect("the fixture is text"));
+        }
+    }
+    println!("P17_BYTEWISE={}", lines.len());
+    assert_eq!(lines, expected, "🔴 P17: a byte at a time loses a line");
+
+    // 🔴 One line spread over two chunks. The engine does not currently frame it this way, which is
+    // exactly why a reader is not allowed to assume it will not: a proxy in front of the engine is
+    // enough to change it, and the change would be invisible until events went missing.
+    let whole = format!("{}\n", events[0]);
+    let (head, tail) = whole.split_at(11);
+    let mut straddled: Vec<u8> = Vec::new();
+    for part in [head, tail] {
+        straddled.extend_from_slice(format!("{:X}\r\n", part.len()).as_bytes());
+        straddled.extend_from_slice(part.as_bytes());
+        straddled.extend_from_slice(b"\r\n");
+    }
+    straddled.extend_from_slice(b"0\r\n\r\n");
+    let mut frames = live::Frames::chunked();
+    let straddling: Vec<String> = frames
+        .push(&straddled)
+        .into_iter()
+        .map(|line| String::from_utf8(line).expect("the fixture is text"))
+        .collect();
+    assert_eq!(
+        straddling,
+        vec![events[0].to_string()],
+        "🔴 P17: a line split across two chunks did not come back whole"
+    );
+
+    // A body with no transfer encoding, because the encoding is read off the headers rather than
+    // assumed — and a body that ends in the middle of a line, which is counted and not dropped.
+    let mut frames = live::Frames::plain();
+    let lines = frames.push(b"{\"event\":\"a\"}\n{\"event\":\"b\"");
+    assert_eq!(lines.len(), 1, "🔴 P17: the plain reader lost a whole line");
+    assert!(
+        frames.partial() > 0,
+        "🔴 P17: the half of a line that arrived is being treated as though it never arrived, which \
+         is the lie `nothing came`"
+    );
+}
+
+/// 🔴 An event cannot write a row, measured over the source rather than promised in a paragraph.
+///
+/// The subscription hands the rest of the face a state and a boolean; no field of an event body
+/// crosses that boundary. So **no module of this face spells the name of one** — and that is a
+/// property a scan can check, which a sentence about intent is not. The day somebody reaches into
+/// `data` to save a read, this gate goes red before the second source of truth exists.
+#[test]
+fn p19_no_module_of_this_face_names_a_field_of_an_event() {
+    // The keys the engine's own events carry, read off `GET /v1/stream` against the running engine
+    // on 2026-08-31 rather than out of a document.
+    let needles: Vec<(&'static str, u8)> = vec![
+        ("candidate.created", 1),
+        ("verdict.issued", 1),
+        ("canonicalized", 1),
+        ("intent_digest", 1),
+        ("proof_digest", 1),
+        ("ledger_index", 1),
+    ];
+    let findings = scan(&tui_dir(), &[], &needles);
+    println!("P19_FINDINGS={findings:?}");
+    assert!(
+        findings.is_empty(),
+        "🔴 P19: this face names a field of an event body. An event says `look again` and nothing \
+         else; a face that reads one is a second thing on this machine that claims to know what is \
+         true, and the two disagree the first time a message is missed: {findings:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// g20 / P18 — `req/38` SS974 queue row Q4. The collapse inside the classifier that refuses
+// collapses.
+// ---------------------------------------------------------------------------------------------
+
+/// 🔴 **The defect SS974 recorded by name.** `wire::cell` answered `zero` for an empty string, so a
+/// value the engine carried as `""` was drawn with the mark that means *a count of nought* — the
+/// same rounding the six words exist to prevent, committed by the function whose whole job is to
+/// prevent it.
+///
+/// The repair is a seventh word rather than a `Cell::Value("")`, because drawing an empty string as
+/// empty space is the other collapse: a blank cell and a cell that was never carried look identical.
+#[test]
+fn g20_an_empty_string_is_not_a_count_of_nought() {
+    let object: serde_json::Value = serde_json::from_str(
+        r#"{"empty_text":"","text":"x","count":0,"empty_list":[],"empty_object":{},"null_valued":null,"no":false}"#,
+    )
+    .expect("fixture parses");
+
+    assert_eq!(
+        wire::cell(&object, "empty_text"),
+        wire::Cell::Nothing(Nothing::Empty),
+        "🔴 g20: the wire carried the key and what it carried has no characters. That is not a count"
+    );
+    // 🔴 The other half, so this gate cannot be satisfied by deleting `zero` from the vocabulary: a
+    // genuine count of nought still reads `0`.
+    assert_eq!(
+        wire::cell(&object, "count"),
+        wire::Cell::Nothing(Nothing::Zero),
+        "🔴 g20: a real zero has to survive the repair"
+    );
+    // 🔴 The declared range of the repair, asserted so that the range is a decision rather than a
+    // thing nobody looked at. `[]` is nought items and `{}` is nought members; both of those are
+    // counts, and the string is the one container with nothing to count.
+    assert_eq!(
+        wire::cell(&object, "empty_list"),
+        wire::Cell::Nothing(Nothing::Zero)
+    );
+    assert_eq!(
+        wire::cell(&object, "empty_object"),
+        wire::Cell::Nothing(Nothing::Zero)
+    );
+    // The neighbours the repair must not have disturbed.
+    assert_eq!(
+        wire::cell(&object, "null_valued"),
+        wire::Cell::Nothing(Nothing::Unknown)
+    );
+    assert_eq!(
+        wire::cell(&object, "no"),
+        wire::Cell::Nothing(Nothing::False)
+    );
+    assert_eq!(
+        wire::cell(&object, "missing"),
+        wire::Cell::Nothing(Nothing::Absent)
+    );
+    assert_eq!(
+        wire::cell(&object, "text"),
+        wire::Cell::Value("x".to_string())
+    );
+
+    // Told apart at the symbol layer and one rung below it.
+    assert_ne!(Nothing::Empty.mark(), Nothing::Zero.mark());
+    assert_ne!(Nothing::Empty.role(), Nothing::Zero.role());
+    assert!(
+        Nothing::Empty
+            .mark()
+            .chars()
+            .all(|c| (' '..='~').contains(&c))
+    );
+    println!(
+        "G20_MARK={:?} G20_WORDS={}",
+        Nothing::Empty.mark(),
+        Nothing::ALL.len()
+    );
+    // The vocabulary grew by one and every gate that sweeps it grew with it.
+    assert_eq!(Nothing::ALL.len(), 7);
+    assert_eq!(NOTHING_COVERAGE.len(), Nothing::ALL.len());
+
+    // 🔴 The negative control: the classifier as it was, run over the same value. It has to disagree
+    // with the shipped one on exactly this case, or the assertion at the top of this test is not
+    // measuring a repair.
+    let before = |value: &serde_json::Value| -> Option<Nothing> {
+        match value {
+            serde_json::Value::String(text) if text.is_empty() => Some(Nothing::Zero),
+            _ => None,
+        }
+    };
+    let empty = object.get("empty_text").expect("the fixture carries it");
+    assert_eq!(before(empty), Some(Nothing::Zero));
+    assert_ne!(
+        wire::cell(&object, "empty_text"),
+        wire::Cell::Nothing(before(empty).expect("the planted answer")),
+        "🔴 g20: the shipped classifier still answers what the pre-repair one answered"
+    );
+
+    // 🔴 **What this repair is, stated once and measured rather than described.**
+    //
+    // `cell` is a map from the values the wire can carry onto a vocabulary, so it induces a
+    // partition of those values — two values are in the same class when they are drawn the same.
+    // Adding a word makes that partition **strictly finer**: the new map separates a pair the old
+    // one merged, and it merges **no** pair the old one separated. One-directional refinement is
+    // exactly what distinguishes a repair from a trade, and it is checkable.
+    //
+    // The old classifier is written here as the new one with the two classes glued back together
+    // (`Empty` read as `Zero`) rather than as a second hand-written `match`, because a
+    // re-implementation would be measuring this test's memory of the old code instead of the old
+    // code. Gluing two classes of a partition is precisely the coarsening being undone.
+    let classes: Vec<serde_json::Value> =
+        serde_json::from_str(r#"["", "x", " ", 0, 1, [], [1], {}, {"k":1}, null, false, true]"#)
+            .expect("the sample parses");
+    let now = |value: &serde_json::Value| -> String {
+        format!("{:?}", wire::cell(&serde_json::json!({ "k": value }), "k"))
+    };
+    let glued = |value: &serde_json::Value| -> String { now(value).replace("Empty", "Zero") };
+    let mut strictly_finer = false;
+    for left in &classes {
+        for right in &classes {
+            if now(left) == now(right) {
+                assert_eq!(
+                    glued(left),
+                    glued(right),
+                    "🔴 g20: {left} and {right} are drawn the same now and were drawn differently \
+                     before. The repair merged a distinction, which is a trade and not a repair"
+                );
+            }
+            if glued(left) == glued(right) && now(left) != now(right) {
+                strictly_finer = true;
+            }
+        }
+    }
+    println!(
+        "G20_SAMPLE={} G20_STRICTLY_FINER={strictly_finer}",
+        classes.len()
+    );
+    assert!(
+        strictly_finer,
+        "🔴 g20: the new classification is not finer than the old one anywhere, so nothing was \
+         repaired"
+    );
+}
+
+/// The seventh word on the screen, through the same `draw` a live frame goes through.
+///
+/// 🔴 A classifier repaired in isolation is a repair nobody can see. The cell in the `state` column
+/// has to come out as the new mark and not as `0`, in a frame.
+#[test]
+fn p18_the_screen_draws_an_empty_string_as_itself() {
+    let healthz: serde_json::Value = serde_json::from_str(HEALTHZ).expect("fixture parses");
+    let rows: serde_json::Value = serde_json::from_str(
+        r#"{"items":[{"transformation":"gx1:t3sto0000000009","state":"","verdict":"Admit","enforced":true,"created_at":"2026-08-31T00:00:00Z","actor":"agent-a","scope":"src/lib.rs","inverse_status":"Escrowed","rollback":null,"superseded_by":null}],"next_cursor":null}"#,
+    )
+    .expect("fixture parses");
+    let answered = |route: &str, body: serde_json::Value| wire::Reading {
+        route: format!("GET {route}"),
+        status: Some(200),
+        read_at: "2026-08-31T00:00:00.000000000Z".to_string(),
+        elapsed_ms: 1,
+        body: Some(body),
+        error: None,
+    };
+    let empty_list: serde_json::Value = serde_json::from_str(CANDIDATES).expect("fixture parses");
+    let screen = Screen {
+        healthz: answered(wire::ROUTES[0], healthz),
+        transformations: answered(wire::ROUTES[1], rows),
+        candidates: answered(wire::ROUTES[2], empty_list.clone()),
+        escalations: answered(wire::ROUTES[3], empty_list),
+    };
+
+    let text = renderer::buffer_text(&renderer::render_to_buffer(
+        &screen,
+        200,
+        24,
+        Tier::Mono,
+        false,
+    ));
+    println!("--- P18 200x24 ---\n{text}");
+    let column = LEDGER_COLUMNS
+        .iter()
+        .position(|column| column.key == "state")
+        .expect("the state is a declared column");
+    let row = text
+        .lines()
+        .find(|line| line.contains("src/lib.rs"))
+        .unwrap_or_else(|| panic!("the record is not on the screen:\n{text}"));
+    let cell = row
+        .split_whitespace()
+        .nth(column)
+        .unwrap_or_default()
+        .to_string();
+    println!("P18_STATE_CELL={cell:?}");
+    assert_eq!(
+        cell,
+        Nothing::Empty.mark(),
+        "🔴 P18: the wire carried `state: \"\"` and the screen draws {cell:?}"
+    );
+    assert_ne!(
+        cell,
+        Nothing::Zero.mark(),
+        "🔴 P18: the reader is being told the state is a count, and it is nought"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// g21 — the reducer and the screen, on what opening means.
+// ---------------------------------------------------------------------------------------------
+
+/// 🔴 **The disagreement design round 2 found and `renderer::offered` used to carry a paragraph
+/// about.** `acts::apply` set `view.open` whatever the row count was; `renderer::subject` opens only
+/// when there is a record to open. So the declaration said `act.open` moves the state on an empty
+/// list and the screen said it does not, and a note derived from the declaration would have promised
+/// a key that does nothing.
+///
+/// This gate is what keeps them from drifting apart again, and it asks the general question rather
+/// than the one case: **every act a note offers at a given row count has to move something at that
+/// row count.**
+#[test]
+fn g21_the_reducer_and_the_screen_agree_about_what_opening_means() {
+    let shut = View::default();
+
+    // The repair itself.
+    let (after, signal) = acts::apply(&shut, Act::Open, 0);
+    assert!(
+        !after.open,
+        "🔴 g21: the reducer opened a record on a list that has none"
+    );
+    assert_eq!(signal, acts::Signal::None);
+    assert!(
+        acts::apply(&shut, Act::Open, 1).0.open,
+        "🔴 g21: and it still opens when there is something to open"
+    );
+    // A list that shrank to nothing between two reads closes what was open, rather than leaving an
+    // opened record pointing at a row that is gone.
+    let opened = View {
+        selected: 0,
+        open: true,
+    };
+    assert!(!acts::apply(&opened, Act::Open, 0).0.open);
+
+    // 🔴 **The invariant, stated as one rather than as a case.** An empty list is a **fixed point**
+    // of the reducer's state: `View::default()` is carried to itself by every declared act, and the
+    // attention is carried to `0` from anywhere. Written over `ACTS` rather than over `Act::Open`,
+    // so an act added later is measured by it without anybody remembering to add a line.
+    for act in acts::ACTS {
+        assert_eq!(
+            acts::apply(&View::default(), act, 0).0,
+            View::default(),
+            "🔴 g21: {} moves the state on a list with nothing in it. The empty list is a fixed \
+             point of this reducer or the screen and the declaration are describing two programs",
+            act.name()
+        );
+    }
+    for start in [
+        shut,
+        opened,
+        View {
+            selected: 9,
+            open: true,
+        },
+    ] {
+        for act in acts::ACTS {
+            let (next, _) = acts::apply(&start, act, 0);
+            assert_eq!(
+                next,
+                View::default(),
+                "🔴 g21: {} carried {start:?} somewhere other than the one state a list of nothing \
+                 has",
+                act.name()
+            );
+        }
+    }
+
+    // 🔴 The general property, and the one that found the second defect. `renderer::offered` is the
+    // note's declaration of what a reader can do at this row count, and every entry in it has to be
+    // true of the reducer at that row count.
+    //
+    // 🔴 It went red at `rows = 1` on its first run: the note named `act.next` on a list of one
+    // record, where the attention has nowhere to go. The repair was a third rung in `offered`, not
+    // a narrower question here — a probe that skips the row count it fails at is measuring the
+    // probe's comfort. Every row count from nought to four is swept, so a rung added later is
+    // measured without anybody remembering to add a line.
+    for rows in [0usize, 1, 2, 3, 4] {
+        let starts = [
+            View {
+                selected: 0,
+                open: false,
+            },
+            View {
+                selected: 0,
+                open: true,
+            },
+            View {
+                selected: rows.saturating_sub(1),
+                open: false,
+            },
+        ];
+        for act in renderer::offered(rows) {
+            let moved = starts.iter().any(|start| {
+                let (next, signal) = acts::apply(start, *act, rows);
+                next != *start || signal != acts::Signal::None
+            });
+            println!("G21 rows={rows} {} moved={moved}", act.name());
+            assert!(
+                moved,
+                "🔴 g21: the note offers {} on a list of {rows} and the reducer says it does \
+                 nothing. A key a reader is told about and which does nothing reads as a broken \
+                 program",
+                act.name()
+            );
+        }
+    }
+
+    // And on the frame: with nothing to open, the two views draw the same screen, which is what
+    // `open` meaning nothing here amounts to.
+    let fixture = Fixture::start_refusing();
+    let refused = fixture.read();
+    let with = renderer::buffer_text(&renderer::render_view_to_buffer(
+        &refused,
+        80,
+        24,
+        Tier::Mono,
+        false,
+        &opened,
+    ));
+    let without = renderer::buffer_text(&renderer::render_view_to_buffer(
+        &refused,
+        80,
+        24,
+        Tier::Mono,
+        false,
+        &shut,
+    ));
+    assert_eq!(
+        with, without,
+        "🔴 g21: the flag changes the screen on a list with nothing in it"
+    );
+
+    // 🔴 The negative control: the reducer as it was, which the assertion at the top has to disagree
+    // with. Without this the top of this test is a green that cannot go red.
+    let unconditional = |view: &View| View {
+        open: true,
+        ..*view
+    };
+    assert!(unconditional(&shut).open);
+    assert_ne!(
+        acts::apply(&shut, Act::Open, 0).0,
+        unconditional(&shut),
+        "🔴 g21: the shipped reducer still does what the pre-repair one did"
+    );
 }

@@ -107,6 +107,10 @@ pub enum Role {
     MarkZero,
     /// The mark for a row that was struck out.
     MarkDeleted,
+    /// 🔴 The mark for a value that arrived with nothing in it (`req/38` SS974 row Q4). Its own
+    /// role, and not `mark.zero`'s, because the whole of that ruling is that the two are different
+    /// answers — and a shared role would put them back together one rung below the symbol.
+    MarkEmpty,
     /// The engine admitted the transformation.
     VerdictAdmit,
     /// The engine refused it.
@@ -117,8 +121,9 @@ pub enum Role {
     VerdictNone,
 }
 
-/// Every paint role this face declares. Gate g14 requires each one to resolve to a value.
-pub const ROLES: [Role; 14] = [
+/// Every paint role this face declares. Gate g14 requires each one to resolve to a value, and gate
+/// g16 pins which value.
+pub const ROLES: [Role; 15] = [
     Role::Head,
     Role::Quiet,
     Role::Body,
@@ -129,6 +134,7 @@ pub const ROLES: [Role; 14] = [
     Role::MarkFalse,
     Role::MarkZero,
     Role::MarkDeleted,
+    Role::MarkEmpty,
     Role::VerdictAdmit,
     Role::VerdictDeny,
     Role::VerdictEscalate,
@@ -150,6 +156,7 @@ impl Role {
             Role::MarkFalse => "mark.false",
             Role::MarkZero => "mark.zero",
             Role::MarkDeleted => "mark.deleted",
+            Role::MarkEmpty => "mark.empty",
             Role::VerdictAdmit => "verdict.admit",
             Role::VerdictDeny => "verdict.deny",
             Role::VerdictEscalate => "verdict.escalate",
@@ -167,11 +174,15 @@ impl Role {
             Role::Head => Token::Accent,
             Role::Body | Role::MarkZero => Token::Plain,
             Role::Attend => Token::Attend,
+            // 🔴 `mark.empty` is quiet and `mark.zero` is not, and that is the pairing the SS974
+            // ruling is about: a count of nought is a value the wire carried, and a value with
+            // nothing in it is an absence. They are told apart at the symbol layer **and** here.
             Role::Quiet
             | Role::MarkLoading
             | Role::MarkUnknown
             | Role::MarkAbsent
             | Role::MarkFalse
+            | Role::MarkEmpty
             | Role::VerdictNone => Token::Thin,
             Role::MarkDeleted | Role::VerdictDeny => Token::Refuse,
             Role::VerdictAdmit => Token::Affirm,

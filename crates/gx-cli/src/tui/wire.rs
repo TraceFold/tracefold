@@ -16,7 +16,13 @@
 //! asserts the same fact twice, once by scanning this source and once by recording what a fixture
 //! server actually received.
 //!
-//! # The six words for nothing
+//! # The six words for nothing, which are now seven
+//!
+//! 🔴 `req/38` SS974 queue row Q4 added [`Nothing::Empty`]: the wire carrying a key as `""` was
+//! being drawn with the mark for *a count of nought*, inside the very function whose job is to keep
+//! those apart. The heading is kept in the shape it was written, with the correction beside it,
+//! because a heading edited to read as though it had always said seven takes the reader's chance to
+//! see that this face got it wrong once.
 //!
 //! `req/942` §12 asks for six, and asks that the two failures they exist to prevent stay visible:
 //! **loading is not unknown** (not yet measured against measured-and-unknowable) and **absent is
@@ -51,6 +57,8 @@ pub const TOKEN_ENV: &str = "GX_TOKEN";
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const READ_TIMEOUT: Duration = Duration::from_secs(10);
+/// The most header bytes this face will hold while waiting for the blank line that ends them.
+const MAX_HEAD_BYTES: usize = 64 * 1024;
 
 /// One route read once: what was asked, what came back, and the four facts the renderer measured
 /// while asking.
@@ -225,8 +233,42 @@ pub fn read_route(base_url: &str, path: &str, token: Option<&str>) -> Reading {
     }
 }
 
-/// HTTP/1.1 over a loopback socket, closing the connection so the body ends at end-of-file.
-fn send(base_url: &str, path: &str, token: Option<&str>) -> Result<(u16, Vec<u8>), String> {
+/// A socket that has answered its status line and its headers, handed over before the body has been
+/// read.
+///
+/// 🔴 This type exists so that the subscription (`super::live`) and the four reads can share
+/// **one** writer of a request. The alternative was a second place in this face that composes an
+/// HTTP request, and the claim `super`'s documentation makes — that the only method this face can
+/// put on a socket is `GET` — is worth exactly as much as the number of places that could put a
+/// different one there.
+#[derive(Debug)]
+pub struct Opened {
+    /// The status line's code.
+    pub status: u16,
+    /// The socket, positioned at the first body byte that has not been handed over.
+    pub socket: TcpStream,
+    /// Body bytes that arrived in the same read as the headers. A streaming body's first events are
+    /// routinely in here, and a reader that started at the next `read` would lose them.
+    pub head_body: Vec<u8>,
+    /// Whether the response declared `transfer-encoding: chunked`.
+    ///
+    /// 🔴 Read off the headers rather than assumed. Measured against the engine on `:8842`: the four
+    /// list routes answer with `content-length` and the stream answers `chunked`, so a face that
+    /// hard-coded either one would be right about half of its own reads.
+    pub chunked: bool,
+}
+
+/// Connect, write the request, and read as far as the end of the headers.
+///
+/// The read timeout is the caller's: a list read wants to give up on a server that has stopped
+/// talking, and a subscription wants a short window it can wake up in without concluding anything
+/// (`super::live::pulse`).
+fn open(
+    base_url: &str,
+    path: &str,
+    token: Option<&str>,
+    read_timeout: Duration,
+) -> Result<Opened, String> {
     let rest = base_url
         .strip_prefix("http://")
         .ok_or_else(|| format!("only http:// is supported; {base_url} is not"))?;
@@ -246,7 +288,7 @@ fn send(base_url: &str, path: &str, token: Option<&str>) -> Result<(u16, Vec<u8>
         .ok_or_else(|| format!("{authority} resolves to no address"))?;
     let mut socket =
         TcpStream::connect_timeout(&address, CONNECT_TIMEOUT).map_err(|e| e.to_string())?;
-    socket.set_read_timeout(Some(READ_TIMEOUT)).ok();
+    socket.set_read_timeout(Some(read_timeout)).ok();
     socket.set_write_timeout(Some(CONNECT_TIMEOUT)).ok();
 
     // 🔴 The only method this module can write. There is no branch here and no parameter for it.
@@ -254,6 +296,10 @@ fn send(base_url: &str, path: &str, token: Option<&str>) -> Result<(u16, Vec<u8>
     request.push_str(path);
     request.push_str(" HTTP/1.1\r\nHost: ");
     request.push_str(authority);
+    // 🔴 `Connection: close` is kept for the stream as well, measured rather than reasoned about:
+    // asked this way the engine still answers `200`, still sends `transfer-encoding: chunked`, still
+    // replays its history and still holds the connection open. So the header costs nothing and the
+    // request stays one string with no branch in it.
     request.push_str("\r\nAccept: application/json\r\nUser-Agent: gx-tui\r\nConnection: close\r\n");
     if let Some(token) = token {
         request.push_str("Authorization: Bearer ");
@@ -265,9 +311,23 @@ fn send(base_url: &str, path: &str, token: Option<&str>) -> Result<(u16, Vec<u8>
         .write_all(request.as_bytes())
         .map_err(|e| e.to_string())?;
 
-    let mut raw = Vec::new();
-    socket.read_to_end(&mut raw).map_err(|e| e.to_string())?;
-    let head_end = find(&raw, b"\r\n\r\n").ok_or_else(|| "no header terminator".to_string())?;
+    // Read until the header terminator arrives. Bounded, because a server that never sends one is
+    // otherwise a server that fills this process's memory.
+    let mut raw: Vec<u8> = Vec::new();
+    let mut buffer = [0u8; 4096];
+    let head_end = loop {
+        if let Some(end) = find(&raw, b"\r\n\r\n") {
+            break end;
+        }
+        if raw.len() > MAX_HEAD_BYTES {
+            return Err("the response headers do not end".to_string());
+        }
+        let read = socket.read(&mut buffer).map_err(|e| e.to_string())?;
+        if read == 0 {
+            return Err("the connection ended before the headers did".to_string());
+        }
+        raw.extend_from_slice(&buffer[..read]);
+    };
     let head = String::from_utf8_lossy(&raw[..head_end]).to_string();
     let status = head
         .lines()
@@ -275,7 +335,45 @@ fn send(base_url: &str, path: &str, token: Option<&str>) -> Result<(u16, Vec<u8>
         .and_then(|line| line.split_whitespace().nth(1))
         .and_then(|code| code.parse::<u16>().ok())
         .ok_or_else(|| "no status line".to_string())?;
-    Ok((status, raw[head_end + 4..].to_vec()))
+    let lowered = head.to_lowercase();
+    let chunked = lowered
+        .lines()
+        .any(|line| line.starts_with("transfer-encoding:") && line.contains("chunked"));
+    Ok(Opened {
+        status,
+        socket,
+        head_body: raw[head_end + 4..].to_vec(),
+        chunked,
+    })
+}
+
+/// HTTP/1.1 over a loopback socket, closing the connection so the body ends at end-of-file.
+fn send(base_url: &str, path: &str, token: Option<&str>) -> Result<(u16, Vec<u8>), String> {
+    let mut opened = open(base_url, path, token, READ_TIMEOUT)?;
+    let mut raw = std::mem::take(&mut opened.head_body);
+    opened
+        .socket
+        .read_to_end(&mut raw)
+        .map_err(|e| e.to_string())?;
+    Ok((opened.status, raw))
+}
+
+/// Open a route that does not end, and hand the socket to the caller.
+///
+/// 🔴 The one road out of this module for a long-lived read. Everything after the headers —
+/// un-chunking, finding line boundaries, deciding that a timeout is not a disconnection — belongs to
+/// `super::live`, because none of it is about sockets and all of it is about what an event means.
+///
+/// # Errors
+/// The same string-shaped failures [`read_route`] folds into a [`Reading`]: an unreachable host, a
+/// refused connection, headers that never end.
+pub fn open_stream(
+    base_url: &str,
+    path: &str,
+    token: Option<&str>,
+    read_timeout: Duration,
+) -> Result<Opened, String> {
+    open(base_url, path, token, read_timeout)
 }
 
 /// The read time, RFC 3339 in UTC to nanosecond precision, from a nanosecond epoch.
@@ -347,7 +445,7 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
-/// The six kinds of nothing (`req/942` §12-1), each with its own mark.
+/// The kinds of nothing (`req/942` §12-1, plus `req/38` SS974's seventh), each with its own mark.
 ///
 /// 🔴 The marks carry the meaning; colour never does. That is what makes the mono capability tier a
 /// full-strength tier rather than a degradation, and it is also what makes the marks immune to the
@@ -367,17 +465,30 @@ pub enum Nothing {
     Zero,
     /// It was there, and it was struck out.
     Deleted,
+    /// The wire carried the key, and what it carried has no characters in it.
+    ///
+    /// 🔴 **The seventh word, and the ruling that added it** (`req/38` SS974, queue row Q4). It was
+    /// [`Nothing::Zero`] until then: `""` and `0` were drawn with the same mark, so a name the
+    /// engine carried as an empty string read on screen as *a count of nought*. That is the same
+    /// collapse the other six exist to refuse, committed inside the classifier that refuses it —
+    /// an empty string is not a measurement, it is a value that says nothing, and the two are only
+    /// the same fact if you are not looking.
+    Empty,
 }
 
 impl Nothing {
-    /// All six, in the order `req/942` §12-1 lists them.
-    pub const ALL: [Nothing; 6] = [
+    /// All seven, in the order `req/942` §12-1 lists them, with `req/38` SS974's addition last.
+    ///
+    /// 🔴 The count is read from this array everywhere it is used, so a word added here grows every
+    /// gate that sweeps the vocabulary rather than leaving one of them measuring six.
+    pub const ALL: [Nothing; 7] = [
         Nothing::Loading,
         Nothing::Unknown,
         Nothing::Absent,
         Nothing::False,
         Nothing::Zero,
         Nothing::Deleted,
+        Nothing::Empty,
     ];
 
     /// What is drawn in the cell.
@@ -396,6 +507,8 @@ impl Nothing {
             Nothing::Zero => "0",
             // A line that was written and struck.
             Nothing::Deleted => "-x",
+            // An empty quotation: the wire opened a value and closed it with nothing between.
+            Nothing::Empty => "''",
         }
     }
 
@@ -415,6 +528,7 @@ impl Nothing {
             Nothing::False => Role::MarkFalse,
             Nothing::Zero => Role::MarkZero,
             Nothing::Deleted => Role::MarkDeleted,
+            Nothing::Empty => Role::MarkEmpty,
         }
     }
 
@@ -428,6 +542,7 @@ impl Nothing {
             Nothing::False => "false",
             Nothing::Zero => "zero",
             Nothing::Deleted => "deleted",
+            Nothing::Empty => "empty",
         }
     }
 }
@@ -448,7 +563,7 @@ pub enum Coverage {
 /// `superseded_by` names a replacement, which is a different fact — so the word is declared and
 /// its cell is marked out of reach with the reason. `req/942` §12-1: "quietly settling for four is
 /// the worst outcome". Settling for five and saying so is not the same act.
-pub const NOTHING_COVERAGE: [(Nothing, Coverage); 6] = [
+pub const NOTHING_COVERAGE: [(Nothing, Coverage); 7] = [
     (Nothing::Loading, Coverage::Reachable),
     (Nothing::Unknown, Coverage::Reachable),
     (Nothing::Absent, Coverage::Reachable),
@@ -460,6 +575,10 @@ pub const NOTHING_COVERAGE: [(Nothing, Coverage); 6] = [
             "no route among the four reports a removed row; superseded_by names a replacement",
         ),
     ),
+    // 🔴 Reachable, and reachable is a claim: `crates/gx-api/src/list.rs` puts the wire's string
+    // fields on these routes without a rule that forbids an empty one, so this face can meet `""`
+    // on any of them. It met it as `0` until `req/38` SS974.
+    (Nothing::Empty, Coverage::Reachable),
 ];
 
 /// What one key of one row says: a value, or one of the six kinds of nothing.
@@ -587,9 +706,20 @@ pub fn cell(object: &serde_json::Value, key: &str) -> Cell {
                 Cell::Value(number.to_string())
             }
         }
+        // 🔴 **`req/38` SS974 queue row Q4.** This arm answered [`Nothing::Zero`] until that ruling,
+        // so a `state` or an `actor` the engine carried as `""` was drawn as `0` and read as a count
+        // of nought. An empty string is not a count of anything; it is a value that arrived and says
+        // nothing, and it now has a word of its own.
+        //
+        // 🔴 **The range of the repair, and why it stops here.** The two arms below keep
+        // [`Nothing::Zero`] for an empty array and an empty object, and that is a decision rather
+        // than an oversight: `[]` **is** a count — nought items — and `{}` is nought members, so
+        // for those two the mark is the right answer to the question the reader is asking. The
+        // string is the one case where the container has no items to count. Saying where a repair
+        // ends is part of making it.
         serde_json::Value::String(text) => {
             if text.is_empty() {
-                Cell::Nothing(Nothing::Zero)
+                Cell::Nothing(Nothing::Empty)
             } else {
                 Cell::Value(text.clone())
             }

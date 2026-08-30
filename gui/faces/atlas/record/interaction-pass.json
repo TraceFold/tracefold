@@ -1,0 +1,137 @@
+{
+  "what": "req/38 SS24k interaction pass: every disclosure on faces/atlas pressed, screenshot after each act -- the two regions (control-row and subject fold) this face's own README named as not yet pressed",
+  "why": "this face declares zero acts (read-only by design, ACTS = []); its interactivity is four native <details> control disclosures (why/legend/claims/omitted) plus, separately, every subject's own fold, and SS24k requires those be exercised and judged from pixels rather than assumed static. The right-click menu is not repeated here -- it already has its own real-window pass in tools/browser-mount-smoke.mjs",
+  "how": "tools/rig/renderer.mjs against the same browser-mount fixture the W15 smoke drives, real module load, real click events on real <summary> elements",
+  "acts": [
+    {
+      "act": "initial",
+      "subjects": [
+        {
+          "path": "/work/deck.pdf",
+          "open": false
+        },
+        {
+          "path": "/work/budget.xlsx",
+          "open": false
+        }
+      ],
+      "shot": "atlas_act_0_initial.png",
+      "note": "the fixture entry script's own menuPass() runs on load and leaves a menu open; this pass dismisses it (real click-away) before treating this as \"initial\"",
+      "menuOpenAtStart": false
+    },
+    {
+      "act": "controls found",
+      "names": [
+        "why",
+        "legend",
+        "claims",
+        "omitted"
+      ]
+    },
+    {
+      "act": "why:open",
+      "open": true,
+      "shot": "atlas_act_1_why-open.png"
+    },
+    {
+      "act": "legend:open",
+      "open": true,
+      "whyStillOpen": true,
+      "shot": "atlas_act_2_legend-open.png"
+    },
+    {
+      "act": "claims:open",
+      "open": true,
+      "whyStillOpen": true,
+      "legendStillOpen": true,
+      "shot": "atlas_act_3_claims-open.png"
+    },
+    {
+      "act": "omitted:open",
+      "open": true,
+      "whyStillOpen": true,
+      "legendStillOpen": true,
+      "claimsStillOpen": true,
+      "shot": "atlas_act_4_omitted-open.png"
+    },
+    {
+      "act": "why:close",
+      "whyClosedAgain": false,
+      "legendAfterWhyClose": true,
+      "omittedAfterWhyClose": true,
+      "shot": "atlas_act_5_why-closed.png"
+    },
+    {
+      "act": "subject-fold:open",
+      "target": "/work/deck.pdf",
+      "targetWasClosedAtStart": true,
+      "targetOpenAfterClick": true,
+      "otherSubjectsUnchanged": [
+        {
+          "path": "/work/budget.xlsx",
+          "before": false,
+          "after": false,
+          "unchanged": true
+        }
+      ],
+      "controlsUnchangedAfterFold": {
+        "why": true,
+        "legend": true,
+        "omitted": true
+      },
+      "shot": "atlas_act_6_subject-open.png"
+    },
+    {
+      "act": "subject-fold:close",
+      "target": "/work/deck.pdf",
+      "targetOpenAfterSecondClick": false,
+      "shot": "atlas_act_7_subject-closed.png"
+    },
+    {
+      "act": "subject-fold:open a second, different subject",
+      "secondSubject": "/work/budget.xlsx",
+      "secondOpenAfterClick": true,
+      "targetStillClosed": true,
+      "shot": "atlas_act_8_second-subject-open.png"
+    }
+  ],
+  "shotIntegrity": {
+    "question": "did any two of this run's own screenshots come out byte-identical (SS857: a no-op capture always reports \"same\", whether nothing ran or nothing visibly changed)",
+    "shotCount": 9,
+    "duplicateShotGroups": [
+      [
+        "atlas_act_5_why-closed.png",
+        "atlas_act_7_subject-closed.png"
+      ]
+    ],
+    "allDistinct": false
+  },
+  "openState": {
+    "question": "does a disclosure a reader opened survive a repaint, and do the control region and the subject-fold region ever move each other",
+    "answer": "not applicable to the repaint question, and here is the mechanism rather than the assurance -- the same one README already states for this face",
+    "mechanism": "mount() paints exactly twice and never again: once with the waiting screen, once when the two reads answer. This face declares no acts, holds no state a control can change, and has nothing that asks for a redraw -- the only thing a reader can do to this screen is fold one of the four controls or one subject's own history, which the browser does in place. Nothing rebuilds the tree, so there is no repaint for an open state to be lost to.",
+    "witnessSurvivedEveryAct": true,
+    "finalControlStates": {
+      "why": false,
+      "legend": true,
+      "claims": true,
+      "omitted": true
+    },
+    "finalSubjectStates": [
+      {
+        "path": "/work/deck.pdf",
+        "open": false
+      },
+      {
+        "path": "/work/budget.xlsx",
+        "open": true
+      }
+    ]
+  },
+  "readByEye": {
+    "held": [],
+    "notHeld": [
+      "not yet judged by a person -- screenshots written, judged separately and recorded in README.md"
+    ]
+  }
+}

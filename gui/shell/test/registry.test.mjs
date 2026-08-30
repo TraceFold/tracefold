@@ -35,6 +35,27 @@ test('a face-track act names a membrane method that exists, and keeps no inverse
   }
 });
 
+test('the shell names the engine\'s "verify" step, not only its "undo"', () => {
+  // glovrex req/822_c6 §3 measured this live against a real engine: a commit sent
+  // for a candidate the engine had not yet verified came back refused with
+  // INVALID_STATE ("Candidateはverify前"). Before this test, `record:undo` was the
+  // only face-track act this table held, so a reader of ACTS alone had no way to
+  // learn that a step comes before commit, let alone which one -- the shell's own
+  // vocabulary had no word for it, which is the defect this test reproduces and
+  // this file's next act closes. The control that presses it belongs to the face
+  // that draws the held screen (a separate build, out of this file's reach); what
+  // this table can hold is the verb itself: on the face track, naming the real
+  // membrane method, with no inverse kept here -- the same three facts it already
+  // states for `record:undo`'s own delegate.
+  assert.ok('candidate:verify' in ACTS, 'the shell has no word for the engine\'s verify step, so nothing reading this table can learn it comes before commit');
+  const act = ACTS['candidate:verify'];
+  assert.equal(act.track, TRACK.FACE, 'verify moves the engine\'s own state, not the shell\'s layout');
+  assert.equal(act.invert, null, 'verify would give the shell a second way to hold what is the engine\'s decision');
+  assert.equal(act.delegate, 'post_candidates_id_verify');
+  const names = new Set(ROUTES.map((r) => r.name));
+  assert.ok(names.has(act.delegate), `candidate:verify delegates to "${act.delegate}", which the membrane does not serve`);
+});
+
 test('the census of inverses over this act set, measured not transcribed', () => {
   const found = census();
   assert.equal(found.total, VERBS.length);

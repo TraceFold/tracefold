@@ -294,7 +294,15 @@ pub const READ_NOT_DRAWN: [&str; 2] = ["GET /v1/candidates", "GET /v1/escalation
 /// believe they could be fetched again.
 pub const NO_ADDRESS_PHRASE: &str = "no address, measured here";
 
-/// The four facts each reading measured, summarised for the provenance region.
+/// The four facts each reading measured, summarised for the provenance region — and, since the
+/// subscription landed, the fifth: whether these numbers are being kept fresh.
+///
+/// 🔴 The subscription's state belongs **here** rather than in the apparatus region, and the reason
+/// is the one this whole module is ordered by. The apparatus is `priority.3` and is let go of first;
+/// the state of the connection is a fact this process measured, which the engine returns from no
+/// route, so losing it destroys it — [`Recoverable::Nowhere`], which is what puts the provenance at
+/// `priority.1`. Putting the connection anywhere else would mean a screen that quietly stops saying
+/// whether it is live.
 #[derive(Clone, Debug)]
 pub struct Measured {
     /// How many routes were read.
@@ -305,6 +313,8 @@ pub struct Measured {
     pub worst_ms: u128,
     /// `all 200`, or the codes one by one when they are not all the same.
     pub statuses: String,
+    /// The subscription's state and its counts (`super::live`).
+    pub link: super::live::LinkReport,
 }
 
 impl Measured {
@@ -312,8 +322,13 @@ impl Measured {
     #[must_use]
     pub fn long(&self) -> String {
         format!(
-            "read {} routes at {} | worst {}ms | {}",
-            self.routes, self.read_at, self.worst_ms, self.statuses
+            "{} read {} routes at {} | worst {}ms | {} | {}",
+            self.link.link.mark(),
+            self.routes,
+            self.read_at,
+            self.worst_ms,
+            self.statuses,
+            self.link.long()
         )
     }
 
@@ -321,9 +336,45 @@ impl Measured {
     #[must_use]
     pub fn short(&self) -> String {
         let clock = self.read_at.split('T').next_back().unwrap_or(&self.read_at);
+        let tail = self.link.short();
+        let line = format!(
+            "{} {} routes {} {}ms {}",
+            self.link.link.mark(),
+            self.routes,
+            clock,
+            self.worst_ms,
+            self.statuses
+        );
+        if tail.is_empty() {
+            line
+        } else {
+            format!("{line} {tail}")
+        }
+    }
+
+    /// The shortest form: the connection's mark and the four facts, with the connection's counts
+    /// given up.
+    ///
+    /// 🔴 The **mark** is never given up, and it leads the line for that reason. A terminal cuts
+    /// from the right, so anything at the front of the row survives every width; the four states of
+    /// the subscription are therefore told apart at every size this face can be drawn at, and gate
+    /// g19 measures exactly that over the range 20..=200.
+    ///
+    /// **Named ceiling**: when this rung is chosen the counts are gone and no line on the screen
+    /// says so. The disclosure counts the *grid's* dropped columns and is composed before the
+    /// provenance is spelled, which is the same cause as the two ceilings already named in
+    /// `super::renderer`. Upgrade path is the same one: hand the view and the provenance rung to
+    /// [`resolve`] in one pass.
+    #[must_use]
+    pub fn bare(&self) -> String {
+        let clock = self.read_at.split('T').next_back().unwrap_or(&self.read_at);
         format!(
-            "{} routes {} {}ms {}",
-            self.routes, clock, self.worst_ms, self.statuses
+            "{} {} routes {} {}ms {}",
+            self.link.link.mark(),
+            self.routes,
+            clock,
+            self.worst_ms,
+            self.statuses
         )
     }
 
@@ -532,11 +583,7 @@ fn compose_disclosure(
 /// The disclosure may take three rows, or four once the provenance has folded into it — the row the
 /// provenance gave up is the row the fold is allowed to spend.
 const fn disclosure_cap(folded: bool) -> u16 {
-    if folded {
-        4
-    } else {
-        3
-    }
+    if folded { 4 } else { 3 }
 }
 
 /// Resolve the grid.
@@ -627,10 +674,21 @@ pub fn resolve(width: u16, height: u16, measured: &Measured, wide: bool) -> Plan
         columns,
         dropped_fields,
         total_fields,
-        provenance: if width >= 60 {
-            measured.long()
-        } else {
-            measured.short()
+        // 🔴 A ladder rather than one threshold, for the reason `compose_disclosure` and
+        // `super::renderer::fold_note` are ladders: this region gets exactly one row and a terminal
+        // cuts what does not fit **without saying so**. Adding the subscription to the line made the
+        // long form longer than sixty cells in some states, so the rung is chosen by measuring it
+        // instead of by a width the line used to fit at.
+        provenance: {
+            let long = measured.long();
+            let short = measured.short();
+            if width >= 60 && rows_needed(&long, width) <= 1 {
+                long
+            } else if rows_needed(&short, width) <= 1 {
+                short
+            } else {
+                measured.bare()
+            }
         },
         disclosure,
         truncated,

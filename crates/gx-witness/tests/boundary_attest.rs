@@ -370,43 +370,21 @@ fn the_arithmetic_will_not_produce_a_degenerate_mixture() {
 // The attest must not reach the thing it attests
 // ---------------------------------------------------------------------------
 
-/// 🔴 **The self-reference bed**, and the reason it is a separate instrument.
-///
-/// `req/444` §1's counter-argument limits the determinism claim to "replaying the same input yields the
-/// same verdict". A boundary field that were itself an input to the derivation would make the claim
-/// circular — the attest would be part of what it attests. `req/454`'s DR-46-27 answered exactly
-/// this for `decided_at` with a structural scan plus the gate's own declared-field list, and this
-/// is that pair of machines one erratum later.
-///
-/// Two readings, because either alone is weak: the gate's source does not mention the field
-/// (a hand cannot wire it in without this going red), and the gate's declared input list — the
-/// third-party count `gx-gate/tests/gate_input_spec.rs` holds — does not name it.
-#[test]
-fn the_boundary_does_not_reach_the_gate() {
-    let gate_lib = include_str!("../../gx-gate/src/lib.rs");
-    let gate_policy = include_str!("../../gx-gate/src/policy.rs");
-    let declared = include_str!("../../gx-gate/tests/gate_input_spec.rs");
-
-    for (name, src) in [("lib.rs", gate_lib), ("policy.rs", gate_policy)] {
-        let hits = src.matches("determinism_boundary").count();
-        println!("GATE_BOUNDARY_MENTIONS {name}={hits}");
-        assert_eq!(
-            hits, 0,
-            "the boundary attest reached the gate; a field that certifies a derivation may not \
-             be an input to it"
-        );
-    }
-
-    let fields = declared
-        .lines()
-        .find(|l| l.contains("const DECLARED_FIELDS"))
-        .expect("gate_input_spec.rs declares the gate's field list");
-    println!("GATE_DECLARED_FIELDS={}", fields.trim());
-    assert!(
-        !fields.contains("determinism_boundary") && !fields.contains("boundary"),
-        "the gate's declared inputs name the boundary"
-    );
-}
+// 🔴 `the_boundary_does_not_reach_the_gate` MOVED, req/38 SS991 (2026-08-31), to
+// `boundary_gate_reach.rs` in this same directory. Not deleted, not weakened: the test is
+// byte-for-byte what it was, and both `include_str!` paths resolve identically because the file
+// sits in the same directory.
+//
+// Why it had to leave this file: it embeds `../../gx-gate/tests/gate_input_spec.rs`, which is on
+// the public sync's canon-reading exclusion set (it names `req/spec` outside a comment).
+// `include_str!` resolves before any Rust is read, so a shipped file that embeds a withheld file
+// does not compile on a public clone — measured, twice (`req/38_ERRATA_2026-08-07.md` §SS773, and
+// the staging check that produced this move).
+//
+// `tools/pub_sync_dryrun.sh` now closes its exclusion set under `include_str!`/`include_bytes!`
+// reachability, so whichever file holds this test is withheld automatically. Left here, that
+// closure would have withheld all eleven tests in this file to withhold one. The other ten are
+// ordinary tests of `DeterminismBoundary` that owe the private tree nothing, and they still ship.
 
 // ---------------------------------------------------------------------------
 // The wire

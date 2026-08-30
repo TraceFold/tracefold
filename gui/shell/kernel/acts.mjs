@@ -370,9 +370,9 @@ export const ACTS = Object.freeze({
     },
   },
 
-  // ---- the face track. One entry, and it is here to be refused by undo, not performed
-  // by it: the shell offers the verb so that "the inverse is elsewhere" is a thing the
-  // shell can say, rather than a thing a reader has to know.
+  // ---- the face track. Two entries, and both are here to be refused by name, not
+  // performed by it: the shell offers the verb so that "the engine decides this, not
+  // me" is a thing the shell can say, rather than a thing a reader has to know.
   'record:undo': {
     track: TRACK.FACE,
     // Stated, not omitted. "null" is the declaration that this act cannot hold an
@@ -382,6 +382,27 @@ export const ACTS = Object.freeze({
     layer: 'tab', operation: 'update',
     delegate: 'post_transformations_id_undo',
     said: 'undoing a committed transformation moves the ledger, so its inverse is the backend\'s undo, reached through the membrane; the shell does not keep a second one',
+    build: () => { throw new Refused(REFUSAL.NOT_DECLARED_HERE, 'a face-track act is performed through the membrane, not through the shell history'); },
+  },
+
+  // A candidate sits in `Provisional` until something asks the engine to move it to
+  // `Verified`, and only a `Verified` candidate accepts `commit` -- ask any earlier
+  // and the engine answers INVALID_STATE. glovrex req/822_c6 §3 measured exactly that
+  // live, against a real engine: "commit実送=refused INVALID_STATE(Candidateはverify
+  // 前)". Until this entry existed, this table's only face-track act was `undo`, so a
+  // reader of ACTS had no way to learn that a step comes before commit at all, let
+  // alone which one -- the shell's own act vocabulary had no word for it, and that
+  // silence is the defect this entry closes. It does not draw a control: the face
+  // that offers the button is a separate build (`glovrex_app/faces/`), and this
+  // table names no face (W1). What belongs here is what already belongs here for
+  // `record:undo` -- the verb exists, is on the face track, and names the real
+  // membrane method it defers to.
+  'candidate:verify': {
+    track: TRACK.FACE,
+    invert: null,
+    layer: 'tab', operation: 'update',
+    delegate: 'post_candidates_id_verify',
+    said: 'moving a candidate toward committable is the engine\'s decision, reached through the membrane; the shell does not hold a second opinion on it',
     build: () => { throw new Refused(REFUSAL.NOT_DECLARED_HERE, 'a face-track act is performed through the membrane, not through the shell history'); },
   },
 });

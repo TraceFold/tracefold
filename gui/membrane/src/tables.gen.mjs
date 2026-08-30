@@ -14,6 +14,7 @@ export const TABLE = {
   "auth_source": "glovrex/crates/gx-api/src/auth.rs:166-180 (header `authorization`, scheme `Bearer `, every route but /healthz)",
   "idempotency_source": "glovrex/crates/gx-api/src/handlers.rs:323 (`idempotency-key`), read at :917 and :1339; plus attach_sources.rs register() which reads the same header into its own replay cache (req/824 A4, absorbed req/822_c6). CAUTION (named, not fixed): the membrane's stableKey derives from method name + path id only -- it has no body axis -- so a caller sending two different register bodies through the membrane would collide into IDEMPOTENCY_CONFLICT. No face consumes post_attach_sources today; the hazard is carried in req/822_c6 rather than silently shipped into a caller.",
   "page_source": "glovrex/crates/gx-api/src/list.rs:57-70 (limit 1..=200 default 50, opaque cursor); verdict_checkpoints.rs:78-84,249-253 (integer cursor, `total`)",
+  "observations_source": "glovrex/crates/gx-api/src/observations.rs:58,64-75,157-161 (req/824 A5; router registration at lib.rs:601-604 inside `guarded`, so auth=bearer). Row added by hand (T1 repair, not the extraction tool -- route_table_from_crate.mjs reads only base_path/verb/path; every other column on every row in this table has always been hand-curated against its own source, this row included): effect=write (mutates engine state via ingest_observation/verify), kind=single, idempotency=none (ingest() takes no `headers` argument and never calls idempotency_key()/reads `idempotency-key` -- unlike the three T4 routes; the observation_id/prev_ref replay the handler does do is an engine-level chain check, not the crate's Idempotency-Key cache), cursor=null (not a list route), actor=none (IngestBody at :64-75 has no `actor` field), accepts_body=true (Payload<IngestBody> extractor).",
   "routes": [
     {
       "verb": "GET",
@@ -47,6 +48,17 @@ export const TABLE = {
       "cursor": null,
       "actor": "none",
       "accepts_body": false
+    },
+    {
+      "verb": "POST",
+      "path": "/attach-sources/{id}/observations",
+      "effect": "write",
+      "kind": "single",
+      "auth": "bearer",
+      "idempotency": "none",
+      "cursor": null,
+      "actor": "none",
+      "accepts_body": true
     },
     {
       "verb": "POST",
@@ -318,6 +330,10 @@ export const COVERAGE = {
       "get_attach_sources_id": {
         "tag": "undesigned",
         "note": "attach-source registry; no face is built"
+      },
+      "post_attach_sources_id_observations": {
+        "tag": "undesigned",
+        "note": "observation ingest (req/824 A5); no face is built"
       },
       "post_candidates": {
         "tag": "undesigned",

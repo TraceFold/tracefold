@@ -1,12 +1,13 @@
 # membrane/ — 膜。app層で唯一networkに触るadapter 1 module(backend直上・不可視・0から)。→ req/01_MEMBRANE.md
 
-構成: `route-table.json`(wire半分はcrateから機械抽出)・`coverage.json`(面の宣言)・`wire-fields.json`(NOT_DRAWNの母集団)・`src/`(7 file)・`test/`(4 file)・`tools/`(抽出器・gate述語・実serve smoke)。
+構成: `route-table.json`(wire半分はcrateから機械抽出)・`coverage.json`(面の宣言)・`wire-fields.json`(NOT_DRAWNの母集団)・`src/`(実装本体・件数はディレクトリ一次)・`test/`(contract test・件数はディレクトリ一次)・`tools/`(抽出器・gate述語・実serve smoke)。この行の数値記載は鮮度gateの死角(req/104 §1①)——数を知りたければ手元で数え直せ。
 
 ```
 node --test                                    # unit+contract 52本(2026-08-24実測)
 bash tools/serve_bed.sh <gx> 8791 <log>        # WSLで実サーバを立てる
 node tools/smoke_serve.mjs http://127.0.0.1:8791 <token>   # 実wireへの10 check
-node tools/route_table_from_crate.mjs          # crateから21 routeを抽出
+node tools/route_table_from_crate.mjs          # crateからroute抽出(件数はroute-table.jsonが正・drift検査はtest/route_table.test.mjs)
+node tools/verdict_table_from_crate.mjs        # 2026-08-31 req/972 R-972-9追加: gx-core/src/verdict.rsのVerdictKindを抽出(drift検査はtest/verdict_table.test.mjs)。wire.mjs VERDICT_KINDSのみ対象・OUTCOMEはcrate由来でないため対象外(理由はtool内コメント)
 node tools/bench.mjs                           # 2026-08-24 repair lane追加(app req/98 V-1): 1リクエストの膜内側(URL/header/idempotency/notice)msをmedian of 5で計測。実network msは別軸(smoke_serve.mjsが担当)
 ```
 

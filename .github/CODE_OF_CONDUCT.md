@@ -9,4 +9,4 @@ be wrong, say so plainly and carry on — retractions are normal here and carry 
 Harassment, personal attacks, and bad-faith argument are not welcome and will end
 participation.
 
-Report a problem to mahirhir@glovrex.com.
+Report a problem to mahirohirakawa@glovrex.com.

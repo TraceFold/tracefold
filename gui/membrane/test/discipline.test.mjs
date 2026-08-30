@@ -6,9 +6,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, readFileSync, mkdtempSync, readdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdtempSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname, basename, delimiter } from 'node:path';
+import { join, dirname, basename, delimiter, relative, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
@@ -203,29 +203,91 @@ test('D3-neg the same gate refuses an inherited identifier', () => {
 });
 
 // --- D4: nothing above the membrane touches a network (AC-M0) ---------------
+//
+// Widened 2026-08-31 (glovrex_app req/104 boundary ledger B2/B6): the population used
+// to be shell/faces/parts only, on the strength of a comment calling monitor/terminal/
+// wire/demo/tools "never in a shipped browser bundle" without anywhere a reader could
+// check that claim. It wasn't checked -- req/104's census found a direct-fetch near-miss
+// in terminal/wire (B2) and a second, self-declared network surface in monitor/ that
+// this gate's old population never saw (B6). Below is every file the widened population
+// (this census, run against the same networkOffenders() D4 always used) actually finds
+// with a network word in it, named with why it is not an offender. An undeclared new
+// `fetch(`/`WebSocket`/... anywhere in the widened population is still red -- this is a
+// list, not a directory-shaped exemption, so a ninth file added tomorrow gets no pass it
+// was not given by name.
+const D4_DECLARED = [
+  // (a) fetchImpl injection (Owner-named shape): the function is defined here and handed
+  // to createMembrane({ fetchImpl }); the one call site is membrane/src/transport.mjs.
+  // Verified by reading the call site, not assumed (req/104 §1②).
+  { file: 'terminal/tui.mjs', reason: 'fetchImpl injected into createMembrane(); call site is transport.mjs (req/104 §1②)' },
+  { file: 'terminal/check.mjs', reason: 'same fetchImpl-injection shape as terminal/tui.mjs' },
+  { file: 'wire/probe.mjs', reason: 'fetchImpl injected into createMembrane(); same shape as terminal/tui.mjs (req/104 §1②)' },
+  // (b) the monitor's self-declared surface (Owner-named shape, monitor/serve.mjs; the
+  // other three are the same surface by the same header claim and the same gate):
+  // "a monitor that could change the thing it watches is not a monitor" -- GET-only,
+  // never imports membrane/src, gated by monitor/check.mjs's own "the monitor writes
+  // nothing" regex (req/104 §1⑥/B6).
+  { file: 'monitor/serve.mjs', reason: "monitor's own GET-only engine mirror; gated by monitor/check.mjs (req/104 §1⑥)" },
+  { file: 'monitor/shoot.mjs', reason: 'monitor family: GET-only liveness probe before a screenshot, same surface as serve.mjs' },
+  { file: 'monitor/check.mjs', reason: "monitor's own live() health probe, and the file that implements the monitor's self-gate" },
+  { file: 'monitor/face.mjs', reason: 'dev-only live-reload <script> text emitted for a browser tab (EventSource sits inside a template-literal string, not a Node call); off by ?live=0' },
+  // found by this widening, outside the two Owner-named shapes: dev/CLI tooling that
+  // self-declares a narrow network touch and ships nothing to a browser bundle.
+  { file: 'demo/serve.mjs', reason: "local static file server only (node:http for inbound serving); header states 'issues no request of its own'" },
+  { file: 'demo/check.mjs', reason: "the demo's own gate: 'fetch(' appears only inside the regex asserting the rendered page calls out to nothing -- same self-naming exemption D2/D3 already give discipline.mjs/discipline.test.mjs" },
+  { file: 'tools/verify-all.mjs', reason: 'top-level verify orchestrator: one GET to /v1/healthz to ask whether a real engine is reachable before grading against it' },
+  { file: 'tools/rig/wire_ws.mjs', reason: 'dev rig driving the pixel tier over a raw WebSocket for testing; not shipped app code' },
+];
+const D4_DIRS = ['shell', 'faces', 'parts', 'monitor', 'terminal', 'wire', 'demo', 'tools'];
+const relPosix = (f) => relative(APP, f).split(sep).join('/');
 
-test('D4 the shell, the faces and the parts reach no network, with the denominator said', () => {
-  // shell/faces/parts each carry their own tools/ (self-audit gates, dev-only local
-  // static servers) and test/ (fault-injection fixtures that plant the very words this
-  // check forbids, on purpose, to prove their own gate goes red for them -- the same
-  // reason D2/D3 above exclude discipline.mjs/discipline.test.mjs from themselves).
-  // Those files are Node-only tooling never in a shipped browser bundle, so they are
-  // not part of AC-M0's population; scanning them was never intentional -- when this
-  // check was written the comment below still called the denominator "empty", so the
-  // drift was never seen. Confirmed empty outside this filter by direct grep over
-  // shell/demo+kernel+record, faces/ledger's four shipped files, and parts/src+generated.
-  const above = ['shell', 'faces', 'parts']
-    .flatMap((dir) => sourceFiles(join(APP, dir)))
-    .filter((f) => !isTestPath(f) && !/[\\/]tools[\\/]/.test(f));
-  const offenders = networkOffenders(above);
-  assert.deepEqual(offenders, []);
-  // Reported rather than implied: the denominator is small because these layers are
-  // still thin, so this pass is cheap and must not be read as a strong result.
-  console.log(`      D4 denominator: ${above.length} shipped source files above the membrane`);
+/** shell/faces/parts keep their pre-widening rule (their own nested tools/ -- self-audit
+ * gates, dev-only local static servers -- is out of population); that rule would also eat
+ * the newly-added top-level tools/ itself if applied unconditionally, so it is scoped to
+ * the three directories it was written for. */
+function d4Population(dirs) {
+  return dirs
+    .flatMap((dir) => sourceFiles(join(APP, dir)).map((f) => ({ f, dir })))
+    .filter(({ f, dir }) => !isTestPath(f) && (dir === 'tools' || !/[\\/]tools[\\/]/.test(f)))
+    .map(({ f }) => f);
+}
+
+test('D4 shell/faces/parts/monitor/terminal/wire/demo/tools reach no undeclared network (AC-M0)', () => {
+  const above = d4Population(D4_DIRS);
+  const declaredPaths = new Set(D4_DECLARED.map((d) => d.file));
+  for (const path of declaredPaths) {
+    assert.ok(above.some((f) => relPosix(f) === path), `D4_DECLARED names a file the widened population no longer contains: ${path}`);
+  }
+  const scanned = above.filter((f) => !declaredPaths.has(relPosix(f)));
+  const offenders = networkOffenders(scanned);
+  assert.deepEqual(offenders, [], `undeclared network touch above the membrane: ${JSON.stringify(offenders)}`);
+  // Reported rather than implied, same as before the widening.
+  console.log(`      D4 denominator: ${above.length} source files above the membrane`
+    + ` (${declaredPaths.size} declared network-touch exceptions, ${scanned.length} scanned for undeclared network)`);
 });
 
 test('D4-neg the same gate refuses a face that calls fetch', () => {
   assert.equal(networkOffenders(scratch('const r = await fetch("/v1/candidates");\n')).length, 1);
+});
+
+test('D4-widen-neg a fetch planted inside the newly-widened tools/ population is caught, then removed', () => {
+  // scratch() above proves networkOffenders() itself catches a fetch; it does not prove
+  // the widened *population* actually walks the new directories, because scratch() writes
+  // outside APP entirely (os.tmpdir()). This plants inside tools/ -- one of the five
+  // directories this widening added -- so the assertion can only pass if d4Population()
+  // truly reaches it, then removes the plant in a finally so the tree is unchanged after.
+  const dir = mkdtempSync(join(APP, 'tools', 'd4-widen-negctl-'));
+  const planted = join(dir, 'offender.mjs');
+  try {
+    writeFileSync(planted, 'const r = await fetch("/v1/candidates");\n');
+    const above = d4Population(D4_DIRS);
+    assert.ok(above.includes(planted), 'a file freshly written inside tools/ must appear in the widened D4 population');
+    const declaredPaths = new Set(D4_DECLARED.map((d) => d.file));
+    const offenders = networkOffenders(above.filter((f) => !declaredPaths.has(relPosix(f))));
+    assert.ok(offenders.some((o) => o.file === planted), 'D4 must flag a planted fetch inside the newly-included tools/ directory');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // --- D5: the copy gate (Z-1), a floor and reported as one -------------------

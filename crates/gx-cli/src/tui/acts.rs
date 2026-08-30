@@ -195,6 +195,13 @@ pub enum Signal {
 /// 🔴 An empty list is not a special case with its own branch: `rows == 0` clamps every selection to
 /// `0`, which is where it already is, so the acts that move the attention are correctly inert on a
 /// screen with nothing to attend to.
+///
+/// 🔴 **That sentence was true of the attention and false of the flag beside it** (`req/38` SS974).
+/// `selected` was clamped and `open` was not, so an act could leave a record opened on a list with
+/// no records in it; the disagreement with the screen was written down in
+/// `super::renderer::offered` instead of being repaired. Both members are now clamped by the same
+/// two lines, so the sentence is true of the whole state rather than of most of it, and the
+/// paragraph in `offered` records that the disagreement is closed rather than being deleted.
 #[must_use]
 pub fn apply(view: &View, act: Act, rows: usize) -> (View, Signal) {
     let last = rows.saturating_sub(1);
@@ -223,5 +230,20 @@ pub fn apply(view: &View, act: Act, rows: usize) -> (View, Signal) {
     // The list can shrink between reads; an index into rows that are gone would draw an attention
     // mark on a record nobody is looking at.
     next.selected = next.selected.min(last);
+    // 🔴 **`req/38` SS974, design round 2's third finding — and the repair is one line further than
+    // the finding was.**
+    //
+    // The report said `act.open` moved the view on an empty list while `super::renderer::subject`
+    // declined to open anything, so the declaration and the screen described two different
+    // programs, and `super::renderer::offered` carried a paragraph explaining the disagreement
+    // instead of anybody closing it. The obvious repair is a row count inside the `Open` arm.
+    //
+    // That repair is wrong, and gate g21 said so on the first run: it leaves `act.prev` carrying an
+    // opened flag on a list that has emptied, because only the arm that was patched asks the
+    // question. **The question is not "may this act open something", it is "does what the view
+    // points at still exist"** — and the line above has been asking exactly that about `selected`
+    // since the first build. So it is asked here, once, about both members. Every act inherits it,
+    // including the ones nobody has written yet.
+    next.open &= rows > 0;
     (next, signal)
 }

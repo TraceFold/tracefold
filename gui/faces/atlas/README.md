@@ -49,6 +49,7 @@ req/03 §2's one-line identity for this face -- "主面。stage col分割の主�
 | `tools/browser-mount-smoke.mjs` | real-browser (headless-renderer) mount smoke, the W15 clause-2/3 evidence |
 | `tools/real-window-smoke.mjs` | drives `shell/tools/real_window.ps1` (this lane's DWM-extended-frame-bounds fix included) in both themes |
 | `tools/bench.mjs` | `view(state)` over 1,000 independent synthetic states of 60 transformations (20 paths x 3 touches) each |
+| `tools/interaction-pass.mjs` | G-7 round (below): presses all four control disclosures and one subject's own fold in a real window, a screenshot after each act, `sha256`-checked against itself for byte-identical (no-op) captures |
 | `test/declaration.test.mjs`, `test/atlas.test.mjs`, `test/gate.test.mjs` | 81 tests total; `stub-port.mjs`/`dom-stand-in.mjs` imported directly from `faces/ledger/test/`, the same precedent every other face in this tree already set (req/99 §5) |
 
 ## Placement and semantics, written before code
@@ -69,7 +70,7 @@ req/03 §2's one-line identity for this face -- "主面。stage col分割の主�
 - `[ ]` **RC-5 (no control on this screen reaches another face) is open here too**, and this face additionally cannot be reached *from* another face (no row on `faces/ledger`/`faces/held`/`faces/receipt`/`faces/graph` links here, and this face draws no address any other face could follow to it either -- `emits`/`handles` are both declared empty).
 - `[ ]` **The document/graph/timeline lens-switching machinery (`glovrex/req/08 §14`) is not implemented.** This face implements the document model only, consistent with §14's own risk analysis (kill-battery G-1..G-5) recommending document as the safest default when the read population is layer-A-thin, which is this repo's actual state today. Which of `act`-extended or a new namespace a future lens-mode toggle would use is not decided here.
 - `[ ]` **Shell-level `default_slot`/`emits`/`handles` wiring does not exist.** No `shell/kernel` code resolves these fields into an actual mounted position or address routing; this lane declares the data, not the mechanism.
-- `[ ]` **No interaction pass (req/38 SS24k)** was performed for this face -- this screen's interactive controls (two disclosures, every subject's own fold) were not individually pressed and screenshotted after each act. *(Partly superseded by the #348/#349 round, last section of this file: the right-click menu now has a real-window interaction pass with ten measured properties. The two disclosures and the subject folds are still not individually pressed, so this line stays `[ ]`.)*
+- `[ ]` **No interaction pass (req/38 SS24k)** was performed for this face -- this screen's interactive controls (two disclosures, every subject's own fold) were not individually pressed and screenshotted after each act. *(Partly superseded by the #348/#349 round, last section of this file: the right-click menu now has a real-window interaction pass with ten measured properties. The two disclosures and the subject folds are still not individually pressed, so this line stays `[ ]`.)* *(Further superseded by the G-7 round, last section of this file: `tools/interaction-pass.mjs` now presses all four control disclosures -- this screen grew two more since the #348/#349 round, `claims` and `omitted`, that line above never counted -- and a subject's own fold, independently, with a screenshot after each act. This line stays `[ ]` only for the part still true: no independent re-run of any of this file's own numbers has happened, on this evidence or any other.)*
 - `[ ]` **Narrow-width real-window capture is absent.** `real_window.ps1` opens at a fixed 1440x900; `tools/shoot.mjs`'s headless narrow (720px) and wide (1280px) captures are the only other-viewport evidence.
 - `[ ]` **`get_transformations`'s pagination has never reached a real `gx serve`.** The same open item every other face's README states for its own routes.
 - `[ ]` **A destructive fault-injection sweep across every shared AC (AC-F1..AC-F4 style) was not repeated here.** The genuine negative control performed (above) targeted this face's own defining property (open/closed state); the four generic negative-truth-ledger ACs are inherited unmodified from the shared parts every other face already fault-injected.
@@ -298,3 +299,94 @@ floor, 10 of 10 menu properties held in a real window;
 two disclosures and every subject's own fold were still not individually pressed and shot; no
 independent re-run of any number here; and the 81px-per-subject density is unchanged, so this screen
 still fits about 8 subjects in a 720px window where the pre-box version fitted about 20.
+
+## G-7 round -- the two disclosures the menu round left, and a subject's own fold (2026-08-31)
+
+Source: `glovrex/req/964` §2 (`G-7 | glovrex_app/faces/ | ready(F-6 atlas面の追加)`) and `glovrex/req/974`
+§D-1 (`G-7 ... brief: F-6 atlas面の追加(既存部分稼働の拡張)`). Write-target for this atom is
+`glovrex_app/faces/` only; `glovrex_app/shell/` is G-8's own write-target and was not opened for
+edit here (read-only, to confirm `[data-role="subject-summary"]` etc. before writing the pass). No
+line of `atlas.mjs`, `binding.mjs`, `declaration.mjs`, or `index.mjs` changed in this round --
+everything below is a new file (`tools/interaction-pass.mjs`) plus its own generated evidence
+(`record/atlas_act_0..8_*.png`, `record/interaction-pass.json`).
+
+**What this closes**: the `[ ]` line above ("no interaction pass ... the two disclosures and the
+subject folds are still not individually pressed") was already stale in one more way before this
+round touched it -- this screen carries **four** control disclosures today (`why`/`legend`/`claims`/
+`omitted`), not the two that line and the #348/#349 section above were written against; `claims` and
+`omitted` were both already shipped and neither had ever been pressed in a real window either.
+`tools/interaction-pass.mjs` presses all four, independently, and separately presses one subject's
+own fold open and shut and a second subject's fold besides -- the region `subjectBox()` builds, which
+no earlier pass on this face (menu included) ever pressed.
+
+**Two real defects found while building the pass, both in the new tool, neither in shipped source**:
+
+1. **The fixture's own entry script leaves a menu open on load.** `browser-mount-smoke.mjs`'s
+   `ENTRY_SOURCE` runs its own `menuPass()` unconditionally as part of mount and, by that file's own
+   design ("the last one is left open on purpose, so the shot has a menu in it"), leaves a
+   `copy value` menu open over the second subject row before this pass had clicked anything at all.
+   Found by looking at the first act 0 screenshot rather than trusting it -- the same discipline
+   `record/interaction-pass.json`'s own `shotIntegrity` block (below) exists to hold mechanically.
+   Fixed by dispatching a real click-away (`PointerEvent('pointerdown')` on `document.body`, this
+   screen's own documented dismiss route) before treating the page as "initial"; `menuOpenAtStart`
+   in the report is `false`, checked rather than assumed.
+2. **A no-op capture trap, walked into once before it was avoided.** `tools/rig/renderer.mjs`'s
+   `capture()` clips a fixed rect at the page's own origin -- `faces/receipt/tools/interaction-pass.mjs`
+   already states half of this in its own comments ("anything below the first 900px is not in a shot")
+   and the other half too ("scrolling first makes it worse, not better ... the shot comes back blank
+   cream"), which a first version of this file read past and then reproduced anyway: it scrolled the
+   acted-on element into view before every capture, and three of its nine shots -- three different
+   acts, three different `window.scrollY` values, three genuinely different DOM states, checked with
+   `sha256` -- came back byte-identical. They were blank: opened and looked at, not just hashed. The
+   fix applied is the one already sitting in the sibling file: never scroll; open the renderer at a
+   fixed, tall-enough viewport (`900x2200`, this round's own `VIEWPORT` constant) so every act stays
+   inside the one region the fixed clip actually captures. Re-run after the fix: the no-op trio
+   collapsed to zero.
+
+**One remaining pixel-identical pair, and why it is evidence rather than a defect**: `record/
+interaction-pass.json`'s `shotIntegrity.duplicateShotGroups` still names one pair,
+`atlas_act_5_why-closed.png` and `atlas_act_7_subject-closed.png`, `sha256`-identical. Read against
+the acts rather than assumed: act 5 is "why closed, legend/claims/omitted open, both subjects closed"
+and act 7 is "the same, after a subject was opened (act 6) and folded back shut again" -- the same
+DOM state by construction, not by coincidence. Two states that a click sequence claims are equal came
+back pixel-equal too, which this pair is kept as a positive round-trip reading of rather than
+silently dropped from the report.
+
+**Independence, read from a live document rather than assumed from the four calls that changed one
+state each**: every one of the four controls stayed at its own open/closed state while every other
+control and the subject fold were pressed (`whyStillOpen`/`legendStillOpen`/`claimsStillOpen` through
+the acts, `controlsUnchangedAfterFold` at act 6); the untouched subject's own fold state never moved
+while the target subject's did (`otherSubjectsUnchanged`); a second, different subject's fold opened
+independently of the first, which stayed exactly as act 7 left it (`targetStillClosed` at act 8); and
+the repaint witness planted at the top of the run (the same mechanism receipt's own pass plants)
+survived every act (`witnessSurvivedEveryAct: true`) -- consistent with this face's own stated
+mechanism (mount paints twice and never again) rather than merely not contradicting it.
+
+**Measured this round** (from the repo root): `node --test "faces/atlas/test/*.test.mjs"` =
+**122 pass / 0 fail** (121 before this round -- the one new test came from the unrelated req/822_c7
+commit on 2026-08-26, not from this round); `tools/gate.mjs` = **22 checks, 0 fell** (unchanged);
+`tools/browser-mount-smoke.mjs` = mounted, menu pass green (unchanged); `tools/interaction-pass.mjs` =
+**9 acts, 9 screenshots**, 8 of 9 byte-distinct (the one exception explained above),
+`witnessSurvivedEveryAct: true`, every independence check `true`. `tools/shoot.mjs` and
+`tools/bench.mjs` were **not** re-run this round (no shipped source changed that either reads).
+
+**Whole-tree baseline, checked and left alone**: `node --test "faces/*/test/*.test.mjs"` from the
+repo root reports **688 tests, 624 pass, 64 fail** at the start and end of this round -- all 64
+failures are in `faces/ledger` (`ledger` alone: 116 tests, 52 pass, 64 fail), a different face this
+atom's write-target does not include and this round did not open. `faces/atlas` alone: **122/122**,
+both before and after. `shell/**` carries 2 pre-existing failures of its own (a route-count mismatch,
+107 tests / 105 pass), also outside this atom's write-target (`shell/` is G-8's).
+
+**`[ ]` -- still not done, named rather than silently closed**:
+
+- No independent re-run of this round's own numbers (the same open item every earlier round on this
+  face states of itself).
+- `record/interaction-pass.json`'s `readByEye.notHeld` says what it always says: the 9 new
+  screenshots were written and partially eyeballed by this round's own author in cropped form (not a
+  second, independent pass) -- a genuine human read-by-eye judgment, recorded as `[ ]` until one
+  happens.
+- The right-click menu's own interaction pass (browser-mount-smoke.mjs, #348/#349 round) was not
+  repeated or extended here -- this round's own scope was the two regions that pass does not touch.
+- `faces/ledger`'s 64 failures, `shell/`'s 2, and the other four faces' own missing disclosure-level
+  interaction passes (only `faces/receipt` had one before this round) are named above as seen, not
+  fixed -- none are this atom's write-target.

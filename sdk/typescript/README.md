@@ -41,7 +41,7 @@ node quickstart.mjs
 import { GxClient } from "@mahirhir/tracefold";
 
 const client = new GxClient({
-  baseUrl: process.env.GX_BASE_URL ?? "http://127.0.0.1:8787",
+  baseUrl: process.env.GX_BASE_URL ?? "http://127.0.0.1:8842",
   token: process.env.GX_TOKEN,
 });
 

@@ -30,6 +30,7 @@ use ratatui::{Frame, Terminal};
 
 use super::acts::{self, Act, Signal, View};
 use super::layout::{self, Measured, Plan, RegionRole};
+use super::live::{self, Subscription};
 use super::tokens::{self, Role};
 use super::wire::{self, Nothing, Reading, Screen};
 
@@ -39,6 +40,14 @@ use super::wire::{self, Nothing, Reading, Screen};
 /// terminal, and the value a token takes in it belongs beside the token table rather than beside
 /// the code that types escape sequences. Re-exported so that `renderer::Tier` is still the road.
 pub use super::tokens::Tier;
+
+/// How long the loop waits for a key before asking the subscription what has happened.
+///
+/// 🔴 Shorter than [`super::live::DEBOUNCE`] on purpose: the wake is what *notices* that the
+/// debounce has expired, so a wake longer than it would make the debounce the wake's period instead
+/// of its own. It is also the longest a keypress can sit unread, which is why it is a fifth of a
+/// second rather than a comfortable one.
+pub const WAKE: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// A role, in the medium's own type. **The one place in this face where a colour is spelled**, and
 /// the numbers are not here either: they are in `super::tokens`, and this function only types them.
@@ -71,8 +80,18 @@ fn paint(role: Role, tier: Tier) -> Style {
 }
 
 /// Summarise what the four readings measured, for the provenance region.
+///
+/// The subscription is [`live::LinkReport::off`], which is the truth for every caller that draws one
+/// frame and leaves: `gx tui --dump` opens no stream. A run that does subscribe uses
+/// [`measured_with_link`].
 #[must_use]
 pub fn measured(screen: &Screen) -> Measured {
+    measured_with_link(screen, live::LinkReport::off())
+}
+
+/// The same, for a run that is subscribed to the engine's events.
+#[must_use]
+pub fn measured_with_link(screen: &Screen, link: live::LinkReport) -> Measured {
     let readings = screen.readings();
     let worst_ms = readings.iter().map(|r| r.elapsed_ms).max().unwrap_or(0);
     let read_at = readings
@@ -94,6 +113,7 @@ pub fn measured(screen: &Screen) -> Measured {
         read_at,
         worst_ms,
         statuses,
+        link,
     }
 }
 
@@ -397,6 +417,19 @@ pub const NOTE_ORDER: [Act; 7] = [
 /// Everything that moves the attention has nothing to move, and `act.open` opens nothing.
 pub const NOTE_ORDER_EMPTY: [Act; 2] = [Act::Leave, Act::Read];
 
+/// The same, for a list of exactly one record.
+///
+/// 🔴 **The third rung, and gate g21 is what asked for it.** The repair this build made to
+/// `super::acts::apply` closed the disagreement at nought records; running the same question over
+/// every row count found it again one size up. On a list of one there is nowhere for the attention
+/// to go, so `act.next`, `act.prev`, `act.first` and `act.last` are all inert — and this note was
+/// naming all four of them. A legend that offers a key which does nothing teaches the reader that
+/// the program is broken, which is the exact defect `super::acts` exists to prevent, arrived at
+/// from the other side.
+///
+/// There is no fourth rung: from two records upward every declared act moves something.
+pub const NOTE_ORDER_ONE: [Act; 3] = [Act::Leave, Act::Open, Act::Read];
+
 /// Which acts the list state offers, at this many rows.
 ///
 /// 🔴 **Not the reducer's answer, and the disagreement is worth writing down.** `acts::apply`
@@ -405,12 +438,20 @@ pub const NOTE_ORDER_EMPTY: [Act; 2] = [Act::Leave, Act::Read];
 /// A note derived from the reducer would therefore promise a key that does nothing on that screen.
 /// The declaration lives in `super::acts` and reconciling the two is not a drawing decision, so the
 /// disagreement is recorded here rather than papered over.
+///
+/// 🔴 **Closed, `req/38` SS974.** The reconciliation happened where the paragraph above said it
+/// belonged: `acts::apply` now reads the row count for `act.open` as it already did for the four
+/// acts that move the attention, so the reducer and this function agree without either of them
+/// knowing about the other. The paragraph stays because it is the record of a defect that was named
+/// before it was repaired — and because the *shape* of it is still the rule: a note derived from a
+/// declaration that disagrees with the screen is a promise the face does not keep. Gate g21 is what
+/// stops the two drifting apart again.
 #[must_use]
 pub fn offered(rows: usize) -> &'static [Act] {
-    if rows == 0 {
-        &NOTE_ORDER_EMPTY
-    } else {
-        &NOTE_ORDER
+    match rows {
+        0 => &NOTE_ORDER_EMPTY,
+        1 => &NOTE_ORDER_ONE,
+        _ => &NOTE_ORDER,
     }
 }
 
@@ -590,7 +631,36 @@ pub fn render_view_to_buffer(
     wide: bool,
     view: &View,
 ) -> Buffer {
-    let measured = measured(screen);
+    render_live_to_buffer(
+        screen,
+        width,
+        height,
+        tier,
+        wide,
+        view,
+        live::LinkReport::off(),
+    )
+}
+
+/// The same, for a run whose subscription is in a given state.
+///
+/// 🔴 The road every other buffer function ends up in, so a probe that sweeps the four states of the
+/// connection is drawing the frame the live face draws rather than a second rendering of it. That is
+/// the same reason `--dump` goes through [`draw`].
+///
+/// # Panics
+/// Only if the in-memory backend fails to allocate, which it does not.
+#[must_use]
+pub fn render_live_to_buffer(
+    screen: &Screen,
+    width: u16,
+    height: u16,
+    tier: Tier,
+    wide: bool,
+    view: &View,
+    link: live::LinkReport,
+) -> Buffer {
+    let measured = measured_with_link(screen, link);
     let plan = layout::resolve(width, height, &measured, wide);
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("the in-memory backend does not fail");
@@ -609,6 +679,19 @@ pub fn render_view_to_buffer(
 /// [`Nothing::Loading`] in this build. A face that showed an empty table while it waited would be
 /// saying "nothing happened" about a question it had not yet asked.
 ///
+/// # The loop waits on two things, and redraws for a third reason
+///
+/// 🔴 It used to block in `event::read()`, which is correct for a face whose only source of change
+/// is a keypress and wrong for one the engine can talk to. It now waits [`WAKE`] for a key and,
+/// when none arrives, asks the subscription whether anything happened. Three things make a frame:
+/// a key, a re-read, and the connection's own state moving — the last of those matters because
+/// `opening -> open -> closed` has to reach the screen even on a run where nobody touches the
+/// keyboard and no event ever arrives.
+///
+/// 🔴 And the frame is drawn only when one of them happened. A loop that redrew on every wake would
+/// make `frames` a count of elapsed time rather than a count of changes, which is the number this
+/// verb reports on the way out.
+///
 /// # Errors
 /// [`crate::Error::OutputFailed`] when the terminal cannot be measured, drawn on, or read from.
 pub fn interactive(options: &super::Options, tier: Tier) -> crate::Result<(u64, u64)> {
@@ -619,55 +702,90 @@ pub fn interactive(options: &super::Options, tier: Tier) -> crate::Result<(u64, 
     let mut view = View::default();
     let mut frames: u64 = 0;
     let mut reads: u64 = 0;
+    // Opened before the first frame, so that the first thing the screen says about the connection is
+    // `opening` rather than a state invented to fill the gap.
+    let subscription = Subscription::start(&options.base_url, options.token.as_deref());
+    let mut link = subscription.report();
+    let mut dirty = true;
     let outcome = loop {
-        let size = match terminal.size() {
-            Ok(size) => size,
-            Err(e) => break Err(e),
-        };
-        let measured = measured(&screen);
-        let plan = super::layout::resolve(size.width, size.height, &measured, options.wide);
-        if let Err(e) = terminal.draw(|frame| draw(frame, &screen, &plan, tier, &view)) {
-            break Err(e);
+        if dirty {
+            let size = match terminal.size() {
+                Ok(size) => size,
+                Err(e) => break Err(e),
+            };
+            let measured = measured_with_link(&screen, link);
+            let plan = super::layout::resolve(size.width, size.height, &measured, options.wide);
+            if let Err(e) = terminal.draw(|frame| draw(frame, &screen, &plan, tier, &view)) {
+                break Err(e);
+            }
+            frames += 1;
+            dirty = false;
         }
-        frames += 1;
         if screen.healthz.is_pending() {
             screen = Screen::read(&options.base_url, options.token.as_deref());
             reads += 1;
+            dirty = true;
             continue;
         }
-        match event::read() {
-            Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
-                // 🔴 The interrupt is the medium's, not an act. `Ctrl-C` stops a process in every
-                // terminal program a reader has ever used; declaring the convention as one of this
-                // face's capabilities would be claiming credit for the terminal's own manners.
-                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-                    break Ok(());
-                }
-                // Key -> name -> act -> effect. The binding table is `super::acts`; the only thing
-                // the medium contributes is how the bytes of a key are spelled.
-                let Some(act) = key_name(key.code).and_then(|name| acts::for_key(&name)) else {
-                    continue;
-                };
-                let rows = screen.transformations.items().len();
-                let (next, signal) = acts::apply(&view, act, rows);
-                view = next;
-                match signal {
-                    Signal::Read => {
-                        screen = Screen::read(&options.base_url, options.token.as_deref());
-                        reads += 1;
+        match event::poll(WAKE) {
+            Ok(true) => match event::read() {
+                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                    // 🔴 The interrupt is the medium's, not an act. `Ctrl-C` stops a process in
+                    // every terminal program a reader has ever used; declaring the convention as one
+                    // of this face's capabilities would be claiming credit for the terminal's own
+                    // manners.
+                    if key.modifiers.contains(KeyModifiers::CONTROL)
+                        && key.code == KeyCode::Char('c')
+                    {
+                        break Ok(());
                     }
-                    Signal::Leave => break Ok(()),
-                    Signal::None => {}
+                    // Key -> name -> act -> effect. The binding table is `super::acts`; the only
+                    // thing the medium contributes is how the bytes of a key are spelled.
+                    let Some(act) = key_name(key.code).and_then(|name| acts::for_key(&name)) else {
+                        continue;
+                    };
+                    let rows = screen.transformations.items().len();
+                    let (next, signal) = acts::apply(&view, act, rows);
+                    dirty |= next != view;
+                    view = next;
+                    match signal {
+                        Signal::Read => {
+                            screen = Screen::read(&options.base_url, options.token.as_deref());
+                            reads += 1;
+                            dirty = true;
+                        }
+                        Signal::Leave => break Ok(()),
+                        Signal::None => {}
+                    }
                 }
-            }
-            Ok(_) => {}
+                Ok(_) => {}
+                Err(e) => break Err(e),
+            },
+            Ok(false) => {}
             Err(e) => break Err(e),
+        }
+        // 🔴 The event says "look again"; it does not say what to look at. The rows on the screen
+        // are still whatever the four routes answered, which is what keeps the engine the only thing
+        // that says what is true (`super::live::ON_EVENT`).
+        if subscription.due() {
+            screen = Screen::read(&options.base_url, options.token.as_deref());
+            reads += 1;
+            dirty = true;
+        }
+        let now = subscription.report();
+        if now != link {
+            link = now;
+            dirty = true;
         }
     };
     // 🔴 Unconditionally, on the error road as well: a process that leaves the terminal in raw mode
     // and in the alternate screen has broken the operator's session, and it did so while reporting
     // a different failure.
     ratatui::restore();
+    // 🔴 After the restore, and that order is the decision: dropping the subscription asks the
+    // worker to stop and waits for it, and the longest that can take is one read window. The
+    // operator gets the terminal back first and the wait happens on a shell they can already use.
+    drop(subscription);
     outcome.map_err(|e| crate::Error::OutputFailed {
         detail: e.to_string(),
     })?;
