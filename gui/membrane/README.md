@@ -15,5 +15,5 @@ node tools/bench.mjs                           # 2026-08-24 repair lane追加(ap
 ### 生成物の位置(2026-08-24 repair lane追加・app req/98 V-13)
 
 - `route-table.json`: 生成物・source=crate。regen: `node tools/route_table_from_crate.mjs`(drift test: `test/route_table.test.mjs`)。
-- `coverage.json`: **hand-maintained、非生成と宣言する**——面の宣言(どのrouteをどの面が使うか)は人が書く判断であり、crateから機械抽出できる性質のものではない。regenerateコマンドは無い(そもそもregenerate対象でない)。
+- `coverage.json`: **hand-maintained、非生成と宣言する**——面の宣言(どのrouteをどの面が使うか)は人が書く判断であり、crateから機械抽出できる性質のものではない。regenerateコマンドは無い(そもそもregenerate対象でない)。**ただし各faceの登録行自体は、そのfaceのcode一次(export)と`test/face_coverage.test.mjs`で機械照合される(req/967 §4-2・2026-08-30 terminalが最初のentry)**——手で書く判断は「どの面が使うか」であって「何を使っているか」の数え上げではない。
 - `wire-fields.json`: **hand-maintained、非生成と宣言する**——NOT_DRAWNの母集団(意図的に描画しない配線)は人が書く判断。同じくregenerate対象でない。両fileとも変更時は`req/01_MEMBRANE.md`の該当宣言行と一致させる(一致検査は現状未実装=open)。

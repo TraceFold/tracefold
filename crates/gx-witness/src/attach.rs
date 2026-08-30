@@ -41,6 +41,19 @@
 //! Folding these into one "unknown" would make a gap that a later lane can close look identical to
 //! one that physics forbids. `req/510` spent a lane undoing exactly that collapse one layer in.
 //!
+//! # 🔴 The bundle is usually not in the response (`req/969`)
+//!
+//! Every attestation entry observed in a real response carries `"bundle": null` and a `bundle_url`
+//! pointing at storage, so the inline road this module was first written for is the road real
+//! responses do **not** take. That is [`Refusal::BundleExternalized`], and it is a separate arm
+//! from [`Refusal::NoBundle`] for the same reason [`NotAttested`] keeps three members: an absence a
+//! caller can act on must not look like one it cannot. The caller fetches and decompresses
+//! (`Content-Type: application/x-snappy`), then comes back through [`read_resolved_bundle`].
+//!
+//! This crate performs no I/O and grows no decompressor for it. `Measured` is out of reach because
+//! of a missing dependency and the type says so; retrieval is out of reach because a network client
+//! in this dependency graph trips a floor gate, and the refusal vocabulary says that.
+//!
 //! # 🔴 What is deliberately *not* checked
 //!
 //! No signature is verified, no certificate is parsed, and no transparency-log inclusion is
@@ -193,6 +206,25 @@ pub enum Refusal {
         /// Which entry.
         index: usize,
     },
+    /// 🔴 One entry does not carry its bundle: it carries the address of one.
+    ///
+    /// Distinct from [`Refusal::NoBundle`] for the reason [`NotAttested::NotReadByThisBuild`] is
+    /// distinct from [`NotAttested::DocumentSilent`]: **this one is a fetch away**. A caller told
+    /// "no bundle" stops; a caller told "elsewhere, here" continues. Reporting an externalised
+    /// bundle as an absent one is the answer-vocabulary's collapse committed one layer out, and it
+    /// is what the collected response actually provoked (`req/969` §1-3).
+    ///
+    /// This crate does not fetch. Doing so would put a network client in `gx-witness`'s dependency
+    /// graph, which a floor gate refuses on purpose, so retrieval — and the Snappy decompression
+    /// the storage layer applies — belong to the caller, which then returns here through
+    /// [`read_resolved_bundle`].
+    BundleExternalized {
+        /// Which entry.
+        index: usize,
+        /// Where the entry says its bundle lives. Never empty: an address that addresses nothing
+        /// would send a caller to fetch it (`req/969` INV-E2).
+        url: String,
+    },
     /// One bundle carries no `dsseEnvelope`.
     NoDsseEnvelope {
         /// Which entry.
@@ -255,6 +287,13 @@ impl fmt::Display for Refusal {
             Refusal::NoBundle { index } => {
                 write!(f, "attestations[{index}] carries no `bundle`")
             }
+            Refusal::BundleExternalized { index, url } => write!(
+                f,
+                "attestations[{index}] holds no bundle inline and names {url} as where its bundle \
+                 lives; this is not an absent attestation but an unfetched one, and this crate \
+                 does not fetch. Retrieve and decompress it, then read it with \
+                 `read_resolved_bundle`"
+            ),
             Refusal::NoDsseEnvelope { index } => {
                 write!(f, "attestations[{index}].bundle carries no `dsseEnvelope`")
             }
@@ -330,40 +369,115 @@ pub fn read_github_attestations(
     let wanted = expected_subject;
     let mut out = Vec::with_capacity(attestations.len());
     for (index, attestation) in attestations.iter().enumerate() {
-        let bundle = attestation
-            .get("bundle")
-            .ok_or(Refusal::NoBundle { index })?;
-        let envelope = bundle
-            .get("dsseEnvelope")
-            .ok_or(Refusal::NoDsseEnvelope { index })?;
-        let payload = envelope
-            .get("payload")
-            .and_then(Value::as_str)
-            .ok_or(Refusal::NoPayload { index })?;
-        let decoded =
-            gx_core::b64::decode(payload).map_err(|detail| Refusal::PayloadNotBase64 {
-                index,
-                detail: detail.to_string(),
-            })?;
-        let statement: Value =
-            serde_json::from_slice(&decoded).map_err(|e| Refusal::StatementNotJson {
-                index,
-                detail: e.to_string(),
-            })?;
-
-        out.push(project(index, attestation, &statement, wanted)?);
+        let bundle = bundle_of(index, attestation)?;
+        let statement = statement_in(index, bundle)?;
+        let initiator = attestation.get("initiator").and_then(Value::as_str);
+        out.push(project(
+            index,
+            format!("attestations[{index}]"),
+            initiator,
+            &statement,
+            wanted,
+        )?);
     }
     Ok(out)
 }
 
+/// 🔴 The inline bundle, or the reason there is not one — told apart by whether the entry named a
+/// place to find it.
+///
+/// `serde_json` returns `Some(&Value::Null)` for a key that is present and null, so the first
+/// version of this walk fell through a `null` bundle into the `dsseEnvelope` lookup and refused
+/// with [`Refusal::NoDsseEnvelope`] — announcing that a document with a perfectly good envelope had
+/// none. **Every real entry observed so far takes this road** (`req/948b_artifacts`), so it was not
+/// an edge case; it was the case.
+fn bundle_of(index: usize, attestation: &Value) -> Result<&Value, Refusal> {
+    match attestation.get("bundle") {
+        Some(bundle) if !bundle.is_null() => Ok(bundle),
+        // Present-and-empty is not an address: a caller sent to fetch `""` is worse off than one
+        // told there is nothing, because it will spend a request finding that out (INV-E2).
+        _ => match attestation.get("bundle_url").and_then(Value::as_str) {
+            Some(url) if !url.trim().is_empty() => Err(Refusal::BundleExternalized {
+                index,
+                url: url.to_string(),
+            }),
+            _ => Err(Refusal::NoBundle { index }),
+        },
+    }
+}
+
+/// The in-toto statement inside one bundle's DSSE envelope.
+///
+/// Shared by both entry points, so an inline bundle and a fetched one are read by the same code and
+/// cannot drift into two dialects of the same format.
+fn statement_in(index: usize, bundle: &Value) -> Result<Value, Refusal> {
+    let envelope = bundle
+        .get("dsseEnvelope")
+        .ok_or(Refusal::NoDsseEnvelope { index })?;
+    let payload = envelope
+        .get("payload")
+        .and_then(Value::as_str)
+        .ok_or(Refusal::NoPayload { index })?;
+    let decoded = gx_core::b64::decode(payload).map_err(|detail| Refusal::PayloadNotBase64 {
+        index,
+        detail: detail.to_string(),
+    })?;
+    serde_json::from_slice(&decoded).map_err(|e| Refusal::StatementNotJson {
+        index,
+        detail: e.to_string(),
+    })
+}
+
+/// 🔴 Read a bundle the caller fetched from the address a [`Refusal::BundleExternalized`] handed
+/// back, after decompressing it.
+///
+/// The other half of the externalised road. Without it the repair would be a politer dead end — a
+/// refusal that names a place and no door to bring the answer back to.
+///
+/// `initiator` is the value from the *outer* response entry, because the bundle does not carry one;
+/// passing `None` is honest and costs the authority row, which then reports
+/// [`NotAttested::NotReadByThisBuild`] rather than claiming nobody is named.
+///
+/// # 🔴 What this does not check
+///
+/// That these bytes came from that URL. This is translation, not verification: a caller who hands
+/// over different bytes gets an answer about different bytes. The same reason nothing here reaches
+/// `Measured` applies one level up — [`Declared::source`] records where each row was read off so a
+/// reader can go and look instead of being asked to trust the trip.
+///
+/// # Errors
+/// One [`Refusal`] per condition, at `index` 0 since a resolved bundle stands alone.
+pub fn read_resolved_bundle(
+    bytes: &[u8],
+    expected_subject: &str,
+    initiator: Option<&str>,
+) -> Result<AttachedEvidence, Refusal> {
+    let bundle: Value = serde_json::from_slice(bytes).map_err(|e| Refusal::NotJson {
+        detail: e.to_string(),
+    })?;
+    let statement = statement_in(0, &bundle)?;
+    project(
+        0,
+        "bundle.dsseEnvelope".to_string(),
+        initiator,
+        &statement,
+        expected_subject,
+    )
+}
+
 /// The projection itself: four questions, four answers, no road that returns fewer.
+///
+/// 🔴 This is the seam. It takes a statement and an initiator — never a transport shape — so an
+/// inline bundle and a fetched one reach the four questions by the same road. `req/948c` predicted
+/// a second *format* would test the seam; a second *carriage* of the same format tested it first,
+/// and the return type did not have to widen (`req/969` §6).
 fn project(
     index: usize,
-    attestation: &Value,
+    locator: String,
+    initiator: Option<&str>,
     statement: &Value,
     wanted: &str,
 ) -> Result<AttachedEvidence, Refusal> {
-    let locator = format!("attestations[{index}]");
     let written = what_was_written(index, &locator, statement, wanted)?;
 
     Ok(AttachedEvidence {
@@ -391,7 +505,7 @@ fn project(
             (Question::When, when(statement)),
             (
                 Question::ByWhoseAuthority,
-                by_whose_authority(&locator, attestation),
+                by_whose_authority(&locator, initiator),
             ),
         ],
     })
@@ -505,8 +619,13 @@ fn when(statement: &Value) -> AttachedAnswer {
 /// The response's own `initiator` is a name somebody wrote down. When it is absent the identity
 /// lives in the bundle's Fulcio certificate, which this build does not parse — releasable, and said
 /// as such rather than reported as "no authority".
-fn by_whose_authority(locator: &str, attestation: &Value) -> AttachedAnswer {
-    match attestation.get("initiator").and_then(Value::as_str) {
+///
+/// Taken as an `Option<&str>` rather than dug out of a response body, because a bundle fetched from
+/// `bundle_url` carries no `initiator`: the name lives in the outer entry, and the caller that held
+/// both is the one that can supply it. Passing `None` loses the name honestly; inventing a place
+/// for it to live in the bundle would not.
+fn by_whose_authority(locator: &str, initiator: Option<&str>) -> AttachedAnswer {
+    match initiator {
         Some(initiator) => AttachedAnswer::Declared(Declared {
             source: format!("{locator}.initiator"),
             claim: format!(

@@ -24,6 +24,13 @@
 //! | `tile.rs` | `LedgerEntry`, `LedgerLeaf`, `Tile` | 2 (done) | AC-021, AC-024 |
 //! | `proof.rs` | `ConsistencyProof`, proof generation and verification | 2 (done) | AC-022, AC-023 |
 //! | `store.rs` | persistence, fsync-on-append | 3 (done) | AC-069 (NFR-009) |
+//! | `head.rs` | `PersistedHead`, `HeadWitness`, `HeadFloor`, `AcceptedRollback`, `RolledBack` (R6/R7, not 42 §0) | req/230 R6 (done) | M-02 (req/232 H-01/H-02) |
+//! | `witness_audit.rs` | — (detector; no new type) | req/682 Phase B (done) | AC-B1, AC-B2, AC-B3, AC-B6, AC-B7 |
+//!
+//! 🔴 Both rows are additive (registry gap closed, `req/964` §10 Z-B): 41 §2 fixed the module list
+//! as `src/{lib,tile,proof,store}.rs` before `head.rs` (`req/230`, R6 monotonicity) and
+//! `witness_audit.rs` (`req/682`, Phase B equivocation) existed; this table previously omitted
+//! both even though `pub mod head` / `pub mod witness_audit` (below) already shipped them.
 //!
 //! The two halves are separate types on purpose. [`tile::TileLog`] is the tree: it holds leaves,
 //! folds roots and answers proofs, and nothing in it survives a process. [`store::LedgerStore`] is

@@ -88,11 +88,12 @@ test('L4 a wanted address is matched on the verb and the path together, never on
 
 test('L5 a reason tag outside the three is refused', () => {
   const coverage = clone(COVERAGE);
-  // get_stream stays genuinely NOT_CONSUMED (no face reads the byte stream, req/967
-  // §5-1); a route the terminal face already registered as consumed (get_healthz) is
-  // no longer a member of NOT_CONSUMED at all, so a bad tag written against it would be
-  // refused for the different reason of naming a non-member, not for the tag itself.
-  coverage.reasons.NOT_CONSUMED.get_stream = { tag: 'later', note: '' };
+  // get_ledger_proof stays genuinely NOT_CONSUMED (no face carries a verifier for it,
+  // req/967 §5-1); a route the terminal face already registered as consumed (e.g.
+  // get_healthz, get_stream) is no longer a member of NOT_CONSUMED at all, so a bad tag
+  // written against one of those would be refused for the different reason of naming a
+  // non-member, not for the tag itself.
+  coverage.reasons.NOT_CONSUMED.get_ledger_proof = { tag: 'later', note: '' };
   const { ok, problems } = deriveLedgers({ routes: ROWS, coverage, fields: FIELDS });
   assert.equal(ok, false);
   assert.ok(problems.some((p) => p.includes('later')));

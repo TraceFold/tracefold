@@ -84,7 +84,7 @@ const LONG_ABOUT: &str = "gx is a guard the changes an AI agent makes go through
                   verdict-checkpoint, repair\n\
                   Put gx in the path:   attach (place gx's own directory on a project that is \
                   already running, and print what was placed), wrap (an agent's tools), serve \
-                  (HTTP), demo\n\
+                  (HTTP), tui (read a running server on a terminal), demo\n\
                   Hold it at the kernel: confine (Linux: run a command under a Landlock ruleset \
                   the catalogue decides — `gx limits` says what that does and does not cover)\n\
                   Set up and inspect:   key, policy, draft, limits\n\
@@ -523,6 +523,97 @@ enum Command {
         #[arg(long)]
         #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
+    },
+    /// 🔴 **`req/942`** — the terminal face: what a running `gx serve` is admitting, refusing and
+    /// handing to a person, on a fixed grid.
+    ///
+    /// Not one of 44 §1.1's thirteen, and reported as an addition in the shape `gx wrap`,
+    /// `gx confine` and `gx attach` took. It is the third renderer over the same four routes the
+    /// browser monitor draws (`req/932`), and it opens no project: it reads `GET /v1/healthz`,
+    /// `/v1/transformations`, `/v1/candidates` and `/v1/escalations` over loopback HTTP and draws
+    /// them. There is no writing method in `src/tui/`, and two probes in
+    /// `crates/gx-cli/tests/r942_tui.rs` measure that rather than promising it.
+    ///
+    /// 🔴 **`cfg(feature = "tui")`** (`req/942` §10-2) — the one external crate this face needs
+    /// (`ratatui`) is optional, so a build that does not want a terminal library does not carry one.
+    #[cfg(feature = "tui")]
+    #[command(
+        about = "Read a running gx server on a terminal.",
+        long_about = "Read a running gx server on a terminal.\n\
+                      \n\
+                      Four routes are read and two of them are drawn: GET /v1/healthz above and \
+                      GET /v1/transformations below. GET /v1/candidates and GET /v1/escalations \
+                      are read for the timing line and declared, on screen, as not drawn. Nothing \
+                      is written: this face can put no method other than GET on a socket.\n\
+                      \n\
+                      Keys, one per declared act (gx_cli::tui::acts::ACTS; the alternatives are in \
+                      that table and this line spells the first of each):\n\
+                      \x20 k    attend to the record above this one\n\
+                      \x20 j    attend to the record below this one\n\
+                      \x20 g    attend to the first record\n\
+                      \x20 G    attend to the last record\n\
+                      \x20 return  see everything this record carries\n\
+                      \x20 escape  stop seeing one record and see the list again\n\
+                      \x20 r    ask the engine again, now\n\
+                      \x20 q    stop reading and give the terminal back\n\
+                      \n\
+                      Marks. A cell is never blank when the answer is a kind of nothing, and the \
+                      six kinds are told apart:\n\
+                      \x20 ...  not measured yet\n\
+                      \x20 ?    measured, and the answer was not knowable\n\
+                      \x20 --   the wire did not carry the key\n\
+                      \x20 no   the wire carried the key, and the answer is no\n\
+                      \x20 0    measured, and the count is nought\n\
+                      \x20 -x   it was there and was struck out (declared; no route among these \
+                      four reports it, so it does not appear in this build)\n\
+                      \x20 ~    the value was wider than its column and was cut\n\
+                      \x20 !    at the start of the bottom line: the screen was too small to hold \
+                      even the floor, so the table above is clipped\n\
+                      \n\
+                      The bottom line says what is not on the screen and where to go for it. When \
+                      the screen is too small to carry the timing line as its own region, that \
+                      line is folded into the bottom line and marked `no address, measured here` \
+                      -- those four facts are measured by this process, so a second read makes a \
+                      new measurement rather than returning the lost one.\n\
+                      \n\
+                      Environment: GX_BASE_URL (default 127.0.0.1:8842 over http) and GX_TOKEN. \
+                      Both names are the ones sdk/typescript and glovrex_app/monitor already use."
+    )]
+    Tui {
+        /// The server to read.
+        #[arg(long, value_name = "URL")]
+        #[arg(help = "The server to read. Defaults to $GX_BASE_URL, then http://127.0.0.1:8842.", long_help = None)]
+        base_url: Option<String>,
+
+        /// The bearer token, in a file rather than in a shell history.
+        #[arg(long, value_name = "FILE")]
+        #[arg(help = "A file holding the bearer token. Defaults to $GX_TOKEN.", long_help = None)]
+        token_file: Option<PathBuf>,
+
+        /// Draw one frame into a buffer and print it, instead of taking the terminal.
+        #[arg(long)]
+        #[arg(help = "Draw one frame into a buffer and print it instead of taking the terminal.", long_help = None)]
+        dump: bool,
+
+        /// The buffer's width, with `--dump`.
+        #[arg(long, default_value_t = 80, value_name = "CELLS")]
+        #[arg(help = "The buffer's width, with --dump.", long_help = None)]
+        width: u16,
+
+        /// The buffer's height, with `--dump`.
+        #[arg(long, default_value_t = 24, value_name = "CELLS")]
+        #[arg(help = "The buffer's height, with --dump.", long_help = None)]
+        height: u16,
+
+        /// Spell the bottom line in full, even where it costs rows.
+        #[arg(long)]
+        #[arg(help = "Spell the bottom line in full, even where it costs rows.", long_help = None)]
+        wide: bool,
+
+        /// Force a colour tier instead of reading the environment.
+        #[arg(long, value_name = "TIER", value_parser = ["truecolor", "256", "16", "mono"])]
+        #[arg(help = "Force a colour tier: truecolor, 256, 16 or mono. Marks never carry colour in any of them.", long_help = None)]
+        tier: Option<String>,
     },
     /// 🔴 **S③** (`req/493` §0) — run a command under a kernel ruleset (Landlock) whose write face
     /// the catalogue decides.
@@ -1790,6 +1881,12 @@ fn reads_the_mcp_wiring(command: &Command) -> bool {
         // cannot be written on one alternative inside an `|`-chain.
         #[cfg(feature = "confine")]
         Command::Confine { .. } => true,
+        // 🔴 **`req/942`** — `gx tui` reads four routes over HTTP and starts nothing. The six
+        // globals name a server this verb has no road to, so it answers the way `gx cancel` does:
+        // false, and `refuse_unused_mcp_flags` refuses them rather than accepting and dropping
+        // them. Its own arm because the variant is `cfg(feature = "tui")`.
+        #[cfg(feature = "tui")]
+        Command::Tui { .. } => false,
         // 🔴 `gx wrap` names its server **after `--`** and carries its own `--server-env`,
         // `--endpoint`, `--restore` and `--restore-catalogue`. The globals are a second spelling it
         // does not read, and two spellings of "which server" on one command is the ambiguity this
@@ -2188,6 +2285,28 @@ fn run(cli: &Cli) -> Result<Outcome> {
         #[cfg(feature = "mcp")]
         Command::DemoNotesServer => gx_cli::demo::serve_notes(),
         Command::Limits { json } => gx_cli::limits::run(*json),
+        // 🔴 **`req/942`** — no project is opened and no engine is constructed on this road. The
+        // options are resolved once, here, so that the flag/environment/default order is one fact
+        // in one place (`gx_cli::tui::Options::resolve`).
+        #[cfg(feature = "tui")]
+        Command::Tui {
+            base_url,
+            token_file,
+            dump,
+            width,
+            height,
+            wide,
+            tier,
+        } => {
+            let mut options =
+                gx_cli::tui::Options::resolve(base_url.clone(), token_file.as_deref());
+            options.dump = *dump;
+            options.width = *width;
+            options.height = *height;
+            options.wide = *wide;
+            options.tier = tier.as_deref().and_then(gx_cli::tui::renderer::Tier::parse);
+            gx_cli::tui::run(&options)
+        }
         #[cfg(feature = "confine")]
         Command::Confine {
             tool,

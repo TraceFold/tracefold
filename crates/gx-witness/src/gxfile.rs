@@ -131,9 +131,13 @@ pub enum GxKind {
     VerdictCheckpoint,
     /// 42 §3.8.
     EscalationTicket,
-    /// 🔴 **Provisional.** The proposed chapter §3.16.1 records that `AttachSource` has no type
-    /// table in 42 and no endpoint row in 44 — a pre-existing spec debt, not one this file makes.
-    /// The number is reserved so that closing that debt does not have to renumber anything.
+    /// 🔴 **Provisional** (`is_shipped() == false`). Until `req/824` landed A4/A5, `AttachSource`
+    /// had no type table in 42 and no endpoint row in 44 — the number was reserved so that closing
+    /// that debt later would not have to renumber anything. Both now exist: 42 §3.16 gives the type
+    /// table (`AttachedEvidence`/`AttachedSource`/`AttachedAnswer`), and 44 §2.1 carries the 4 route
+    /// rows (`POST`/`GET /attach-sources`, `GET /attach-sources/{id}`, `POST
+    /// /attach-sources/{id}/observations`, L509-512) plus the 2 `gx_code` rows tied to them
+    /// (`SOURCE_UNKNOWN`/`SOURCE_KEY_INVALID`, L870-871).
     AttachSource,
     /// 42 §3.13.
     EngineJournal,

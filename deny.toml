@@ -285,6 +285,54 @@ name = "sha2"
 version = "=0.10.9"
 
 # ---------------------------------------------------------------------------
+# 2026-08-30, `req/942` (`gx tui`): `lru`, the fifth duplicate this file has measured, and the
+# first one the terminal face brought.
+# ---------------------------------------------------------------------------
+#
+# Two versions, two unrelated chains, neither this workspace's choice:
+#   * `0.16.4` under `gx-adapter-mysql -> mysql v28.0.0` -- the MySQL client's own prepared-statement
+#     cache.
+#   * `0.18.3` under `ratatui-core v0.1.2 <- ratatui` -- the terminal library's own cache of measured
+#     text widths.
+# Skipping the older half (`0.16.4`), the same shape as `getrandom`/`hashbrown`/`arrayvec`/`sha2`
+# above: the newer version stays the one `multiple-versions = "deny"` enforces against a *sixth*
+# duplicate. Closes when `mysql` releases against `lru` 0.18 -- the thing to watch is
+# `mysql` v28.0.0's own pin, not anything on this side.
+#
+# 🔴 Measured, not asserted: `req/942`'s five-point count for this edge is +28 packages
+# (290 -> 318 on `cargo tree -e normal -p gx-cli`), all `MIT` or `MIT OR Apache-2.0`, subtree MSRV
+# max 1.88.0 against this workspace's 1.89. The numbers and the budget overrun are in
+# `req/942_artifacts/build_lane_report.md` rather than settled quietly here.
+[[bans.skip]]
+name = "lru"
+version = "=0.16.4"
+
+# 🔴 And `darling`, in three crates, which is the honest cost of this edge rather than the one
+# number a report would rather give. `ratatui` marks its own unstable items with `instability`, a
+# proc-macro that depends on `darling` 0.24.1; `cedar-policy` reaches `darling` 0.23.0 through
+# `serde_with -> serde_with_macros`. Neither side is this workspace's choice and neither is
+# reachable from anything gx decides -- both are attribute-macro plumbing that runs at build time
+# and ships nothing.
+#
+# Skipping the older half (`0.23.0`), the same shape as every entry above, so a *seventh* duplicate
+# is still a red build. Closes when `serde_with` releases against `darling` 0.24 -- the thing to
+# watch is `serde_with_macros` v3.21.0's pin, on cedar's side, not on ours.
+#
+# 🔴 Four new entries from one dependency is the largest single addition to this file since cedar's
+# seven, and it is stated here rather than left for a reader to count.
+[[bans.skip]]
+name = "darling"
+version = "=0.23.0"
+
+[[bans.skip]]
+name = "darling_core"
+version = "=0.23.0"
+
+[[bans.skip]]
+name = "darling_macro"
+version = "=0.23.0"
+
+# ---------------------------------------------------------------------------
 # sources -- where a crate may come from
 # ---------------------------------------------------------------------------
 [sources]

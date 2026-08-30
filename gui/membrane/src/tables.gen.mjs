@@ -283,7 +283,7 @@ export const TABLE = {
 };
 
 export const COVERAGE = {
-  "note": "What the faces declare they call and draw. Membership in the three ledgers is NOT written here -- it is computed from this file against the route table and the field domain. The terminal face (glovrex_app/terminal/, req/946) has landed and is the first entry in `consumed`/`drawn`: its registration below is machine-checked against its own exports (`READS`/`SUBJECT` in terminal/tui.mjs, `COLUMNS` in terminal/roles.mjs) by membrane/test/face_coverage.test.mjs (req/967 §4-2), not hand-guessed -- run that suite after touching either file. As each face lands it adds itself to `consumed`/`drawn`, and its reason below must be removed in the same change or the gate goes red for keeping a stale explanation.",
+  "note": "What the faces declare they call and draw. Membership in the three ledgers is NOT written here -- it is computed from this file against the route table and the field domain. The terminal face (glovrex_app/terminal/, req/946) has landed and is the first entry in `consumed`/`drawn`: its registration below is machine-checked against its own exports (`READS`/`STREAM`/`SUBJECT` in terminal/tui.mjs, `COLUMNS` in terminal/roles.mjs) by membrane/test/face_coverage.test.mjs (req/967 §4-2), not hand-guessed -- run that suite after touching any of them. As each face lands it adds itself to `consumed`/`drawn`, and its reason below must be removed in the same change or the gate goes red for keeping a stale explanation.",
   "consumed": {
     "get_healthz": [
       "terminal"
@@ -295,6 +295,9 @@ export const COVERAGE = {
       "terminal"
     ],
     "get_escalations": [
+      "terminal"
+    ],
+    "get_stream": [
       "terminal"
     ]
   },
@@ -367,10 +370,6 @@ export const COVERAGE = {
       "get_ledger_consistency": {
         "tag": "undesigned",
         "note": "no face is built"
-      },
-      "get_stream": {
-        "tag": "unimplemented",
-        "note": "live events; nothing consumes the byte stream the membrane hands back"
       },
       "post_verdict_checkpoints": {
         "tag": "undesigned",

@@ -129,6 +129,10 @@ pub mod replay;
 pub mod rng;
 pub mod serve;
 pub mod session;
+/// 🔴 **`cfg(feature = "tui")`** (`req/942` §10-2) — the terminal face. It reads the HTTP surface
+/// and nothing else: no engine is opened here, no project directory, no verdict constructed.
+#[cfg(feature = "tui")]
+pub mod tui;
 pub mod verdict;
 /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — `gx wrap` is the road from an agent's `tools/call` to
 /// `Engine::commit`, and that road is `gx_mcp_wire`'s transport; see `attach` above.
