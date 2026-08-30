@@ -283,9 +283,24 @@ export const TABLE = {
 };
 
 export const COVERAGE = {
-  "note": "What the faces declare they call and draw. Membership in the three ledgers is NOT written here -- it is computed from this file against the route table and the field domain. Today there are no faces, so every route is uncovered and every reason says so. As each face lands it adds itself to `consumed`/`drawn`, and its reason below must be removed in the same change or the gate goes red for keeping a stale explanation.",
-  "consumed": {},
-  "drawn": [],
+  "note": "What the faces declare they call and draw. Membership in the three ledgers is NOT written here -- it is computed from this file against the route table and the field domain. The terminal face (glovrex_app/terminal/, req/946) has landed and is the first entry in `consumed`/`drawn`: its registration below is machine-checked against its own exports (`READS`/`SUBJECT` in terminal/tui.mjs, `COLUMNS` in terminal/roles.mjs) by membrane/test/face_coverage.test.mjs (req/967 §4-2), not hand-guessed -- run that suite after touching either file. As each face lands it adds itself to `consumed`/`drawn`, and its reason below must be removed in the same change or the gate goes red for keeping a stale explanation.",
+  "consumed": {
+    "get_healthz": [
+      "terminal"
+    ],
+    "get_transformations": [
+      "terminal"
+    ],
+    "get_candidates": [
+      "terminal"
+    ],
+    "get_escalations": [
+      "terminal"
+    ]
+  },
+  "drawn": [
+    "get_transformations.items"
+  ],
   "requested": [],
   "reasons": {
     "NOT_CONSUMED": {
@@ -304,10 +319,6 @@ export const COVERAGE = {
       "post_candidates": {
         "tag": "undesigned",
         "note": "no face proposes a change yet"
-      },
-      "get_candidates": {
-        "tag": "undesigned",
-        "note": "no face is built"
       },
       "get_candidates_id": {
         "tag": "undesigned",
@@ -338,14 +349,6 @@ export const COVERAGE = {
         "note": "no face is built"
       },
       "get_transformations_id": {
-        "tag": "undesigned",
-        "note": "no face is built"
-      },
-      "get_transformations": {
-        "tag": "undesigned",
-        "note": "no face is built"
-      },
-      "get_escalations": {
         "tag": "undesigned",
         "note": "no face is built"
       },
@@ -380,36 +383,28 @@ export const COVERAGE = {
       "get_verdict_checkpoints_window_end": {
         "tag": "undesigned",
         "note": "no face is built"
-      },
-      "get_healthz": {
-        "tag": "undesigned",
-        "note": "reachability is checked at start-up and is not drawn"
       }
     },
     "NOT_DRAWN": {
       "get_candidates.items": {
         "tag": "undesigned",
-        "note": "no face is built"
+        "note": "the terminal face reads this route (`consumed`, via READS) so its denominator counts and its disclosure name it, but the face draws rows only from its declared SUBJECT (get_transformations); whether a second panel ever draws candidates is undesigned"
       },
       "get_candidates.next_cursor": {
         "tag": "undesigned",
-        "note": "paging is folded by the membrane; a face may never see this member"
-      },
-      "get_transformations.items": {
-        "tag": "undesigned",
-        "note": "no face is built"
+        "note": "paging is folded inside the membrane (port.fold); a face may never see this member directly"
       },
       "get_transformations.next_cursor": {
         "tag": "undesigned",
-        "note": "as above"
+        "note": "as above -- folded internally by port.fold; unlike .items, the cursor itself is never handed to the renderer"
       },
       "get_escalations.items": {
         "tag": "undesigned",
-        "note": "no face is built"
+        "note": "as get_candidates.items -- read by the terminal face, not drawn; get_transformations is the only SUBJECT"
       },
       "get_escalations.next_cursor": {
         "tag": "undesigned",
-        "note": "as above"
+        "note": "as get_candidates.next_cursor -- folded internally"
       },
       "get_verdict_checkpoints.items": {
         "tag": "undesigned",

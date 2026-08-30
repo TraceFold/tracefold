@@ -11,27 +11,44 @@ const ROWS = tableRows();
 const FIELDS = WIRE_FIELDS.fields;
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
-test('L1 today every route is uncovered, and the count is the table\'s own', () => {
+test('L1 the denominator is the table\'s own, and today\'s coverage is the terminal face\'s own registration', () => {
+  // req/967 §4-2: the terminal face landed and registered itself in COVERAGE (the JSON
+  // beside this module, not a number written here) -- so "every route is uncovered" is
+  // no longer this file's claim. What stays true, and is asserted the same way it was
+  // before the face existed, is that N is read off the table/field domain and n is
+  // whatever COVERAGE's own consumed/drawn currently leave uncovered -- derived from
+  // COVERAGE, never hand-counted, so a face landing or leaving cannot make this stale.
   const { port } = createMembrane({ origin: 'http://127.0.0.1:8787' });
   const { ledgers, ok, problems } = port.ledgers();
   assert.equal(ok, true, problems.join('; '));
+  const calledRoutes = new Set(
+    Object.entries(COVERAGE.consumed ?? {}).filter(([, faces]) => faces.length > 0).map(([name]) => name),
+  );
+  const drawnFields = new Set(COVERAGE.drawn ?? []);
   assert.equal(ledgers.NOT_CONSUMED.N, ROWS.length);
-  assert.equal(ledgers.NOT_CONSUMED.n, ROWS.length);
+  assert.equal(ledgers.NOT_CONSUMED.n, ROWS.length - calledRoutes.size);
   assert.equal(ledgers.NOT_DRAWN.N, FIELDS.length);
-  assert.equal(ledgers.NOT_DRAWN.n, FIELDS.length);
+  assert.equal(ledgers.NOT_DRAWN.n, FIELDS.length - drawnFields.size);
   assert.equal(ledgers.NOT_A_ROUTE.n, 0);
   // Every member carries a reason, and the reasons are as many as the members.
   assert.equal(ledgers.NOT_CONSUMED.entries.length, ledgers.NOT_CONSUMED.n);
+  // And the face that IS registered really did leave the ledger, not just shrink the count.
+  for (const route of calledRoutes) assert.ok(!ledgers.NOT_CONSUMED.members.includes(route), `${route} is registered as consumed and is still in NOT_CONSUMED`);
 });
 
 test('L2 a face that starts calling a route leaves the ledger, and its stale reason is refused', () => {
   const coverage = clone(COVERAGE);
-  coverage.consumed = { get_candidates: ['ledger-face'] };
+  // post_candidates, not get_candidates: the terminal face already registered
+  // get_candidates as consumed (req/967 §4-2) and its old reason was removed in the
+  // same change that registered it, which is the behaviour this test exists to prove --
+  // so a route that still carries a real, un-removed reason is what demonstrates the
+  // refusal here. post_candidates is one (no face proposes a change yet).
+  coverage.consumed = { post_candidates: ['ledger-face'] };
   const { ledgers, problems, ok } = deriveLedgers({ routes: ROWS, coverage, fields: FIELDS });
   assert.equal(ledgers.NOT_CONSUMED.n, ROWS.length - 1);
-  assert.ok(!ledgers.NOT_CONSUMED.members.includes('get_candidates'));
+  assert.ok(!ledgers.NOT_CONSUMED.members.includes('post_candidates'));
   assert.equal(ok, false);
-  assert.ok(problems.some((p) => /get_candidates.*not a member/.test(p)), problems.join('; '));
+  assert.ok(problems.some((p) => /post_candidates.*not a member/.test(p)), problems.join('; '));
 });
 
 test('L3 a route with no reason is refused (the forgotten-entry road)', () => {
@@ -39,7 +56,13 @@ test('L3 a route with no reason is refused (the forgotten-entry road)', () => {
   const { ledgers, ok, problems } = deriveLedgers({ routes, coverage: clone(COVERAGE), fields: FIELDS });
   assert.equal(ok, false);
   assert.ok(problems.some((p) => p.includes('get_newly_served')));
-  assert.equal(ledgers.NOT_CONSUMED.n, routes.length);
+  // Not routes.length: the terminal face's own registration (req/967 §4-2) already
+  // takes some of them out of NOT_CONSUMED, so the count is derived from COVERAGE the
+  // same way L1 derives it, rather than assumed to be every route.
+  const calledRoutes = new Set(
+    Object.entries(COVERAGE.consumed ?? {}).filter(([, faces]) => faces.length > 0).map(([name]) => name),
+  );
+  assert.equal(ledgers.NOT_CONSUMED.n, routes.length - calledRoutes.size);
 });
 
 test('L4 a wanted address is matched on the verb and the path together, never on a prefix', () => {
@@ -65,7 +88,11 @@ test('L4 a wanted address is matched on the verb and the path together, never on
 
 test('L5 a reason tag outside the three is refused', () => {
   const coverage = clone(COVERAGE);
-  coverage.reasons.NOT_CONSUMED.get_healthz = { tag: 'later', note: '' };
+  // get_stream stays genuinely NOT_CONSUMED (no face reads the byte stream, req/967
+  // §5-1); a route the terminal face already registered as consumed (get_healthz) is
+  // no longer a member of NOT_CONSUMED at all, so a bad tag written against it would be
+  // refused for the different reason of naming a non-member, not for the tag itself.
+  coverage.reasons.NOT_CONSUMED.get_stream = { tag: 'later', note: '' };
   const { ok, problems } = deriveLedgers({ routes: ROWS, coverage, fields: FIELDS });
   assert.equal(ok, false);
   assert.ok(problems.some((p) => p.includes('later')));
