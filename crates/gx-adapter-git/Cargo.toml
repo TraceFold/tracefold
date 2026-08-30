@@ -1,21 +1,22 @@
 # The second real `SubstrateAdapter`, and the first one the canon names a dependency for.
-# `req/spec/40-architecture/41-architecture.md:48`, verbatim: "`gx-adapter-git/         # dep: gix
-# (gitoxide)`", and 32 FR-045: "gx-adapter-git MUST implement all `SubstrateAdapter` methods for the git repo substrate
+# The architecture spec, verbatim: "`gx-adapter-git/         # dep: gix
+# (gitoxide)`", and a functional requirement: "gx-adapter-git MUST implement all `SubstrateAdapter` methods for the git repo substrate
 # **via gix**". (sem: SEM-gx-adapter-git-001)
 #
-# M7 hand 1 builds all seven (req/98 §7-2 hand 1). `gx-adapter-mcp` is hand 3. (sem: SEM-gx-adapter-git-002)
+# An early hand built all seven adapter methods; `gx-adapter-mcp` followed a couple of hands later. (sem: SEM-gx-adapter-git-002)
 [package]
 name = "gx-adapter-git"
 description = "The git SubstrateAdapter: a file on a branch, moved by a commit, undone by a reference reset."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-adapter-git-003)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
-publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-adapter-git-003)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
 # 🔴 **The first external dependency an adapter has had**, and the canon is what put it here rather
-# than this hand: 41 §2's crate table writes `dep: gix (gitoxide)` on this row, and FR-045 makes the
-# implementation route a MUST rather than a preference. `gx-adapter-fs` ships "zero dependencies" (E-M4-26) (sem: SEM-gx-adapter-git-004)
+# than this hand: the architecture spec's crate table writes `dep: gix (gitoxide)` on this row, and
+# the functional requirement makes the implementation route a MUST rather than a preference.
+# `gx-adapter-fs` ships "zero dependencies" (sem: SEM-gx-adapter-git-004)
 # because a filesystem is `std`; a git object database is not.
 #
 # **`default-features = false`, and one feature.** `gix` activates 31 features by default -- a
@@ -28,8 +29,8 @@ publish = false                       # req/636: no crate in this workspace is a
 #
 # **Licence, checked first-hand** (`cargo info gix`, 2026-08-12, recorded in
 # `Desktop/GitRepo/REFERENCES.md`): `MIT OR Apache-2.0`. An `OR` is satisfied by either branch and
-# this repository ships Apache-2.0 (35 DR-5), so the Apache branch is the one taken. `rust-version`
-# is 1.85, under this workspace's declared 1.89 (blocker item 1). (sem: SEM-gx-adapter-git-005)
+# this repository ships Apache-2.0, so the Apache branch is the one taken. `rust-version`
+# is 1.85, under this workspace's declared 1.89. (sem: SEM-gx-adapter-git-005)
 #
 # 🔴 **Observed, never copied.** gitoxide's implementation is not read and not reproduced here: what
 # this crate uses is the public API (`open`, `write_blob`, `write_object`, `find_object`,
@@ -37,33 +38,35 @@ publish = false                       # req/636: no crate in this workspace is a
 # seven contracts are gx's own.
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
-# requirement (M2 hand 6, req/55 §4 H6-1).
+# requirement, learned in an earlier build phase.
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
 gx-canon = { path = "../gx-canon", version = "0.1.0" }
 gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
 
-serde = { version = "1", features = ["derive"] }  # the delta grammar of 42 §3.4
+serde = { version = "1", features = ["derive"] }  # the delta's field grammar
 gix = { version = "0.86", default-features = false, features = ["sha1"] }
 
-# The shared contract harness of 51 §7, which an adapter crate calls from one `#[test]`
-# ("each adapter crate only calls this harness from one `#[test]` to inherit the contract tests"). `gix` is (sem: SEM-gx-adapter-git-006)
+# The shared contract harness the architecture spec requires, which an adapter crate calls from one
+# `#[test]` ("each adapter crate only calls this harness from one `#[test]` to inherit the contract
+# tests"). `gix` is (sem: SEM-gx-adapter-git-006)
 # repeated here because an integration test is its own crate and does not inherit the library's
-# dependencies; it resolves to the same package, so no package is added to the graph (§29 M4H1-6's
-# sense of "zero dependencies added"). The fixture needs it to move the substrate **behind the adapter's back** (sem: SEM-gx-adapter-git-007)
-# (`Fixture::disturb`) and to read HEAD and the tree hash for AC-050 by a route that is not the
-# adapter's own.
+# dependencies; it resolves to the same package, so no package is added to the graph. The fixture
+# needs it to move the substrate **behind the adapter's back** (sem: SEM-gx-adapter-git-007)
+# (`Fixture::disturb`) and to read HEAD and the tree hash for one acceptance criterion by a route
+# that is not the adapter's own.
 #
-# 🔴 **M7 hand 4** adds `gx-gate`, and it is a **dev** dependency for the reason H-2 exists: "locator
-# is normalised before being passed to the gate" is a claim about a road that ends at a gate, so measuring it needs one. (sem: SEM-gx-adapter-git-008)
+# 🔴 A later hand adds `gx-gate`, and it is a **dev** dependency for the reason a house rule exists:
+# "locator is normalised before being passed to the gate" is a claim about a road that ends at a
+# gate, so measuring it needs one. (sem: SEM-gx-adapter-git-008)
 # `crates/gx-adapter-git/tests/h2_normalised_before_the_gate.rs` drives real spellings through
 # `snapshot` into the shipped git pack and shows three of four evading it when the normalisation is
 # skipped. The precedent is exact and one substrate over: `gx-adapter-mcp` dev-depends on `gx-gate`
-# and `gx-engine` for AC-051's integration test (req/101 §0), ratified by req/38 §60. (sem: SEM-gx-adapter-git-009)
+# and `gx-engine` for its own integration test, ratified the same way. (sem: SEM-gx-adapter-git-009)
 #
 # Nothing in `[dependencies]` moves: an adapter that depended on a policy layer would be an adapter
-# that could ask what a rule says, and 41 §4 keeps judging in one function. It is a path dependency
-# already resolved in this workspace, so the package graph does not move either.
+# that could ask what a rule says, and the architecture spec keeps judging in one function. It is a
+# path dependency already resolved in this workspace, so the package graph does not move either.
 [dev-dependencies]
 gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.0" }
 gx-gate = { path = "../gx-gate", version = "0.1.0" }

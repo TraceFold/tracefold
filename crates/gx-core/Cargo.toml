@@ -1,30 +1,30 @@
-# The core types of the calculus and nothing else. 41 §2 places this crate first in
-# the workspace and 41 §6 tells it what it may not do: no I/O, deterministic, no unsafe.
+# The core types of the calculus and nothing else. The architecture spec places this crate first in
+# the workspace and defines what it may not do: no I/O, deterministic, no unsafe.
 [package]
 name = "gx-core"
 description = "Core types of the Glovrex transformation calculus. No I/O, deterministic."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-core-001)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
-publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-core-001)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
-# 41 §2 allows this crate "serde, thiserror and not much more" and step 2 spends exactly that much.
-# serde is not optional here: AC-004 and AC-005 are stated as serde round-trip properties,
-# so the derive is the acceptance criterion rather than a convenience. thiserror is named
-# by 41 §6 ("errors are typed with thiserror") and carries `Error::OrderExceeded` (AC-003).
-# Neither performs I/O, which is what AC-008 actually forbids -- the DoD line in req/31 §9
-# reads "zero I/O crates in cargo tree", not "zero dependencies". (sem: SEM-gx-core-002)
+# The architecture spec allows this crate "serde, thiserror and not much more" and it spends exactly
+# that much. serde is not optional here: the acceptance criteria are stated as serde round-trip
+# properties, so the derive is the acceptance criterion rather than a convenience. thiserror is named
+# by the same spec ("errors are typed with thiserror") and carries `Error::OrderExceeded`.
+# Neither performs I/O, which is what the no-I/O acceptance criterion actually forbids -- the
+# definition-of-done reads "zero I/O crates in cargo tree", not "zero dependencies". (sem: SEM-gx-core-002)
 #
 # The dependency that matters in the other direction is the one that is absent for good:
-# gx-core never names gx-canon (A-1 / ASM-16), so the two crates cannot cycle.
+# gx-core never names gx-canon, so the two crates cannot cycle.
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 
 # Test-only. They are absent from `cargo tree -p gx-core -e normal` and so cannot reach the
 # shipped dependency graph. serde_json supplies the concrete format for the round trips of
-# AC-004/AC-005, which name serde but no encoding; gx-canon's DAG-CBOR cannot be used here
+# the acceptance criteria, which name serde but no encoding; gx-canon's DAG-CBOR cannot be used here
 # because gx-core is forbidden to know that crate exists.
 [dev-dependencies]
 proptest = "1.11"

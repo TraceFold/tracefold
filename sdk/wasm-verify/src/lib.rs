@@ -280,6 +280,9 @@ mod tests {
             read_set: None,
             // DR-46-26: absent for the same reason — C-25 is answered by that same escrow.
             reversibility: None,
+            // DR-46-45 (`req/973` §B-2): absent, and `check_schema` refuses any other value on a
+            // verdict receipt — the witness half of the pair is about a CAS that guarded an apply.
+            undo: None,
             // DR-46-28: `unknown` for both stages — a hand-built fixture establishes neither.
             determinism_boundary: gx_core::DeterminismBoundary::Unknown,
             receipt_kind: ReceiptKind::VerdictReceipt,
@@ -511,6 +514,10 @@ mod tests {
                 .expect("the fixture entry has a canonical form"),
             ),
             reversibility: Some(gx_core::Reversibility::True),
+            // DR-46-45 (`req/973` §B-2): this fixture is an ordinary commit, not an undo's, so the
+            // seat is empty. `None` here says "no undo road wrote this payload" — it is not a third
+            // value of the disposition, which is spelled out inside a `Some` when there is one.
+            undo: None,
             determinism_boundary: gx_core::DeterminismBoundary::Mixed {
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
                 verdict_derivation: gx_core::BoundaryStage::DeterministicReplay,

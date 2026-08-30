@@ -2201,8 +2201,8 @@ dependencies = [
  "gx-log",
  "gx-mcp-wire",
  "gx-substrate",
+ "gx-tui",
  "gx-witness",
- "ratatui",
  "serde",
  "serde_json",
  "thiserror",
@@ -2305,6 +2305,14 @@ dependencies = [
  "gx-canon",
  "gx-core",
  "gx-substrate",
+]
+
+[[package]]
+name = "gx-tui"
+version = "0.1.0"
+dependencies = [
+ "ratatui",
+ "serde_json",
 ]
 
 [[package]]

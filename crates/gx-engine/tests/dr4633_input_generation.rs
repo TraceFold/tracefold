@@ -253,6 +253,8 @@ fn with_input_generation(
             fp0: fp0.clone(),
             parents: parents.clone(),
             input_generation: stage,
+            // DR-46-45 (`req/973` B-1): not an undo's plan, so no witness was compared.
+            undo_witness: None,
             at: *at,
         },
         other => other.clone(),

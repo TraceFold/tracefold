@@ -657,6 +657,92 @@ impl ConfinementContext {
     }
 }
 
+/// 🔴 **DR-46-45 (`req/973` §B-1)** — what an undo compared before it fired, carried in the signed
+/// bytes so a third party holding the receipt alone can tell the two apart.
+///
+/// # The three-valued discipline, and why only two values reach a receipt
+///
+/// `gx_engine::UndoWitness` has three variants and the third one — `Missing` — is a **refusal**
+/// (R3, `req/38` §160 ruling 2). A refused undo mints no `TransformationId`, appends no `Planned`
+/// and issues no receipt, so there is no signed payload for the third value to appear in. That is
+/// not the third value being folded into one of the other two (which is the defect `req/38`
+/// §294/DR-46-26 spent lanes closing); it is the third value living in the refusal surface — exit 3
+/// / HTTP 409 `PRECONDITION_CHANGED` — where `req/38` §132 ruling 2 put it.
+///
+/// # `Unobservable` carries text, not a second copy of the engine's enum
+///
+/// The vocabulary of *which* nothing it was belongs to `gx_engine::Unobservable`, whose `reason()`
+/// is the one place those five sentences are written. Re-declaring that enum here would give one
+/// fact two spellings across a crate boundary — DR-46-26's defect in the shape gx-witness is least
+/// able to keep in step, since this crate cannot name gx-engine (the dependency runs the other
+/// way). So the reason arrives as opaque text, exactly as `catalogue_hash` does: "gx-witness
+/// carries the field; it does not know what a `Catalogue` is."
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UndoDisposition {
+    /// The compare-and-swap ran: the world was read afresh and matched the `postcondition_
+    /// fingerprint` the original's own receipt signed. This is "checked, then restored".
+    Attested,
+    /// No attestation existed to compare against, so the inverse was applied **without** a CAS —
+    /// declared rather than refused (DR-46-7, `req/38` §123 ruling 1). This is "fired without
+    /// checking", and before this field it wore the same face as `Attested`.
+    Unobservable {
+        /// `gx_engine::Unobservable::reason()`'s sentence, carried verbatim.
+        reason: String,
+    },
+}
+
+impl UndoDisposition {
+    /// The word both surfaces print, and the word this payload answers with.
+    ///
+    /// One spelling for CLI stdout, HTTP's `witness`, and a reader of the signed bytes — the parity
+    /// `req/973` §B-1 asks for is *this function having one caller-visible form*, not three
+    /// formatters agreeing by inspection.
+    #[must_use]
+    pub fn word(&self) -> String {
+        match self {
+            UndoDisposition::Attested => "attested".to_string(),
+            UndoDisposition::Unobservable { reason } => format!("unobservable:{reason}"),
+        }
+    }
+}
+
+/// 🔴 **DR-46-45 (`req/973` §B-2)** — the compensation edge, on the face.
+///
+/// # One key and not two, and the reason is that the two `Option`s would be the same `Option`
+///
+/// `req/973` §B-2 names a field `undoes: Option<TransformationId>` and §B-1 names a witness field
+/// beside it. The set on which each is `Some` is *identical* — a committed undo — so two `Option`s
+/// would need a cross-field agreement rule in [`ReceiptPayload::check_schema`] to forbid the two
+/// states that are not states of the world. One key cannot be assembled into a contradictory shape,
+/// which is `req/440` §0-3's rule ("two fields can contradict each other; one field cannot be built
+/// into a contradictory form") applied one erratum along. The deviation from §B-2's literal field
+/// name is declared in `req/973` §7-3 rather than made silently.
+///
+/// # The edge is already signed; this only makes it readable
+///
+/// `T_u.parents` includes `T_o.id` (43 T-12) and `parents` is inside the `IdentityView` the
+/// `TransformationId` is a CID over, so `canonical_cid` already binds this edge. Publishing it in
+/// the payload adds **no new authority**: it moves an edge from "inside a hash nobody can invert"
+/// to "readable by a party holding the receipt". The direction is child→parent only — `T_o`'s
+/// receipt is signed and immutable, and 43 T-12 forbids touching it — so the DAG stays append-only:
+/// only a new node makes a new edge.
+///
+/// # Why the edge cannot be inferred instead
+///
+/// Measured, not assumed (`req/973` §1-2): `inverse_delta` is **not** a join key — an undo and an
+/// unrelated later transformation held the same `gx1:…` because both deltas say "make it BBB", so a
+/// join on it stands up false edges. Nor is the fingerprint chain one: two different acts left the
+/// same `postcondition_fingerprint`, so it produces parallel edges. `crates/gx-engine/tests/
+/// r973_undo_attestation.rs` keeps the `inverse_delta` join as a **negative control** and asserts
+/// the false edge appears, so the gate names what it is protecting.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UndoAttestation {
+    /// The transformation this one undoes — `T_u.parents[0]`, which 43 T-12 fixes as `T_o.id`.
+    pub undoes: TransformationId,
+    /// Whether the CAS ran before the inverse was applied. See [`UndoDisposition`].
+    pub witness: UndoDisposition,
+}
+
 /// What a receipt says, and the whole of what its signature covers (42 §3.10).
 ///
 /// # Fourteen fields, and the count 42 §3.10 is read as having
@@ -877,6 +963,49 @@ pub struct ReceiptPayload {
     /// closes a row from a filed receipt *before* the rebuild is attempted and the rebuild road is
     /// therefore the road on which no filed receipt exists.
     pub reversibility: Option<Reversibility>,
+    /// 🔴 **DR-46-45 (`req/973` §B-1 + §B-2)** — if this receipt is an undo's, what it undoes and
+    /// whether the CAS ran. See [`UndoAttestation`].
+    ///
+    /// # `None` has two readings here and they are the same reading
+    ///
+    /// `None` means "this receipt is not a committed undo's" — which covers every ordinary commit,
+    /// every verdict receipt, and every receipt signed before this erratum. That is deliberately
+    /// **not** a third value of the disposition: "we did not check" is `Unobservable`, spelled out,
+    /// inside a `Some`. A reader who finds `None` learns that no undo road wrote this payload, and
+    /// a reader who finds `Some` learns which of the two things happened. The state `req/973` §B-1
+    /// says a third party could not previously distinguish — "checked and restored" versus "fired
+    /// without checking" — is exactly the two arms of the `Some`.
+    ///
+    /// # Kind-dependent, and the rule is `read_set`'s rather than `confinement`'s
+    ///
+    /// Always `None` on a `VerdictReceipt`, held by [`ReceiptPayload::check_schema`]. The reason is
+    /// not `read_set`'s (that the escrow has not run yet) — `parents` is fixed at T-2 and a verdict
+    /// receipt for `T_u` could name it. It is that this field's other half is a claim about a
+    /// **write**: a CAS that guarded an application. A verdict receipt applied nothing, so half of
+    /// the pair would be a sentence about an event that had not happened. Keeping it commit-only is
+    /// also what makes the DAG gate exact rather than approximate: the receipt-borne edge set is
+    /// then *precisely* the set of undos that committed, which is the set the journal's `Superseded`
+    /// records enumerate. `Planned.parents` is a strict superset of both — it is written for undos
+    /// that are later denied or aborted, and the `--retry` road (`req/38` §98 ruling 2) writes two
+    /// `Planned` records for one committed undo. `req/973` §B-2's AC named `Planned.parents` as an
+    /// equality partner; that is corrected to a containment in `req/973` §8.
+    ///
+    /// # The rebuild roads reproduce this from Σ
+    ///
+    /// 43 §7-3b digests a rebuilt payload against the leaf the ledger holds, so a field the rebuild
+    /// cannot reproduce answers `payload_mismatch` — the word for tampering — on every crash-window
+    /// recovery of an undo. The witness is not derivable from Σ (it is a fact about a comparison
+    /// this process made against the live world), so it is **journalled**, in the `Planned` record
+    /// that already carries `parents` and `input_generation` for this exact reason
+    /// (`gx_engine::store::EngineJournalRecord::Planned`). Both roads read it back through
+    /// `Engine::journalled_undo`, exactly as `determinism_boundary` reads
+    /// `journalled_input_generation`.
+    ///
+    /// `Option` **and** `#[serde(default)]`, for `confinement`'s reason (`req/38` §294 ruling 2):
+    /// a decoder handed bytes with no `undo` key reads `None` and goes on, so `docs/LIMITS.md`'s
+    /// declared set of members-added-required-with-no-default does not move.
+    #[serde(default)]
+    pub undo: Option<UndoAttestation>,
     /// 🔴 **DR-46-28** — where the replay-deterministic part of this change ends and the
     /// LLM-originated part begins, in the **signed bytes**.
     ///
@@ -1391,6 +1520,20 @@ impl ReceiptPayload {
                     return Err(refuse(
                         "an inverse-status",
                         "always absent: C-25 is answered by the escrow at 43 T-10b, during commit",
+                    ));
+                }
+                // 🔴 **DR-46-45 (`req/973` §B-2)** — the fourth field with a kind-dependent rule,
+                // and the reason is *not* the other three's. `parents` is fixed at T-2, so a
+                // verdict receipt could name what an undo undoes; what it cannot carry is the
+                // other half of the pair, which is a claim about a compare-and-swap that guarded
+                // an **application**. A verdict receipt applied nothing. Keeping the pair
+                // commit-only is also what makes the receipt-borne edge set exactly the set of
+                // undos that committed — the set `Superseded` enumerates — which is the equality
+                // `crates/gx-engine/tests/r973_undo_attestation.rs` asserts.
+                if self.undo.is_some() {
+                    return Err(refuse(
+                        "an undo attestation",
+                        "always absent: its witness is a claim about a CAS that guarded an apply, and 42 §3.10's `VerdictReceipt` applies nothing",
                     ));
                 }
             }

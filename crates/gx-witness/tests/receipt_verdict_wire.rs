@@ -124,7 +124,19 @@ const REVERSIBILITY_KEY: &str = "6d7265766572736962696c697479f6";
 /// The canonical encoding of the fixture with DR-46-26's key removed and the map header wound back
 /// to thirteen: the bytes D24 shipped, reconstructed rather than re-pinned.
 fn as_dr_46_24_shipped_it(now: &str) -> String {
-    // 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — the outermost layer now: nineteen keys
+    // 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — the outermost layer now: twenty keys back
+    // to nineteen. The fixture is a verdict receipt and `check_schema` refuses any other value on
+    // that kind, so the contribution is the key and a null — `catalogue_hash`'s shape, and a
+    // reminder that an absent `Option` is `f6` **at a key**, which is what makes a new key a
+    // migration rather than a retyping.
+    let undo = format!("64{}f6", hex(b"undo"));
+    assert!(
+        now.contains(&undo),
+        "DR-46-45's key is not on the wire; this subtraction is measuring nothing"
+    );
+    let now = now.replacen(&undo, "", 1).replacen("b4", "b3", 1);
+    let now = now.as_str();
+    // 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — nineteen keys
     // back to eighteen. Derived from the fixture's own constant rather than re-spelled, so this
     // layer cannot keep passing after the value it subtracts has moved.
     let engine_version = format!(
@@ -277,6 +289,17 @@ const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_F7: &str =
 const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2: &str =
     "gx1:aiidrq4gou424jesocvg2bxmkxcrwgtj2zjsu34jfd7gzu4eukya";
 
+/// 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — the twentieth key, and the ninth state of
+/// this one fixture's wire. The ninth digest kept beside the other eight.
+///
+/// Same entitlement and same limit as the eight above: the seat carries `#[serde(default)]`, so
+/// every receipt already signed still decodes, and what moves is the digest of a fixture
+/// **re-encoded by this build**. Kept rather than overwritten for the reason the file states one
+/// constant up — a pin overwritten each time would record one wire state where there have been
+/// nine.
+const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_40: &str =
+    "gx1:wmesukp37j6szhubek6xmjv4dzykmmejfvgewh3lzjysnd4zny2a";
+
 // ---------------------------------------------------------------------------
 // The type
 // ---------------------------------------------------------------------------
@@ -319,9 +342,10 @@ fn e_m5_11_the_verdict_field_is_optional() {
     // (`req/777`) seated `catalogue_hash`; this pin was not taught on landing day and the first
     // live run after it is what moved the count.
     // 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)** — seventeen became eighteen.
+    // 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — nineteen became twenty.
     assert_eq!(
-        fields, 19,
-        "E-M5-11 retypes a field and adds none; DR-46-24(A) added two, DR-46-26 a third,          DR-46-28 a fourth, S③ (`req/493` §1 AC-6) a fifth, DR-46-39 (`req/777` catalogue_hash) a sixth, F7 (`req/868` R-868-6, payload_version) a seventh, and A2 (`req/910`, engine_version) an eighth"
+        fields, 20,
+        "E-M5-11 retypes a field and adds none; DR-46-24(A) added two, DR-46-26 a third,          DR-46-28 a fourth, S③ (`req/493` §1 AC-6) a fifth, DR-46-39 (`req/777` catalogue_hash) a sixth, F7 (`req/868` R-868-6, payload_version) a seventh, A2 (`req/910`, engine_version) an eighth, and DR-46-45 (`req/973`, undo) a ninth"
     );
 }
 
@@ -427,9 +451,15 @@ fn the_ledger_digest_of_that_payload_is_the_one_the_ledger_already_holds() {
     // the six values it moved through are all kept above.
     // 🔴 **A2** — the pin moves an eighth time (`req/910` A., `req/919` W8, 2026-08-30), and the
     // seven values it moved through are all kept above.
+    // 🔴 **DR-46-45** — the pin moves a ninth time (`req/973` §B-1/§B-2, 2026-08-31), and the eight
+    // values it moved through are all kept above.
     assert_eq!(
-        text, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2,
+        text, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_40,
         "43 ASM-43-1 keys the ledger on this digest; moving it is a migration"
+    );
+    assert_ne!(
+        VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_40, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2,
+        "a twentieth map key cannot leave the digest where A2 left it"
     );
     assert_ne!(
         VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_F7,

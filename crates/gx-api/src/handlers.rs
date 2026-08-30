@@ -2274,11 +2274,13 @@ fn undo_witness(state: &AppState, id: &TransformationId) -> gx_engine::UndoWitne
 /// There is no third, because [`gx_engine::UndoWitness::Missing`] does not reach a `200` at all
 /// since R3 — it is `409 PRECONDITION_CHANGED`, and the refusal's own detail names the reason.
 fn witness_word(witness: &gx_engine::UndoWitness) -> String {
-    match witness {
-        gx_engine::UndoWitness::Attested(_) => "attested".to_string(),
-        gx_engine::UndoWitness::Unobservable(why) => format!("unobservable:{}", why.reason()),
-        gx_engine::UndoWitness::Missing(why) => format!("missing:{}", why.reason()),
-    }
+    // 🔴 **DR-46-45 (`req/973` §B-1)** — delegated rather than spelled here. The three arms used to
+    // live in this function and an identical three had to be written again for CLI stdout and a
+    // third time for the signed payload; `gx_engine::UndoWitness::word` is now the one place the
+    // sentence is minted, so "the surfaces agree" is a fact about the call graph rather than
+    // something a reader checks by eye. The strings are byte-identical to the ones this function
+    // returned before the move — `crates/gx-api/tests/wire_census.rs` is what says so.
+    witness.word()
 }
 
 /// File the last verdict receipt this transformation issued, under `slot`.

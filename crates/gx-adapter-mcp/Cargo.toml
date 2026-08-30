@@ -1,23 +1,28 @@
-# The third real `SubstrateAdapter`, and the one 22-roadmap.md:23 calls "**the actual body of DR-1(a)'s wedge**". (sem: SEM-gx-adapter-mcp-021)
-# `req/spec/30-requirements/32-functional.md:101`, verbatim (FR-046): "gx-adapter-mcp MUST implement a proxy that intercepts the MCP tool-call boundary (sem: SEM-gx-adapter-mcp-022)
+# The third real `SubstrateAdapter`, and the one an early roadmap note calls "**the actual body of
+# a key design wedge**". (sem: SEM-gx-adapter-mcp-021)
+# The functional-requirements spec, verbatim: "gx-adapter-mcp MUST implement a proxy that intercepts
+# the MCP tool-call boundary (sem: SEM-gx-adapter-mcp-022)
 # and candidates a tool-call intent into a `PlannedDelta`", (sem: SEM-gx-adapter-mcp-023)
-# and 34 **AC-051** is what is measured: "inspect at the **configuration level** whether a direct call path bypassing the proxy exists (sem: SEM-gx-adapter-mcp-024)
+# and one acceptance criterion is what is measured: "inspect at the **configuration level** whether a
+# direct call path bypassing the proxy exists (sem: SEM-gx-adapter-mcp-024)
 # ...and that no bypass route technically exists". (sem: SEM-gx-adapter-mcp-025)
 #
-# M7 hand 3 builds all seven (req/98 §7-2, hand 3), ratified by `req/38` §59. (sem: SEM-gx-adapter-mcp-026)
+# An early hand built all seven adapter methods, ratified afterward. (sem: SEM-gx-adapter-mcp-026)
 [package]
 name = "gx-adapter-mcp"
 description = "The MCP SubstrateAdapter: a tool call that cannot reach a server except through an admitted apply."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace only (sem: SEM-gx-adapter-mcp-027)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
-publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+rust-version.workspace = true         # declared once, in the workspace only, per the adopted MSRV decision (sem: SEM-gx-adapter-mcp-027)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
-# 🔴 **No external dependency, and that is AC-051's doing rather than thrift.** 41 §2's crate table
+# 🔴 **No external dependency, and that is the no-bypass acceptance criterion's doing rather than
+# thrift.** The architecture spec's crate table
 # writes `dep: gix (gitoxide)` on the git adapter's row and writes **nothing** on this one, so no
-# implementation route is mandated here the way FR-045 mandates one there. What decides it is
-# AC-051: "no bypass route technically exists" is a claim about the set of roads to the substrate, and a (sem: SEM-gx-adapter-mcp-028)
+# implementation route is mandated here the way the git functional requirement mandates one there.
+# What decides it is the acceptance criterion: "no bypass route technically exists" is a claim about
+# the set of roads to the substrate, and a (sem: SEM-gx-adapter-mcp-028)
 # linked MCP client library is a **second road** -- its own transport, reachable by anyone who can
 # name the crate, with no `Admitted` in its signature. So the wire is the deployment's
 # ([`transport::ToolTransport`]) and this crate holds the boundary, the grammar and the gate.
@@ -28,16 +33,17 @@ publish = false                       # req/636: no crate in this workspace is a
 # one admitted `apply`.
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
-# requirement (M2 hand 6, req/55 §4 H6-1).
+# requirement, learned in an earlier build phase.
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
 gx-canon = { path = "../gx-canon", version = "0.1.0" }
 gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
 
-serde = { version = "1", features = ["derive"] }  # the delta grammar of 42 §3.4
+serde = { version = "1", features = ["derive"] }  # the delta's field grammar
 
-# A2 (req/38 §92, ruling 1) narrowed the sentence above, and the narrowing is stated rather than the (sem: SEM-gx-adapter-mcp-031)
-# sentence deleted: "no external dependency" was AC-051's refusal of a **linked MCP client library** (sem: SEM-gx-adapter-mcp-032)
+# A later ruling narrowed the sentence above, and the narrowing is stated rather than the (sem: SEM-gx-adapter-mcp-031)
+# sentence deleted: "no external dependency" was the acceptance criterion's refusal of a **linked MCP
+# client library** (sem: SEM-gx-adapter-mcp-032)
 # (a second road to the substrate), and neither line below is one -- no transport, no framing, no
 # `Admitted`-free path to a server. `tests/ac_051.rs`'s two compile_fail doctests still hold with
 # both in the graph.
@@ -48,33 +54,35 @@ serde = { version = "1", features = ["derive"] }  # the delta grammar of 42 §3.
 # `sha1`: `ArgSource::GitBlobSha1OfForward` (catalogue.rs says why a git content address is the one
 #   "the do-time return" an escrow built before `apply` can carry). RustCrypto's, MIT OR Apache-2.0, (sem: SEM-gx-adapter-mcp-033)
 #   already in this workspace's lockfile through `gix` (gx-adapter-git). Not a security boundary:
-#   the receipts' hash road stays gx-canon's (41 §6).
+#   the receipts' hash road stays gx-canon's (the architecture spec's rule).
 serde_json = "1"
 sha1 = "0.10"
 
-# The shared contract harness of 51 §7, which an adapter crate calls from one `#[test]`
-# ("each adapter crate inherits the contract tests merely by calling this harness from `#[test]`"). (sem: SEM-gx-adapter-mcp-034)
+# The shared contract harness the architecture spec requires, which an adapter crate calls from one
+# `#[test]` ("each adapter crate inherits the contract tests merely by calling this harness from `#[test]`"). (sem: SEM-gx-adapter-mcp-034)
 #
-# 🔴 **`gx-engine` and `gx-gate` are here, and they are AC-051's other half.** 34 AC-051 asks for two
-# things and the second is "confirmed by an **integration test**" that "every tool call always passes through the submit->verify route". (sem: SEM-gx-adapter-mcp-035)
+# 🔴 **`gx-engine` and `gx-gate` are here, and they are the no-bypass acceptance criterion's other
+# half.** That criterion asks for two
+# things and the second is "confirmed by an **integration test**" that "every tool call always passes
+# through the submit->verify route". (sem: SEM-gx-adapter-mcp-035)
 # A scan of this crate cannot say that: whether a tool call reaches a server *only* after a gate
 # admitted it is a fact about the **pipeline**, and the pipeline is the engine's. So `tests/ac_051.rs`
 # drives a real `Engine` with a denying gate and with an admitting one and counts what arrived at the
 # transport -- 0 and 1.
 #
 # The precedent is exact and it is the engine's own: `gx-engine` dev-depends on `gx-adapter-fs`
-# ("for the benches only", req/85 §5.2), for the same reason in the other direction. **N-13 is (sem: SEM-gx-adapter-mcp-036)
-# untouched where N-13 is written**: `[dependencies]` above names no engine, `cargo tree -e normal`
+# ("for the benches only"), for the same reason in the other direction. **The no-shipped-adapter
+# invariant is (sem: SEM-gx-adapter-mcp-036)
+# untouched where it is written**: `[dependencies]` above names no engine, `cargo tree -e normal`
 # shows none, and `probes/doubt/tests/workspace_doubt.rs` reads the shipping section. Moving either
-# line up into `[dependencies]` compiles and is caught by one text gate only -- which is why it is
-# **the a4-shaped 2nd instance** in this hand's battery (req/98 §5-1, as §58 re-spelled it). (sem: SEM-gx-adapter-mcp-037)
+# line up into `[dependencies]` compiles and is caught by one text gate only. (sem: SEM-gx-adapter-mcp-037)
 [dev-dependencies]
 gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.0" }
 gx-gate = { path = "../gx-gate", version = "0.1.0" }
 gx-engine = { path = "../gx-engine", version = "0.1.0" }
 gx-witness = { path = "../gx-witness", version = "0.1.0" }
 
-# 🔴 **AC-067 / NFR-004** (req/98 §7-2, hand 5, ruling #15) -- "the latency the proxy adds is p99 <= 30ms". (sem: SEM-gx-adapter-mcp-038)
+# 🔴 One performance requirement -- "the latency the proxy adds is p99 <= 30ms". (sem: SEM-gx-adapter-mcp-038)
 #
 # The bench lives here rather than in `gx-api` because the subject is **this proxy**, and it reuses
 # `tests/support/mod.rs` through `#[path]` rather than a second fixture: the server a measurement

@@ -129,10 +129,17 @@ pub mod replay;
 pub mod rng;
 pub mod serve;
 pub mod session;
-/// 🔴 **`cfg(feature = "tui")`** (`req/942` §10-2) — the terminal face. It reads the HTTP surface
-/// and nothing else: no engine is opened here, no project directory, no verdict constructed.
-#[cfg(feature = "tui")]
-pub mod tui;
+// 🔴 **`pub mod tui` used to be here** (`req/942` §10-2), and #188/#189 moved it out of this crate
+// entirely: the terminal face is now the `gx-tui` package at `tui/`, and this crate's `tui`
+// feature is `["dep:gx-tui"]`. Nothing re-exports it — a `pub use gx_tui as tui` would put the
+// face back inside this crate's namespace and let a reader believe the module still lives here,
+// which is the fiction the move exists to end. `src/main.rs`'s `Command::Tui` arm names
+// `gx_tui::` directly and is the only site in this crate that does.
+//
+// The reason is the dependency graph and not tidiness: this crate links `gx-engine`, `gx-gate`,
+// `gx-witness`, `gx-log` and four adapters, so a face shipped inside it could say "I touch no
+// engine internals" only as a claim about source. `cargo tree -e normal -p gx-tui` now says it
+// about the build.
 pub mod verdict;
 /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — `gx wrap` is the road from an agent's `tools/call` to
 /// `Engine::commit`, and that road is `gx_mcp_wire`'s transport; see `attach` above.

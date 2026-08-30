@@ -1,0 +1,51 @@
+# 🔴 **The terminal face as its own package**, at the repository root beside `crates/` rather
+# than inside it.
+#
+# The extraction trigger for a renderer framework is the **second** renderer written against the
+# seam, and this is the first. Splitting a crate now would generalise from zero wins. That
+# reasoning is about a *framework* — an abstraction over renderers. This is not that: no seam is
+# generalised here and not a line of the face changes shape. What is ruled on is **packaging**:
+# the face was a module inside `gx-cli`, and `gx-cli` depends on `gx-engine`, `gx-gate`,
+# `gx-witness`, `gx-log` and four adapters. A face that consumes nothing but the HTTP surface was
+# shipped inside a crate that links the engine, so "this face touches no engine internals" was a
+# claim about *source* that the *dependency graph* did not carry. Moving the package is what makes
+# the claim structural: `cargo tree -e normal -p gx-tui` names no `gx-*` crate at all.
+#
+# 🔴 The renderer-framework extraction trigger is therefore **not** superseded and still stands
+# unspent: a second Rust renderer against this seam is still what would justify extracting a
+# framework. This split buys the membrane, not an abstraction.
+[package]
+name = "gx-tui"
+description = "The `gx tui` terminal face: four GET routes, a buffer, and no engine."
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet
+repository.workspace = true           # `dist generate` reads this
+
+# 🔴 **The whole of the table is the membrane, and it is short on purpose.**
+#
+# Three edges: the terminal library, the JSON the four routes answer with, and nothing else. There
+# is no `gx-core` here — the face carried one road into it (`crate::clock::now()` returned a
+# `gx_core::Timestamp`), and `src/clock.rs` replaces that with the nanosecond count the face
+# actually wanted. `gx_core::Timestamp` is a newtype over `i64`; taking a dependency on the
+# engine's id crate to read `.0` off it would be the "except for one date formatter" shape
+# `tui/tests/r942_tui.rs`'s g11 was written against, one layer out in the graph.
+#
+# 🔴 **No HTTP client crate, for the reason it was not declared in `gx-cli` either**:
+# `src/tui/wire.rs` is forty lines of `std::net` over HTTP/1.1, so the read-only claim is
+# structural — the module writes the four bytes `GET ` and has no branch for another method — and
+# `crates/gx-cli/tests/ac_057.rs` keeps measuring exactly one workspace member (`gx-api`) that
+# declares a name which can open a socket. This manifest declares none of the seven.
+#
+# `crossterm` is not declared: `ratatui` re-exports the one it was built against, and a second
+# declaration here would be a second version of the same terminal library in one binary.
+#
+# `default-features = false` with `crossterm` alone — the default set also resolves the termion,
+# termwiz and termina backends and the `palette` colour-space crate. Same version, same features
+# and same reason as the line this replaces in `crates/gx-cli/Cargo.toml`, so `Cargo.lock` does not
+# move: this is a re-parenting of one edge, not a new one.
+[dependencies]
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+serde_json = "1"

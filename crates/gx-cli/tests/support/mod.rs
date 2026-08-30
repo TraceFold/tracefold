@@ -113,6 +113,9 @@ pub fn verdict_payload(kind: VerdictKind, key: &KeyPair, seed: u64) -> ReceiptPa
         read_set: None,
         // 🔴 **DR-46-26** — absent for the same reason: C-25 is the same escrow's answer.
         reversibility: None,
+        // DR-46-45 (`req/973` §B-2): absent on a verdict receipt, and `check_schema` refuses a
+        // `Some` — the witness half is a claim about a CAS that guarded an apply.
+        undo: None,
         // 🔴 **DR-46-28** — `unknown` is a value here and not an absence: this fixture is
         // hand-built, so nothing established where its input came from, and the road that
         // built it derived no verdict of its own. `check_schema` allows it on both kinds.
@@ -161,6 +164,8 @@ pub fn commit_payload(key: &KeyPair, seed: u64, inclusion: InclusionProof) -> Re
         ),
         // 🔴 **DR-46-26** — C-25's answer, beside the read that produced it.
         reversibility: Some(gx_core::Reversibility::True),
+        // DR-46-45 (`req/973` §B-2): an ordinary commit fixture, not an undo's.
+        undo: None,
         // 🔴 **DR-46-28** — the boundary attest, with both stages named.
         determinism_boundary: gx_core::DeterminismBoundary::Mixed {
             input_generation: gx_core::BoundaryStage::LlmOriginated,

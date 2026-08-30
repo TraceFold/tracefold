@@ -31,7 +31,7 @@
 //! → canonical-encode → compare lengths`, and step one does not exist: the document does not
 //! decode, which is the limit itself. There is no build in the tree that produced 25 and no build
 //! this lane can reach that would. So the number came off the page and what replaced it is what
-//! this file measures: the specimen carries eleven members and this build's payload names nineteen.
+//! this file measures: the specimen carries eleven members and this build's payload names twenty.
 //!
 //! 🔴 **`req/901` (2026-08-26): "fifteen" was stale — the count is seventeen, and it had been wrong
 //! since `confinement` and `catalogue_hash` landed.** The reason it went stale silently is worth

@@ -1,10 +1,10 @@
-# 🔴 **This file is the PUBLIC workspace root** (`req/817`), staged at `public/Cargo.toml` and
+# 🔴 **This file is the PUBLIC workspace root**, staged at `public/Cargo.toml` and
 # synced to `Cargo.toml` in github.com/TraceFold/tracefold. It is the private root with the five
 # member paths the public tree does not contain removed, and nothing else changed.
 #
-# Why it exists: `req/789` §3 holds four crates private (`gx-adapter-mysql`,
+# Why it exists: four crates are held private (`gx-adapter-mysql`,
 # `gx-adapter-postgres`, `gx-confine`, `gx-mcp-wire`), and `probes/` is not in the sync set at
-# all. Until `req/817` the public `Cargo.toml` was the private one verbatim, so it declared 19
+# all. Before this split the public `Cargo.toml` was the private one verbatim, so it declared 19
 # members while a public clone carried 14 -- and cargo refuses to load a workspace whose member
 # manifest is missing. Measured on an anonymous fresh clone before this fix: `cargo metadata`
 # **exit 101**, `cargo build --workspace` **exit 101**. Every cargo command in the published
@@ -19,7 +19,7 @@
 # change to the private root that is not reflected here ships a stale public workspace.
 [workspace]
 resolver = "2"
-# 🔴 **S③ (`req/493` §4 item 1)** adds `crates/gx-confine`, the eighteenth member: the
+# 🔴 **A later addition** adds `crates/gx-confine`, the eighteenth member: the
 # kernel-ruleset derivation `gx confine` stands on. It sits above `crates/gx-cli` because `gx-cli`
 # depends on it and this list reads bottom-up.
 #
@@ -45,25 +45,27 @@ members = [
     "crates/gx-cli",
     "crates/gx-api",
     "sdk/wasm-verify",
+    "tui",
 ]
 
-# 🔴 **blocker item 1, adopted** (req/38 §47, discipline 51 shape): "MSRV=1.89 declaration adopted.
-# Grounds = cedar 4.12's measured requirement (M3 hand 1) + rust-toolchain.toml pinned to 1.97.1 / timing = M6 hand 1 moves `rust-version` into Cargo.toml / reversible = 1 line." (sem: SEM-Cargo.toml-001)
+# 🔴 **Adopted:** "MSRV=1.89 declaration adopted.
+# Grounds = cedar 4.12's measured requirement (an early hand's measurement) + rust-toolchain.toml pinned to 1.97.1 / timing = moving `rust-version` into Cargo.toml / reversible = 1 line." (sem: SEM-Cargo.toml-001)
 #
-# 41 §2 and 33 NFR-023 say 1.85+, and M3 hand 1 measured cedar-policy 4.12's real requirement as 1.89.
+# The architecture spec and a performance requirement say 1.85+, and an early hand measured
+# cedar-policy 4.12's real requirement as 1.89.
 # Of the two numbers, the one that is **true is whichever the build actually passes with** -- while the
 # declaration stayed at 1.85, it claimed to build on a 1.85 runner while actually failing there --
-# NFR-023's CI job (the `cargo msrv verify` equivalent) did not exist yet, so nothing caught that lie either. (sem: SEM-Cargo.toml-002)
+# that requirement's CI job (the `cargo msrv verify` equivalent) did not exist yet, so nothing caught that lie either. (sem: SEM-Cargo.toml-002)
 #
 # Declared once in `[workspace.package]`, and the 12 members inherit it with `rust-version.workspace = true`.
-# Writing the same number in 12 places is exactly the shape 3-declarations-1-measurement (M5H1-7)
-# exists to prevent -- a number sitting in more than one place, never compared against the others, is, in effect, more than one number. (sem: SEM-Cargo.toml-003)
+# Writing the same number in 12 places is exactly the shape a standing "one number, one place"
+# principle exists to prevent -- a number sitting in more than one place, never compared against the others, is, in effect, more than one number. (sem: SEM-Cargo.toml-003)
 [workspace.package]
 rust-version = "1.89"
-# P5 (req/134 §1 item 6): `dist generate` (cargo-dist) reads this for the installer scripts'
+# `dist generate` (cargo-dist) reads this for the installer scripts'
 # download URLs. Declared once here and referenced with `repository.workspace = true` by the
 # members `dist generate` names, the same pattern `rust-version.workspace = true` already uses
-# (blocker item 1, adopted; req/38 §47) rather than repeating the URL in each manifest. (sem: SEM-Cargo.toml-004)
+# (the adopted MSRV decision) rather than repeating the URL in each manifest. (sem: SEM-Cargo.toml-004)
 repository = "https://github.com/TraceFold/tracefold"
 
 # The profile that 'dist' will build with

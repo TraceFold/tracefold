@@ -249,6 +249,16 @@ pub fn undo(
     if let Some(map) = json.as_object_mut() {
         map.insert("transformation".into(), undoing.0.to_text().into());
         map.insert("undone".into(), id.0.to_text().into());
+        // 🔴 **DR-46-45 (`req/973` §B-1)** — surface parity with HTTP's `witness`, which has carried
+        // this word since R3 while stdout carried nothing. `req/973` §B-1 measured what that cost:
+        // an operator reading this JSON could not tell "the world was checked against T_o's own
+        // signed observation and then restored" from "nothing was there to check against, so the
+        // inverse was fired". Both were a `state: Committed` with the same six keys beside it.
+        //
+        // The word is minted by `UndoWitness::word` and by nothing here, so this line cannot drift
+        // away from the HTTP field or from the `undo.witness` inside the signed payload printed
+        // above it — the same sentence reaches all three from one function.
+        map.insert("witness".into(), witness.word().into());
         map.insert("state".into(), to_json(&state));
         // 43 T-12: "append `superseded_by = T_u.id` to `T_o`'s metadata" (sem: SEM-gx-cli-345). The edge is the engine's and
         // is printed because it is the fact an operator ran the command for.
@@ -385,6 +395,14 @@ fn settle_preflight(
             crate::note!(
                 "gx undo settle: polls=1 elapsed_ms=0 result=abandoned (the probe could not read                  the world: {e}); firing as before"
             );
+            // 🔴 **DR-46-46 (open, `req/973` §8-6, filed 2026-08-31)** — the reason is wrong, and
+            // since DR-46-45 it is wrong **inside the signature**. What happened here is "the probe
+            // could not read the world"; what the receipt will now say is "the commit receipt
+            // carries no postcondition". Harmless while nothing published the word; a lie once the
+            // word is attested, which is what DR-46-45 changed. Two sites: this one and the twin
+            // after the wait, below. Owner: the next cargo lane on this crate. Release condition:
+            // `Unobservable` gains a `WorldUnreadable` variant (one arm per cause, `req/38` §231
+            // ruling 5's gate) and both sites name it, with a probe that fires each.
             return Ok(UndoWitness::Unobservable(Unobservable::NoPostcondition));
         }
     }
@@ -418,6 +436,9 @@ fn settle_preflight(
         ),
         Err(e) => {
             crate::note!("gx undo settle: {outcome} — the world would not read afterwards ({e})");
+            // 🔴 **DR-46-46 (open)** — the twin of the site above, same defect, same release
+            // condition. Named here too because a repair that fixed one and not the other would
+            // leave the same false sentence reachable by the slower road.
             return Ok(UndoWitness::Unobservable(Unobservable::NoPostcondition));
         }
     }

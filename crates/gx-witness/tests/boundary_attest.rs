@@ -140,9 +140,10 @@ fn dr_46_28_the_payload_declares_a_boundary_field_that_is_not_optional() {
     // (`req/777`) seated `catalogue_hash`; this pin was not taught on landing day.
     // 🔴 **F7 / `req/868` R-868-6 / `req/919` W5 (2026-08-29)** — seventeen became eighteen when
     // `payload_version` seated.
+    // 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — nineteen became twenty when `undo` seated.
     assert_eq!(
-        fields, 19,
-        "DR-46-26 took the count to fourteen, DR-46-28 added the fifteenth, S③ (`req/493`          §1 AC-6) the sixteenth, DR-46-39 (`req/777` catalogue_hash) the seventeenth, F7 (`req/868` R-868-6, `payload_version`) the eighteenth, and A2 (`req/910`, `engine_version`) the nineteenth"
+        fields, 20,
+        "DR-46-26 took the count to fourteen, DR-46-28 added the fifteenth, S③ (`req/493`          §1 AC-6) the sixteenth, DR-46-39 (`req/777` catalogue_hash) the seventeenth, F7 (`req/868` R-868-6, `payload_version`) the eighteenth, A2 (`req/910`, `engine_version`) the nineteenth, and DR-46-45 (`req/973`, `undo`) the twentieth"
     );
 }
 
@@ -418,9 +419,10 @@ fn the_wire_moved_by_exactly_the_one_key_dr_46_28_added() {
     // 🔴 **F7 (`req/868` R-868-6, `payload_version`, eighteenth key, `req/919` W5, 2026-08-29)** —
     // the header check moved again.
     // 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — and again for the nineteenth.
+    // 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — and again for the twentieth.
     assert!(
-        now.starts_with("b3"),
-        "a canonical map of nineteen opens `b3`; today's opens {}",
+        now.starts_with("b4"),
+        "a canonical map of twenty opens `b4`; today's opens {}",
         &now[..2]
     );
 
@@ -489,7 +491,20 @@ fn the_wire_moved_by_exactly_the_one_key_dr_46_28_added() {
         now.contains(&engine_version_contribution),
         "A2's key is not on the wire; this subtraction would measure nothing"
     );
+    // 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — an eighth layer, outermost: `undo` comes
+    // off first and the header winds twenty → nineteen. The fixture is a verdict receipt, on which
+    // `check_schema` refuses any other value, so the contribution is the key and a null — the same
+    // shape `catalogue_hash` has here and for the same reason (an absent `Option` is `f6` **at a
+    // key**, which is why a key added to a canonical map is a migration and not a retyping).
+    let undo_contribution = format!("64{}f6", hex(b"undo"));
+    println!("WIRE_ADDED_UNDO_KEY={undo_contribution}");
+    assert!(
+        now.contains(&undo_contribution),
+        "DR-46-45's key is not on the wire; this subtraction would measure nothing"
+    );
     let stripped = now
+        .replacen(&undo_contribution, "", 1)
+        .replacen("b4", "b3", 1)
         .replacen(&engine_version_contribution, "", 1)
         .replacen("b3", "b2", 1)
         .replacen(&payload_version_contribution, "", 1)

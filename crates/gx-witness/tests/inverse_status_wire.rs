@@ -170,6 +170,21 @@ fn without_engine_version(now: &str) -> String {
     now.replacen(&contribution, "", 1).replacen("b3", "b2", 1)
 }
 
+/// 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — the eighth layer, outermost: today's bytes
+/// are a map of twenty. `crates/gx-engine/tests/r973_undo_attestation.rs` asserts what *this* key
+/// adds; here it is only removed, so DR-46-26's claim stays measurable through it.
+///
+/// The fixture is a verdict receipt and `check_schema` refuses any other value on that kind, so the
+/// contribution is the key and a null.
+fn without_undo(now: &str) -> String {
+    let contribution = format!("64{}f6", hex(b"undo"));
+    assert!(
+        now.contains(&contribution),
+        "DR-46-45's key is not on the wire; this subtraction is measuring nothing"
+    );
+    now.replacen(&contribution, "", 1).replacen("b4", "b3", 1)
+}
+
 // ---------------------------------------------------------------------------
 // The type
 // ---------------------------------------------------------------------------
@@ -215,9 +230,10 @@ fn dr_46_26_the_payload_declares_an_inverse_status_field() {
     // `payload_version` seated.
     // 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — eighteen became nineteen when
     // `engine_version` seated.
+    // 🔴 **DR-46-45 (`req/973` §B-1/§B-2, 2026-08-31)** — nineteen became twenty when `undo` seated.
     assert_eq!(
-        fields, 19,
-        "DR-46-24(A) took the count to thirteen, DR-46-26 the fourteenth, DR-46-28 the fifteenth,          and S③ (`req/493` §1 AC-6) the sixteenth, DR-46-39 (`req/777` catalogue_hash) the seventeenth, F7 (`req/868` R-868-6, payload_version) the eighteenth, and A2 (`req/910`, engine_version) the nineteenth"
+        fields, 20,
+        "DR-46-24(A) took the count to thirteen, DR-46-26 the fourteenth, DR-46-28 the fifteenth,          and S③ (`req/493` §1 AC-6) the sixteenth, DR-46-39 (`req/777` catalogue_hash) the seventeenth, F7 (`req/868` R-868-6, payload_version) the eighteenth, A2 (`req/910`, engine_version) the nineteenth, and DR-46-45 (`req/973`, undo) the twentieth"
     );
 }
 
@@ -234,10 +250,10 @@ fn dr_46_26_the_payload_declares_an_inverse_status_field() {
 #[test]
 fn the_wire_moved_by_exactly_the_one_key_dr_46_26_added() {
     let key = keypair(1);
+    let encoded =
+        hex(&cbor::encode(&verdict_payload(VerdictKind::Admit, &key, 5)).expect("canonical"));
     let now = without_dr_46_28(&without_s3_confinement(&without_dr_46_39(
-        &without_payload_version(&without_engine_version(&hex(
-            &cbor::encode(&verdict_payload(VerdictKind::Admit, &key, 5)).expect("canonical"),
-        ))),
+        &without_payload_version(&without_engine_version(&without_undo(&encoded))),
     )));
     let before = VERDICT_PAYLOAD_HEX_BEFORE_DR_46_26.replace(['\n', ' '], "");
     let added = absent_reversibility_key();

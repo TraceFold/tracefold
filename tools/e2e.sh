@@ -1624,8 +1624,50 @@ set -u
 # so f1/f2 were RED before this lane touched anything, exactly as they were when req/895 ratcheted.
 # It is named here because f1 asserts equality and f2 asserts the set: a ratchet of only this
 # lane's share would leave both RED and would be a ratchet that measured nothing.
-MIN_PROBES=2684
-MIN_SUITES=474
+# req/973 §B-1/§B-2 (DR-46-45, the undo attestation on the signed payload): **2684/474 -> 2811/484**,
+# measured by floor_doubt f1's own FLOOR_RECONSTRUCTED rather than by arithmetic
+# (#[test]=2800 doc-tests=11 | integration=443 libs=18 bins=5). The number was re-measured after
+# each merge of the shared branch rather than carried forward: arithmetic on a moving tree is how
+# a floor goes stale in the first place.
+#
+# 🔴 The split, for the reason the two blocks above give -- a ratchet that hides whose work it is
+# cannot be audited. This lane added **13 probes / 3 suites**: r973_undo_attestation (9, gx-engine),
+# r973_undo_witness_stdout (2, gx-cli), r973_undo_attestation_forgery (2, gx-witness -- written by
+# the independent verifying seat and adopted, see the file's own header). The remaining
+# **114 probes / 7 suites** were already in the
+# tree and already uncounted when this lane opened: f1 was RED at the unmodified base commit
+# (0a156895) with FLOOR_DECLARED=2684/474 against FLOOR_RECONSTRUCTED=2795/480, measured in a second
+# worktree of that commit before this lane changed a line. Six of those seven suites are the ones
+# the [bookkeeping-repair] note below registered by name without ratcheting; the seventh is
+# `boundary_gate_reach`, split out of `boundary_attest.rs` by req/38 SS991 and likewise unnamed.
+# They are folded in here because f1 asserts equality: a ratchet of only this lane's share would
+# leave it RED and would be a ratchet that measured nothing.
+#
+# 🔴 What this ratchet does **not** repair: the README and the public banner still quote **2664/470**
+# (floor_doubt f6/f8), and they were RED at the base commit too. They are the public face's own
+# files, edited by the pub_sync lane and dirty in the shared tree while this lane ran, so they are
+# left alone rather than carried along -- named here so the gap is a recorded number and not a
+# silence.
+#
+# 🔴 [merge-union] (independent re-verify lane, 2026-08-31, branch tui_crate_extract 634dd262 merged
+# onto the r973-landed main above): #188/#189 (the tui crate extraction) forked from `e38e9acc`, a
+# point BEFORE the req/973 ratchet above, so its own declared move (2684/474 -> 2685/477, "req/942's
+# 53 probes became 54 in two files -- 51 in `tui/tests/r942_tui.rs`, 3 in
+# `crates/gx-cli/tests/r942_tui_binding.rs`, net +1 probe / +3 suites -- see that lane's own commit
+# 634dd262 for the full argument") was computed against a base the r973 ratchet above has since moved
+# past. Per this file's own stated rule ("measured by floor_doubt f1's own FLOOR_RECONSTRUCTED rather
+# than by arithmetic"), this union does not add 2685-2684=1 / 477-474=3 on top of 2811/484 by hand --
+# it takes the number floor_doubt reconstructs on the actual merged tree (both lanes' probes present
+# at once): **FLOOR_RECONSTRUCTED=2812/487** (`#[test]`=2801 doc-tests=11 | integration=444 libs=19
+# bins=5), measured by running `cargo test -p doubt --test floor_doubt` on this merge commit before
+# it was made. The reconstructed move from 2811/484 is +1 probe / +3 suites -- the same shape tui's
+# own declared delta had against its own base, landing additively here because none of tui's new
+# names (`r942_tui_binding`) collide with r973's three new suite names or with the seven inherited
+# ones r973 already folded in. The gap `f1` already reported before this merge (README/banner still
+# 2664/470, `boundary_gate_reach` etc.) is unchanged by this merge and is not this lane's to repair
+# -- named here, not repaired here, same as every block above it.
+MIN_PROBES=2812
+MIN_SUITES=487
 # KNOWN_IGNORED: exactly one probe is unconditionally #[ignore]d (gx-engine two_phase_escrow.rs,
 # B2 / req/871 F1, frozen pending an Owner ruling on the third-value vocabulary). MIN_PROBES counts
 # #[test] functions (the basis floor_doubt f1/f2 reconstruct), while the gate below counts passes,
@@ -1756,12 +1798,17 @@ writer_doubt
 receipt_payload_json_round_trip dr892_read_set_attestation dr891_http_undo_branches
 r868_name_durability r868_payload_version_attest r922_gx_object_file
 m5_11_postcondition_mismatch r919_index_branch_cache r919_engine_version_attest r919_engine_version_seat
-r942_tui r939_kind_binding attach_externalized attach_interface h9_operational_disclosure_doubt inference_closed_doubt'
+r942_tui r942_tui_binding r939_kind_binding attach_externalized attach_interface h9_operational_disclosure_doubt inference_closed_doubt
+r973_undo_attestation r973_undo_witness_stdout r973_undo_attestation_forgery boundary_gate_reach'
 # [bookkeeping-repair] (req/38 SS978/SS1000): the six suite files above landed over several lanes
 # (tui942 merge 787ec6bf, kind-binding batch1, X-band attach externalization, h9/inference-closed
 # doubt probes) without a matching EXPECTED_SUITES entry -- f2 caught the gap census-side, all six
 # suites run green. Names only, registered here; MIN_PROBES/MIN_SUITES (floor_doubt f1, README f6/f8)
 # are a separate ratchet row and are not touched by this edit.
+# [ratchet-row] (req/973 DR-46-45, 2026-08-31): the ratchet that block deferred is taken above --
+# 2684/474 -> 2806/483 -- and the three names on the end of the list are this lane's two suites plus
+# `boundary_gate_reach` (req/38 SS991's move out of `boundary_attest.rs`, likewise unnamed).
+# README/banner (f6/f8) remain deferred and are named as a number in the ratchet block above.
 EXPECTED_SUITES=$(printf '%s' "$EXPECTED_SUITES" | tr '
 ' ' ')  # V§17: line-boundary tokens failed the space-delimited case match
 

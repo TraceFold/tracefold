@@ -531,11 +531,13 @@ enum Command {
     /// `gx confine` and `gx attach` took. It is the third renderer over the same four routes the
     /// browser monitor draws (`req/932`), and it opens no project: it reads `GET /v1/healthz`,
     /// `/v1/transformations`, `/v1/candidates` and `/v1/escalations` over loopback HTTP and draws
-    /// them. There is no writing method in `src/tui/`, and two probes in
-    /// `crates/gx-cli/tests/r942_tui.rs` measure that rather than promising it.
+    /// them. There is no writing method in `tui/src/tui/`, and two probes in
+    /// `tui/tests/r942_tui.rs` measure that rather than promising it.
     ///
-    /// 🔴 **`cfg(feature = "tui")`** (`req/942` §10-2) — the one external crate this face needs
-    /// (`ratatui`) is optional, so a build that does not want a terminal library does not carry one.
+    /// 🔴 **`cfg(feature = "tui")`** (`req/942` §10-2, re-parented by #188/#189) — the face is the
+    /// `gx-tui` package now, and the feature is `["dep:gx-tui"]`: a build that does not want a
+    /// terminal library still does not carry one, and the face's manifest is where `ratatui` is
+    /// declared. This arm is the whole of the binding — resolve the options, call, print the lines.
     #[cfg(feature = "tui")]
     #[command(
         about = "Read a running gx server on a terminal.",
@@ -546,7 +548,7 @@ enum Command {
                       are read for the timing line and declared, on screen, as not drawn. Nothing \
                       is written: this face can put no method other than GET on a socket.\n\
                       \n\
-                      Keys, one per declared act (gx_cli::tui::acts::ACTS; the alternatives are in \
+                      Keys, one per declared act (gx_tui::tui::acts::ACTS; the alternatives are in \
                       that table and this line spells the first of each):\n\
                       \x20 k    attend to the record above this one\n\
                       \x20 j    attend to the record below this one\n\
@@ -558,17 +560,30 @@ enum Command {
                       \x20 q    stop reading and give the terminal back\n\
                       \n\
                       Marks. A cell is never blank when the answer is a kind of nothing, and the \
-                      six kinds are told apart:\n\
+                      seven kinds are told apart:\n\
                       \x20 ...  not measured yet\n\
                       \x20 ?    measured, and the answer was not knowable\n\
                       \x20 --   the wire did not carry the key\n\
                       \x20 no   the wire carried the key, and the answer is no\n\
                       \x20 0    measured, and the count is nought\n\
+                      \x20 ''   the wire carried the key and what it carried has no characters, \
+                      which is not a count\n\
                       \x20 -x   it was there and was struck out (declared; no route among these \
                       four reports it, so it does not appear in this build)\n\
                       \x20 ~    the value was wider than its column and was cut\n\
                       \x20 !    at the start of the bottom line: the screen was too small to hold \
                       even the floor, so the table above is clipped\n\
+                      \n\
+                      The subscription. The timing line leads with the state of the connection to \
+                      the engine's event stream (GET /v1/stream), and an event never writes a row: \
+                      it says `look again` and the four routes above are read afresh. Four of the \
+                      five states borrow the marks above; only being connected needs one of its \
+                      own:\n\
+                      \x20 <<   this run is subscribed and the engine is pushing changes down it\n\
+                      \x20 ...  asked for, and it has not answered yet\n\
+                      \x20 no   asked at least once, and it has never once been up\n\
+                      \x20 ?    it has been up, and what is arriving now is not knowable\n\
+                      \x20 --   this run does not subscribe (--dump draws one frame and leaves)\n\
                       \n\
                       The bottom line says what is not on the screen and where to go for it. When \
                       the screen is too small to carry the timing line as its own region, that \
@@ -2287,7 +2302,21 @@ fn run(cli: &Cli) -> Result<Outcome> {
         Command::Limits { json } => gx_cli::limits::run(*json),
         // 🔴 **`req/942`** — no project is opened and no engine is constructed on this road. The
         // options are resolved once, here, so that the flag/environment/default order is one fact
-        // in one place (`gx_cli::tui::Options::resolve`).
+        // in one place (`gx_tui::tui::Options::resolve`).
+        //
+        // 🔴 **#188/#189 — the whole of the binding, and it is deliberately this small.** The face
+        // is its own package now, so this arm does the three things a consumer owes it and nothing
+        // else: fill the options, call, and put what came back where this crate has always put
+        // things. Two of those are worth naming:
+        //
+        // * **`say!` is here and not there.** `gx-tui` composes the rows of a `--dump` frame and
+        //   returns them; it holds no output stream at all. `declaration_writer_doubt.rs` d6
+        //   counts the sites in this crate that do, and a face that printed from another package
+        //   would be outside that count rather than red in it.
+        // * **The exit code is minted here.** Both of the face's roads answer `Ok`, and this maps
+        //   that onto `Outcome::ok` exactly as `gx_cli::tui::run` used to do inside the library —
+        //   so the status this verb exits with is unchanged, and `gx_tui::Error`'s two variants
+        //   carry the names that land on the rows they always landed on.
         #[cfg(feature = "tui")]
         Command::Tui {
             base_url,
@@ -2299,13 +2328,20 @@ fn run(cli: &Cli) -> Result<Outcome> {
             tier,
         } => {
             let mut options =
-                gx_cli::tui::Options::resolve(base_url.clone(), token_file.as_deref());
+                gx_tui::tui::Options::resolve(base_url.clone(), token_file.as_deref());
             options.dump = *dump;
             options.width = *width;
             options.height = *height;
             options.wide = *wide;
-            options.tier = tier.as_deref().and_then(gx_cli::tui::renderer::Tier::parse);
-            gx_cli::tui::run(&options)
+            options.tier = tier.as_deref().and_then(gx_tui::tui::renderer::Tier::parse);
+            let answer = gx_tui::tui::run(&options).map_err(|e| match e {
+                gx_tui::Error::Usage { detail } => gx_cli::Error::Usage { detail },
+                gx_tui::Error::OutputFailed { detail } => gx_cli::Error::OutputFailed { detail },
+            })?;
+            for line in &answer.lines {
+                gx_cli::say!("{line}")?;
+            }
+            Ok(Outcome::ok(answer.json))
         }
         #[cfg(feature = "confine")]
         Command::Confine {

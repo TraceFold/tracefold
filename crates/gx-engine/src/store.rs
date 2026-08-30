@@ -537,6 +537,34 @@ pub enum EngineJournalRecord {
         /// reason.
         #[serde(default, skip_serializing_if = "is_stage_unknown")]
         input_generation: BoundaryStage,
+        /// 🔴 **DR-46-45 (`req/973` §B-1)** — what the undo road's compare-and-swap answered,
+        /// journalled here for `input_generation`'s reason one field up rather than by analogy
+        /// with it.
+        ///
+        /// # Why the journal and not the receipt-construction site
+        ///
+        /// `Engine::undo` does not build a receipt — it returns a `Candidate` and the caller drives
+        /// `verify`/`canonicalize`/`commit` (43 §5). So the witness is out of scope by the time
+        /// T-11 assembles a payload, and the only way to get it there is to write it down. And the
+        /// only place it may be written down is Σ: 43 §7-3b compares a rebuilt payload's digest
+        /// against the leaf the ledger already holds, and the process that repairs is not the
+        /// process that compared, so a witness re-derived at rebuild time would answer
+        /// `payload_mismatch` — the word for tampering — for every crash-window recovery of an
+        /// undo. This is `read_set`'s road (journalled on `InverseEscrowed`) and `confinement`'s
+        /// (journalled on `ProvenanceDerived`), on the record that already carries `parents`.
+        ///
+        /// `None` for every `plan()` — which is the discriminator the payload uses: a `Planned`
+        /// with no witness is not an undo's. `None` also for a journal written before this erratum,
+        /// which reproduces the absence in the filed receipt rather than inventing a claim about a
+        /// comparison nobody recorded.
+        ///
+        /// `serde(default)` and skipped when absent, in `input_generation`'s exact E-M5-13 shape,
+        /// so a journal written before this field decodes **and re-encodes to the same bytes**
+        /// (`journal_roundtrip.rs`, `r30_journal_backward_compat.rs`). **Σ does not move**: no
+        /// `StateRow` field and no `reconstruct` arm reads it, so `Sigma::canonical_bytes` —
+        /// AC-039's "bit-equal" — is untouched, for `reads`' reason.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        undo_witness: Option<gx_witness::receipt::UndoDisposition>,
         at: Timestamp,
     },
     /// T-3 `verify_start`.

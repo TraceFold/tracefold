@@ -104,6 +104,11 @@ pub fn every_variant() -> Vec<EngineJournalRecord> {
             // 🔴 **DR-46-33** — non-`Unknown` so the flag reaches the wire in the sample, in
             // `pending`/`reads_attested`'s reason above (skip_serializing_if drops `Unknown`).
             input_generation: gx_core::BoundaryStage::LlmOriginated,
+            // 🔴 **DR-46-45 (`req/973` §B-1)** — `Some` for `input_generation`'s reason one line
+            // up: `skip_serializing_if` drops a `None`, and a sample that never fills the seat
+            // would let `journal_identity.rs` report a field count that no encoding ever carried.
+            // The sample is therefore an undo's plan, which is the only road that fills it.
+            undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
             at: Timestamp(101),
         },
         EngineJournalRecord::VerifyStarted {
@@ -264,6 +269,9 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(1),
                 parents: Vec::new(),
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
                 at: Timestamp(101),
             },
         ),
@@ -278,6 +286,9 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(1),
                 parents: Vec::new(),
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
                 at: Timestamp(101),
             },
         ),
@@ -292,6 +303,9 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(1),
                 parents: Vec::new(),
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
                 at: Timestamp(101),
             },
         ),
@@ -306,6 +320,9 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(9),
                 parents: Vec::new(),
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
                 at: Timestamp(101),
             },
         ),
@@ -320,6 +337,9 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(1),
                 parents: Vec::new(),
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
                 at: Timestamp(999),
             },
         ),
@@ -334,6 +354,9 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(1),
                 parents: Vec::new(),
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
                 at: Timestamp(101),
             },
         ),
@@ -348,6 +371,9 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(1),
                 parents: vec![tid(9)],
                 input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
                 at: Timestamp(101),
             },
         ),
@@ -364,6 +390,34 @@ pub fn one_field_changed() -> Vec<(&'static str, &'static str, EngineJournalReco
                 fp0: fp(1),
                 parents: Vec::new(),
                 input_generation: gx_core::BoundaryStage::DeterministicReplay,
+                // DR-46-45 (`req/973` §B-1): the baseline's value, so this mutant differs from it
+                // in the field it is named for and in nothing else.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Attested),
+                at: Timestamp(101),
+            },
+        ),
+        (
+            // 🔴 **DR-46-45 (`req/973` §B-1)** — the CAS answer reaches the digest, which is what
+            // makes the journalled witness reproducible rather than merely recorded: a rebuild that
+            // read back a different disposition would not reproduce the leaf (43 §7-3b), and a
+            // field that did not move the digest could be edited in a journal without the
+            // reconstruction noticing.
+            "Planned",
+            "undo_witness",
+            EngineJournalRecord::Planned {
+                transformation: tid(1),
+                intent_id: iid(1),
+                locator: "/tmp/one".to_string(),
+                delta_cid: cid(11),
+                fp0: fp(1),
+                parents: Vec::new(),
+                input_generation: gx_core::BoundaryStage::LlmOriginated,
+                // The other arm. `Unobservable` is the one that says the inverse was fired without
+                // a compare-and-swap, so this mutant is the pair `req/973` §B-1 exists to keep
+                // distinguishable.
+                undo_witness: Some(gx_witness::receipt::UndoDisposition::Unobservable {
+                    reason: "the commit receipt carries no postcondition".to_string(),
+                }),
                 at: Timestamp(101),
             },
         ),

@@ -1,12 +1,14 @@
-# The state machine of 43 and the commit protocol of 41 §5. 41 §2 gives this crate its module list
-# (`src/{lib,pipeline,store,replay}.rs`) and its one-line remit "the executable body of 43's state
-# machine, the CAS commit protocol" (quoted in SEM-gx-engine-001); 42 §0 files `EscrowedInverse`,
+# The state machine and commit protocol the architecture spec defines. The same spec gives this
+# crate its module list
+# (`src/{lib,pipeline,store,replay}.rs`) and its one-line remit "the executable body of the state
+# machine, the CAS commit protocol" (quoted in SEM-gx-engine-001); the field-table spec files
+# `EscrowedInverse`,
 # `InverseStatus` and `EngineJournalRecord` under
 # `store.rs`/`replay.rs`.
 #
-# M5 hand 1 creates the crate, the journal and the escrow types only. **No transition is
-# implemented** (req/78 §6.2 hand 1: "not one transition is implemented", quoted in SEM-gx-engine-002)
-# -- `pipeline.rs` is hand 2's file and
+# An early hand creates the crate, the journal and the escrow types only. **No transition is
+# implemented** ("not one transition is implemented", quoted in SEM-gx-engine-002)
+# -- `pipeline.rs` is a later hand's file and
 # is deliberately absent, because a module that exists and does nothing is a module a reader has to
 # rule out.
 [package]
@@ -14,33 +16,36 @@ name = "gx-engine"
 description = "The Transformation lifecycle: engine journal, escrow store, deterministic replay."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47; sem: SEM-gx-engine-003): declared once, in the workspace
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
-publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
-repository.workspace = true           # P5 (req/134 §1 item 6): `dist generate` reads this
+rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-engine-003)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # `dist generate` reads this
 
-# 🔴 **N-13** (req/78 §1) is a claim about this table: no substrate adapter is here, and none may
-# be. 41 §1 puts the substrate behind the adapter boundary, and an engine that linked
+# 🔴 A standing invariant is a claim about this table: no substrate adapter is here, and none may
+# be. The architecture spec puts the substrate behind the adapter boundary, and an engine that linked
 # `gx-adapter-fs` would ship one substrate's grammar to every user of every substrate --
 # breaking this turns "the same engine no matter the substrate" into a lie in the implementation
 # (quoted in SEM-gx-engine-004). The mechanical check is
 # `probes/doubt/tests/workspace_doubt.rs::gx_engine_ships_no_substrate_adapter`, which reads this
 # section and not the whole file, plus `cargo tree -p gx-engine -e normal` in tools/verify_m5h1.sh.
 #
-# **E-M5's six, complete as of hand 2.** req/78 §2.2 writes the dependency shape as six -- "gx-engine
+# **The dependency shape's six, complete as of an early hand.** The architecture spec writes the
+# dependency shape as six -- "gx-engine
 # depends on exactly six: gx-core / gx-canon / gx-witness / gx-log / gx-gate / gx-substrate" (quoted
 # in SEM-gx-engine-005) -- and
-# M5-26 files that as the 41 §2 erratum. Hand 1 declared four and raised **M5H1-1**, because a
-# dependency declared before its first use cannot be reviewed against a reason (the rule gx-substrate
-# set in M4 hand 1, which §29 accepted when E-M4-26 was called complete only after hand 3 minted the
-# first CID). req/38 §38 ruled adopted (a) -- "a shipping dependency is **declared in the hand where
-# a call exists**...gx-gate is added in hand 2, gx-witness in hand 4" (quoted in SEM-gx-engine-006)
+# an erratum files that as the correction. An early hand declared four and raised a review flag,
+# because a dependency declared before its first use cannot be reviewed against a reason (the rule
+# gx-substrate set in an early hand, accepted once an earlier erratum was called complete only after
+# a later hand minted the first CID). A ruling was adopted -- "a shipping dependency is **declared in
+# the hand where a call exists**...gx-gate is added in one hand, gx-witness in a later one" (quoted
+# in SEM-gx-engine-006)
 # -- and both call sites arrive here rather than one:
 #
-#   * `gx-gate`    -- `Gate::verify` in T-4a/b/c, exactly where the ruling put it.
-#   * `gx-witness` -- **one hand earlier than the ruling expected.** `Receipt::issue` is still hand
-#                     4's, but **M5-03 adopted (a)** (sem: SEM-gx-engine-007) types `EvidenceSource::collect` as returning
-#                     `Vec<Evidence>`, and `Evidence` is gx-witness's (42 §3.7). A type in a public
+#   * `gx-gate`    -- `Gate::verify`, exactly where the ruling put it.
+#   * `gx-witness` -- **one hand earlier than the ruling expected.** `Receipt::issue` is still a
+#                     later hand's, but an earlier ruling (sem: SEM-gx-engine-007) types
+#                     `EvidenceSource::collect` as returning
+#                     `Vec<Evidence>`, and `Evidence` is gx-witness's. A type in a public
 #                     signature is a use, so the reason exists now and the ruling's condition
 #                     ("in the hand where a call exists", quoted in SEM-gx-engine-008) is met early rather than bent.
 #
@@ -48,21 +53,23 @@ repository.workspace = true           # P5 (req/134 §1 item 6): `dist generate`
 # `external` package count is unaffected -- both are workspace members already in the graph.
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
-# requirement (M2 hand 6, req/55 §4 H6-1).
+# requirement, learned in an earlier build phase.
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }        # every id, `Timestamp`, `AbortReason`, `VerdictKind`, DR-2's two axes
-gx-canon = { path = "../gx-canon", version = "0.1.0" }      # 41 §6: "every canonical encode goes through gx-canon only, no detour" (quoted in SEM-gx-engine-009)
-gx-substrate = { path = "../gx-substrate", version = "0.1.0" } # `PlannedDelta`, the body an escrowed inverse holds (42 §3.12)
+gx-core = { path = "../gx-core", version = "0.1.0" }        # every id, `Timestamp`, `AbortReason`, `VerdictKind`, and its two-axis verdict shape
+gx-canon = { path = "../gx-canon", version = "0.1.0" }      # the architecture spec: "every canonical encode goes through gx-canon only, no detour" (quoted in SEM-gx-engine-009)
+gx-substrate = { path = "../gx-substrate", version = "0.1.0" } # `PlannedDelta`, the body an escrowed inverse holds
 gx-log = { path = "../gx-log", version = "0.1.0" }          # `Recovery`: one spelling of "what opening an append-only file found" (sem: SEM-gx-engine-009)
-gx-gate = { path = "../gx-gate", version = "0.1.0" }        # `Gate::verify` (E-M3-3's `Result<Verdict>`), T-4a/b/c
-gx-witness = { path = "../gx-witness", version = "0.1.0" }  # `Evidence` (42 §3.7): what an `EvidenceSource` returns
+gx-gate = { path = "../gx-gate", version = "0.1.0" }        # `Gate::verify`, returning a `Result<Verdict>`
+gx-witness = { path = "../gx-witness", version = "0.1.0" }  # `Evidence`: what an `EvidenceSource` returns
 
-serde = { version = "1", features = ["derive"] }  # the journal's canonical form (42 §3.13)
-thiserror = "2"                       # 41 §6, "errors are typed with thiserror" (sem: SEM-gx-engine-010)
+serde = { version = "1", features = ["derive"] }  # the journal's canonical form
+thiserror = "2"                       # the architecture spec, "errors are typed with thiserror" (sem: SEM-gx-engine-010)
 
-# AC-030 asks the two-stage identity to hold across "a fully independent separate process" (quoted
+# One acceptance criterion asks the two-stage identity to hold across "a fully independent separate
+# process" (quoted
 # in SEM-gx-engine-010), so a second binary
-# has to exist. Gated exactly the way gx-canon gates AC-011's `cid_probe` (req/38 §5's precedent):
+# has to exist. Gated exactly the way gx-canon gates its own probe-binary criterion (an established
+# precedent):
 # off by default, so `cargo build`, `cargo install` and `cargo package` never see it, and turned on
 # only by this package's own dev-dependency below -- which is what makes `cargo test` build it and
 # export `CARGO_BIN_EXE_engine_id_probe`.
@@ -74,70 +81,76 @@ name = "engine_id_probe"
 path = "tests/bin/engine_id_probe.rs"
 required-features = ["probe-bin"]
 
-# 🔴 **M5-13 adopted (a)** (req/38 §37): 51 §8.1 asks for crash recovery to be measured "with a real
-# binary, a real process" (quoted in SEM-gx-engine-011), and `gx-cli` is M6's (req/78 N-01). So the
+# 🔴 A ruling asks for crash recovery to be measured "with a real
+# binary, a real process" (quoted in SEM-gx-engine-011), and `gx-cli` belongs to a later phase. So the
 # real binary is this one, behind the same
-# gate as AC-030's probe: `cargo build`, `cargo install` and `cargo package` never build it, and
-# `cargo test` does because the dev-dependency below turns the feature on. 51 §8.1's own sentence
+# gate as the two-stage-identity probe: `cargo build`, `cargo install` and `cargo package` never
+# build it, and `cargo test` does because the dev-dependency below turns the feature on. That same
+# ruling's own sentence
 # ("a test-only hook, or an injection-point environment variable", quoted in SEM-gx-engine-012)
 # permits a hook inside the engine instead; the
 # injection points live in this binary's adapter so that no shipping line reads an environment
-# variable (req/83 §3.2).
+# variable.
 [[bin]]
 name = "crash_probe"
 path = "tests/bin/crash_probe.rs"
 required-features = ["probe-bin"]
 
 [dev-dependencies]
-proptest = "1.11"                     # the journal round-trip is stated as a property (req/78 §6.2 hand 1 ④; sem: SEM-gx-engine-013)
+proptest = "1.11"                     # the journal round-trip is stated as a property (sem: SEM-gx-engine-013)
 gx-engine = { path = ".", features = ["probe-bin"] }  # turns the probe binary on for `cargo test` alone
 
-# 🔴 **No adapter in the shipping graph -- and, from M5 hand 7, one here.**
+# 🔴 **No adapter in the shipping graph -- and, from a later hand, one here.**
 #
-# Hands 1..6 declared none at all: `ENGINE_ADAPTER_DECLARATIONS=0` (hand 1's measure, which counts
+# Earlier hands declared none at all: `ENGINE_ADAPTER_DECLARATIONS=0` (an early measure, which counts
 # *any* declaration in this file) stayed 0, and every suite drives the engine with a stub written
 # against `SubstrateAdapter` in `tests/support/mod.rs`. Two reasons, and the second was the real one.
 # A stub is the better instrument -- an engine test that failed because a real filesystem behaved
-# unexpectedly would be measuring the adapter. And N-13 is a claim about "the same engine no matter
+# unexpectedly would be measuring the adapter. And the no-substrate-adapter invariant is a claim about
+# "the same engine no matter
 # the substrate" (quoted in SEM-gx-engine-014): a hand that reaches for the fs adapter to make its own tests convenient is the first step
 # of the drift the rule exists to stop.
 #
-# **AC-065 is not that hand.** 34's Given is "**via the fs adapter**, a commit pipeline on tmpfs"
-# (quoted in SEM-gx-engine-015) and 33 NFR-002's measurement column names the crate: "using
+# **One integration benchmark is not that hand.** Its Given is "**via the fs adapter**, a commit
+# pipeline on tmpfs"
+# (quoted in SEM-gx-engine-015) and its measurement column names the crate: "using
 # `gx-adapter-fs` on tmpfs". A bench that measured a
-# stub would print a number about `tests/support/mod.rs` under NFR-002's name. So the adapter is here,
-# **for the benches only**, and N-13 is untouched where N-13 is written:
+# stub would print a number about `tests/support/mod.rs` under that requirement's name. So the
+# adapter is here,
+# **for the benches only**, and the no-substrate-adapter invariant is untouched where it is written:
 #
 #   * `cargo tree -p gx-engine -e normal` shows no adapter (`ENGINE_SHIPPED_ADAPTERS=0`);
 #   * `probes/doubt/tests/workspace_doubt.rs::gx_engine_ships_no_substrate_adapter` reads the
-#     `[dependencies]` section above and finds none -- that probe's own note has said since hand 1
+#     `[dependencies]` section above and finds none -- that probe's own note has said since its
+#     first hand
 #     that "`[dev-dependencies]` is deliberately outside it: a test may drive the engine with a real
-#     adapter, and doing so is how M5 hands 2 and after will show that the boundary holds"
+#     adapter, and doing so is how later hands will show that the boundary holds"
 #     (quoted in SEM-gx-engine-016);
 #   * `crates/gx-engine/tests/engine_shape.rs::no_source_line_names_an_adapter` scans `src/` and finds
 #     none -- benches are not `src/`, and a bench is not in a published artefact either.
 #
-# What **does** move is hand 1's stricter reading of its own instrument ("not even a dev-dependency",
-# quoted in SEM-gx-engine-017).
-# `ENGINE_ADAPTER_DECLARATIONS` goes 0 -> 1 and hand 7 reports it as a change rather than re-scoping
-# the number quietly (req/85 §5.2 raises it). No package is added to the graph: `gx-adapter-fs` is
+# What **does** move is an early hand's stricter reading of its own instrument ("not even a
+# dev-dependency", quoted in SEM-gx-engine-017).
+# `ENGINE_ADAPTER_DECLARATIONS` goes 0 -> 1 and a later hand reports it as a change rather than
+# re-scoping the number quietly. No package is added to the graph: `gx-adapter-fs` is
 # already a workspace member and already resolved.
 #
 # 🔴 Written in the **inline** form, on a line that begins `gx-adapter-fs =`, on purpose. A
 # `[dev-dependencies.gx-adapter-fs]` table would declare exactly the same dependency and would be
-# **invisible** to hand 1's grep (`^gx-adapter[a-z-]* *=`), so the instrument would keep printing 0
-# while the dependency was there. Changing the spelling to keep a number is the failure §30's ledger
-# is about; the number moves and the report says why.
+# **invisible** to the early grep-based instrument (`^gx-adapter[a-z-]* *=`), so the instrument
+# would keep printing 0
+# while the dependency was there. Changing the spelling to keep a number is the failure a standing
+# ledger warns about; the number moves and the report says why.
 gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
 
-# AC-065/066/068's instrument, named by 34 ("gx-engine's integration bench" / "bench (load test)" /
-# "bench (recovery benchmark)", quoted in SEM-gx-engine-018) and by 51 §9, which files all three under this crate by name.
+# Three acceptance criteria's instrument, named ("gx-engine's integration bench" / "bench (load test)" /
+# "bench (recovery benchmark)", quoted in SEM-gx-engine-018), which files all three under this crate by name.
 #
-# The feature list is **the same one gx-gate resolved in M3 hand 6** and that is deliberate: cargo
-# unifies features across the graph, so a second spelling here would turn criterion's defaults
-# (`rayon`, `plotters`, `alloca`) back on for both crates and move the external package count. M3-14's
+# The feature list is **the same one gx-gate resolved in an earlier hand** and that is deliberate:
+# cargo unifies features across the graph, so a second spelling here would turn criterion's defaults
+# (`rayon`, `plotters`, `alloca`) back on for both crates and move the external package count. A
 # ruling is the clause -- "feature selection (default to a configuration that does not pull in the
-# plotters family)" (quoted in SEM-gx-engine-019) -- and req/66 §2 carries the
+# plotters family)" (quoted in SEM-gx-engine-019) -- and a research note carries the
 # five measurements that approved the crate. `cargo_bench_support` is the one feature that makes a
 # bench runnable by `cargo bench`; what it costs is the HTML report, which no gate reads.
 #
@@ -146,11 +159,14 @@ criterion = { version = "0.8", default-features = false, features = [
     "cargo_bench_support",
 ] }
 
-# 51 §9 names all three files and 34 names the criteria again. `harness = false` because criterion
+# The benchmark spec names all three files and the acceptance criteria again. `harness = false`
+# because criterion
 # supplies its own main -- and because each of these runs a **raw** instrument first, for the
-# percentile its NFR is stated in (criterion samples batch means, and the p99 of batch means is not
+# percentile its performance requirement is stated in (criterion samples batch means, and the p99 of
+# batch means is not
 # the p99 of calls). The raw half runs only under `cargo bench`, which is the flag that separates a
-# measurement from `cargo test`'s check that the file still builds (AC-064's file carries the
+# measurement from `cargo test`'s check that the file still builds (one acceptance criterion's file
+# carries the
 # 23x unoptimised-profile measurement that made that guard necessary).
 [[bench]]
 name = "commit_pipeline"
@@ -164,26 +180,27 @@ harness = false
 name = "journal_recovery"
 harness = false
 
-# 🔴 **M6-18 adopted (a) = AC-M6-b** (req/38 §47) — 51 §9's **sixth** row, and the first one 34 did not
-# already have a criterion for. `journal_recovery` times the replay (Σ, E-M5-2); this times
+# 🔴 A later ruling added the benchmark spec's **sixth** row, and the first one that did not
+# already have a criterion. `journal_recovery` times the replay; this times
 # `Engine::recover`, which re-applies through an adapter, appends to the ledger and issues receipts.
-# The recovery-flow ledger, §1.2: "the time to resume after a crash is the flight recorder's product
+# The recovery-flow ledger: "the time to resume after a crash is the flight recorder's product
 # promise itself" (quoted in SEM-gx-engine-020).
 [[bench]]
 name = "recover_cost"
 harness = false
 
-# 🔴 **ruling #20** (req/38 §56, req/98 §7-2 hand 5) — "keep D-7's firing condition and do not
-# implement a lock -- add **commits/sec measurement over disjoint object groups** to hand 5" (quoted
+# 🔴 A ruling — "keep the existing firing condition and do not
+# implement a lock -- add **commits/sec measurement over disjoint object groups**" (quoted
 # in SEM-gx-engine-021). Three arms (1 engine in series / 1 engine + 1 Mutex across N threads / N
 # engines across N threads), and the third is an **upper bound** on what a per-object lock could
-# buy rather than an implementation of one — `src/` gains no lock and 42/43 gain no vocabulary. The
+# buy rather than an implementation of one — `src/` gains no lock and the spec gains no new
+# vocabulary. The
 # file's own header carries that disclosure beside the numbers.
 [[bench]]
 name = "disjoint_lock"
 harness = false
 
-# 🔴 P5 (req/134 §1 item 6, `gx-mcp-wire/Cargo.toml`'s identical note): `engine_id_probe` and
+# 🔴 (`gx-mcp-wire/Cargo.toml` carries an identical note): `engine_id_probe` and
 # `crash_probe` are `probe-bin`-gated test fixtures, not shipped product. Opted out of `dist
 # generate`'s default (every `[[bin]]` in the workspace) the same way. **At the end of the file, on
 # purpose** — a `[package.metadata.dist]` table earlier in this manifest silently swallowed the

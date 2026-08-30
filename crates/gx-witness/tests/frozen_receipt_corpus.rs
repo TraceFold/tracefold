@@ -31,7 +31,7 @@
 //!
 //! ## Why, measured
 //!
-//! Eleven payload members (`0xab`, a CBOR map of eleven). Eight members the current `ReceiptPayload`
+//! Eleven payload members (`0xab`, a CBOR map of eleven). Nine members the current `ReceiptPayload`
 //! names are absent, in two families:
 //!
 //! 🔴 **`req/901` (2026-08-26): the number in the sentence above was `Five` and is now `Six`.**

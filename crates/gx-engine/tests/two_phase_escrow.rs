@@ -493,6 +493,8 @@ fn crashed_window(dir: &std::path::Path, observed: bool) -> gx_core::Transformat
             fp0,
             parents: Vec::new(),
             input_generation: gx_core::BoundaryStage::Unknown,
+            // DR-46-45 (`req/973` B-1): not an undo's plan, so no witness was compared.
+            undo_witness: None,
             at: AT,
         },
         EngineJournalRecord::VerifyStarted {

@@ -57,7 +57,7 @@ use std::path::{Path, PathBuf};
 /// `every_shipped_crate_root_is_in_the_list` below is the other half: it walks the tree and fails
 /// if a root exists that this list does not name, which is what stops the list from being a
 /// comfortable fiction.
-const SHIPPED_CRATE_ROOTS: [&str; 23] = [
+const SHIPPED_CRATE_ROOTS: [&str; 24] = [
     // M6 hand 1: the thirteenth, fourteenth and fifteenth. `gx-cli` has **two** roots because
     // NFR-019 asks for a single static binary and 44 spells every command `gx <verb>`: the library
     // is what the tests drive and `src/main.rs` is what a user runs, and `#![forbid(unsafe_code)]`
@@ -135,7 +135,21 @@ const SHIPPED_CRATE_ROOTS: [&str; 23] = [
     // 🔴 **P4** (`req/132` §5 item 1): the twenty-first, and the first root outside `crates/` --
     // `sdk/wasm-verify`, the WASM half of the TypeScript SDK's offline receipt verification.
     "sdk/wasm-verify/src/lib.rs",
+    // 🔴 **#188/#189** (2026-08-31): the twenty-fourth, and the first root that is a *repository
+    // root entry* rather than something under a group directory -- `tui/`, the terminal face
+    // extracted from `crates/gx-cli/src/tui/`. The walker below found nothing here until it was
+    // told to look: it enumerates `crates/` and `sdk/` as groups, and a member with no group above
+    // it has no directory to be discovered in. That is why `ROOT_LEVEL_MEMBERS` exists beside it —
+    // a root nobody names is a root nobody checks, which is this file's second test in one line.
+    "tui/src/lib.rs",
 ];
+
+/// Workspace members that live at the repository root rather than under `crates/` or `sdk/`.
+///
+/// Named rather than derived, for the same reason `SHIPPED_CRATE_ROOTS` is: the walk below needs
+/// something to walk, and "everything at the root that has a Cargo.toml" would make this list
+/// unable to disagree with the tree.
+const ROOT_LEVEL_MEMBERS: [&str; 1] = ["tui"];
 
 fn repo_root() -> PathBuf {
     // CARGO_MANIFEST_DIR is `<repo>/crates/gx-canon`.
@@ -147,9 +161,21 @@ fn repo_root() -> PathBuf {
 }
 
 /// The workspace member a listed crate root belongs to: `crates/<name>/…` → `crates/<name>`,
-/// `sdk/<name>/…` → `sdk/<name>`.
+/// `sdk/<name>/…` → `sdk/<name>`, and `tui/…` → `tui`.
+///
+/// 🔴 The third case is not cosmetic. A member at the repository root has **one** path segment, so
+/// the two-segment rule would answer `tui/src` — which no manifest declares, so `workspace_declares`
+/// would answer `false` and the root would be *skipped as a crate this tree does not carry*. The
+/// guard written to keep the published tree honest would have quietly stopped checking a crate the
+/// private tree does ship. Group prefixes are named rather than inferred so that a fourth group
+/// added tomorrow is a decision here rather than a silent reclassification.
 fn member_of(rel: &str) -> String {
-    rel.splitn(3, '/').take(2).collect::<Vec<_>>().join("/")
+    let first = rel.split('/').next().unwrap_or(rel);
+    if ["crates", "sdk", "probes"].contains(&first) {
+        rel.splitn(3, '/').take(2).collect::<Vec<_>>().join("/")
+    } else {
+        first.to_string()
+    }
 }
 
 /// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
@@ -273,6 +299,43 @@ fn every_shipped_crate_root_is_in_the_list() {
                             dir.file_name().expect("named").to_string_lossy()
                         ));
                     }
+                }
+            }
+        }
+    }
+
+    // 🔴 **#188/#189** — members that are themselves root entries. The loop above enumerates
+    // *groups* and asks each child whether it is a crate; a member with no group above it is
+    // never offered to that question, so `tui/src/lib.rs` would have been in the list with
+    // nothing walking towards it — a declaration checked in one direction only. Walked directly
+    // here, with the same three questions the group loop asks.
+    for name in ROOT_LEVEL_MEMBERS {
+        let dir = root.join(name);
+        if !dir.join("Cargo.toml").is_file() {
+            continue;
+        }
+        for candidate in ["src/lib.rs", "src/main.rs"] {
+            if dir.join(candidate).is_file() {
+                found.push(format!("{name}/{candidate}"));
+            }
+        }
+        if let Ok(bins) = std::fs::read_dir(dir.join("src/bin")) {
+            for b in bins.flatten() {
+                found.push(
+                    b.path()
+                        .strip_prefix(&root)
+                        .expect("under the root")
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                );
+            }
+        }
+        let manifest = std::fs::read_to_string(dir.join("Cargo.toml")).unwrap_or_default();
+        for line in manifest.lines() {
+            if let Some(rest) = line.trim().strip_prefix("path = ") {
+                let p = rest.trim().trim_matches('"');
+                if p.ends_with(".rs") && dir.join(p).is_file() {
+                    found.push(format!("{name}/{p}"));
                 }
             }
         }

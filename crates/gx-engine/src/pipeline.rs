@@ -106,7 +106,7 @@ use gx_substrate::{
     elide_scope, AppliedDelta, InputStageDeclaration, InverseCompletion, InvertOutcome,
     PlannedDelta, SubstrateAdapter,
 };
-use gx_witness::receipt::ReadSet;
+use gx_witness::receipt::{ReadSet, UndoAttestation, UndoDisposition};
 use gx_witness::{
     Environment, Evidence, KeyPair, Provenance, ProvenanceInputs, Receipt, ReceiptKind,
     ReceiptPayload, VerdictSummary, CURRENT_PAYLOAD_VERSION,
@@ -4600,6 +4600,10 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // predecessor, and the one producer of a non-empty list is `undo`.
             parents: transformation.parents.clone(),
             input_generation,
+            // 🔴 **DR-46-45 (`req/973` §B-1)** — `None` here and `Some` on the undo road, which is
+            // what makes this field the discriminator the receipt-construction sites use. A `plan`
+            // compared nothing against a prior attestation because there is no prior to attest.
+            undo_witness: None,
             at,
         })?;
         self.remember_resolution(intent_id, id);
@@ -5293,6 +5297,11 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // deviation is reported in `req/453` rather than implemented.
             read_set: None,
             reversibility: None,
+            // 🔴 **DR-46-45 (`req/973` §B-2)** — `None`, and `ReceiptPayload::check_schema` refuses
+            // any other value on this kind. The undo's `parents` exist by T-2 and could be named
+            // here; its witness could not, because the CAS guards an apply and a verdict receipt
+            // applies nothing. Half a pair is not a smaller claim, it is a different one.
+            undo: None,
             // 🔴 **DR-46-28** — the boundary attest, on both kinds: the question it answers
             // (did a gate derive this, and from what kind of input) is asked at verdict time as
             // much as at commit time, so this is the first of the erratum fields with **no**
@@ -6016,6 +6025,49 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             .unwrap_or(BoundaryStage::Unknown)
     }
 
+    /// 🔴 **DR-46-45 (`req/973` §B-1/§B-2)** — the undo attestation a committed receipt carries,
+    /// read back out of the `Planned` record so the live road and the two rebuild roads answer
+    /// alike (43 §7-3b).
+    ///
+    /// `None` for a transformation that is not an undo, and for an undo planned by a build that
+    /// predates this erratum — the second reproduces the absence in the filed receipt rather than
+    /// inventing a claim about a comparison nobody recorded.
+    ///
+    /// The last `Planned` for `id` wins, for [`Engine::planned_record`]'s reason: `req/38` §98
+    /// ruling 2's `--retry` road re-plans an `Aborted(ApplyFailed)` undo and writes a second record.
+    /// Each attempt performed its own CAS, so the last one is the one that guarded the apply this
+    /// receipt is about.
+    ///
+    /// **Both halves come from the same record.** Taking `undoes` from the in-memory
+    /// `Transformation` and the witness from Σ would give the two rebuild roads a seat they cannot
+    /// fill — the repairing process holds no table — which is the shape `req/440` §0-3 warns about
+    /// (two sources for one fact can disagree; one source cannot).
+    #[must_use]
+    fn journalled_undo(&self, id: &TransformationId) -> Option<UndoAttestation> {
+        let (parents, witness) =
+            self.journal
+                .records()
+                .iter()
+                .rev()
+                .find_map(|record| match record {
+                    EngineJournalRecord::Planned {
+                        transformation,
+                        parents,
+                        undo_witness,
+                        ..
+                    } if transformation == id => Some((parents.clone(), undo_witness.clone())),
+                    _ => None,
+                })?;
+        // 43 T-12 fixes `T_u.parents` as `[T_o.id]` and `Engine::undo` is its one producer, so the
+        // first element is the original. A `Planned` that carries a witness and no parent is a
+        // journal this build cannot have written; it is answered `None` rather than `expect`ed,
+        // because 41 §6 counts a panic as a bug.
+        Some(UndoAttestation {
+            undoes: *parents.first()?,
+            witness: witness?,
+        })
+    }
+
     // -----------------------------------------------------------------------
     // T-12 -- undo
     // -----------------------------------------------------------------------
@@ -6364,6 +6416,16 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         match existing_state {
             None => {}
             Some(Lifecycle::Candidate) if in_table => {
+                // 🔴 **DR-46-47 (open, `req/973` §8-6, filed 2026-08-31)** — this return is before
+                // the `Planned` append, so a second `undo` of the same `T_o` does not re-journal
+                // its witness: the receipt names the **first** call's disposition, not the last.
+                // Both calls did run the CAS (the `match` on `witness` is above this line), so no
+                // undo can claim `Attested` without having compared -- the direction is
+                // fail-closed. What it can do is keep saying `Unobservable` after a later call
+                // compared successfully, i.e. under-claim. Owner: the next cargo lane on gx-engine.
+                // Release condition: either the second call updates the seat, or `undo` refuses a
+                // re-plan whose witness differs from the journalled one, with a probe that drives
+                // both orders (Attested-then-Unobservable and its reverse) and asserts the receipt.
                 return Ok((intent_id, id));
             }
             Some(Lifecycle::Candidate) => {
@@ -6403,6 +6465,12 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // which the `M5H6_6` probe measured); now the journal carries it.
             parents: transformation.parents.clone(),
             input_generation,
+            // 🔴 **DR-46-45 (`req/973` §B-1)** — the answer the CAS above gave, written down here
+            // because T-11 is where it has to be readable and this call does not reach T-11. Every
+            // road that reaches this line has already passed the `match` on `witness`, so the
+            // `Missing` arm — a refusal — cannot be recorded: what is journalled is exactly the two
+            // outcomes a committed undo can have.
+            undo_witness: witness.disposition(),
             at,
         })?;
         self.remember_resolution(intent_id, id);
@@ -7361,6 +7429,11 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // the receipt and nothing else saw `inverse_delta: null` for both "there is no undo"
             // and "nobody found out".
             reversibility: Some(verdict_c25),
+            // 🔴 **DR-46-45 (`req/973` §B-1/§B-2)** — read back out of the `Planned` record, not
+            // taken from this process's table, and for `determinism_boundary`'s reason one field
+            // down rather than by analogy with it: the two rebuild roads must reproduce these bytes
+            // from Σ alone (43 §7-3b), so the live road reads the same seat they will.
+            undo: self.journalled_undo(id),
             // 🔴 **DR-46-28 / DR-46-33** — the verdict stage is derived here; the input-generation
             // stage is read back from the `Planned` record (`journalled_input_generation`), which
             // is where the plan-time join was journalled precisely so the two rebuild roads below
@@ -8178,6 +8251,11 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // taken from one source rather than one taken and one derived.
             read_set: filed_read_set,
             reversibility: filed_reversibility,
+            // 🔴 **DR-46-45 (`req/973` §B-1/§B-2)** — reproduced from the same `Planned` record the
+            // live road read, which is the whole reason the witness was journalled: a rebuild that
+            // re-derived it would answer `payload_mismatch` for every crash-window recovery of an
+            // undo, and `payload_mismatch` is the word for tampering.
+            undo: self.journalled_undo(&id),
             // 🔴 **DR-46-28 / DR-46-33** — reproduced rather than read back. The verdict stage
             // comes from `verdict`, which Σ carries (`StateRow::verdict`); the input-generation
             // stage comes from `journalled_input_generation` — the `Planned` record's field, which
@@ -8770,6 +8848,10 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // 🔴 **DR-46-26** — and now it does. See [`Engine::filed_attest`].
             read_set: filed_read_set,
             reversibility: filed_reversibility,
+            // 🔴 **DR-46-45 (`req/973` §B-1/§B-2)** — the re-issue road reads the same seat as the
+            // resume road above and for the same reason: a re-issue carries what the filed receipt
+            // carried, and R9's whole point is that the two digests agree.
+            undo: self.journalled_undo(id),
             // 🔴 **DR-46-28 / DR-46-33** — reproduced rather than read back. The verdict stage
             // comes from `verdict`, which Σ carries (`StateRow::verdict`); the input-generation
             // stage comes from `journalled_input_generation` — the `Planned` record's field, where
@@ -9190,6 +9272,50 @@ pub enum UndoWitness {
     Missing(WitnessMissing),
     /// There is nothing to compare against, and this is which nothing it is.
     Unobservable(Unobservable),
+}
+
+impl UndoWitness {
+    /// 🔴 **DR-46-45 (`req/973` §B-1)** — what a receipt may say about this witness, or `None` if
+    /// this witness produces no receipt.
+    ///
+    /// `Missing` is a **refusal** (R3): it mints no `TransformationId`, appends no `Planned` and
+    /// issues no receipt, so there is no signed payload for it to appear in. Returning `None` here
+    /// is that fact, not the three-valued discipline being folded into two — the third value lives
+    /// in the refusal surface (exit 3 / HTTP 409 `PRECONDITION_CHANGED`) where `req/38` §132
+    /// ruling 2 put it. `crates/gx-engine/tests/r973_undo_attestation.rs` asserts the mapping
+    /// arm by arm so a fourth variant cannot be added without a decision about this function.
+    #[must_use]
+    pub fn disposition(&self) -> Option<UndoDisposition> {
+        match self {
+            UndoWitness::Attested(_) => Some(UndoDisposition::Attested),
+            UndoWitness::Unobservable(why) => Some(UndoDisposition::Unobservable {
+                reason: why.reason().to_string(),
+            }),
+            UndoWitness::Missing(_) => None,
+        }
+    }
+
+    /// 🔴 **DR-46-45 (`req/973` §B-1)** — the word every surface prints for this witness.
+    ///
+    /// Minted here, once, so that CLI stdout, HTTP's `witness` field and the signed payload cannot
+    /// drift into three formatters that agree only by inspection. `gx_api`'s `witness_word` and
+    /// `gx_cli`'s undo stdout both call this; the receipt reaches the same string through
+    /// [`UndoDisposition::word`], and the `Missing` arm — which reaches no receipt — is the one this
+    /// function answers that [`UndoDisposition::word`] cannot.
+    #[must_use]
+    pub fn word(&self) -> String {
+        match (self, self.disposition()) {
+            (_, Some(disposition)) => disposition.word(),
+            // The refusal surface's own word. Kept here rather than at the call sites because a
+            // second spelling of it is exactly what this function exists to prevent.
+            (UndoWitness::Missing(why), None) => format!("missing:{}", why.reason()),
+            // A variant added later without deciding what a receipt may say about it lands here.
+            // Named rather than guessed at, and not a panic: 41 §6 counts a panic as a bug, and a
+            // word invented for an undecided case would be the "green that lies" this workspace
+            // keeps measuring.
+            (other, None) => format!("undecided:{other:?}"),
+        }
+    }
 }
 
 /// Which trust an [`UndoWitness::Missing`] lacks (**R3**, `req/38` §160 ruling 2).

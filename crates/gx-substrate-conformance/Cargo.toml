@@ -1,11 +1,11 @@
-# The shared contract harness 51 §7 requires of every `SubstrateAdapter`, and **E-M4-19**
-# (`req/38_ERRATA_2026-08-07.md` §28) is the erratum that puts it in 41 §2's crate table:
+# The shared contract harness the architecture spec requires of every `SubstrateAdapter`, added by
+# an erratum that puts it in the crate table:
 # "member count 6->9 (gx-substrate/gx-adapter-fs/gx-substrate-conformance); conformance is **not a
-# publish target** (the §5 probe-bin precedent); a note (N-12) that it is a **different thing** from
-# `gx-conformance-gen` (M8)" (sem: SEM-gx-substrate-conformance-001).
+# publish target** (the probe-bin precedent); a note that it is a **different thing** from
+# a separate, later-planned `gx-conformance-gen` tool" (sem: SEM-gx-substrate-conformance-001).
 #
-# 51 §7, verbatim (sem: SEM-gx-substrate-conformance-002): "implement, as an adapter-independent
-# shared test harness `gx-substrate-conformance` (a new test-only crate, filed under 35), the
+# The architecture spec, verbatim (sem: SEM-gx-substrate-conformance-002): "implement, as an
+# adapter-independent shared test harness `gx-substrate-conformance` (a new test-only crate), the
 # contract every adapter implementing the `SubstrateAdapter` trait (fs, git, mcp, and future
 # additions) must satisfy. Each adapter crate inherits the contract tests merely by calling this
 # harness from `#[test]`."
@@ -14,12 +14,12 @@ name = "gx-substrate-conformance"
 description = "The adapter contract harness: seven contracts and the laws the rulings added."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the
-                                       # workspace (sem: SEM-gx-substrate-conformance-003)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+rust-version.workspace = true         # declared once, in the
+                                       # workspace, per the adopted MSRV decision (sem: SEM-gx-substrate-conformance-003)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
 
-# **Not published.** E-M4-19, verbatim (sem: SEM-gx-substrate-conformance-004): "conformance is not
-# a publish target (the §5 probe-bin precedent)". This crate is a
+# **Not published.** The publish-target erratum, verbatim (sem: SEM-gx-substrate-conformance-004):
+# "conformance is not a publish target (the probe-bin precedent)". This crate is a
 # test instrument: it holds no product code, and a released version of it would be a second
 # published surface whose compatibility promises nobody has made. `probes/doubt` carries the same
 # line for the same reason.
@@ -32,7 +32,7 @@ publish = false
 # which mints its own snapshot ids the way any adapter has to.
 #
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
-# requirement (M2 hand 6, req/55 §4 H6-1).
+# requirement, learned in an earlier build phase.
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
 gx-substrate = { path = "../gx-substrate", version = "0.1.0" }

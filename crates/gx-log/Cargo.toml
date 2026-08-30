@@ -1,61 +1,61 @@
-# The append-only Merkle transparency log. 41 §2 gives this crate its module list
+# The append-only Merkle transparency log. The architecture spec gives this crate its module list
 # (`src/{lib,tile,proof,store}.rs`) and its dependency line (`rs_merkle` or homegrown, tile design after (sem: SEM-gx-log-001)
-# Rekor v2); 42 §3.11 gives the hash rules and the field tables.
+# Rekor v2); the same spec gives the hash rules and the field tables.
 [package]
 name = "gx-log"
 description = "Append-only Merkle tile log: inclusion and consistency proofs."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-log-002)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
-publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-log-002)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
-# One way, like gx-witness's: E-M2-1 put `InclusionProof` and `Checkpoint` in gx-core so this crate
-# and gx-witness need never name each other.
+# One way, like gx-witness's: an early ruling put `InclusionProof` and `Checkpoint` in gx-core so
+# this crate and gx-witness need never name each other.
 #
-# `version` beside `path`: see gx-canon's manifest for why (M2 hand 6, `cargo deny check bans`).
+# `version` beside `path`: see gx-canon's manifest for why (`cargo deny check bans`).
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
 
-# E-M2-12: 42 §3.11's `BLAKE3(0x00 || canonical_dagcbor(LedgerLeaf))` is minted by gx-canon, not
-# here. That edge is what lets this crate name neither a CBOR codec nor a hash -- 41 §6's
-# "canonical encoding goes through gx-canon alone" (sem: SEM-gx-log-003), checked by gx-canon's AC-014.
+# An early ruling: `BLAKE3(0x00 || canonical_dagcbor(LedgerLeaf))` is minted by gx-canon, not
+# here. That edge is what lets this crate name neither a CBOR codec nor a hash -- the architecture spec's
+# "canonical encoding goes through gx-canon alone" (sem: SEM-gx-log-003), checked by one of gx-canon's acceptance criteria.
 gx-canon = { path = "../gx-canon", version = "0.1.0" }
 #
-# 41 §2 wrote the merkle dependency as a choice: "rs_merkle or homegrown (tile design follows Rekor v2)", (sem: SEM-gx-log-004)
-# and hand 1 declared `rs_merkle = "1.5"` to make the choice concrete rather than to spend it
-# (req/50 §6). **M2H1-6 → hand 2 ruling** (req/38 §9) took the other branch and the dependency is gone: (sem: SEM-gx-log-005)
-#   1. gx hashes with BLAKE3 (35 DR-3) and rs_merkle brings `sha2` 0.10 with it, so the workspace
-#      carried two SHA-256 implementations for a log that uses none (req/50 §6 measured it).
-#   2. 42 §3.11's `0x00`/`0x01` domain separation is no library's default, so the interesting part
+# The architecture spec wrote the merkle dependency as a choice: "rs_merkle or homegrown (tile design follows Rekor v2)", (sem: SEM-gx-log-004)
+# and an early hand declared `rs_merkle = "1.5"` to make the choice concrete rather than to spend it.
+# A later ruling took the other branch and the dependency is gone: (sem: SEM-gx-log-005)
+#   1. gx hashes with BLAKE3 and rs_merkle brings `sha2` 0.10 with it, so the workspace
+#      carried two SHA-256 implementations for a log that uses none (measured directly).
+#   2. The `0x00`/`0x01` domain separation is no library's default, so the interesting part
 #      would have been written here either way.
 #   3. The three-point licence check disagreed with itself: crates.io publishes `Apache-2.0/MIT`,
 #      the repository holds one LICENSE.md and it is MIT only, and the GitHub API answers MIT.
-# The library was **observed and not copied** (52 / 05 §4 R-4); `tests/ac_021.rs` fails if any
+# The library was **observed and not copied**; `tests/ac_021.rs` fails if any
 # merkle library is declared here again.
 
-# 41 §6: "errors are typed with thiserror" (sem: SEM-gx-log-006). serde carries 42 §3.11's field tables.
+# The architecture spec: "errors are typed with thiserror" (sem: SEM-gx-log-006). serde carries the same spec's field tables.
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 
-# 🔴 **R6 / DR-43-11** — `.gx/checkpoints/head.json` is JSON and `src/head.rs` reads and writes it.
+# 🔴 `.gx/checkpoints/head.json` is JSON and `src/head.rs` reads and writes it.
 #
 # A shipping dependency where it was a dev-dependency before, and the reason it is JSON rather than
 # this workspace's canonical DAG-CBOR is that the file is an **operator- and auditor-facing**
 # document: `gx checkpoint export` copies the signed `Checkpoint` out of it and `gx receipt verify
-# --checkpoint` reads that copy, both of which are JSON on 44 §1.3's stdout already. No package is
+# --checkpoint` reads that copy, both of which are JSON on the CLI's stdout already. No package is
 # added to the graph — serde_json is resolved for gx-witness, gx-api and gx-cli — and no canonical
-# encode moves: 41 §6's "every canonical encode goes through gx-canon only" is about the bytes a
-# digest is taken over, and nothing here is hashed.
+# encode moves: the architecture spec's "every canonical encode goes through gx-canon only" is about
+# the bytes a digest is taken over, and nothing here is hashed.
 serde_json = "1"
 
 [dev-dependencies]
-proptest = "1.11"                     # AC-022 and AC-023 are stated as properties (34)
+proptest = "1.11"                     # two acceptance criteria are stated as properties
 
-# 🔴 **FR-M7-2** (req/98 §3-2, additional ruling a = req/38 §56) — the controlled experiment's instrument. (sem: SEM-gx-log-007)
+# 🔴 The controlled experiment's instrument. (sem: SEM-gx-log-007)
 #
 # `harness = false` and **no criterion**. The other four benches in this workspace use criterion for
-# 51 §9's regression detection over a single call; this one measures a **shape** (how the cost of one
+# regression detection over a single call; this one measures a **shape** (how the cost of one
 # proof grows with `n`) across seven tree sizes, and criterion's sampling of batch means is not the
 # thing being asked about. Declaring criterion here to keep the four files looking alike would add a
 # dev-dependency for a `main` this file already has.

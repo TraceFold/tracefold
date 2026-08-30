@@ -187,8 +187,11 @@ fn every_variant_declares_one_key_per_field() {
     }
     println!("JOURNAL_FIELDS_TOTAL={total_fields}");
     assert_eq!(
-        total_fields, 59,
-        "the fifteen variants carry fifty-nine fields between them (**DR-46-33** added \
+        total_fields, 60,
+        "the fifteen variants carry sixty fields between them (**DR-46-45** added \
+         `Planned.undo_witness`, `req/973` §B-1 -- the compare-and-swap answer the undo road \
+         reached, journalled because `Engine::undo` builds no receipt and 43 §7-3b's rebuild \
+         cannot re-derive a comparison made against a live world; **DR-46-33** added \
          `Planned.input_generation`, `req/38` §413 -- the input-generation stage joined at plan \
          time and journalled as its result so 43 §7-3b's rebuild reproduces the boundary without \
          the actor; **DR-46-34** added \
@@ -280,8 +283,9 @@ fn every_field_of_every_record_reaches_its_digest() {
          {missing:?}"
     );
     assert_eq!(
-        declared, 59,
-        "the fifteen records declare fifty-nine fields (**DR-46-33** added \
+        declared, 60,
+        "the fifteen records declare sixty fields (**DR-46-45** added `Planned.undo_witness`, \
+         `req/973` §B-1; **DR-46-33** added \
          `Planned.input_generation`, `req/38` §413; **E-M5-13** added `Planned.locator` and \
          `Planned.parents` in M6 hand 1; two-phase escrow added `InverseEscrowed.pending` and the \
          `ApplyObserved`/`InverseCompleted` pair, req/38 §98 ruling 1, sem: SEM-gx-engine-752; \
@@ -294,8 +298,11 @@ fn every_field_of_every_record_reaches_its_digest() {
     );
     assert_eq!(
         mutants.len(),
-        63,
-        "one mutant per field (**DR-46-33** brings its own, `Planned.input_generation`, and \
+        64,
+        "one mutant per field (**DR-46-45** brings its own, `Planned.undo_witness`, in the same \
+         commit as the field, and its mutant is the other arm of the disposition rather than an \
+         absence -- the absence is `None`, which is \"not an undo's plan\" and not a third value; \
+         **DR-46-33** brings its own, `Planned.input_generation`, and \
          **DR-46-34** brings `reads_attested`, in the same \
          commit as the field), plus four absent cases: `Verdict.verdict_digest` (43 T-4e), \
          `InverseEscrowed.inverse_cid` (E-M5-9), `InverseCompleted.inverse_cid` (the \
@@ -379,6 +386,8 @@ fn every_component_of_a_written_fingerprint_reaches_the_digest() {
         ),
         parents: Vec::new(),
         input_generation: gx_core::BoundaryStage::Unknown,
+        // DR-46-45 (`req/973` B-1): not an undo's plan, so no witness was compared.
+        undo_witness: None,
         at: gx_core::Timestamp(101),
     };
 

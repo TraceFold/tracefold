@@ -1,16 +1,16 @@
-# The offline-verification half of P4's TypeScript SDK (`req/132` §2 item 2 / §5 item 1).
+# The offline-verification half of the TypeScript SDK.
 #
-# `req/132` §5 orders a WASM spike **before** this crate is written: build the four engine crates a
-# receipt's offline check touches (gx-core/gx-canon/gx-log/gx-witness) for `wasm32-unknown-unknown`
-# and read the verify path itself to see whether it calls `getrandom` at all. It does not --
-# `gx_witness::receipt::verify_offline` reaches `ed25519_dalek::VerifyingKey::verify_strict` (a public-
-# key operation) and `gx_canon`/`gx_log`'s deterministic hashing, and the only caller of
-# `getrandom::fill` in this dependency graph is `KeyPair::generate` (`crates/gx-witness/src/keys.rs`),
-# which this crate never calls. Measured (`Desktop/GitRepo/REFERENCES.md`, 2026-08-14): the four
-# crates build clean as `wasm32-unknown-unknown` rlibs, and a `wasm-bindgen`-linked module exposing
-# only [`verify_receipt_offline`] below imports **no** `getrandom`/entropy host function at all --
+# A spike built the four engine crates a receipt's offline check touches (gx-core/gx-canon/gx-log/
+# gx-witness) for `wasm32-unknown-unknown` before this crate was written, and read the verify path
+# itself to see whether it calls `getrandom` at all. It does not -- `gx_witness::receipt::verify_offline`
+# reaches `ed25519_dalek::VerifyingKey::verify_strict` (a public-key operation) and
+# `gx_canon`/`gx_log`'s deterministic hashing, and the only caller of `getrandom::fill` in this
+# dependency graph is `KeyPair::generate` (`crates/gx-witness/src/keys.rs`), which this crate never
+# calls. Measured (`Desktop/GitRepo/REFERENCES.md`, 2026-08-14): the four crates build clean as
+# `wasm32-unknown-unknown` rlibs, and a `wasm-bindgen`-linked module exposing only
+# [`verify_receipt_offline`] below imports **no** `getrandom`/entropy host function at all --
 # `wasm-bindgen`'s own placeholder/externref plumbing is the whole import table, because nothing this
-# crate calls reaches the code path that would need one. `req/133` §1 carries the full measurement.
+# crate calls reaches the code path that would need one.
 [package]
 # Directory-basename == package-name (`probes/doubt` -> `doubt`, `crates/gx-core` -> `gx-core`):
 # `probes/doubt/tests/workspace_doubt.rs::the_member_names_in_ci_are_the_member_names_in_the_manifest`
@@ -19,14 +19,14 @@
 # `gx-` prefix the product crates use — it is SDK tooling bundled into an npm package, not a 13th
 # `gx-*` product crate (the same non-`gx-` standing `doubt` already has).
 name = "wasm-verify"
-description = "wasm32 receipt offline verification, exposed to JS via wasm-bindgen (P4, req/132 §5 item 1)."
+description = "wasm32 receipt offline verification, exposed to JS via wasm-bindgen."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the
-                                       # workspace (sem: SEM-sdk-wasm-verify-001)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
+rust-version.workspace = true         # declared once, in the workspace, per the workspace's adopted
+                                       # MSRV decision (sem: SEM-sdk-wasm-verify-001)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
 publish = false                       # ships inside the npm package's dist/, not to crates.io (same
-                                       # standing as gx-substrate-conformance / probes/doubt, E-M4-19)
+                                       # standing as gx-substrate-conformance / probes/doubt)
 
 [lib]
 crate-type = ["cdylib", "rlib"]        # cdylib: what `wasm-bindgen` links; rlib: what `cargo test`
@@ -40,7 +40,7 @@ serde_json = "1"
 # gh primary-source check (crates.io API + GitHub API, `Desktop/GitRepo/REFERENCES.md` 2026-08-14;
 # sem: SEM-sdk-wasm-verify-002): MIT OR Apache-2.0,
 # `wasm-bindgen/wasm-bindgen`, not archived, 9k+ stars. The one dependency this crate adds beyond
-# what M6/M7 already put in the workspace graph (`ed25519-dalek`, `getrandom`, `serde`, `serde_json`
+# what the workspace graph already carries (`ed25519-dalek`, `getrandom`, `serde`, `serde_json`
 # are all already there via gx-witness). Builds and lints clean on the host target too (verified
 # above), which is what lets this crate sit in the ordinary `--workspace` clippy/test scope rather
 # than needing a carve-out.
@@ -51,7 +51,7 @@ wasm-bindgen = "0.2"
 # signing half `gx-witness`'s own suites use, and it is a dev-only need (the shipped function only
 # verifies, never signs).
 ed25519-dalek = "3"
-# 🔴 **E-SDK-10** (`req/503` §0): the three negative controls need a *real* anchor to attack -- a
+# 🔴 The three negative-control tests need a *real* anchor to attack -- a
 # `TileLog` the fixture appends to, the `InclusionProof` that log produces, and the head it would
 # publish (`gx_log::proof::unsigned_checkpoint`, then `gx_witness::dsse::sign_checkpoint`). A
 # hand-built `Checkpoint` would let the tests pass against a verifier that never walked an audit

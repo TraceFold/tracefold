@@ -104,6 +104,8 @@ fn any_record() -> impl Strategy<Value = EngineJournalRecord> {
                 fp0: support::fp(seed),
                 parents: vec![tid(seed + 1)],
                 input_generation: gx_core::BoundaryStage::Unknown,
+                // DR-46-45 (`req/973` B-1): not an undo's plan, so no witness was compared.
+                undo_witness: None,
                 at
             }),
             Just(EngineJournalRecord::VerifyStarted {
@@ -397,6 +399,8 @@ fn a_record_over_the_ceiling_is_refused() {
         ),
         parents: Vec::new(),
         input_generation: gx_core::BoundaryStage::Unknown,
+        // DR-46-45 (`req/973` B-1): not an undo's plan, so no witness was compared.
+        undo_witness: None,
         at: Timestamp(1),
     };
     let path = scratch("roundtrip_ceiling").join("journal.gxj");
@@ -446,6 +450,8 @@ fn a_whole_record_over_the_ceiling_is_refused_on_the_way_back_in() {
         ),
         parents: Vec::new(),
         input_generation: gx_core::BoundaryStage::Unknown,
+        // DR-46-45 (`req/973` B-1): not an undo's plan, so no witness was compared.
+        undo_witness: None,
         at: Timestamp(1),
     };
     let payload = cbor::encode(&record).expect("canonical, and larger than the ceiling");
@@ -542,6 +548,8 @@ fn a_record_exactly_at_the_ceiling_replays() {
         ),
         parents: Vec::new(),
         input_generation: gx_core::BoundaryStage::Unknown,
+        // DR-46-45 (`req/973` B-1): not an undo's plan, so no witness was compared.
+        undo_witness: None,
         at: Timestamp(1),
     };
     // Two encodings in the same CBOR length-prefix class (both text lengths are >= 65536, a

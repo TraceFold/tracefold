@@ -1,61 +1,64 @@
-# Provenance, evidence and the signed receipt. 41 §2 gives this crate its module list
+# Provenance, evidence and the signed receipt. The architecture spec gives this crate its module list
 # (`src/{lib,provenance,receipt,evidence,dsse,keys}.rs`) and its dependency line (`ed25519-dalek`);
-# 42 §3.7 / §3.9 / §3.10 give the field tables those modules carry.
+# the field-table spec gives the field tables those modules carry.
 [package]
 name = "gx-witness"
 description = "Provenance, evidence and DSSE-signed receipts."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the
-                                       # workspace (sem: SEM-gx-witness-001)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
-publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+rust-version.workspace = true         # declared once, in the
+                                       # workspace, per the adopted MSRV decision (sem: SEM-gx-witness-001)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
 
-# The edge that E-M2-1 made one-way (`req/38_ERRATA_2026-08-07.md` §8). This crate names gx-core
-# and gx-log names gx-core; neither names the other, so the cycle 42 §3.10 + §3.11 would have
+# The edge that an early ruling made one-way. This crate names gx-core
+# and gx-log names gx-core; neither names the other, so the cycle the field-table spec would have
 # produced is absent from the graph rather than forbidden by a convention. gx-canon is NOT here:
-# hand 1 needs no canonical encoding, and a dependency declared before its first use cannot be
-# reviewed against a reason. Hand 4 adds it when `Provenance` first needs a CID.
+# an early hand needs no canonical encoding, and a dependency declared before its first use cannot be
+# reviewed against a reason. A later hand adds it when `Provenance` first needs a CID.
 #
-# `version` beside `path`: see gx-canon's manifest for why (M2 hand 6, `cargo deny check bans`).
+# `version` beside `path`: see gx-canon's manifest for why (`cargo deny check bans`).
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }
 
-# Hand 4. 42 §1.3 gives `Evidence` an IdentityView row (all fields, no exclusions) (sem:
+# A later hand. The field-table spec gives `Evidence` an IdentityView row (all fields, no exclusions) (sem:
 # SEM-gx-witness-002), so the type needs a
-# CID, and 41 §6 routes every canonical encode through gx-canon: `IdentityView` is declared there,
-# and `cid::compute` is the only road to a digest (AC-014). Declaring the edge here is what lets
+# CID, and the architecture spec routes every canonical encode through gx-canon: `IdentityView` is
+# declared there, and `cid::compute` is the only road to a digest (checked by one of gx-canon's
+# acceptance criteria). Declaring the edge here is what lets
 # `evidence.rs` implement the trait for a local type without gx-witness ever naming BLAKE3 or a CBOR
 # codec -- `tests/evidence_cid.rs` reads the source and fails if it does. No cycle: gx-canon names
 # gx-core and nothing else in this workspace.
 gx-canon = { path = "../gx-canon", version = "0.1.0" }
 
-# Hand 5. AC-070 verifies a `CommitReceipt`'s inclusion proof offline and H3-7
-# (`req/38_ERRATA_2026-08-07.md` §12) attaches a signature over `gx_log::proof::
+# A later hand. One acceptance criterion verifies a `CommitReceipt`'s inclusion proof offline and a
+# ruling attaches a signature over `gx_log::proof::
 # checkpoint_signing_bytes`; both are gx-log's arithmetic, and a second copy of a merkle verifier is
-# the drift E-M2-12 moved the `Proof` family down to gx-core to avoid. The edge runs one way --
-# gx-log does not name this crate -- so E-M2-1's cycle is still absent from the graph and cargo, not
-# a convention, is what says so. `tests/ac_018.rs` reads gx-log's manifest and fails if that ever
-# changes. Raised in req/54 §4: 41 §2's informal dep line for gx-witness names neither this nor
-# gx-canon.
+# the drift an earlier ruling moved the `Proof` family down to gx-core to avoid. The edge runs one way --
+# gx-log does not name this crate -- so that earlier one-way ruling's cycle is still absent from the
+# graph and cargo, not a convention, is what says so. `tests/ac_018.rs` reads gx-log's manifest and
+# fails if that ever changes. The architecture spec's informal dep line for gx-witness names neither
+# this nor gx-canon.
 gx-log = { path = "../gx-log", version = "0.1.0" }
 
-# Named on this crate's dependency line in 41 §2 and approved in research/02 §3 by E-M2-10.
+# Named on this crate's dependency line in the architecture spec and approved in a research note.
 # Versions are the max_stable_version read off the crates.io API on 2026-08-07; every license was
 # checked at three points (crates.io API, GitHub API, LICENSE file in the repository) and written
-# into Desktop/GitRepo/REFERENCES.md the same day (R-10 / T-36).
+# into Desktop/GitRepo/REFERENCES.md the same day.
 #
 # 3.0.0 declares rust-version 1.85, which is exactly this workspace's floor -- so a future patch
 # release that raises its MSRV raises ours. `--locked` in CI pins what was reviewed; 2.2.0 (MSRV
-# 1.81) is the fallback if that floor ever moves before ours does. Recorded in req/50 §5.
-ed25519-dalek = "3"                   # FR-018/FR-019/FR-020, DSSE signature and verification
+# 1.81) is the fallback if that floor ever moves before ours does.
+ed25519-dalek = "3"                   # DSSE signature and verification requirements
 
-# base64 is NOT here. Hand 1 declared `base64 = "0.23"` for 44 §2.2's "`payload` is base64" (sem:
+# base64 is NOT here. An early hand declared `base64 = "0.23"` for the stdout spec's "`payload` is
+# base64" (sem:
 # SEM-gx-witness-003) and
-# req/50 §5 re-opened the version at first use rather than at declaration, because the release was
-# published three days earlier and had not soaked. Hand 5 is that first use and takes the other
-# branch: `gx_core::b64` writes RFC 4648 §4 out longhand, next to the base32 table 42 §1.2 already
-# made gx-core write for `Cid` -- one crate, one place where an alphabet lives, and 41 §2's
+# a later review re-opened the version at first use rather than at declaration, because the release was
+# published three days earlier and had not soaked. A later hand is that first use and takes the other
+# branch: `gx_core::b64` writes RFC 4648 §4 out longhand, next to the base32 table the architecture
+# spec already
+# made gx-core write for `Cid` -- one crate, one place where an alphabet lives, and the same spec's
 # "serde, thiserror and not much more" (sem: SEM-gx-witness-004) respected on the crate that would
 # otherwise have taken the dependency.
 # `gx-core/tests/base64_vectors.rs` checks the table against RFC 4648 §10's own vectors, and the
@@ -64,21 +67,22 @@ ed25519-dalek = "3"                   # FR-018/FR-019/FR-020, DSSE signature and
 # Ed25519 seeds. `SigningKey::generate` needs ed25519-dalek's `rand_core` feature, which is off by
 # default and would pull `rand_core` 0.10 into the graph for one call; `KeyPair::from_seed` takes the
 # thirty-two bytes and this fills them. Already in the tree (0.3.4).
-getrandom = "0.3"                     # FR-020, key generation
+getrandom = "0.3"                     # key-generation requirement
 
-# 41 §6: "errors are typed with thiserror" (sem: SEM-gx-witness-005). serde carries every field
-# table in 42.
+# The architecture spec: "errors are typed with thiserror" (sem: SEM-gx-witness-005). serde carries
+# every field table.
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 
-# 42 §3.7 types `InTotoStatementRef.inline` as `Option<serde_json::Value>`, so the field table puts
-# this crate in the dependency rather than the dev-dependency column. Already in the graph: gx-canon
-# carries it for `Intent.goal` (42 §3.3) under A-6, so hand 4 adds no package to the tree.
+# The field-table spec types `InTotoStatementRef.inline` as `Option<serde_json::Value>`, so the field
+# table puts this crate in the dependency rather than the dev-dependency column. Already in the
+# graph: gx-canon carries it for `Intent.goal` under an approved-dependency ruling, so this hand adds
+# no package to the tree.
 serde_json = "1"
 
-# 🔴 **P2 item2** (`req/130` §1, ruling 1 = adopted (b): RustCrypto pure-Rust, gh primary-source +
+# 🔴 A licensing review (RustCrypto pure-Rust, gh primary-source +
 # recorded in REFERENCES.md `Desktop/GitRepo/REFERENCES.md` 2026-08-14) (sem: SEM-gx-witness-006).
-# Key-at-rest encryption (NFR-010, opt-in — ruling 2)
+# Key-at-rest encryption (opt-in)
 # for [`keys::KeyPair::save_encrypted`]/[`keys::KeyPair::load_encrypted`]. `default-features =
 # false` on both: argon2's default set pulls in the `password-hash` crate (a PHC-string API this
 # module does not use — the low-level `hash_password_into_with_memory` is called directly, so the
@@ -90,7 +94,7 @@ serde_json = "1"
 argon2 = { version = "0.5.3", default-features = false, features = ["alloc"] }
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
 
-# 🔴 **M6H7-5 (b)** (req/38 §54; implemented by the M6 fix batch's confirmed item 2). Since 0.3,
+# 🔴 A wasm-target fix, from an earlier build-repair batch. Since 0.3,
 # getrandom refuses to guess a backend on `wasm32-unknown-unknown` and fails the build with the
 # message naming this feature. The feature is declared **per target**, so it is resolved only when
 # that target is being built: the x86_64 graph is byte-identical and the external package count does
@@ -98,11 +102,12 @@ chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["
 #
 # The feature is half of getrandom's contract and `.cargo/config.toml` carries the other half
 # (`--cfg getrandom_backend="wasm_js"`); either alone still fails to compile, which is why the two
-# edits are one change. Measured before and after: `WASM_gx-witness_RC=101` → `0`.
+# edits are one change. Measured before and after: the wasm build's return code went from failing to
+# passing.
 #
-# This is a **build**, not an implementation of the WASM verifier — 46 §5 and N-03 are M7's.
+# This is a **build**, not an implementation of the WASM verifier -- that belongs to a later phase.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
-proptest = "1.11"                     # AC-015 is stated as unit + property, AC-019 as a property (34)
+proptest = "1.11"                     # two acceptance criteria are stated as unit+property / property

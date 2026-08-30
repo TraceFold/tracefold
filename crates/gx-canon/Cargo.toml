@@ -1,49 +1,48 @@
-# Canonical form and content addressing. 41 §2 gives this crate its module list and its
-# dependency line; 42 gives the encoding rules those dependencies are asked to carry out.
+# Canonical form and content addressing. The architecture spec gives this crate its module list and its
+# dependency line; the encoding spec gives the rules those dependencies are asked to carry out.
 [package]
 name = "gx-canon"
 description = "Canonical DAG-CBOR form, CID, and the JCS compatibility layer."
 version = "0.1.0"
 edition = "2021"
-rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-canon-001)
-license = "Apache-2.0"                # 35 DR-5, DEFAULT column
-publish = false                       # req/636: no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
-repository.workspace = true           # P5 (req/134 §1 item 6): `dist generate` reads this
+rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-canon-001)
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # `dist generate` reads this
 
 # Every version below is the max_stable_version read off the crates.io API on 2026-08-07,
 # and every license was checked at three points -- the published Cargo.toml (crates.io
 # API), the GitHub API license field, and the LICENSE files in the repository -- and
-# written into Desktop/GitRepo/REFERENCES.md the same day (T-36). Nothing here is used by
-# any line of code yet: step 1 of the req/31 §9 plan declares and locks, and steps 3 and 4
+# written into Desktop/GitRepo/REFERENCES.md the same day. Nothing here is used by
+# any line of code yet: an early planning step declares and locks, and later steps
 # spend. Declaring early is what makes the lock file part of the review rather than a
 # side effect of the first commit that happens to need a hash.
 [dependencies]
-# The one-way edge (A-1). See crates/gx-core/src/lib.rs.
+# The one-way edge. See crates/gx-core/src/lib.rs.
 #
-# `version` beside `path` (M2 hand 6): a path with no version requirement is a wildcard, and
+# `version` beside `path`: a path with no version requirement is a wildcard, and
 # `cargo publish` refuses one on a crate that declares a license and a description as this one
 # does -- so the manifest was shaped to be published and could not have been. Found by
 # `cargo deny check bans` on its first real run (`deny.toml`, `wildcards = "deny"`); inside the
 # workspace the path still wins and nothing about resolution changes. Same in gx-log and
-# gx-witness. Reported in req/55 §4 H6-1.
+# gx-witness.
 gx-core = { path = "../gx-core", version = "0.1.0" }
 
-# Named on this crate's dependency line in 41 §2.
-blake3 = "1.8"                        # Cid = BLAKE3-256 (T-23, 35 DR-3 DEFAULT)
-serde_ipld_dagcbor = "0.7"            # canonical binary form (42 §2, T-20)
-# research/02 §2 selects the two together ("serde_ipld_dagcbor + ipld-core"), and req/10 §5.2
-# quotes that line, so this is inside the approved table rather than a ninth item on top of A-6.
+# Named on this crate's dependency line in the architecture spec.
+blake3 = "1.8"                        # Cid = BLAKE3-256 (this workspace's default hash choice)
+serde_ipld_dagcbor = "0.7"            # canonical binary form
+# The research note that selected the two together ("serde_ipld_dagcbor + ipld-core") is quoted
+# elsewhere, so this is inside the approved table rather than an extra item on top.
 # `Ipld` is the untyped value `is_canonical` needs: judging bytes canonical means decoding them
 # to *some* value and asking the encoder what it would have written, and that question has to be
 # askable without knowing which struct the bytes came from.
-ipld-core = "0.4"                     # untyped DAG-CBOR value, for is_canonical (T-21)
-serde_json_canonicalizer = "0.3"      # RFC 8785 JCS compatibility layer (T-25)
+ipld-core = "0.4"                     # untyped DAG-CBOR value, for is_canonical
+serde_json_canonicalizer = "0.3"      # RFC 8785 JCS compatibility layer
 
-# Outside the research/02 table until A-6 approved them; req/10 §5.2 lists the eight and
-# 38_ERRATA §1 A-6 is the approval.
+# Outside the original approved table until a later ruling approved them.
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"                      # Intent.goal and the JCS input (42 §3.3)
-thiserror = "2"                       # 41 §6, "errors are typed with thiserror" (sem: SEM-gx-canon-002)
+serde_json = "1"                      # Intent.goal and the JCS input
+thiserror = "2"                       # the architecture spec, "errors are typed with thiserror" (sem: SEM-gx-canon-002)
 
 # Off by default, and that is the point: it is what keeps the probe binary out of anything a
 # published crate hands a user (see the [[bin]] block). Nothing in src/ reads it.
@@ -51,36 +50,36 @@ thiserror = "2"                       # 41 §6, "errors are typed with thiserror
 probe-bin = []
 
 [dev-dependencies]
-proptest = "1.11"                     # the eight properties of T-28 (51 §3)
+proptest = "1.11"                     # eight documented properties
 # Depending on this package from its own dev-dependencies is what turns `probe-bin` on for test
 # builds and only for them. `cargo test -p gx-canon` therefore builds the binary below and sets
 # CARGO_BIN_EXE_gx_cid_probe; `cargo build`, `cargo install` and a consumer's build do not.
 gx-canon = { path = ".", features = ["probe-bin"] }
 
-# AC-011 requires the second CID to come from "a separate binary" (sem: SEM-gx-canon-003), so the second binary is part of the
-# acceptance criterion. The path keeps it out of src/, which 41 §2 fixes at four modules; cargo
+# One acceptance criterion requires the second CID to come from "a separate binary" (sem: SEM-gx-canon-003), so the second binary is part of the
+# acceptance criterion. The path keeps it out of src/, which the architecture spec fixes at four modules; cargo
 # builds it ahead of the integration tests and hands them its location in CARGO_BIN_EXE_gx_cid_probe.
 #
-# `required-features` is the publish exclusion the erratum asks for (`req/38_ERRATA_2026-08-07.md`
-# §5, "the probe bin's status" (sem: SEM-gx-canon-004); raised as req/42 §4-H). Cargo has no per-target `publish` key, and
+# `required-features` is the publish exclusion an erratum asks for
+# ("the probe bin's status" (sem: SEM-gx-canon-004)). Cargo has no per-target `publish` key, and
 # `exclude`-ing the file would make `cargo package` fail verification on a target whose source is
 # missing -- so the exclusion is expressed as a feature that is off unless a test build turns it
-# on. `cargo install gx-canon` installs no binary; `cargo test` still runs AC-011 unconditionally.
+# on. `cargo install gx-canon` installs no binary; `cargo test` still runs that criterion unconditionally.
 [[bin]]
 name = "gx_cid_probe"
 path = "tests/bin/cid_probe.rs"
 required-features = ["probe-bin"]
 
-# 🔴 P5 (req/134 §1 item 6, `gx-mcp-wire/Cargo.toml`'s identical note): `gx_cid_probe` is a
+# 🔴 (`gx-mcp-wire/Cargo.toml` carries an identical note): `gx_cid_probe` is a
 # `probe-bin`-gated test fixture, not shipped product. Opted out of `dist generate`'s default
 # (every `[[bin]]` in the workspace) the same way.
 [package.metadata.dist]
 dist = false
 
-# Two of the eight A-6 items are cargo subcommands, not manifest entries, so they are
-# installed by CI rather than declared here: cargo-nextest (51 §2, the workspace test
-# runner) and cargo-llvm-cov (51 §14, line coverage). The eighth is base32 for the
-# `gx1:<base32>` form (42 §1.2); req/31 §6 keeps it out of the manifest and writes
+# Two of the eight approved dependencies are cargo subcommands, not manifest entries, so they are
+# installed by CI rather than declared here: cargo-nextest (the workspace test
+# runner) and cargo-llvm-cov (line coverage). The eighth is base32 for the
+# `gx1:<base32>` form; a ruling keeps it out of the manifest and writes
 # RFC 4648 inside this crate instead, which costs one function and no dependency.
 
 # `#[cfg(kani)]` is set by the Kani driver and by nothing else, so rustc does not know the name

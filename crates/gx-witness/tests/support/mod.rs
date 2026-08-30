@@ -191,6 +191,10 @@ pub fn verdict_payload(kind: VerdictKind, key: &KeyPair, seed: u64) -> ReceiptPa
         // 🔴 **DR-46-26** — and no inverse-status, for exactly that reason: C-25 is what the same
         // escrow answers. `check_schema` refuses a `Some` here too.
         reversibility: None,
+        // 🔴 **DR-46-45 (`req/973` §B-2)** — and no undo attestation, for a *third* reason rather
+        // than that one: `parents` exists by T-2, but the witness half is a claim about a CAS that
+        // guarded an apply, and a verdict receipt applies nothing. `check_schema` refuses a `Some`.
+        undo: None,
         // 🔴 **DR-46-28** — `unknown` is a value here and not an absence: this fixture is
         // hand-built, so nothing established where its input came from, and the road that
         // built it derived no verdict of its own. `check_schema` allows it on both kinds.
