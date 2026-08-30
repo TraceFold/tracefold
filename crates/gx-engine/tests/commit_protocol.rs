@@ -900,6 +900,14 @@ fn a_degraded_admission_commits_and_its_receipt_says_no_gate_ran() {
 ///
 /// The set is asserted by name rather than by count, so that a third mirror has to be justified in
 /// the place it is added.
+///
+/// 🔴 **`req/824` A5 (`req/850`)** — two rows join the named set, and neither is a mirror:
+/// `pipeline.rs::ObservationDelta` and `pipeline.rs::ObservationRestore` are the observation
+/// road's **own** delta grammar (this crate is the type's home, not a copy of a lower crate's
+/// checked-constructor type), carried as serde structs because the payload is canonical CBOR
+/// through gx-canon and the adapter has to read its own grammar back. The scanner is coarser
+/// than the word "mirror" — it names every Deserialize struct — and that coarseness is the
+/// feature: this sentence is the justification the assertion exists to force.
 #[test]
 fn the_mirrors_are_still_the_two_hands_one_and_three_declared() {
     let mut mirrors: Vec<String> = Vec::new();
@@ -908,10 +916,18 @@ fn the_mirrors_are_still_the_two_hands_one_and_three_declared() {
         for (i, line) in lines.iter().enumerate() {
             if line.starts_with("#[derive(") && line.contains("Deserialize") {
                 if let Some(next) = lines.get(i + 1) {
-                    if let Some(name) = next
-                        .strip_prefix("pub struct ")
-                        .or_else(|| next.strip_prefix("struct "))
-                    {
+                    // 🔴 **The scanner's own blind spot, repaired (`req/868`, 2026-08-26).** It
+                    // read `pub struct` and `struct` and nothing else, so a
+                    // `pub(crate) struct` / `pub(super) struct` deriving `Deserialize` was
+                    // invisible to the guard that exists to make every such struct justify
+                    // itself. `pipeline.rs::ObservationDelta` — landed by `req/824` A5 — is
+                    // exactly that shape and is how the hole was found. The visibility of a
+                    // type says nothing about whether it is a mirror, so it must not decide
+                    // whether the type is counted.
+                    let bare = next.strip_prefix("pub").map_or(*next, |rest| {
+                        rest.trim_start_matches(|c| c != ' ').trim_start()
+                    });
+                    if let Some(name) = bare.strip_prefix("struct ") {
                         mirrors.push(format!(
                             "{file}::{}",
                             name.split([' ', '{', '(']).next().unwrap_or(name)
@@ -930,12 +946,16 @@ fn the_mirrors_are_still_the_two_hands_one_and_three_declared() {
     assert_eq!(
         mirrors,
         vec![
+            // req/824 A5: the observation road's own grammar, not mirrors (doc above).
+            "pipeline.rs::ObservationDelta".to_string(),
+            "pipeline.rs::ObservationRestore".to_string(),
             "store.rs::BlobRecord".to_string(),
             "store.rs::FingerprintRecord".to_string(),
             "store.rs::PayloadBytes".to_string(),
         ],
         "M5H3-7: hand 4 persists receipts and provenance and adds no mirror -- a third one here \
-         would be the count the ruling asked to be re-taken"
+         would be the count the ruling asked to be re-taken (the two pipeline.rs rows are \
+         req/824 A5's own grammar, justified in the doc above)"
     );
 }
 

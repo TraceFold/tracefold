@@ -154,6 +154,14 @@ pub fn keypair(seed: u8) -> KeyPair {
     KeyPair::from_seed(format!("key-{seed}"), &[seed; 32])
 }
 
+/// 🔴 **A2 (`req/919` W8)** — the engine version every payload this module builds names.
+///
+/// A constant rather than a literal at each site because three subtraction towers
+/// (`boundary_attest.rs`, `inverse_status_wire.rs`, `receipt_verdict_wire.rs`) derive a wire layer
+/// from it: a tower that re-spelled the string would go on passing after the fixture changed, which
+/// is the failure mode those towers exist to catch.
+pub const FIXTURE_ENGINE_VERSION: &str = "gx-engine 0.1.0";
+
 /// Thirty-two opaque bytes standing in for M4's `Fingerprint` (E-M2-2).
 pub fn fingerprint(seed: u8) -> FingerprintBytes {
     FingerprintBytes([seed; 32])
@@ -197,6 +205,13 @@ pub fn verdict_payload(kind: VerdictKind, key: &KeyPair, seed: u64) -> ReceiptPa
         fail_posture_engaged: true,
         precondition_fingerprint: fingerprint(7),
         postcondition_fingerprint: None,
+        // F7 / R-868-6 (`req/919` W5): fixtures built by this crate's own current code carry the
+        // current version, same as any receipt this build issues.
+        payload_version: Some(gx_witness::CURRENT_PAYLOAD_VERSION),
+        // 🔴 A2 (`req/919` W8): the same spelling `environment()` above uses, because the two are
+        // the same fact seen from Σ and from the receipt -- a fixture that spelled them differently
+        // would make a digest comparison fail for a reason the fixture invented.
+        engine_version: Some(FIXTURE_ENGINE_VERSION.to_string()),
     }
 }
 

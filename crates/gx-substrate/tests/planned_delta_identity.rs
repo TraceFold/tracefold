@@ -111,23 +111,66 @@ fn the_planned_delta_projection_declares_the_two_keys_of_42_1_3() {
     );
 }
 
-/// The projection's key set is the struct's field set minus the one exclusion 42 §1.3 names.
+/// The projection's key set is the struct's field set minus the exclusions 42 §1.3 names.
 ///
 /// The count above is a literal, and a literal is a claim a hand can keep true by editing it. This
-/// is the same claim held against `PlannedDelta` itself: a fourth field added to the struct and not
-/// to `PlannedDeltaView` would be part of a delta and outside its own name, and the only field 42
-/// §1.3 permits to be outside is `reference`, for the stated reason "self-reference".
+/// is the same claim held against `PlannedDelta` itself: a field added to the struct and not to
+/// `PlannedDeltaView` would be part of a delta and outside its own name, so the fields 42 §1.3
+/// permits to be outside are enumerated here and any other one fails this test.
+///
+/// 🔴 **The list moved from one to two** (`req/919` A1; **M5H2-2, adopted (b)**). `promised_target`
+/// is the second exclusion and 42 §1.3 row 4 carries its reason: a delta *is* the change it
+/// describes, so two deltas with the same `{substrate, payload}` are the same delta whatever
+/// either predicts about the result — and 43 T-2 already binds the prediction into identity one
+/// level up, in the `TransformationId` "including delta/**target**". It moved because a named,
+/// dated ruling moved it; the mechanism this test defends is unchanged, and a third field added
+/// without a ruling still fails here.
 #[test]
 fn the_projection_is_the_struct_minus_its_self_reference() {
     let delta = base();
+    const EXCLUDED: [&str; 2] = ["reference", "promised_target"];
     let mut expected = debug_field_names(&delta);
-    expected.retain(|f| f != "reference");
+    expected.retain(|f| !EXCLUDED.contains(&f.as_str()));
     assert_eq!(
         view_keys(&delta),
         expected,
-        "`PlannedDelta` and `PlannedDeltaView` differ by something other than `reference` \
-         (42 §1.3 row 4: excluded = `reference`, reason = self-reference)"
+        "`PlannedDelta` and `PlannedDeltaView` differ by something other than {EXCLUDED:?} \
+         (42 §1.3 row 4: excluded = `reference` (self-reference) and `promised_target` (the \
+         prediction is bound at 43 T-2's `TransformationId`, not at the delta's))"
     );
+}
+
+/// A promise does not move the delta's name, and that is what lets the builder run after `new`.
+///
+/// 🔴 **M5H2-2, adopted (b)** (`req/919` A1) — the soundness argument of
+/// `PlannedDelta::with_promised_target`, measured rather than reasoned. `reference` is minted by
+/// the constructor and never re-minted, so if the seat were inside the projection the builder
+/// would leave every delta naming what it used to be. It is outside, so the digest, the reference
+/// and the projected keys are all the same on both sides of a promise. The negative control is the
+/// pair above it: `payload` **does** move the digest, so this file is not simply unable to see a
+/// change.
+#[test]
+fn a_promised_target_is_outside_the_delta_s_own_name() {
+    let bare = base();
+    let promised = base().with_promised_target(Cid([7u8; 32]));
+
+    assert_eq!(
+        digest_of(&bare),
+        digest_of(&promised),
+        "the prophecy reached the CID, so 42 §1.3 row 4's second exclusion is not implemented"
+    );
+    assert_eq!(
+        bare.reference().cid,
+        promised.reference().cid,
+        "the builder left `reference` naming a value that no longer exists"
+    );
+    assert_eq!(view_keys(&bare), view_keys(&promised));
+    assert_eq!(
+        promised.promised_target(),
+        Some(Cid([7u8; 32])),
+        "the seat did not carry what the builder put in it"
+    );
+    assert_eq!(bare.promised_target(), None, "`new` invented a prophecy");
 }
 
 /// The projection lands on the wire face rather than beside it (AC-014, 42 §2.1-6).

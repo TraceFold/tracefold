@@ -124,7 +124,37 @@ const REVERSIBILITY_KEY: &str = "6d7265766572736962696c697479f6";
 /// The canonical encoding of the fixture with DR-46-26's key removed and the map header wound back
 /// to thirteen: the bytes D24 shipped, reconstructed rather than re-pinned.
 fn as_dr_46_24_shipped_it(now: &str) -> String {
-    // 🔴 **DR-46-39 (`req/777`)** — the outermost layer now: seventeen keys back to sixteen.
+    // 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — the outermost layer now: nineteen keys
+    // back to eighteen. Derived from the fixture's own constant rather than re-spelled, so this
+    // layer cannot keep passing after the value it subtracts has moved.
+    let engine_version = format!(
+        "6e{}{}",
+        hex(b"engine_version"),
+        hex(&cbor::encode(&Some(support::FIXTURE_ENGINE_VERSION.to_string())).expect("canonical"))
+    );
+    assert!(
+        now.contains(&engine_version),
+        "A2's key is not on the wire; this subtraction is measuring nothing"
+    );
+    let now = now.replacen(&engine_version, "", 1).replacen("b3", "b2", 1);
+    let now = now.as_str();
+    // 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)** — eighteen keys back to seventeen.
+    // The fixture carries `Some(CURRENT_PAYLOAD_VERSION)` (every receipt this build issues does),
+    // so the contribution is the key and the encoded small uint.
+    let payload_version = format!(
+        "6f{}{}",
+        hex(b"payload_version"),
+        hex(&cbor::encode(&Some(gx_witness::receipt::CURRENT_PAYLOAD_VERSION)).expect("canonical"))
+    );
+    assert!(
+        now.contains(&payload_version),
+        "F7's key is not on the wire; this subtraction is measuring nothing"
+    );
+    let now = now
+        .replacen(&payload_version, "", 1)
+        .replacen("b2", "b1", 1);
+    let now = now.as_str();
+    // 🔴 **DR-46-39 (`req/777`)** — seventeen keys back to sixteen.
     //
     // Found red by `req/801`'s G-07 live re-run (2026-08-25): DR-46-39 seated `catalogue_hash` and
     // taught its own attest suite (`dr4639_catalogue_hash_attest.rs`) and `ac_018`, but not this
@@ -226,6 +256,27 @@ const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_S3: &str =
 const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_39: &str =
     "gx1:uwqy5h7kvsafrfaqkkp2fsatg6x27azhcsrmd3kpq45fvhye7i6q";
 
+/// 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)** — the eighteenth key, and the seventh
+/// state of this one fixture's wire. The seventh digest kept beside the other six.
+///
+/// A migration with the same entitlement as S③'s and DR-46-39's: the seat carries
+/// `#[serde(default)]`, so bytes written before it still decode. What moves is the digest of a
+/// payload re-encoded by this build.
+const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_F7: &str =
+    "gx1:x4i4l54qttnz5rujfmsqos2fsr3xp2crjskxjfd5rwhuvhrxjdxq";
+
+/// 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — the nineteenth key, and the eighth state of
+/// this one fixture's wire. The eighth digest kept beside the other seven.
+///
+/// Same entitlement as F7's, S③'s and DR-46-39's, and the same limit: the seat carries
+/// `#[serde(default)]`, so every receipt already signed still decodes, and what moves is the digest
+/// of a fixture **re-encoded by this build**. No ledger anyone holds is rekeyed by this line;
+/// `ASM-43-1`'s sentence is about a real ledger and this constant is about a fixture, which is why
+/// the seven values above are kept rather than replaced -- the file is the record of eight wire
+/// states, and a pin that were simply overwritten each time would record one.
+const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2: &str =
+    "gx1:aiidrq4gou424jesocvg2bxmkxcrwgtj2zjsu34jfd7gzu4eukya";
+
 // ---------------------------------------------------------------------------
 // The type
 // ---------------------------------------------------------------------------
@@ -267,9 +318,10 @@ fn e_m5_11_the_verdict_field_is_optional() {
     // 🔴 **G-07 live re-run (`req/801`, 2026-08-25)** — sixteen became seventeen when DR-46-39
     // (`req/777`) seated `catalogue_hash`; this pin was not taught on landing day and the first
     // live run after it is what moved the count.
+    // 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)** — seventeen became eighteen.
     assert_eq!(
-        fields, 17,
-        "E-M5-11 retypes a field and adds none; DR-46-24(A) added two, DR-46-26 a third,          DR-46-28 a fourth, S③ (`req/493` §1 AC-6) a fifth and DR-46-39 (`req/777` catalogue_hash) a sixth"
+        fields, 19,
+        "E-M5-11 retypes a field and adds none; DR-46-24(A) added two, DR-46-26 a third,          DR-46-28 a fourth, S③ (`req/493` §1 AC-6) a fifth, DR-46-39 (`req/777` catalogue_hash) a sixth, F7 (`req/868` R-868-6, payload_version) a seventh, and A2 (`req/910`, engine_version) an eighth"
     );
 }
 
@@ -371,9 +423,21 @@ fn the_ledger_digest_of_that_payload_is_the_one_the_ledger_already_holds() {
     // is a migration, said as a pin rather than as a sentence.
     // 🔴 **DR-46-39** — the pin moves a sixth time, and the five values it moved through are all
     // kept above (`req/801` G-07 live re-run, 2026-08-25).
+    // 🔴 **F7** — the pin moves a seventh time (`req/868` R-868-6, `req/919` W5, 2026-08-29), and
+    // the six values it moved through are all kept above.
+    // 🔴 **A2** — the pin moves an eighth time (`req/910` A., `req/919` W8, 2026-08-30), and the
+    // seven values it moved through are all kept above.
     assert_eq!(
-        text, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_39,
+        text, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2,
         "43 ASM-43-1 keys the ledger on this digest; moving it is a migration"
+    );
+    assert_ne!(
+        VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_F7,
+        "a nineteenth map key cannot leave the digest where F7 left it"
+    );
+    assert_ne!(
+        VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_F7, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_39,
+        "an eighteenth map key cannot leave the digest where DR-46-39 left it"
     );
     assert_ne!(
         VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_39, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_S3,

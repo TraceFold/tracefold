@@ -95,9 +95,24 @@
 // gx-core's is (req/159 §B-2, req/166).
 #![deny(missing_docs)]
 
+// 🔴 **R-928-ATT** — the attach interface (`req/929`): reading what somebody else attested. It
+// sits beside `coverage` deliberately — same four questions, and a vocabulary with the `Measured`
+// arm removed, because a foreign document is unverified by construction in this build.
+pub mod attach;
 pub mod coverage;
+// 🔴 **R-930-B1** — the `.gx` kind-15 body (`req/939`). It sits beside `gxfile` for the reason
+// `attach` sits beside `coverage`: the vocabulary it is written in is that module's, and the rule
+// it exists to satisfy (a kind names itself inside the bytes its identity covers) is enforced
+// there, over the whole registry at once.
+pub mod design_token;
 pub mod dsse;
 pub mod evidence;
+// 🔴 **R-922-F2 phase 1** — the `.gx` object file. A seventh module beside `coverage`, which is
+// itself a sixth beyond 41 §2's `src/{lib,provenance,receipt,evidence,dsse,keys}.rs`: the module
+// list in 41 §2 has not been re-issued since P-1b added one, and this file does not re-issue it
+// either. Raised in the R-922-F2 report rather than corrected here, since a spec line is a spec
+// lane's to move.
+pub mod gxfile;
 pub mod keys;
 pub mod provenance;
 pub mod receipt;
@@ -119,7 +134,7 @@ pub use provenance::{Environment, Provenance, ProvenanceInputs};
 pub use receipt::{
     revocation_status, verify_offline, verify_offline_against, verify_offline_consulting,
     Anchorage, Checks, InclusionCheck, Receipt, ReceiptKind, ReceiptPayload, RevocationCheck,
-    RevocationPolicy, VerdictSummary,
+    RevocationPolicy, VerdictSummary, CURRENT_PAYLOAD_VERSION,
 };
 
 // FR-017's `Proof`, published rather than redefined (E-M2-12; see the crate note above).

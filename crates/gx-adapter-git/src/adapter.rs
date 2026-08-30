@@ -137,15 +137,19 @@ impl SubstrateAdapter for GitAdapter {
     /// Delegates to [`crate::invert`]. **E-M4-30**: the escrowed inverse is constructed **before**
     /// `apply` (43 T-10b), because the tip a reset names is "where the branch is now". (sem: SEM-gx-adapter-git-015)
     /// 🔴 **E-DR4626-1 (DR-46-26)** -- the free function is untouched and the outcome is derived
-    /// here, in one line, by [`InvertOutcome::from_option`].
+    /// here, in one line, by `InvertOutcome::from_option`.
     ///
-    /// This adapter builds its inverse out of the snapshot it was handed. There is no *declared*
-    /// read that could fail on its own, so C-25's `Unknown` -- "the prior could not be read, and
-    /// this deployment said it would rather have the effect" -- has no preimage on this road:
-    /// `Some` is `True` and `None` is `False`, and `reads` is empty because the escrow read nothing
-    /// through a transport. `tests/` holds that as an assertion rather than as this sentence.
+    /// 🔴🔴 **RETRACTED by DEFECT-892-1 (`req/895` §1).** The paragraph that stood here said this
+    /// adapter "builds its inverse out of the snapshot it was handed" and that "`reads` is empty
+    /// because the escrow read nothing through a transport". It reads `repo::tip` — the branch —
+    /// and the empty list became `ReadSet::Nothing` in signed receipts, which is a positive claim
+    /// that no object was read. `crate::invert` now returns the outcome with the entry in it.
+    ///
+    /// C-25's `Unknown` remains unreachable here and that half of the old paragraph stands: the
+    /// `OnReadFailure::Unknown` posture is a `gx-adapter-mcp` catalogue's construct, and a read
+    /// failure on this substrate leaves as an [`Error::Unreadable`].
     fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcome> {
-        crate::invert::invert(delta, pre).map(InvertOutcome::from_option)
+        crate::invert::invert(delta, pre)
     }
 
     /// Delegates to [`crate::commutation`], which compares **branches** and touches no repository

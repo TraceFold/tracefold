@@ -416,6 +416,12 @@ pub fn commit(
         Lifecycle::Aborted(AbortReason::Expired) => ("Expired", ERROR),
         Lifecycle::Aborted(AbortReason::OwnerCancelled) => ("OwnerCancelled", ERROR),
         Lifecycle::Aborted(AbortReason::InternalError) => ("InternalError", ERROR),
+        // 🔴 **M5-11 / blocker item 5** (`req/919` A1) — the seventh reason, named rather than
+        // left to the `_` arm below, which would print `NotAborted` for a row that is aborted.
+        // 44 §1.4 has no code of its own for it, so it takes the generic one the three reasons
+        // above it take; a code is a wire contract and inventing one here would be this file
+        // deciding 44's table.
+        Lifecycle::Aborted(AbortReason::PostconditionMismatch) => ("PostconditionMismatch", ERROR),
         // 43 T-9's idempotency column answers a re-entrant `commit` with `Committing`, which is not
         // an abort and is not a success: the critical section is somebody else's. 44 has no code for
         // it (M6H3-3).

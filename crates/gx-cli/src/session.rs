@@ -1415,13 +1415,41 @@ impl Session {
         }
         // The cache first, and only when it agrees with the engine. A cache consulted *instead of*
         // the authority is the shape hand 1's `index.rs` refused to provide a helper for.
+        //
+        // 🔴 **RESIDUAL-895-B1** (`req/919` W7). This asked `index.get(id) == Some(transformation)`
+        // — "is this intent's *latest* cached transformation the one I was handed" — which is
+        // `DEFECT-891-1`'s spelling exactly, one layer down, and it went on being written that way
+        // after the engine's own copy of it was repaired because `.gx/index/` could not hold a
+        // branch to ask about. It cost an **ordering hint** rather than an answer (the
+        // `.chain(candidates)` fallback below re-walks every candidate and `resolves_to` is the
+        // engine's), so no `gx` command was wrong because of this line — but a hint that is silently
+        // never taken on exactly the branched intents the cache exists to speed up is a hint that
+        // has stopped being one. `ResolutionIndex::resolves_to` is the predicate that was meant,
+        // and it is now the same predicate the engine answers.
         for id in candidates
             .iter()
             .copied()
-            .filter(|id| index.get(id).as_ref() == Some(transformation))
+            .filter(|id| index.resolves_to(id, transformation))
             .chain(candidates.iter().copied())
         {
-            if self.engine.resolved(&id).as_ref() == Some(transformation) {
+            // 🔴 **DEFECT-891-1** (`req/895` §2). This asked `engine.resolved(&id) ==
+            // Some(transformation)` — "is this intent's *latest* transformation the one I was
+            // handed" — which is the question only while an intent has at most one. `undo` gives
+            // an intent as many as there are branches: `Transformation`'s identity carries
+            // `parents` and `Intent`'s does not, so two undos restoring the same bytes at the same
+            // locator under the same context and actor are one intent and two transformations.
+            //
+            // What that cost is measured in `req/895` §2: after a second undo shared an intent
+            // with the first, this returned `None` for the first's transformation,
+            // `rehydrate_committed` raised `NotFound`, and `gx undo <T_u>` exited **6** — "the
+            // named object is not here" — about a transformation whose signed commit receipt was
+            // in `.gx/receipts/` in the same project, and which `gx receipt verify --offline`
+            // accepted. The branch was unreachable for good.
+            //
+            // `Engine::resolves_to` is the predicate that was meant, and it is the engine's to
+            // answer: this file's own documentation above says the engine's map is the authority
+            // and `.gx/index/` is a disposable cache of it.
+            if self.engine.resolves_to(&id, transformation) {
                 return Ok(Some(id));
             }
         }

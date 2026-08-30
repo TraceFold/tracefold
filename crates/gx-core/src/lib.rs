@@ -143,8 +143,9 @@ pub use ledger::{Checkpoint, InclusionProof, VerdictCheckpoint, VerdictTally};
 pub use measure::{Lyapunov, MorphismMeasure, ObjectMeasure};
 pub use object::{ObjectId, ObjectSnapshot, ReprKind, SubstrateKind};
 pub use observation::{
-    is_digest_form, EnvsetAdmission, EnvsetEntry, EnvsetFingerprint, EnvsetScope, ObservationClass,
-    ObservationId, ObservationSubstrate, OBSERVATION_CLASSES,
+    is_digest_form, ConfigRecord, DeployRecord, DsseEnvelope, DsseEnvelopeSignature,
+    EnvsetAdmission, EnvsetEntry, EnvsetFingerprint, EnvsetScope, LogWindowBounds, LogWindowRecord,
+    ObservationClass, ObservationId, ObservationRecord, ObservationSubstrate, OBSERVATION_CLASSES,
 };
 pub use planned::PlannedDeltaBytes;
 pub use proof::{CheckerResultRef, Proof, ProofRef, TheoremId};

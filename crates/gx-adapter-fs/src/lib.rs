@@ -231,6 +231,7 @@ pub mod locator;
 pub mod plan;
 
 pub use adapter::FsAdapter;
+pub use apply::{NameDurability, NAME_DURABILITY};
 pub use delta::{
     Blob, FsDelta, FsOp, MAX_FORWARD_PAYLOAD_BYTES, MAX_INVERSE_PAYLOAD_BYTES, MAX_OPS,
 };

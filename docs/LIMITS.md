@@ -54,12 +54,15 @@ the source rather than restating this page's own authority.
    every run); the Rust implementation is
    compared against that model by a differential test -- 1,500 conformance vectors,
    six kinds, on every push -- and a comparison is a difference check, not a proof: no
-   refinement theorem connects the two. of the checks that run automatically on every
-   push today, 16 of this project's 17 workspace crates are covered (`probes/doubt`
-   runs by hand because its subject lives outside the repository) and the TypeScript
-   SDK's own tests are not run by CI at all -- their green is a person's run, not a
+   refinement theorem connects the two. as of 2026-08-29 (`req/908`), CI has run zero
+   jobs on any push since 2026-08-15T17:25:29Z -- 13 days and 2,245 commits with no
+   machine signal, because the GitHub Actions account is billing-blocked, not because of
+   a code defect; the last time it ran (commit `f65aac2f`), the checks covered 16 of
+   this project's 17 workspace crates automatically (`probes/doubt` runs by hand because
+   its subject lives outside the repository), and the TypeScript SDK's own tests have
+   never run under CI at all -- their green has always been a person's run, not a
    machine's.
-   (45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note))
+   (45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note); req/908 (2026-08-29 CI diagnosis); req/38 ERRATA SS871)
 
    > 🔴 **The two numbers in the first clause are stale, and this note is the correction**
    > (v0.5-f, `req/279` L-01). `README.md` says **92 theorems**, this line says **eight**, and a
@@ -86,6 +89,37 @@ the source rather than restating this page's own authority.
    > remember to update. Two faces this lane could not reach are named in `req/289` §4:
    > `public/README.md` and `public/org_profile/README.md` still print **92 / two axioms** and
    > **90 / three axioms**, and both are outside its write scope.
+
+   > 🔴 **B8 correction (2026-08-29, `req/908`, `req/910` B8, `req/38` ERRATA SS871): the tail
+   > clause's present tense went false on 2026-08-15T17:25:29Z and stayed false for 13 days
+   > before anyone noticed.** The struck sentence below is the wording this line carried from
+   > `req/288` L-01b (2026-08-18) until this correction; it is kept, not deleted, because a
+   > limits page that silently rewrites its own history is asking to be trusted about the
+   > present the same way it was just caught not being:
+   > ~~of the checks that run automatically on every push today, 16 of this project's 17
+   > workspace crates are covered (`probes/doubt` runs by hand because its subject lives
+   > outside the repository) and the TypeScript SDK's own tests are not run by CI at all --
+   > their green is a person's run, not a machine's.~~
+   > **What actually happened**: the last green CI run was `31898083900` (`ci`, 2026-08-15T17:21:42Z,
+   > commit `f65aac2f`); the first red run, `31898263122`, followed **3 minutes 47 seconds later**
+   > (commit `44571dfe`) and every run since -- all three workflows (`ci`/`nfr-ci`/`lean-nightly`),
+   > 13 days, 2,245 commits -- carries the identical scheduler annotation: *"The job was not started
+   > because recent account payments have failed or your spending limit needs to be increased."*
+   > Job "duration" is 2-5 seconds on every failing run, which is the scheduler refusing the job
+   > before assignment, not execution time -- there is no log for any of them because none ever ran.
+   > `req/908` verified this directly (`gh run view` on the run objects, not inferred from logs) and
+   > corroborated it locally: `cargo check --workspace --all-targets` (18 crates + `probes/doubt`)
+   > passes clean at HEAD, but `fmt`/`clippy`/`nextest` -- what `tools/ci.sh` actually gates -- were
+   > not run in that check, so **compiling clean is not the same claim CI green would have been**.
+   > This is a **billing/spending-limit lockout on the GitHub account, not a code defect** -- the
+   > fix is an operator opening Billing & plans, out of any lane's write scope. What is true right
+   > now, and what the live sentence above says: CI ran the design this struck sentence describes
+   > the last time it ran at all (2026-08-15, `f65aac2f`), and has produced zero signal about any of
+   > the 2,245 commits since. **`release.yml` -- the only path that cuts a version -- has never run
+   > at all** (`gh run list -w release.yml` returns `[]`), separately from and not part of the red
+   > streak. A local substitute for the machine-checkable parts of CI (everything except the ARM/
+   > macOS runners) was run separately and is not what this note is about; it does not change what
+   > the live sentence above says about the public, continuously-running gate itself.
 
    > v0.4-l (2026-08-15, `req/189` H-13 -- three faces, req/38 §120): **theory** = eight Lean
    > theorems + five counterexamples, kernel-checked; **mechanised, not proven** = the Rust <->
@@ -3018,8 +3052,27 @@ withdrawn, and no instrument in this tree can re-derive it: the re-encoding it d
 begins with a decode, and the decode failing is the limit itself. A public number nothing re-derives
 is a number that becomes false in silence, so it came off the page rather than being left to be
 trusted. What is measured in its place is the size the limit does have — the specimen carries
-**eleven** members and this build's `ReceiptPayload` names **fifteen** — and both halves of that are
-read off the artefacts on every run (`r39_frozen_receipt_verdict.rs`).
+**eleven** members and this build's `ReceiptPayload` names **eighteen** — and both halves of that are
+read off the artefacts on every run (`r39_frozen_receipt_verdict.rs`, `tools/receipt_generation_gate.mjs`).
+
+🔴 **`req/919` W5 (2026-08-29) moves the count again, seventeen to eighteen: `payload_version`
+(F7, `req/868` R-868-6) landed.** Unlike the four members below that widen how many old, real
+receipts a decoder can still open, this one is `Option<u32>` with `#[serde(default)]` -- every
+receipt signed before this field existed still decodes, `None`, exactly the reading `confinement`'s
+and `catalogue_hash`'s absence already have on this struct. What changes is that a receipt this
+build issues, decoded by a reader with no access to this repository's history, now names its own
+schema generation instead of leaving F7 unanswered.
+
+🔴 **`req/901` (2026-08-26) corrects two things in the sentence above, and the second is the worse
+one.** The count said **fifteen**; the struct has **seventeen**, and had since `confinement` and
+`catalogue_hash` landed. But the clause claiming both halves were "read off the artefacts on every
+run" was **not true of the second half**: `r39_frozen_receipt_verdict.rs` asserts only that the named
+count exceeds the carried one, which stays green at any number above eleven. So a page that said it
+was measured was carrying a number nothing measured — the same failure mode as the incident this
+whole section exists to describe. `tools/receipt_generation_gate.mjs` now counts the struct's members
+directly and the specimen's from byte 0 of its DSSE payload (`0xab`, a canonical CBOR map header),
+and fails the run on a stale statement of either. The clause is true as it now reads because that
+instrument exists; it was not true when it was written.
 
 **So the limit is one level down from where it looks.** A signed, archived document's ledger leaf is
 re-derived from a struct whose canonical form moves with the schema, so every member ever added has
@@ -3065,7 +3118,10 @@ what was read, what was written, when, and by whose authority. The fourth one is
 `unknown` on **every** receipt this build can produce, and it is not a defect being worked around —
 there is nothing in a receipt to answer it with.
 
-**What is measured.** `ReceiptPayload` has fifteen members. `key_id` is the id of the key that
+**What is measured.** `ReceiptPayload` has eighteen members (`req/901`, 2026-08-26: this said
+fifteen, counted by hand at a time when it was true, and nothing recounted it when two more landed —
+`tools/receipt_generation_gate.mjs` now derives it; `req/919` W5, 2026-08-29, moved it again from
+seventeen to eighteen when `payload_version` landed). `key_id` is the id of the key that
 **signed**, which is a different question from who authorised the change; the actor lives on
 `Transformation.actor`, and a receipt carries `transformation: TransformationId` — a join key,
 not the transformation. So a reader holding one receipt cannot reach the actor even to under-read
@@ -3546,3 +3602,140 @@ restart in this atom: the registry is membrane state behind the lock, not a `.gx
 home is deferred, with its reasoning, in `crates/gx-api/src/attach_sources.rs`'s declared delta 1.
 And a registered key proves the source *can* sign; nothing signs or verifies against it until the
 observation ingest route (`req/824` A5) exists to present signed observations.
+
+## Platform-push ingestion does not exist; everything arrives because a client sent it (2026-08-26, `req/824` A5)
+
+**The claim this qualifies.** That Glovrex observes platform operations.
+
+**What is measured.** Client-push only — an authenticated attach-source POSTing
+`/attach-sources/{id}/observations` over the existing Bearer + idempotency membrane, and the
+result travelling the ordinary candidate → verify → commit road (no second pipeline; the response
+is an ordinary candidate id). `crates/gx-api/tests/observations.rs` has **four** probes and lives
+in the private tree only, for `observation_class.rs`'s reason above (`req/850`): it drives all 19
+bed vectors (8 positive / 10 negative / 1 escalate), the four E2E class roads to a receipt, the
+chain-gap Escalate road to `GET /escalations`, and the `observation_id` idempotency control.
+
+**Why.** There is no webhook receiver. The only wire transport beside HTTP is
+`gx-adapter-mcp/src/transport.rs`, which is MCP-protocol-only; `req/805` §2-2 verified the absence
+rather than assuming it.
+
+**What holds in the meantime.** The absence is rendered as typed absence (`req/805` P-03) rather
+than as an empty feed, so no face shows a webhook stream that is silently never populated. A chain
+gap is admitted into **Escalate** — the third state, a 2xx with `CHAIN_GAP_ESCALATE` and a ticket
+reachable at `GET /escalations` — never a silent accept and never a Deny that would discard real
+evidence. And undo of a committed observation is a **typed refusal** at the engine
+(`inverse-not-executable-at-substrate` / `append-only-class`), produced now rather than declared:
+the ingest route is these kinds' first live producer road.
+
+**What this does not fix, said in the same breath.** Three declared holes. First, a source that
+stops reporting produces the same picture as a source with nothing to report; closing that needs
+the `req/805` Phase X sockets (U2/U3), design-frozen and not built here. Second, **no shipped
+policy pack permits the observation substrate**: Cedar is default-deny and every shipped permit is
+scoped to its own substrate, so a deployment that ingests observations composes its own
+`custom:observation` permit into its policy set — the shipped-pack seat is a pack+adapter pair
+decision (`req/38` §60) deliberately not taken by this atom. Third, the ingest road's chain heads
+and replay map are in-memory: a restart keeps every candidate (they are in the journal) but
+forgets the replay short-circuit and the chain-continuity memory, declared in the road's own
+module header rather than silently decided.
+
+## An observation is now published whole or not at all, and until this release it was not (2026-08-26, `req/859` G8, `req/868`)
+
+**The claim this qualifies.** That a content-addressed name in this product is a digest of the
+bytes filed under it.
+
+**What is measured.** `ObservationStore::put` writes through `write_atomically` — temp file,
+`sync_all`, `rename(2)`, parent-directory fsync — the same **one body** `BlobStore::put` uses.
+Before this release it was `File::create` at the final path followed by `write_all`, so for the
+width of that gap the content address held a file that was not the content. That is not a
+theoretical window: `crates/gx-engine/tests/g8_observation_atomicity.rs` has **two** probes. The
+first runs a writer beside a directory-listing observer and measured **485 partially-published `.obs`
+files across 2,321,474 observations** against the old writer, and **0 across 2,653,294** against the
+new one.
+
+**The verification half, which the first landing missed** (`req/871` F4). Closing the write window
+stops the product *creating* a truncated body at a content address; it does nothing for a tree that
+already holds one. `put` answered `AlreadyPresent` on a bare `path.exists()` — trusting the **name**
+where content addressing is a promise about the **bytes** — so such a tree could never heal. It now
+re-reads and byte-compares, exactly as `BlobStore::put` has since R9, and republishes on a mismatch.
+
+**Why it mattered more than it looked.** The read side already failed closed — `get` re-hashes and
+refuses a body that does not match its name — but it failed *quietly*: a truncated observation
+makes escrowed-inverse completion fold to `Unavailable`, which tells an operator the observation is
+**gone** when the truth is that it was **half-written**. This is the same shape `req/236` H-01
+measured and R9 repaired, on the blob store only; the repair lived as a private method on one
+store, so the second content-addressed store in the same file never got it.
+
+**What this does not fix, said in the same breath.** A crash still loses the observation — it just
+loses it under a name no reader resolves (`<cid>.obs.tmp.<pid>`) instead of publishing a lie at the
+content address. Cleanup is not the defence and never was: a power cut does not run `remove_file`,
+so the residue is `gx repair`'s to report. And the test buys its assurance from a **concurrent
+reader**, not from a real crash — a `#[test]` cannot cut power, so what is measured is the window's
+existence and closure, not the kernel's behaviour across a reset.
+
+## A file's bytes are fsynced on every platform; its *name* is only on unix, and this repo's own working tree is not unix (2026-08-26, `req/859` G9, `req/868`)
+
+**The claim this qualifies.** That a committed transformation survives a crash.
+
+**What is measured.** On unix, `sync_parent_directory` opens the parent directory and fsyncs it
+after every publish, so the directory entry is as durable as the bytes. Measured platform is
+x86_64 Linux only (`req/52` §5, A-5); every other unix inherits the *call*, not the *measurement*.
+Off unix the function is `Ok(())`: file contents are still `sync_all`'d, but the directory entry
+naming them is not, so a crash can lose the **name** of a file whose bytes reached the device.
+
+**Why the Windows path is not implemented.** Because the honest Windows answer is not a translation
+of `fsync(dirfd)`. `FlushFileBuffers` on a directory handle is not a supported operation, and the
+usual claim put in its place — that NTFS journals metadata, so the entry is durable once the file's
+own flush returns — is a property of a filesystem **we have never measured**. An `Ok(())` renamed
+as a Windows implementation would be a guarantee we did not earn. The same store records the
+neighbouring unmeasured fact: `.gx/LOCK` is not measured on Windows, on 9p (`/mnt/c`) or under a
+file-sync client, and this repository's working tree is Windows under OneDrive.
+
+**What holds in the meantime.** The gap stopped being a doc comment. `NAME_DURABILITY` is a typed,
+exported constant selected by the *same* `cfg` that selects the implementation, carrying a sentence
+fit to show an operator verbatim, and `crates/gx-engine/tests/g9_name_durability.rs` has **three**
+probes: it fails if a later lane widens the "held" arm without bringing a measurement, or narrows the
+implementation while the declaration still boasts.
+
+**What this does not fix, said in the same breath.** It is a **declaration, not a warning**:
+nothing in the workspace prints it yet, because gx-engine has no logging surface of its own and the
+operator-facing half — a line at `gx serve` start, or a `/healthz` member — is a CLI/wire change
+this lane did not have the box to land. Until that lands, an operator running on Windows is not
+*told*; the fact is merely available to be asked for. `req/868` carries the residual.
+
+## `gx-adapter-fs`'s own directory fsync had the same un-`cfg`-gated gap as the journal's, and reported apply failure for a rename that had already landed (2026-08-26 `req/868` R-868-5, closed 2026-08-29 `req/919` W4)
+
+**The claim this qualifies.** The item directly above: that a file's bytes are fsynced on every
+platform but the directory entry naming them is only fsynced on unix.
+
+**What was measured wrong.** `req/868` found the sibling of G9 in the adapter that actually writes
+an `apply`: `crates/gx-adapter-fs/src/apply.rs` opened and `sync_all`'d the target's parent directory
+**un-`cfg`-gated**, at both the call site after a whole-file write and the call site after a removal.
+On native Windows, opening a directory with `std::fs::File::open` and syncing it fails --
+`FlushFileBuffers` is not a supported operation on a directory handle there either, the same fact G9
+measured for the journal -- so `apply` reported `ApplyFailed` for a rename or removal that had
+**already landed on disk**. The report and the world disagreed in the harmful direction: an operator
+reading the error would retry or escalate a change that did not need it.
+
+**What is fixed.** Both call sites now go through one `#[cfg(unix)]` / `#[cfg(not(unix))]` function,
+`sync_parent_directory`, so a landed change is never reported as a failure off unix. The gap this
+closes is only the false-failure report; it does not add a Windows directory-fsync implementation
+that does not exist (none does, for the same reason G9 gives above).
+
+**What holds in the meantime, and what does not.** This crate carries its own typed declaration --
+`gx_adapter_fs::NameDurability` / `NAME_DURABILITY`, the same shape as `gx_engine::NAME_DURABILITY`
+-- rather than depending on `gx-engine` for it: `gx-adapter-fs` has **zero** workspace dependencies
+beyond `gx-core`/`gx-canon`/`gx-substrate` (crate root, **E-M4-26**), and an adapter importing the
+engine that consumes it would invert the layer direction. The two declarations answer the same
+platform fact for two different directories (the engine's journal, this adapter's target parent) and
+are duplicated by design. As with G9's copy, this is a **declaration, not a warning**: the
+operator-facing half (a line an adapter caller could show) is not wired here, because printing it is
+a CLI/wire change out of `req/919` W4's box (AC: the `cfg`-gate and this doc sync only). `req/868`'s
+own **Residual R-868-1** for the engine's copy applies unchanged to this one.
+
+**What this does not fix.** It does not make Windows directory-entry durability held; it makes the
+*absence* of that guarantee stop masquerading as a failed write. `crates/gx-adapter-fs/tests/apply_durability.rs`'s
+ordering probe was updated in the same lane to look for the new call name (`sync_parent_directory`)
+in place of the literal `sync_all()` it used to find at that position; the **order** it asserts --
+temp-file fsync, then rename, then the directory-durability step -- is unchanged, and the change is
+recorded in the test's own comment with the ruling it cites (`R-868-5`), per the discipline that a
+test may only be edited when a named, dated ruling says the behaviour it pinned was a defect.

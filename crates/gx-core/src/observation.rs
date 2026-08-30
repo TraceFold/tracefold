@@ -75,6 +75,17 @@ impl ObservationClass {
             ObservationClass::LogWindow => "log-window",
         }
     }
+
+    /// The decode half of [`ObservationClass::as_wire_str`] (`req/824` A5). `None` for a value
+    /// outside the enum — the caller's word for that is `OBSERVATION_CLASS_UNKNOWN`
+    /// (`gx_engine::Error::ObservationClassUnknown`, the A3 row), and there is deliberately no
+    /// fallback variant to default into.
+    #[must_use]
+    pub fn from_wire_str(value: &str) -> Option<Self> {
+        OBSERVATION_CLASSES
+            .into_iter()
+            .find(|class| class.as_wire_str() == value)
+    }
 }
 
 /// Where an observed value actually lives — and therefore which undo semantics can honestly hold
@@ -280,6 +291,139 @@ impl EnvsetFingerprint {
                 claimed_prev: self.prev.clone(),
                 last_committed: last_committed.map(str::to_string),
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// req/824 A5 — the other three record shapes, typed (req/wire/schema/observation.schema.json)
+// ---------------------------------------------------------------------------
+//
+// 🔴 `deny_unknown_fields` on every one of these IS req/824 §5-Q2's execution-field fence at the
+// type level: a payload smuggling `command`, `script`, `entrypoint`, `image`, `cron`, `schedule`,
+// `callback_url` or `exec` is refused at decode because *no field outside the schema is accepted
+// at all* — the stronger property, of which the eight-word blocklist is a corollary. Fixture
+// w824-observation-00016 drives it through the ingest route.
+
+/// `req/812` §1-2's deploy record. Checks that cannot run are typed-absent downstream
+/// (`presented_only`), never silently skipped: `commit_sha` resolves only when a git adapter is
+/// attached, and [`DeployRecord::attestation`] verifies only when one was supplied.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeployRecord {
+    /// The platform's own deploy id — also this record's `observation_id` in practice.
+    pub deploy_id: String,
+    /// The commit the source says it built.
+    pub commit_sha: String,
+    /// Artifact digests, as the source spells them (`sha256:<hex>` etc.). Carried, not verified
+    /// here: verification against served bytes is unobservable (the A6 LIMITS row).
+    pub artifact_digests: Vec<String>,
+    /// The environment the source says it deployed to.
+    pub target_env: String,
+    /// The envset fingerprint this deploy ran under, when the source chains one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub envset_fingerprint_ref: Option<String>,
+    /// A digest over platform metadata, when the source supplies one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform_metadata_digest: Option<String>,
+    /// A DSSE/in-toto envelope, when the source supplies one (`req/805` P-12: gx-witness is
+    /// already on BuildKit attestations' standard).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attestation: Option<DsseEnvelope>,
+}
+
+/// A DSSE envelope as a deploy attestation carries one — typed, minimal, and **not verified by
+/// this type**: verification is a check that runs where a key is, and an unrun check lands in
+/// `presented_only`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DsseEnvelope {
+    /// DSSE's `payloadType` (e.g. `application/vnd.in-toto+json`).
+    #[serde(rename = "payloadType")]
+    pub payload_type: String,
+    /// The base64 payload, when carried inline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload: Option<String>,
+    /// The signatures, each a `(keyid, sig)` pair.
+    pub signatures: Vec<DsseEnvelopeSignature>,
+}
+
+/// One signature of a [`DsseEnvelope`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DsseEnvelopeSignature {
+    /// DSSE's `keyid`.
+    pub keyid: String,
+    /// The signature bytes, base64.
+    pub sig: String,
+}
+
+/// `req/812` §1-3's config record. [`ObservationSubstrate`] keeps adapter-mode and declared-mode
+/// from ever being conflated — a declared-mode config rendered as adapter-mode would promise an
+/// undo that cannot happen (`req/824` A1).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConfigRecord {
+    /// The canonical-encoded config blob. Structural diff is derived engine-side, never sent.
+    pub document: String,
+    /// Where the config actually lives — which undo semantics can honestly hold.
+    pub substrate: ObservationSubstrate,
+}
+
+/// `req/812` §1-4's log-window record. Digest-only: log **lines are never stored** (storage would
+/// be the F5① cloud seat, out of this phase's scope). `line_count_census` is a census, never a
+/// billing input (F4/F6; `req/824` A7 owns the machine gate).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogWindowRecord {
+    /// The source's stream identifier.
+    pub stream_id: String,
+    /// The window bounds, as the source states them.
+    pub window: LogWindowBounds,
+    /// The merkle root over the exported lines, computed client-side.
+    pub merkle_root: String,
+    /// How many lines the window covered. A census (see the type doc).
+    pub line_count_census: u64,
+    /// `true` is admissible and is drawn as a declared hole (`req/784` A-26/I-5), never smoothed
+    /// over.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gap: Option<bool>,
+}
+
+/// A log window's bounds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogWindowBounds {
+    /// RFC 3339, as the source spells it — carried opaquely (timing skew between platform time
+    /// and report time is a declared limit, `req/824` A2).
+    pub t_start: String,
+    /// The window's end, same spelling.
+    pub t_end: String,
+}
+
+/// One observation, typed by class — what the ingest road (`req/824` A5) hands the engine after
+/// the wire JSON has been parsed at the membrane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ObservationRecord {
+    /// An env-var fingerprint (`req/812` §1-1), already in canonical entry order.
+    Envset(EnvsetFingerprint),
+    /// A deploy record (`req/812` §1-2).
+    Deploy(DeployRecord),
+    /// A config record (`req/812` §1-3).
+    Config(ConfigRecord),
+    /// A log-window record (`req/812` §1-4).
+    LogWindow(LogWindowRecord),
+}
+
+impl ObservationRecord {
+    /// Which class this record is — total, so the two enums cannot drift.
+    #[must_use]
+    pub const fn class(&self) -> ObservationClass {
+        match self {
+            ObservationRecord::Envset(_) => ObservationClass::Envset,
+            ObservationRecord::Deploy(_) => ObservationClass::Deploy,
+            ObservationRecord::Config(_) => ObservationClass::Config,
+            ObservationRecord::LogWindow(_) => ObservationClass::LogWindow,
         }
     }
 }

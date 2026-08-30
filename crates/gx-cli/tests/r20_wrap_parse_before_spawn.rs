@@ -38,7 +38,6 @@
 // distribution does not carry the verb, so the suite compiles away rather than failing against
 // a subcommand that is deliberately absent. The private build runs it exactly as before.
 #![cfg(feature = "mcp")]
-
 #![cfg(unix)]
 
 use std::os::unix::fs::PermissionsExt;

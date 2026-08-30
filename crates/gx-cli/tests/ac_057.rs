@@ -455,11 +455,16 @@ fn a_checkpoint_key_authenticates_the_anchor_and_refuses_a_forged_one() {
         "44 §1.2's \"7=invalid\" (sem: SEM-gx-cli-1101): {json}"
     );
     assert_eq!(json["anchor_authenticated"], serde_json::json!(false));
+    // 🔴 Was `.contains("--checkpoint-key")`: that spelling never matched
+    // `web_verify/src/verdict.js::CHECKPOINT_REFUTED`'s regex, so this CLI path fell through to the
+    // classifier's default `hold` instead of `deny` — a defect (B1 / DIV-901-1, `req/914` §7, `req/874`
+    // R3: a checkpoint refusing its own signature check is one of R3's four `deny` triggers), not a
+    // property to keep pinning. Rewritten to require the classifier-matched prefix instead.
     assert!(
         json["refusal"]
             .as_str()
-            .is_some_and(|r| r.contains("--checkpoint-key")),
-        "the object says which half refused: {json}"
+            .is_some_and(|r| r.starts_with(gx_witness::dsse::CHECKPOINT_REFUSAL_PREFIX)),
+        "the object says which half refused, in the spelling the classifier recognizes: {json}"
     );
 
     let authenticated = run(support::gx()

@@ -794,7 +794,73 @@ fn scan_tree(files: &[PathBuf]) -> Vec<Finding> {
     findings
 }
 
-/// 🔴 **NFR-012's blocking gate**: `crates/`, `tools/`, `policies/` — 0 findings.
+/// One narrow, named exemption from the dev-tree gate below: a specific (path, line, rule)
+/// triple, not a whole file. R-909-4a (`req/909`, `req/38` SS874): the product scanner
+/// (everything above this point in the file) stays untouched — only the *test*'s own
+/// zero-findings assertion gains a per-finding allowlist, so a real secret anywhere else in the
+/// tree still fails the gate.
+struct AllowedFinding {
+    /// Repo-root-relative path, forward-slash, matching `Finding::path`'s displayed form.
+    path: &'static str,
+    line: usize,
+    rule: &'static str,
+    /// Why this exact finding is not a secret. Required, not optional — an allowlist entry
+    /// without a reason is indistinguishable from silencing the gate.
+    reason: &'static str,
+}
+
+/// req/909 §② stage 7b: `crates/gx-core/tests/observation_class.rs` plants
+/// `"postgres://admin:hunter2@db.acme.internal:5432/prod"` twice (lines 207 and 269) as one of
+/// "the four adversarial shapes, verbatim from the bed" that `is_digest_form`/`EnvsetAdmission`
+/// must *reject* — a negative-fixture literal, not a credential in use anywhere. Each occurrence
+/// trips two rules (`dsn_embedded_password` on the `user:pass@host` shape, `foreign_email` on
+/// `hunter2@db.acme.internal` matching the email heuristic), so four entries. The fixture bytes
+/// are unchanged (ruling 3 keeps adversarial forms verbatim); only this test's assertion is
+/// narrowed, by exact (path, line, rule) triple — a finding at any other line, in any other file,
+/// or a *fifth* finding on these two lines, still fails the gate.
+const ALLOWLISTED_FINDINGS: &[AllowedFinding] = &[
+    AllowedFinding {
+        path: "crates/gx-core/tests/observation_class.rs",
+        line: 207,
+        rule: "dsn_embedded_password",
+        reason: "negative-fixture DSN literal `is_digest_form` must reject (req/909 §②); not a live credential",
+    },
+    AllowedFinding {
+        path: "crates/gx-core/tests/observation_class.rs",
+        line: 207,
+        rule: "foreign_email",
+        reason: "same negative-fixture DSN literal; `hunter2@db.acme.internal` is the userinfo/host of the DSN above, not an address",
+    },
+    AllowedFinding {
+        path: "crates/gx-core/tests/observation_class.rs",
+        line: 269,
+        rule: "dsn_embedded_password",
+        reason: "second occurrence of the same negative-fixture DSN literal, in `a_plaintext_value_is_deny_even_when_the_chain_also_gapped`",
+    },
+    AllowedFinding {
+        path: "crates/gx-core/tests/observation_class.rs",
+        line: 269,
+        rule: "foreign_email",
+        reason: "second occurrence; same reasoning as line 207's foreign_email entry above",
+    },
+];
+
+/// The `ALLOWLISTED_FINDINGS` entry matching `f` exactly (path, line, and rule all agree), if
+/// any. Used only to filter the dev-tree gate's assertion, never to skip scanning a file.
+fn allowlist_entry<'a>(f: &Finding, root: &Path) -> Option<&'a AllowedFinding> {
+    let rel = f.path.strip_prefix(root).ok()?;
+    let rel = rel.to_string_lossy().replace('\\', "/");
+    ALLOWLISTED_FINDINGS
+        .iter()
+        .find(|a| a.path == rel && a.line == f.line && a.rule == f.rule)
+}
+
+fn is_allowlisted(f: &Finding, root: &Path) -> bool {
+    allowlist_entry(f, root).is_some()
+}
+
+/// 🔴 **NFR-012's blocking gate**: `crates/`, `tools/`, `policies/` — 0 findings, modulo the
+/// narrow allowlist above.
 #[test]
 fn the_dev_tree_has_zero_secret_scan_findings() {
     let root = repo_root();
@@ -845,10 +911,29 @@ fn the_dev_tree_has_zero_secret_scan_findings() {
         );
     }
     println!("SECRET_SCAN_DEV_TREE_FINDINGS={}", findings.len());
+    let (allowlisted, unexpected): (Vec<_>, Vec<_>) =
+        findings.iter().partition(|f| is_allowlisted(f, &root));
+    for f in &allowlisted {
+        let entry = allowlist_entry(f, &root).expect("just partitioned as allowlisted");
+        println!(
+            "SECRET_SCAN_ALLOWLISTED_FINDING rule={} path={} line={} reason={}",
+            f.rule,
+            f.path.display(),
+            f.line,
+            entry.reason
+        );
+    }
+    println!(
+        "SECRET_SCAN_ALLOWLISTED={} SECRET_SCAN_UNEXPECTED={}",
+        allowlisted.len(),
+        unexpected.len()
+    );
     assert!(
-        findings.is_empty(),
-        "NFR-012: 0 findings over crates/+tools/+policies/; see the SECRET_SCAN_FINDING lines \
-         above for what tripped: {findings:?}"
+        unexpected.is_empty(),
+        "NFR-012: 0 unallowlisted findings over crates/+tools/+policies/ ({} allowlisted per \
+         R-909-4a, req/909 §②); see the SECRET_SCAN_FINDING lines above for what tripped: \
+         {unexpected:?}",
+        allowlisted.len()
     );
 }
 

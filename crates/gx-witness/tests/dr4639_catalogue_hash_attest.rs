@@ -15,7 +15,9 @@ use gx_core::{
     Cid, DeterminismBoundary, FingerprintBytes, InclusionProof, KeyId, Reversibility,
     TransformationId,
 };
-use gx_witness::receipt::{ConfinementContext, ReadSet, ReceiptKind, ReceiptPayload, VerdictSummary};
+use gx_witness::receipt::{
+    ConfinementContext, ReadSet, ReceiptKind, ReceiptPayload, VerdictSummary,
+};
 
 use support::{commit_payload, keypair};
 
@@ -131,9 +133,16 @@ fn dr4639_ac2_ac3_bytes_with_no_catalogue_hash_key_still_decode() {
         "absent bytes read as an absent answer -- no catalogue was named as governing, not a \
          fabricated empty digest"
     );
+    // 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)**: `PreErratumPayload` now also
+    // predates `payload_version` -- patched back from `now` for the same reason `catalogue_hash`
+    // is: this test isolates `catalogue_hash`'s addition specifically, not a later erratum's.
     assert_eq!(
         ReceiptPayload {
             catalogue_hash: now.catalogue_hash.clone(),
+            payload_version: now.payload_version,
+            // 🔴 **A2 (`req/910`, `req/919` W8, 2026-08-30)**: likewise -- this shadow predates
+            // `engine_version` too, and this test isolates `catalogue_hash`.
+            engine_version: now.engine_version.clone(),
             ..decoded
         },
         now,

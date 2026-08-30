@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 130" width="100%" height="100%">
+  <defs>
+    <linearGradient id="metricBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#171512"/>
+      <stop offset="100%" stop-color="#0e0d0c"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="130" rx="8" fill="#0b0a09" stroke="#26231f" stroke-width="1"/>
+
+  <!-- Card 1: Test Floor -->
+  <g transform="translate(15, 15)">
+    <rect width="205" height="100" rx="6" fill="url(#metricBg)" stroke="#332e27" stroke-width="1"/>
+    <text x="18" y="30" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1">TEST FLOOR</text>
+    <text x="18" y="65" fill="#ece7da" font-family="ui-monospace, monospace" font-size="28" font-weight="800">2,602</text>
+    <text x="18" y="85" fill="#52b788" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10">Probes across 454 suites &middot; Pass</text>
+  </g>
+
+  <!-- Card 2: Lean Theorems -->
+  <g transform="translate(235, 15)">
+    <rect width="205" height="100" rx="6" fill="url(#metricBg)" stroke="#332e27" stroke-width="1"/>
+    <text x="18" y="30" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1">LEAN 4 THEOREMS</text>
+    <text x="18" y="65" fill="#c9b998" font-family="ui-monospace, monospace" font-size="28" font-weight="800">117</text>
+    <text x="18" y="85" fill="#52b788" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10">Machine-checked &middot; 0 sorry</text>
+  </g>
+
+  <!-- Card 3: Adversarial Rounds -->
+  <g transform="translate(455, 15)">
+    <rect width="205" height="100" rx="6" fill="url(#metricBg)" stroke="#332e27" stroke-width="1"/>
+    <text x="18" y="30" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1">ADVERSARIAL AUDIT</text>
+    <text x="18" y="65" fill="#ece7da" font-family="ui-monospace, monospace" font-size="28" font-weight="800">44</text>
+    <text x="18" y="85" fill="#c9b998" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10">Continuous repair rounds</text>
+  </g>
+
+  <!-- Card 4: Open High Holes -->
+  <g transform="translate(675, 15)">
+    <rect width="210" height="100" rx="6" fill="url(#metricBg)" stroke="#332e27" stroke-width="1"/>
+    <text x="18" y="30" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1">OPEN HOLES</text>
+    <text x="18" y="65" fill="#52b788" font-family="ui-monospace, monospace" font-size="28" font-weight="800">0</text>
+    <text x="18" y="85" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10">High-severity as of 25 Aug 2026</text>
+  </g>
+</svg>

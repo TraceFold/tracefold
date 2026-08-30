@@ -352,6 +352,24 @@ pub fn verify_checkpoint(checkpoint: &Checkpoint, key: &VerifyingKeyRef<'_>) -> 
     verify_raw(key, &message, &checkpoint.signature)
 }
 
+/// The spelling both `sdk/wasm-verify` and `crates/gx-cli` embed when they report
+/// [`verify_checkpoint`]'s `Err` to a caller (`format!("{CHECKPOINT_REFUSAL_PREFIX}: {e}")`).
+///
+/// # Why this exists (B1 / DIV-901-1, `req/914` §7, `req/874` R3)
+///
+/// `web_verify/src/verdict.js::CHECKPOINT_REFUTED` matches this exact prefix, anchored to the start
+/// of the string, to read "the checkpoint refused its own signature check" as `deny` — one of R3's
+/// four `deny` triggers. Before this constant existed, `sdk/wasm-verify/src/lib.rs` and
+/// `crates/gx-cli/src/receipt.rs` each hand-wrote their own English for the same
+/// [`Error::SignatureInvalid`] and drifted apart: the CLI's spelling never matched the classifier's
+/// regex, so the CLI side fell through to the classifier's default `hold` instead of `deny`
+/// (`tools/verify_parity.mjs`'s `DIV-901-1`). A single `pub const`, imported by both callers (both
+/// already carry `gx-witness` as a `path` dependency), makes that drift structurally impossible
+/// rather than a matter of two authors remembering to copy the same sentence. Additive only —
+/// [`verify_checkpoint`]'s behavior is unchanged.
+pub const CHECKPOINT_REFUSAL_PREFIX: &str =
+    "checkpoint_key: the checkpoint did not verify under it";
+
 // ---------------------------------------------------------------------------
 // FR-M04 -- the aggregate verdict checkpoint's three functions (M7 hand 6)
 // ---------------------------------------------------------------------------

@@ -53,7 +53,11 @@ fn dr529_cli_order_swap_of_two_receipts_inclusion_proofs_is_refused() {
             )
             .expect("append");
         let proof = gx_log::proof::prove_inclusion(store.log(), index).expect("in the log");
-        assert_eq!(proof.tree_size, index + 1, "proved at commit-time tree size");
+        assert_eq!(
+            proof.tree_size,
+            index + 1,
+            "proved at commit-time tree size"
+        );
         canonical_payloads.push(commit_payload(&key, seed, support::empty_proof()));
         proofs.push(proof);
     }
@@ -82,7 +86,10 @@ fn dr529_cli_order_swap_of_two_receipts_inclusion_proofs_is_refused() {
         &serde_json::to_value(&receipt1).expect("serialises"),
     );
 
-    for (label, file) in [("leaf0-with-leaf1-proof", &file0), ("leaf1-with-leaf0-proof", &file1)] {
+    for (label, file) in [
+        ("leaf0-with-leaf1-proof", &file0),
+        ("leaf1-with-leaf0-proof", &file1),
+    ] {
         let out = run(support::gx()
             .arg("--project")
             .arg(&proj)
@@ -91,7 +98,10 @@ fn dr529_cli_order_swap_of_two_receipts_inclusion_proofs_is_refused() {
             .arg(file)
             .arg("--key")
             .arg(&key_path));
-        println!("DR529_CLI_ORDER_SWAP label={label} code={} stdout={}", out.code, out.stdout);
+        println!(
+            "DR529_CLI_ORDER_SWAP label={label} code={} stdout={}",
+            out.code, out.stdout
+        );
         assert_ne!(
             out.code, 0,
             "DR529 cli order-swap: {label} must NOT verify as exit 0 -- a swapped inclusion \

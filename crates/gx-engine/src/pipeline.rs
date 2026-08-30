@@ -83,7 +83,7 @@
 //! written for rather than falling through it.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 
@@ -98,15 +98,18 @@ use gx_core::{
     BoundaryStage, DeterminismBoundary, FingerprintBytes, InclusionProof, Reversibility,
     VerdictCheckpoint, VerdictTally,
 };
+// 🔴 req/824 A5 — the observation road's vocabulary (the section at the end of this file).
+use gx_core::{ChangeContext, EnvsetAdmission, ObservationClass, ObservationRecord, ReprKind};
 use gx_gate::{AdmitProof, EscalationTicket, Gate, GateInput, Reason, TicketId, Verdict};
 use gx_log::{proof::prove_inclusion, store::VerdictCheckpointStore, LedgerStore};
 use gx_substrate::{
-    AppliedDelta, InputStageDeclaration, InverseCompletion, PlannedDelta, SubstrateAdapter,
+    elide_scope, AppliedDelta, InputStageDeclaration, InverseCompletion, InvertOutcome,
+    PlannedDelta, SubstrateAdapter,
 };
 use gx_witness::receipt::ReadSet;
 use gx_witness::{
     Environment, Evidence, KeyPair, Provenance, ProvenanceInputs, Receipt, ReceiptKind,
-    ReceiptPayload, VerdictSummary,
+    ReceiptPayload, VerdictSummary, CURRENT_PAYLOAD_VERSION,
 };
 
 use crate::replay::{reconstruct, CommittedRow, DraftRow, EscrowRow, Sigma, SigmaShadow, StateRow};
@@ -1057,6 +1060,14 @@ pub mod not_resumed {
     pub const LEDGER_MOVED_ON: &str = "the ledger witnesses this commit at a leaf that later leaves         follow, so the critical section it appears to be inside closed and the world moved on         afterwards (req/227 H-01). Re-applying here would write an old delta over a newer state,         which is the accident this refusal exists for. Nothing was applied";
     /// 🔴 **R7 / `req/232` H-01/M-07** — the recorded head is not a document this binary believes.
     pub const HEAD_INVALID: &str = "this project's recorded head is not a document this binary will         read numbers off (head_invalid, req/232 H-01): its signature does not check out under the         key it names, its signed witness disagrees with the fields beside it, or the file will not         parse. A replaced detector is not an absent one — the audit wrote `tree_size: 0` over this         file, left the signature alone, and watched an operator's file go from `three` back to         `two`. Nothing was applied and nothing was recorded";
+    /// 🔴 **R-923-1** — the machine-readable tag [`HeadReading::invalid`]'s four call sites in
+    /// `read_head` prefix their own per-error sentence with, hand-written four times before this
+    /// constant existed (`req/923` §1d found the drift: [`HEAD_INVALID`] above is a full canned
+    /// sentence with a different consumer — `not_resumed::HEAD_INVALID` at the bottom of this file
+    /// — and none of the four call sites read from either constant). This is the tag alone, no
+    /// colon, so `format!("{HEAD_INVALID_PREFIX}: {detail}")` reproduces the old literal byte for
+    /// byte.
+    pub const HEAD_INVALID_PREFIX: &str = "head_invalid";
     /// 🔴 **R8 / `req/234` H-02 + L-03** — the *declaration* moved, and nothing else did.
     ///
     /// A separate sentence from [`ROLLED_BACK`] because the two are different facts and R7 gave
@@ -1237,11 +1248,12 @@ fn read_head(
                 floor: None,
                 authenticity: Some(HeadAuthenticity::Refuted),
                 invalid: Some(format!(
-                    "head_invalid: {} will not read as a head this binary wrote ({e}). A detector \
+                    "{prefix}: {} will not read as a head this binary wrote ({e}). A detector \
                      that cannot be read is not an absent one — absence means this project never \
                      recorded a head, and an unreadable document means somebody replaced it, so \
                      this refuses rather than passing (req/232 M-07, 43 §7.9 Model A)",
-                    store.path().display()
+                    store.path().display(),
+                    prefix = not_resumed::HEAD_INVALID_PREFIX,
                 )),
                 key_id: None,
             }
@@ -1253,7 +1265,10 @@ fn read_head(
             return HeadReading {
                 floor: None,
                 authenticity: Some(HeadAuthenticity::Refuted),
-                invalid: Some(format!("head_invalid: {e} (req/232 H-01)")),
+                invalid: Some(format!(
+                    "{prefix}: {e} (req/232 H-01)",
+                    prefix = not_resumed::HEAD_INVALID_PREFIX
+                )),
                 key_id: Some(head.checkpoint.signature.keyid.clone()),
             }
         }
@@ -1269,13 +1284,14 @@ fn read_head(
                             floor: None,
                             authenticity: Some(HeadAuthenticity::Refuted),
                             invalid: Some(format!(
-                                "head_invalid: the signed head in {} does not verify under the key \
+                                "{prefix}: the signed head in {} does not verify under the key \
                                  it names ({}): {e}. `req/232` H-01 wrote `tree_size: 0` over this \
                                  file, left the signature where it was, and every gate opened — so \
                                  a head whose signature does not cover its numbers is refused \
                                  rather than compared against (43 §7.9 Model A)",
                                 store.path().display(),
-                                head.checkpoint.signature.keyid
+                                head.checkpoint.signature.keyid,
+                                prefix = not_resumed::HEAD_INVALID_PREFIX,
                             )),
                             key_id: Some(head.checkpoint.signature.keyid.clone()),
                         }
@@ -1286,7 +1302,10 @@ fn read_head(
                             return HeadReading {
                                 floor: None,
                                 authenticity: Some(HeadAuthenticity::Refuted),
-                                invalid: Some(format!("head_invalid: {why} (req/232 H-01)")),
+                                invalid: Some(format!(
+                                    "{prefix}: {why} (req/232 H-01)",
+                                    prefix = not_resumed::HEAD_INVALID_PREFIX
+                                )),
                                 key_id: Some(head.checkpoint.signature.keyid.clone()),
                             }
                         }
@@ -1550,6 +1569,11 @@ pub struct Engine<E: EvidenceSource, C: Canonicalizer = CanonEncoder> {
     /// caller files it afterwards if it files it at all. See [`CommitReceiptSink`] for why the
     /// product roads register one and why the record order changed with it.
     receipt_sink: Option<Arc<dyn CommitReceiptSink>>,
+    /// 🔴 **`req/824` A5** — the engine-internal observation road (the section at the end of this
+    /// file): chain heads + `observation_id` replay map, shared with the adapter this engine
+    /// lazily registers under `custom:observation` on first ingest. In-memory, like the state it
+    /// mirrors; the candidates themselves are in the journal (the module-header restart note).
+    observation_road: Arc<ObservationRoad>,
     gate: Gate,
     evidence: E,
     canon: C,
@@ -1591,7 +1615,38 @@ pub struct Engine<E: EvidenceSource, C: Canonicalizer = CanonEncoder> {
     /// cache rather than a fifth component of Σ (req/88 Λ1): [`Engine::open`] rebuilds it by
     /// replaying them in order, so a restart cannot make it disagree with the journal, and
     /// [`Engine::sigma`] does not report it.
-    resolved: BTreeMap<IntentId, TransformationId>,
+    ///
+    /// # 🔴🔴 **DEFECT-891-1** (`req/895` §2) — why the value is a list
+    ///
+    /// It was a `BTreeMap<IntentId, TransformationId>` and the replay above ended in
+    /// last-write-wins. That is a **function**, and the relation it inverts stopped being one the
+    /// day `undo` shipped:
+    ///
+    /// * `Intent`'s identity is substrate / locator / goal / context / actor. `parents` is not in
+    ///   it.
+    /// * `Transformation`'s identity **is** quantified over `parents` — [`Engine::undo`] mints
+    ///   `T_u` with `parents = vec![T_o]`, and that is 43 T-12's guard.
+    ///
+    /// So two undos of two different transformations that restore the same bytes at the same
+    /// locator under the same context and actor have **one** `IntentId` and **two**
+    /// `TransformationId`s. Under last-write-wins the second silently evicted the first, and
+    /// `gx-cli`'s `Session::intent_of` — which asks this index "does that intent resolve to this
+    /// transformation?" to find the draft a rehydrate needs — then answered `None` for a
+    /// transformation whose **signed commit receipt was on disk in the same project**. `gx undo`
+    /// on it exited 6, `NOT_FOUND`, "the named object is not here". `req/895` §2 has the
+    /// reproduction and the discriminating experiment: changing only `--context` on the second
+    /// branch makes the same sequence succeed.
+    ///
+    /// A `Vec` in journal order is the same fold with the same rule — Λ3(ii)'s "in append order,
+    /// last write winning" decides *which one is the latest*, and [`Engine::resolved`] still
+    /// answers that. What it no longer does is **discard the others**. Nothing about either
+    /// identity moves, so no receipt, ledger leaf or journal record changes by one byte: this
+    /// index is not part of Σ, which is exactly why it is the cheap place to repair.
+    ///
+    /// Entries are unique: a re-`plan` of one intent lands on the same `TransformationId` (43 T-2's
+    /// idempotency), and appending it twice would make "how many transformations does this intent
+    /// have" a count of retries.
+    resolved: BTreeMap<IntentId, Vec<TransformationId>>,
     /// 🔴 **M6-07 adopted (b)** (sem: SEM-gx-engine-140) — [`Engine::table`](Engine) keyed the other way: which rows are about which
     /// subject.
     ///
@@ -2279,18 +2334,25 @@ impl<E: EvidenceSource> Engine<E, CanonEncoder> {
         // last write winning. That order is the rule req/88 Λ3(ii) asks for — see
         // [`Engine::resolved`] — and taking it from the journal rather than from the table is what
         // makes the answer survive a restart, since `open` deliberately leaves the table empty.
-        let resolved = journal
-            .records()
-            .iter()
-            .filter_map(|r| match r {
-                EngineJournalRecord::Planned {
-                    intent_id,
-                    transformation,
-                    ..
-                } => Some((*intent_id, *transformation)),
-                _ => None,
-            })
-            .collect();
+        // 🔴 **DEFECT-891-1** (`req/895` §2) — `.collect()` into a `BTreeMap` here was the
+        // last-write-wins that dropped a branch. The fold is the same one, in the same order; what
+        // changed is that an entry for an intent that already has one is **appended** rather than
+        // substituted. `Engine::resolved` still answers the last, so every reader that wanted the
+        // latest still gets it.
+        let mut resolved: BTreeMap<IntentId, Vec<TransformationId>> = BTreeMap::new();
+        for record in journal.records() {
+            if let EngineJournalRecord::Planned {
+                intent_id,
+                transformation,
+                ..
+            } = record
+            {
+                let seen = resolved.entry(*intent_id).or_default();
+                if !seen.contains(transformation) {
+                    seen.push(*transformation);
+                }
+            }
+        }
         // 🔴 **T6 condition ① (Σ-shadow), at the one place a process learns what is already on
         // disk** (`req/38` §148). `drafted` and `resolved` above are journal-derived indexes and
         // have been since M6-02/FR-M04; this is the same road for the rest of Σ, and the reason it
@@ -2386,6 +2448,7 @@ impl<E: EvidenceSource> Engine<E, CanonEncoder> {
             completions: BTreeMap::new(),
             input_stage_declarations: BTreeMap::new(),
             receipt_sink: None,
+            observation_road: Arc::new(ObservationRoad::default()),
             gate,
             evidence,
             canon: CanonEncoder,
@@ -2450,6 +2513,7 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             completions: self.completions,
             input_stage_declarations: self.input_stage_declarations,
             receipt_sink: self.receipt_sink,
+            observation_road: self.observation_road,
             gate: self.gate,
             evidence: self.evidence,
             canon,
@@ -4218,6 +4282,25 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
     /// `AppliedDelta.resulting_digest` to disagree with, so the comparison blocker item 5 (sem: SEM-gx-engine-187) is about cannot be
     /// written against today's trait at all. Raised as **M5H2-2**.
     ///
+    /// ## 🔴 Superseded in part — **M5H2-2, adopted (b)** (`req/919` A1)
+    ///
+    /// The paragraphs above are kept because a reader of the repair should see the claim it
+    /// replaced, and one clause of that claim was always narrower than it read. "Not knowable"
+    /// was true of the **trait**, not of the world: `plan` is handed `{intent, pre}`, and an
+    /// adapter that can compute a post-state digest from those two has had everything it needs
+    /// all along. What was missing was somewhere to put the answer.
+    ///
+    /// So `PlannedDelta` grew an opt-in `promised_target` seat (`gx-substrate`'s `delta.rs`
+    /// carries the ruling and its three refused alternatives), and this function fills 41 §3's
+    /// `target` from it. Two things are deliberately unchanged: `SubstrateAdapter` still has
+    /// **seven** methods (N-07/N-08/N-09, and §34 M4H6-4's refusal reserved by name for exactly
+    /// this request), and an adapter that promises nothing still produces `target = None` and
+    /// bit-for-bit the same `TransformationId` it produced before.
+    ///
+    /// **Blocker item 5's comparison is now written**, in [`Engine::commit`], and it is reachable
+    /// only from the far side of a prediction: no promise, no check, and the road every shipped
+    /// adapter takes has not moved. The seventh `AbortReason` is `PostconditionMismatch`.
+    ///
     /// # Errors
     /// [`Error::NotFound`] if the intent has no draft or its substrate has no registered adapter.
     /// [`Error::Adapter`] if `snapshot`, `plan` or `precondition` refuses. [`Error::Canon`] if the
@@ -4300,7 +4383,14 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             TransformationId(Cid([0u8; 32])),
             0,
             Subject::Object(*pre.id()),
-            None,
+            // 🔴 **M5H2-2, adopted (b)** (`req/919` A1) — 41 §3's `target`, filled from the plan
+            // that was just made instead of fixed at `None`. An adapter that works out a
+            // post-state digest says so on the `PlannedDelta` it returns; every adapter that does
+            // not answers `None` here, which is bit-for-bit the value this line held before, so
+            // the `TransformationId` of every transformation this workspace can make today is
+            // unchanged. See `Engine::plan`'s doc for the ruling and what it did to blocker
+            // item 5.
+            delta.promised_target(),
             Vec::new(),
             CompositionMetadata {
                 intent_id,
@@ -4374,7 +4464,13 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         //
         // Two things follow, and both are refinements of guards this function already had for the
         // single-process case.
-        let recorded = self.resolved.get(&intent_id).copied();
+        // 🔴 **DEFECT-891-1** (`req/895` §2) — `the latest`, which is what this guard always meant
+        // and what a `BTreeMap` value happened to be while the relation was still a function.
+        let recorded = self
+            .resolved
+            .get(&intent_id)
+            .and_then(|ids| ids.last())
+            .copied();
         let rehydrating = recorded == Some(id) && !self.table.contains_key(&id);
         if let Some(recorded) = recorded {
             if !rehydrating && !self.table.contains_key(&recorded) {
@@ -4506,7 +4602,7 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             input_generation,
             at,
         })?;
-        self.resolved.insert(intent_id, id);
+        self.remember_resolution(intent_id, id);
 
         // 🔴 **E-M4-8 / M5-05 adopted (a)** (sem: SEM-gx-engine-194), and journal-first in the order of two statements: the name
         // goes into the journal, then the body goes into the store. 42 §5 makes keeping the body
@@ -5169,6 +5265,13 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // other. A `Some` unconditionally: see the field's doc for what a `None` would mean.
             confinement: Some(self.confinement.clone()),
             catalogue_hash: None,
+            // F7 / R-868-6 (`req/919` W5): every receipt this build issues is `Some`, on both
+            // kinds and with no kind-dependent rule -- see the field's own doc comment.
+            payload_version: Some(CURRENT_PAYLOAD_VERSION),
+            // 🔴 **A2 (`req/910`, `req/919` W8)** — live, for `confinement`'s reason two lines up:
+            // T-4a's signing process is the process, and this road has no `StateRow` to read a
+            // journalled provenance out of yet. The same string `derive_provenance` will write.
+            engine_version: Some(crate::VERSION.to_string()),
             receipt_kind: ReceiptKind::VerdictReceipt,
             canonical_cid: id.0,
             inverse_delta: None,
@@ -6072,6 +6175,26 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         let locator = entry.pre.locator().to_string();
         let substrate = entry.delta.substrate().clone();
 
+        // 🔴 **`req/824` A5** — an observation's undo is refused by TYPE, before the escrow is
+        // even consulted. The escrow row exists (the record-level restore was escrowed at
+        // T-10b), so falling through would execute a "successful" undo — and un-reporting an
+        // observation is either a write to a platform this system can never write (SS273) or,
+        // for a log window, an un-attestation of history. Both kinds fold onto
+        // `INVERSE_UNAVAILABLE` at the surface with the distinction in `detail` (A3's ruled
+        // fold, Λ4); both are constructible engine-side only (`authority_boundary.rs` holds the
+        // secondary surfaces at zero constructions).
+        if is_observation_substrate(&substrate) {
+            let id_text = original.0.to_text();
+            return Err(
+                match cbor::decode::<ObservationDelta>(entry.delta.payload()) {
+                    Ok(delta) if delta.class == ObservationClass::LogWindow => {
+                        Error::AppendOnlyClass { id: id_text }
+                    }
+                    _ => Error::InverseNotExecutableAtSubstrate { id: id_text },
+                },
+            );
+        }
+
         let row = self
             .escrow
             .get(original)
@@ -6223,7 +6346,14 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         // along is refused.
         let in_table = self.table.contains_key(&id);
         let existing_state = self.table.get(&id).map(|e| e.state).or_else(|| {
-            if self.resolved.get(&intent_id) == Some(&id) {
+            // 🔴 **DEFECT-891-1** (`req/895` §2) — membership, not equality. This is the
+            // expression that killed the branch: two undos sharing an `IntentId` differ in
+            // `parents`, so the second's id is never the one an equality test found here.
+            if self
+                .resolved
+                .get(&intent_id)
+                .is_some_and(|ids| ids.contains(&id))
+            {
                 reconstruct(self.journal.records())
                     .state_of(&id)
                     .and_then(|row| row.state)
@@ -6275,7 +6405,7 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             input_generation,
             at,
         })?;
-        self.resolved.insert(intent_id, id);
+        self.remember_resolution(intent_id, id);
         // **M4H6-3** on the live path for the second time: the body is already filed under this
         // CID, so the store answers `AlreadyPresent` and writes nothing. "storage happens only
         // once" (sem: SEM-gx-engine-243) is what
@@ -7139,6 +7269,47 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             None => None,
         };
 
+        // --- 🔴 M5-11 / blocker item 5: the prophecy, checked ------------------------------------
+        //
+        // **M5H2-2 adopted (b)** (`req/919` A1) gave `Transformation.target` a producer, and this
+        // is the refusal `req/38` §37 filed and deferred: "how should the engine refuse when
+        // plan's prediction and apply's measurement disagree". Until this window the doc on
+        // `Engine::plan` named the *absence* of this check, and the honest reason it named was
+        // that there was no prediction to check.
+        //
+        // **The guard is the `Option`, and it is the whole compatibility story.** `target` is
+        // `None` for every adapter that fills no `promised_target`, which is all six shipped ones,
+        // so the `let Some` below does not open and this block costs one `Option` discriminant
+        // read on the road every existing commit takes.
+        //
+        // **Why here.** It is as early as the comparison can be — a post-state digest exists only
+        // after `apply` — and as late as it must be to leave the undo material intact: the
+        // two-phase escrow above has just completed the inverse, so a mispredicted world is one
+        // an operator can still act on. Nothing has been signed yet; T-11's payload is built
+        // below, and a transformation that leaves here never reaches it.
+        //
+        // **What is deliberately not done.** No compensation is sent. The engine has just
+        // measured that its model of this object's post-state is wrong, and 43 T-10c's road sends
+        // an escrowed inverse on the strength of exactly that model; acting on a model this abort
+        // exists to distrust is what fail-closed forbids. `Rollback::NotAttempted` is therefore
+        // the true word, and it travels without a `NotAttemptedBecause`: that vocabulary's five
+        // causes are all "the inverse was unavailable or unsafe to send", and this one is "the
+        // inverse is available and the engine declines". Naming a sixth cause is a wire change of
+        // its own (`req/38` §231 ruling 5's one-arm-per-cause gate, measured by
+        // `crates/gx-cli/tests/r26_not_attempted_causes.rs`) and is raised in `req/919` A1's
+        // report rather than made here.
+        if let Some(promised) = self.table[id].transformation.target {
+            let observed = *applied.resulting_digest();
+            if promised != observed {
+                return self.abort(
+                    id,
+                    AbortReason::PostconditionMismatch,
+                    Some(Rollback::NotAttempted),
+                    at,
+                );
+            }
+        }
+
         // --- T-11 ------------------------------------------------------------------------------
         // 🔴 **DR-46-28** — read before `verdict` moves into the literal below.
         let verdict_present = verdict.is_some();
@@ -7151,6 +7322,14 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             // roads reading it back out of Σ reproduce these bytes rather than approximate them.
             confinement: Some(self.confinement.clone()),
             catalogue_hash: None,
+            // F7 / R-868-6 (`req/919` W5): every receipt this build issues is `Some`, on both
+            // kinds and with no kind-dependent rule -- see the field's own doc comment.
+            payload_version: Some(CURRENT_PAYLOAD_VERSION),
+            // 🔴 **A2 (`req/910`, `req/919` W8)** — the same value `derive_provenance` journalled a
+            // few hundred lines up, from the same constant, so the rebuild roads reading it back
+            // out of Σ reproduce these bytes rather than approximate them. Exactly `confinement`'s
+            // argument, on the field that answers `#435`.
+            engine_version: Some(crate::VERSION.to_string()),
             receipt_kind: ReceiptKind::CommitReceipt,
             canonical_cid,
             // Two-phase escrow: the receipt names the **completed** inverse (`req/160` §1-1
@@ -7973,6 +8152,21 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
                 .as_ref()
                 .and_then(|p| p.environment.confinement.clone()),
             catalogue_hash: None,
+            // F7 / R-868-6 (`req/919` W5): every receipt this build issues is `Some`, on both
+            // kinds and with no kind-dependent rule -- see the field's own doc comment.
+            payload_version: Some(CURRENT_PAYLOAD_VERSION),
+            // 🔴 **A2 (`req/910`, `req/919` W8)** — read back out of Σ, not out of this process,
+            // and for `confinement`'s reason four lines up rather than by analogy with it: 43
+            // §7-3b digests this payload against the leaf the ledger already holds, and answering
+            // from `crate::VERSION` here would make every repair performed by a build other than
+            // the committing one report `payload_mismatch` -- the word for tampering -- for the
+            // ordinary upgrade 47 §4 describes. `None` for a journal written before M5-25 carried
+            // a provenance record, which reproduces the absence rather than inventing a version
+            // nobody wrote down.
+            engine_version: row
+                .provenance
+                .as_ref()
+                .map(|p| p.environment.engine_version.clone()),
             receipt_kind: ReceiptKind::CommitReceipt,
             canonical_cid,
             inverse_delta: inverse_cid,
@@ -8556,6 +8750,16 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
                 .as_ref()
                 .and_then(|p| p.environment.confinement.clone()),
             catalogue_hash: None,
+            // F7 / R-868-6 (`req/919` W5): every receipt this build issues is `Some`, on both
+            // kinds and with no kind-dependent rule -- see the field's own doc comment.
+            payload_version: Some(CURRENT_PAYLOAD_VERSION),
+            // 🔴 **A2 (`req/910`, `req/919` W8)** — read back out of Σ, as on the rebuild road
+            // above and for the same reason: a re-issue carries what the filed receipt carried, and
+            // the process re-issuing is not necessarily the process that committed.
+            engine_version: row
+                .provenance
+                .as_ref()
+                .map(|p| p.environment.engine_version.clone()),
             receipt_kind: ReceiptKind::CommitReceipt,
             canonical_cid,
             inverse_delta: inverse_cid,
@@ -8866,9 +9070,72 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
     /// fixed" (sem: SEM-gx-engine-303)),
     /// which is why 44 L101's `gx cancel` from-set could not be satisfied by id-resolution and
     /// **E-M6-1** removed `Draft` from it instead (req/38 §47).
+    ///
+    /// # 🔴 **DEFECT-891-1** (`req/895` §2) — the paragraph above was right and the type was not
+    ///
+    /// "Resolution is a **partial** map, and re-planning can make one intent name more than one
+    /// transformation" has been in this doc comment since M5, and the backing store was a
+    /// `BTreeMap<IntentId, TransformationId>` that could hold exactly one. The two disagreed for
+    /// as long as nothing asked, and `undo` is what asked: it mints a second transformation for
+    /// one intent **without** re-planning, by putting `parents` inside a `Transformation`'s
+    /// identity and leaving it outside an `Intent`'s. The evicted branch became unreachable, and
+    /// `gx undo` answered exit 6 `NOT_FOUND` about a transformation holding a signed commit
+    /// receipt. The store is a list now; this accessor's own contract — **the most recently
+    /// planned one** — is unchanged, and [`Engine::resolved_all`] / [`Engine::resolves_to`] are
+    /// how a caller asks the other questions.
     #[must_use]
     pub fn resolved(&self, intent_id: &IntentId) -> Option<TransformationId> {
-        self.resolved.get(intent_id).copied()
+        self.resolved
+            .get(intent_id)
+            .and_then(|ids| ids.last())
+            .copied()
+    }
+
+    /// 🔴 **DEFECT-891-1** (`req/895` §2) — record that `intent_id` was planned into
+    /// `transformation`, without evicting whatever it was planned into before.
+    ///
+    /// The one writer of [`Engine::resolved`]'s backing map on the live path, so that the two
+    /// roads that mint a `TransformationId` (`plan` and `undo`) cannot disagree about what
+    /// "remembering a resolution" means. It is the same fold [`Engine::open`] replays, which is
+    /// what makes the answer after a restart the answer before it.
+    ///
+    /// Idempotent: 43 T-2's "re-running against the same snapshot yields … the same
+    /// `TransformationId`" is the case this must not turn into a second entry.
+    fn remember_resolution(&mut self, intent_id: IntentId, transformation: TransformationId) {
+        let seen = self.resolved.entry(intent_id).or_default();
+        if !seen.contains(&transformation) {
+            seen.push(transformation);
+        }
+    }
+
+    /// 🔴 **DEFECT-891-1** (`req/895` §2) — every transformation this intent was planned into,
+    /// in journal order.
+    ///
+    /// Longer than one element exactly when the same `Intent` was reached by two different
+    /// roads to a `Transformation`, and `undo` is the only producer of such a road in v0.1: it
+    /// mints `T_u` with `parents = vec![T_o]`, and `parents` is inside a `Transformation`'s
+    /// identity and outside an `Intent`'s. Two undos that restore the same bytes at the same
+    /// locator under the same context and actor are therefore one intent and two
+    /// transformations — a **tree**, and this is the seat that stopped flattening it.
+    ///
+    /// [`Engine::resolved`] answers the last of these and is the road 44 §0's id-resolution
+    /// takes. A caller that needs to know whether a *particular* transformation belongs to an
+    /// intent asks [`Engine::resolves_to`] rather than comparing against the last one.
+    #[must_use]
+    pub fn resolved_all(&self, intent_id: &IntentId) -> &[TransformationId] {
+        self.resolved.get(intent_id).map_or(&[], Vec::as_slice)
+    }
+
+    /// 🔴 Was `transformation` planned from `intent_id`?
+    ///
+    /// The predicate `gx-cli`'s `Session::intent_of` wanted. It used to be spelled
+    /// `engine.resolved(&id) == Some(transformation)`, which is the same question **only while
+    /// an intent has at most one transformation** — and once it has two, that spelling answers
+    /// `false` about a committed transformation whose receipt is on disk, which is what
+    /// DEFECT-891-1 was seen as: `gx undo <T_u>` → exit 6, `NOT_FOUND`.
+    #[must_use]
+    pub fn resolves_to(&self, intent_id: &IntentId, transformation: &TransformationId) -> bool {
+        self.resolved_all(intent_id).contains(transformation)
     }
 }
 
@@ -9465,6 +9732,507 @@ pub const UNDO_REFUSALS: [UndoRefusalRow; 13] = [
         judged: false,
     },
 ];
+
+// ---------------------------------------------------------------------------
+// 🔴 req/824 A5 — the observation road
+// ---------------------------------------------------------------------------
+//
+// How an attach-source's report becomes an **ordinary candidate** on the existing
+// candidate → verify → canonicalize → commit road (R-1: one road, not a second pipeline).
+// `Engine::ingest_observation` builds an `Intent` on the engine-internal substrate below and
+// drives 43's own T-1/T-2; nothing here writes a `Lifecycle`, constructs a `Verdict`, or mints a
+// receipt kind, and the returned id is a candidate every existing surface answers about
+// unchanged. **No new journal kind is added by this atom** — the candidate road's own records
+// (`DraftCreated`, `Planned`, `VerifyStarted`, `Verdict`, …) are the observation's records, so
+// gx-api's `EVENT_MAP` does not move and `MAP_COVERS_THE_JOURNAL` keeps proving the count it
+// already proves (req/824 A5's EVENT_MAP duty, discharged by statement).
+//
+// # What this substrate is, and what it is NOT (SS273)
+//
+// `ObservationRoad` is a `SubstrateAdapter` over **our own observation-record space**: the
+// per-scope chain of committed observation records this engine holds. `apply` advances that
+// chain — a write to *our* state, never to the platform the record is about. It is exactly not
+// `gx-adapter-vercel`, which req/824 §2 kills by name: the platform an attach-source reports
+// about is not writable by this system and never will be, and this adapter never touches it.
+// The undo of a committed observation is refused with the **typed** engine refusals
+// (`InverseNotExecutableAtSubstrate` / `AppendOnlyClass`, req/824 A1/A3) inside `Engine::undo`,
+// before any inverse would execute.
+//
+// # How the third state is reached without touching the gate
+//
+// A chain gap (the source's `prev_ref` does not continue what we hold) makes `invert` answer
+// **`None`**: the inverse of "append to a chain whose prior we do not hold" cannot be
+// constructed, because record-level escrow of an unknown prior would be a fabricated chain.
+// E-M3-4 then does the rest — nothing refused + `invert_available == false` ⇒ `Escalate` — so
+// the gap reaches `Escalated`, raises a ticket, and is reachable at `GET /escalations` through
+// machinery that already existed. The gate is not modified and no second escalation rule is
+// minted (req/824 §5-Q6: Escalate stays a third state, asserted as its own variant).
+//
+// # The policy seat, declared rather than silently decided
+//
+// Cedar is default-deny and every shipped pack scopes its permit to its own substrate, so **no
+// shipped pack permits `custom:observation` today**: a deployment that ingests observations
+// composes its own permit statement into its policy set (gx-api's observation test bed does
+// exactly that). A shipped observation pack is deliberately NOT added by this atom: the default
+// policy set and the default adapter registry are decided **as a pair** (req/38 §60), and A5
+// must not decide that pair as a side effect. Declared in docs/LIMITS.md's A5 row.
+//
+// # Restart honesty (declared delta, req/824 §0 protocol)
+//
+// The chain heads and the `observation_id` replay map are in-memory state of this road, like the
+// A4 registry one membrane up: they do not survive a restart. The *candidates* do — they are in
+// the journal — so what a restart costs is the replay short-circuit and the chain-continuity
+// memory, not the records. A rebuild from the journal is deferred to the atom that needs it,
+// with this sentence as the marker.
+
+/// The one spelling of the observation substrate's name. `SubstrateKind::Custom` carries it, and
+/// the policy layer's `substrate_tag` renders it `custom:observation` — the string a permit must
+/// compare `resource.substrate` against.
+pub const OBSERVATION_SUBSTRATE: &str = "observation";
+
+/// The [`SubstrateKind`] every observation intent, delta and fingerprint carries.
+#[must_use]
+pub fn observation_substrate() -> SubstrateKind {
+    SubstrateKind::Custom(OBSERVATION_SUBSTRATE.to_string())
+}
+
+/// Whether a substrate is the observation road's.
+#[must_use]
+pub fn is_observation_substrate(kind: &SubstrateKind) -> bool {
+    matches!(kind, SubstrateKind::Custom(name) if name == OBSERVATION_SUBSTRATE)
+}
+
+/// What an observation delta's payload carries, canonical CBOR through gx-canon (41 §6: every
+/// canonical encode goes through gx-canon only). `held_at_plan` is the chain head this engine
+/// held when the delta was planned — embedded so [`ObservationRoad::invert`]'s answer is a pure
+/// function of `(delta, pre)` and a replay hands back the recorded answer.
+#[derive(Clone, Debug, serde::Deserialize, Serialize)]
+pub(crate) struct ObservationDelta {
+    pub class: ObservationClass,
+    pub source: String,
+    pub observation_id: String,
+    pub scope: String,
+    pub prev_claimed: Option<String>,
+    pub held_at_plan: Option<String>,
+    pub record: ObservationRecord,
+}
+
+/// The inverse's grammar: put the chain head for `scope` back to `head`. Constructed by
+/// [`ObservationRoad::invert`] as the record-level escrow body; never executed in v0.1 —
+/// [`Engine::undo`] refuses an observation undo with the typed refusal before any apply.
+#[derive(Clone, Debug, serde::Deserialize, Serialize)]
+struct ObservationRestore {
+    restore: String,
+    head: Option<String>,
+}
+
+/// The chain-continuity rule, one spelling for all four classes — the same three-way shape as
+/// [`gx_core::EnvsetFingerprint::admit`]'s chain arm: continuous when nothing was claimed and
+/// nothing is held, or when the claim equals the holding; a gap otherwise.
+#[must_use]
+fn chain_continuous(claimed: Option<&str>, held: Option<&str>) -> bool {
+    match (claimed, held) {
+        (None, None) => true,
+        (Some(c), Some(h)) => c == h,
+        _ => false,
+    }
+}
+
+/// A remembered ingest, for the `observation_id` idempotency contract (`req/824` §2-1: a CI job
+/// that retries re-POSTs the same operation for every class; the retry must be an idempotent
+/// no-op, not a second candidate).
+#[derive(Clone, Debug)]
+struct RememberedIngest {
+    id: TransformationId,
+    chain_ref: String,
+    gap: bool,
+}
+
+#[derive(Default)]
+struct ObservationRoadState {
+    /// scope → the chain head: the delta reference CID (as text) of the last **committed**
+    /// observation on that scope. This is the value a source must quote as `prev_ref` for its
+    /// next record, and the ingest response hands it out as `chain_ref`.
+    chains: BTreeMap<String, String>,
+    /// `(source, observation_id)` → the candidate already minted for it.
+    replays: BTreeMap<(String, String), RememberedIngest>,
+}
+
+/// 🔴 The engine-internal observation adapter (the section header above for what it is and is
+/// not). `Send + Sync` because the engine requires it of every adapter; the lock is uncontended
+/// in practice — the engine itself sits behind its caller's lock.
+#[derive(Default)]
+pub struct ObservationRoad {
+    state: Mutex<ObservationRoadState>,
+}
+
+impl std::fmt::Debug for ObservationRoad {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ObservationRoad")
+    }
+}
+
+impl ObservationRoad {
+    /// The committed chain head for a scope, if any.
+    fn chain_head(&self, scope: &str) -> Option<String> {
+        self.state
+            .lock()
+            .ok()
+            .and_then(|s| s.chains.get(scope).cloned())
+    }
+
+    /// The candidate already minted for `(source, observation_id)`, if any.
+    fn replay(&self, source: &str, observation_id: &str) -> Option<RememberedIngest> {
+        self.state.lock().ok().and_then(|s| {
+            s.replays
+                .get(&(source.to_string(), observation_id.to_string()))
+                .cloned()
+        })
+    }
+
+    /// Remember an ingest for the replay contract.
+    fn remember(&self, source: &str, observation_id: &str, entry: RememberedIngest) {
+        if let Ok(mut s) = self.state.lock() {
+            s.replays
+                .insert((source.to_string(), observation_id.to_string()), entry);
+        }
+    }
+
+    /// The chain-state digest for a scope: what `snapshot` and `precondition` both report, so
+    /// T-10a's CAS compares plan-time state with commit-time state and refuses when another
+    /// observation committed on this scope in between.
+    fn state_digest(&self, scope: &str) -> Cid {
+        let held = self.chain_head(scope);
+        let held_bytes: &[u8] = match &held {
+            Some(h) => h.as_bytes(),
+            // A marker no chain head can collide with: heads are CID texts, never NUL-prefixed.
+            None => b"\x00absent",
+        };
+        cid::mint(
+            cid::Domain::Leaf,
+            &[b"gx-observation-chain", scope.as_bytes(), held_bytes],
+        )
+    }
+}
+
+/// The locator grammar: `observation://<scope>?obs=<source>:<observation_id>`. The scope half is
+/// what chain state is keyed on; the query half makes each observation's object identity its
+/// own, so two observations on one scope are different `Subject`s and 43 §8's commutation hold
+/// does not serialise a bed of independent ingests.
+fn observation_locator(scope: &str, source: &str, observation_id: &str) -> String {
+    format!("observation://{scope}?obs={source}:{observation_id}")
+}
+
+/// The scope half of a locator this road minted.
+fn observation_scope_of(locator: &str) -> gx_substrate::Result<String> {
+    let rest =
+        locator
+            .strip_prefix("observation://")
+            .ok_or_else(|| gx_substrate::Error::Unreadable {
+                locator: locator.to_string(),
+                detail: "not an observation locator (the grammar is \
+                     observation://<scope>?obs=<source>:<id>)"
+                    .to_string(),
+            })?;
+    Ok(rest.split('?').next().unwrap_or(rest).to_string())
+}
+
+fn decode_observation_delta(payload: &[u8]) -> gx_substrate::Result<ObservationDelta> {
+    cbor::decode(payload).map_err(|e| gx_substrate::Error::Unreadable {
+        locator: "<observation delta payload>".to_string(),
+        detail: format!("not this road's grammar: {e}"),
+    })
+}
+
+impl SubstrateAdapter for ObservationRoad {
+    fn kind(&self) -> SubstrateKind {
+        observation_substrate()
+    }
+
+    /// The chain state for the locator's scope, as an object. Two-phase id mint, the fs
+    /// adapter's own shape: the placeholder id is outside the projection, so it cannot reach the
+    /// digest.
+    fn snapshot(&self, locator: &str) -> gx_substrate::Result<ObjectSnapshot> {
+        let scope = observation_scope_of(locator)?;
+        let digest = self.state_digest(&scope);
+        let placeholder = ObjectSnapshot::new(
+            ObjectId(Cid([0u8; 32])),
+            observation_substrate(),
+            locator.to_string(),
+            digest,
+            ReprKind::Bytes,
+        );
+        let id = cid::compute(&placeholder).map_err(|e| gx_substrate::Error::NotDigestible {
+            detail: e.to_string(),
+        })?;
+        Ok(ObjectSnapshot::new(
+            ObjectId(id),
+            observation_substrate(),
+            locator.to_string(),
+            digest,
+            ReprKind::Bytes,
+        ))
+    }
+
+    /// The delta is the intent's goal bytes, validated against this road's grammar. Pure — 41
+    /// §4's "no side effects" holds because `Engine::ingest_observation` assembled the payload
+    /// before T-1 ran.
+    fn plan(&self, intent: &Intent, _pre: &ObjectSnapshot) -> gx_substrate::Result<PlannedDelta> {
+        let bytes = intent.goal().0.clone();
+        decode_observation_delta(&bytes)?;
+        PlannedDelta::new(observation_substrate(), bytes)
+    }
+
+    /// The chain-state fingerprint for the snapshot's scope, read **now** — which is what makes
+    /// T-10a's CAS a real check: a second observation committed on this scope between plan and
+    /// commit moves this value.
+    fn precondition(&self, snap: &ObjectSnapshot) -> gx_substrate::Result<Fingerprint> {
+        let scope = observation_scope_of(snap.locator())?;
+        let digest = self.state_digest(&scope);
+        Ok(Fingerprint::new(
+            observation_substrate(),
+            elide_scope(snap.locator().to_string())?,
+            digest,
+        )?)
+    }
+
+    /// Advance the chain: a write to **our** record space, never to any platform (SS273). The
+    /// new head is the delta's own reference CID — the value the ingest response already handed
+    /// the source as `chain_ref`, so the source can quote it as its next `prev_ref`.
+    fn apply(&self, delta: &PlannedDelta) -> gx_substrate::Result<AppliedDelta> {
+        // The inverse grammar first: an executed restore puts the head back (record-level; not
+        // reachable through `Engine::undo` in v0.1, which refuses observation undo by type).
+        if let Ok(restore) = cbor::decode::<ObservationRestore>(delta.payload()) {
+            if let Ok(mut s) = self.state.lock() {
+                match &restore.head {
+                    Some(h) => s.chains.insert(restore.restore.clone(), h.clone()),
+                    None => s.chains.remove(&restore.restore),
+                };
+            }
+            let digest = self.state_digest(&restore.restore);
+            let postcondition = Fingerprint::new(
+                observation_substrate(),
+                elide_scope(restore.restore.clone())?,
+                digest,
+            )?;
+            return Ok(AppliedDelta::new(
+                delta.reference().clone(),
+                postcondition,
+                digest,
+                Timestamp(0),
+            ));
+        }
+        let decoded = decode_observation_delta(delta.payload())?;
+        let head = delta.reference().cid.to_text();
+        if let Ok(mut s) = self.state.lock() {
+            s.chains.insert(decoded.scope.clone(), head);
+        }
+        let digest = self.state_digest(&decoded.scope);
+        let postcondition = Fingerprint::new(
+            observation_substrate(),
+            elide_scope(decoded.scope.clone())?,
+            digest,
+        )?;
+        Ok(AppliedDelta::new(
+            delta.reference().clone(),
+            postcondition,
+            digest,
+            Timestamp(0),
+        ))
+    }
+
+    /// 🔴 Record-level escrow, or the honest `None` that makes E-M3-4 escalate (section header).
+    ///
+    /// Continuous chain ⇒ the inverse is "restore the head this engine held at plan time" —
+    /// constructible entirely from the delta, so `Some`. A gap ⇒ `None`: the prior is not held,
+    /// and an invented one would be exactly the fabricated chain the third state exists to
+    /// prevent.
+    fn invert(
+        &self,
+        delta: &PlannedDelta,
+        _pre: &ObjectSnapshot,
+    ) -> gx_substrate::Result<InvertOutcome> {
+        let decoded = decode_observation_delta(delta.payload())?;
+        if !chain_continuous(
+            decoded.prev_claimed.as_deref(),
+            decoded.held_at_plan.as_deref(),
+        ) {
+            return Ok(InvertOutcome::none(Vec::new()));
+        }
+        let restore = ObservationRestore {
+            restore: decoded.scope,
+            head: decoded.held_at_plan,
+        };
+        let payload = cbor::encode(&restore).map_err(|e| gx_substrate::Error::NotDigestible {
+            detail: e.to_string(),
+        })?;
+        let inverse = PlannedDelta::new(observation_substrate(), payload)?;
+        Ok(InvertOutcome::inverted(inverse, Vec::new()))
+    }
+
+    /// Two observations commute exactly when their scopes differ: one chain is one total order.
+    fn commutation(&self, a: &PlannedDelta, b: &PlannedDelta) -> gx_substrate::Result<Commutation> {
+        let sa = decode_observation_delta(a.payload())?;
+        let sb = decode_observation_delta(b.payload())?;
+        if sa.scope == sb.scope {
+            Ok(Commutation::Conflicts {
+                residual: b.reference().clone(),
+            })
+        } else {
+            Ok(Commutation::Commutes)
+        }
+    }
+}
+
+/// What [`Engine::ingest_observation`] answers.
+#[derive(Clone, Debug)]
+pub struct ObservationIngest {
+    /// The ordinary candidate this observation became (R-1).
+    pub id: TransformationId,
+    /// Whether this call replayed an earlier ingest of the same `(source, observation_id)` —
+    /// the idempotent no-op, exactly one candidate (`req/824` A5's control).
+    pub replayed: bool,
+    /// Whether the chain claim was a gap. The surface renders the Escalate arm's `gx_code`
+    /// (`CHAIN_GAP_ESCALATE`) from the **verdict**, never from this flag alone; the flag is
+    /// carried so a response can print both sides of the disagreement.
+    pub gap: bool,
+    /// The value the source must quote as `prev_ref` for its next record on this scope once
+    /// this candidate commits: the delta reference CID, which is also what `apply` writes as
+    /// the chain head.
+    pub chain_ref: String,
+}
+
+impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
+    /// The engine-side half of `OBSERVATION_CLASS_UNKNOWN` (`req/824` A3: origin "gx-core class
+    /// decode", surfaced through this crate's error type so the membrane never constructs an
+    /// engine refusal of its own).
+    ///
+    /// # Errors
+    /// [`Error::ObservationClassUnknown`] for a value outside the four `req/812` §1 classes —
+    /// refused, never defaulted.
+    pub fn observation_class(&self, class: &str) -> Result<ObservationClass> {
+        ObservationClass::from_wire_str(class).ok_or_else(|| Error::ObservationClassUnknown {
+            class: class.to_string(),
+        })
+    }
+
+    /// 🔴 **`req/824` A5** — ingest one observation as an **ordinary candidate** (T-1 + T-2 on
+    /// the observation substrate; the section header above carries the whole design).
+    ///
+    /// The caller (gx-api's ingest route) has already parsed the wire JSON into a typed
+    /// [`ObservationRecord`]; this accessor owns everything semantic: the A2 admission (plaintext
+    /// ⇒ refusal, chain gap ⇒ the Escalate road), the `observation_id` replay, the lazy adapter
+    /// registration, and the intent construction. The candidate it returns is then verified and
+    /// committed by the same calls as any other candidate.
+    ///
+    /// # Errors
+    /// [`Error::Malformed`] for an empty `observation_id`; [`Error::PlaintextSecret`] when an
+    /// envset value field is not of the declared digest form (`req/824` A2 — the refusal that
+    /// keeps this from becoming a secrets store); whatever [`Engine::submit`] and
+    /// [`Engine::plan`] refuse with.
+    pub fn ingest_observation(
+        &mut self,
+        source: &str,
+        observation_id: &str,
+        prev_ref: Option<&str>,
+        record: ObservationRecord,
+        rng_seed: u64,
+        at: Timestamp,
+    ) -> Result<ObservationIngest> {
+        if observation_id.is_empty() {
+            return Err(Error::Malformed {
+                detail: "`observation_id` must be a non-empty string: it is the source's own id \
+                         for the operation, and without it a retry is indistinguishable from a \
+                         second operation (req/824 §2-1)"
+                    .to_string(),
+            });
+        }
+        // The per-class chain scope. Envset carries its own scope; the other three are keyed on
+        // the reporting source so two sources' chains never interleave.
+        let scope = match &record {
+            ObservationRecord::Envset(fp) => {
+                format!("envset/{}/{}", fp.scope().project, fp.scope().environment)
+            }
+            ObservationRecord::Deploy(r) => format!("deploy/{source}/{}", r.target_env),
+            ObservationRecord::Config(_) => format!("config/{source}"),
+            ObservationRecord::LogWindow(r) => format!("logw/{source}/{}", r.stream_id),
+        };
+        let held = self.observation_road.chain_head(&scope);
+        // 🔴 The A2 admission, engine-side. Deny is checked before the chain (a plaintext value
+        // must never ride an Escalate into the ledger); the Escalate arm is NOT an error — the
+        // candidate is created and the gate reaches the third state through invert (section
+        // header). The chain rule for the other three classes is the same three-way shape,
+        // through `chain_continuous`.
+        let gap = match &record {
+            ObservationRecord::Envset(fp) => match fp.admit(held.as_deref()) {
+                EnvsetAdmission::Deny { name } => {
+                    return Err(Error::PlaintextSecret { name });
+                }
+                EnvsetAdmission::Escalate { .. } => true,
+                EnvsetAdmission::Allow => false,
+            },
+            _ => !chain_continuous(prev_ref, held.as_deref()),
+        };
+        if let Some(remembered) = self.observation_road.replay(source, observation_id) {
+            return Ok(ObservationIngest {
+                id: remembered.id,
+                replayed: true,
+                gap: remembered.gap,
+                chain_ref: remembered.chain_ref,
+            });
+        }
+        if !self.adapters.contains_key(&observation_substrate()) {
+            self.register_adapter(
+                self.observation_road.clone(),
+                "engine-internal observation road (req/824 A5)",
+            );
+        }
+        let class = record.class();
+        let delta = ObservationDelta {
+            class,
+            source: source.to_string(),
+            observation_id: observation_id.to_string(),
+            scope: scope.clone(),
+            prev_claimed: prev_ref.map(str::to_string),
+            held_at_plan: held,
+            record,
+        };
+        let payload = cbor::encode(&delta).map_err(Error::Canon)?;
+        let intent = Intent::new(
+            observation_substrate(),
+            observation_locator(&scope, source, observation_id),
+            GoalBytes(payload),
+            // 42 §3.2's second row, literally: "the change responds to new evidence -- an
+            // observation arrived and the state follows it".
+            ChangeContext::Evidence,
+            Actor::Process {
+                key: format!("attach-source:{source}"),
+            },
+        );
+        self.submit(&intent, rng_seed, at)?;
+        let id = self.plan(&intent, at)?;
+        let chain_ref = self
+            .table
+            .get(&id)
+            .map(|entry| entry.delta.reference().cid.to_text())
+            .unwrap_or_default();
+        self.observation_road.remember(
+            source,
+            observation_id,
+            RememberedIngest {
+                id,
+                chain_ref: chain_ref.clone(),
+                gap,
+            },
+        );
+        Ok(ObservationIngest {
+            id,
+            replayed: false,
+            gap,
+            chain_ref,
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {

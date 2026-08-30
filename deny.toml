@@ -263,6 +263,28 @@ name = "rand_core"
 version = "=0.6.4"
 
 # ---------------------------------------------------------------------------
+# 2026-08-29, R-909-3 (req/909 §②, req/38 SS874): `sha2`, the fourth duplicate this file has
+# measured to completion (after wasi/phf_shared/rand_core above), found by the same lane that ran
+# `cargo deny check` to a real exit code for the first time on this machine rather than trusting
+# `cargo check`.
+# ---------------------------------------------------------------------------
+#
+# Two versions, on two unrelated chains, neither this workspace's choice:
+#   * `0.10.9` under `gx-adapter-mysql -> mysql v28.0.0 -> mysql_common v0.37.3` -- the MySQL
+#     client crate's own hashing dependency (`mysql_common`'s auth/handshake code), not this
+#     workspace's hash choice (gx hashes with BLAKE3, DR-3, and reaches neither version).
+#   * `0.11.0` under `gx-witness -> ed25519-dalek v3.0.0` -- `ed25519-dalek` 3's SHA-2
+#     dependency for its own signing internals.
+# Skipping the older half (`0.10.9`), same shape as `getrandom`/`hashbrown`/`arrayvec` above:
+# leaves the newer version (`0.11.0`) as the one `multiple-versions = "deny"` still enforces
+# against a *third* duplicate. Closes when `mysql_common` releases against `sha2` 0.11 (its
+# `mysql` v28.0.0 -> `mysql_common` v0.37.3 pin is the thing to watch, not a version bump on our
+# side -- `gx-adapter-mysql`'s own `Cargo.toml` does not pin `sha2` directly).
+[[bans.skip]]
+name = "sha2"
+version = "=0.10.9"
+
+# ---------------------------------------------------------------------------
 # sources -- where a crate may come from
 # ---------------------------------------------------------------------------
 [sources]

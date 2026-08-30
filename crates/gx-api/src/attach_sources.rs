@@ -144,6 +144,14 @@ pub struct Registry {
     replays: BTreeMap<String, Entry>,
 }
 
+impl Registry {
+    /// Whether a source is registered under this id — `req/824` A5's gate: the registry decides
+    /// who may present observations, and an unregistered source cannot.
+    pub(crate) fn holds(&self, id: &str) -> bool {
+        self.sources.iter().any(|row| row.id == id)
+    }
+}
+
 type Answer = Result<Response, ApiError>;
 
 fn ok(status: StatusCode, body: serde_json::Value) -> Answer {

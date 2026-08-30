@@ -50,9 +50,10 @@
 //! ("a transformation whose prediction went wrong never reaches apply, because of a Fingerprint mismatch"), so an adapter that refused here would (sem: SEM-gx-adapter-fs-057)
 //! be turning a state machine transition into an error at a layer that does not own the decision.
 
-use gx_core::{ObjectSnapshot, SubstrateKind};
-use gx_substrate::{Error, PlannedDelta, Result};
+use gx_core::{ObjectSnapshot, ReadEntry, SubstrateKind};
+use gx_substrate::{Error, InvertOutcome, PlannedDelta, Result};
 
+use crate::adapter::{absent_digest, content_digest};
 use crate::delta::{FsDelta, FsOp, MAX_INVERSE_PAYLOAD_BYTES};
 use crate::locator;
 
@@ -83,7 +84,21 @@ use crate::locator;
 /// grammar did not write, [`Error::NotAPosition`] for a payload whose locator is not a position,
 /// [`Error::Unimplemented`] for a sequence v0.1 does not run, and [`Error::Unreadable`] when the
 /// position exists and will not answer.
-pub(crate) fn invert(delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<Option<PlannedDelta>> {
+///
+/// # 🔴 **DEFECT-892-1** (`req/895` §1) — why this answers an [`InvertOutcome`] and not an `Option`
+///
+/// It used to answer `Result<Option<PlannedDelta>>`, and `adapter.rs` folded that into an outcome
+/// with `InvertOutcome::from_option`, which fixed an **empty read-set** on both arms. The engine
+/// carries that list into `InverseEscrowed.reads` and from there into `ReadSet::from_reads`, so
+/// every fs commit produced a signed receipt whose `read_set` was `ReadSet::Nothing` — a member
+/// `gx-witness` documents as answering "was this locator read?" with `Some(false)` **for every
+/// locator in the universe**. `read_if_present` below reads the position. The receipt denied it.
+///
+/// The read entry is therefore built **at the one place in this function where a read has
+/// answered** — the shape `gx-adapter-mcp/src/invert.rs` already used — so that every road out of
+/// here carries it and none of them can forget to. `locator` is the normalised position, which is
+/// the same object `snapshot`, `precondition` and the compare-and-set are quantified over.
+pub(crate) fn invert(delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcome> {
     if delta.substrate() != &SubstrateKind::Fs {
         return Err(Error::ForeignDelta {
             expected: SubstrateKind::Fs,
@@ -105,15 +120,39 @@ pub(crate) fn invert(delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<Optio
         });
     }
 
-    let restore = match read_if_present(&position)? {
-        Some(old) => FsOp::write(position, old),
-        None => FsOp::remove(position),
+    // 🔴 **DEFECT-892-1** — the read, and the entry that attests it, in one place.
+    //
+    // Both arms are reads that answered: bytes, or "there is nothing here". The absent arm digests
+    // through [`absent_digest`], whose collision with an empty file this crate discloses rather than
+    // papering over with an invented marker — the same residue `gx-adapter-git`'s `repo` module and
+    // `gx-adapter-postgres`'s `row` module already carry, and the same one `Fingerprint` is where
+    // it would be closed. The entry is minted before `old` moves into the operation, because the
+    // digest is of what the read answered and not of what is done with it afterwards.
+    let (restore, reads) = match read_if_present(&position)? {
+        Some(old) => {
+            let entry = ReadEntry {
+                digest: content_digest(&old),
+                locator: position.clone(),
+            };
+            (FsOp::write(position, old), vec![entry])
+        }
+        None => {
+            let entry = ReadEntry {
+                digest: absent_digest(),
+                locator: position.clone(),
+            };
+            (FsOp::remove(position), vec![entry])
+        }
     };
     let payload = FsDelta::one(restore).encode()?;
     if payload.len() > MAX_INVERSE_PAYLOAD_BYTES {
-        return Ok(None);
+        // **M4-21**: over the ceiling there is no escrow. 🔴 The read still happened and is still
+        // attested — "gx read your file and then declined to escrow an inverse for it" is a
+        // different fact from "gx never looked", and this arm used to say the second.
+        return Ok(InvertOutcome::none(reads));
     }
-    PlannedDelta::new(SubstrateKind::Fs, payload).map(Some)
+    PlannedDelta::new(SubstrateKind::Fs, payload)
+        .map(|inverse| InvertOutcome::inverted(inverse, reads))
 }
 
 /// The bytes at a position, or `None` when there are none.

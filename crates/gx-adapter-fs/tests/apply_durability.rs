@@ -66,6 +66,18 @@ fn apply_source() -> String {
 /// `fsync` answered the search. That is §30 M4H2-6's rule ("somewhere in the file" is not "written
 /// at that spot") in its fourth costume, and the fifth entry the ledger §31 M4H3-5 opened: an (sem: SEM-gx-adapter-fs-177)
 /// instrument that finds the right token in the wrong scope reports on a claim nobody made.
+///
+/// 🔴 **`req/868` R-868-5 / `req/919` W4 (2026-08-29): the literal token this probe searches for at
+/// the directory-sync position changed from `sync_all()` to `sync_parent_directory(`.** The
+/// un-`cfg`-gated `std::fs::File::open(parent)?.sync_all()` this test used to find directly is the
+/// defect R-868-5 named (native Windows: `File::open` on a directory handle fails, so `apply`
+/// reported failure for a rename that had already landed). The repair extracts the step into a
+/// `#[cfg(unix)]`/`#[cfg(not(unix))]` function so the directory-durability guarantee is `cfg`-gated
+/// and typed (`NameDurability`/`NAME_DURABILITY`, mirroring `gx_engine::NAME_DURABILITY`/G9) rather
+/// than called unconditionally. The **order** this test asserts (temp fsync, then rename, then the
+/// directory-durability step) is unchanged and still the whole of what it means to test; only the
+/// name of the third call moved from an inline `sync_all()` to a named, cfg-gated call that performs
+/// `sync_all()` internally on unix.
 #[test]
 fn the_write_syncs_the_temporary_file_then_renames_then_syncs_the_directory() {
     let src = apply_source();
@@ -89,9 +101,12 @@ fn the_write_syncs_the_temporary_file_then_renames_then_syncs_the_directory() {
         .find("fs::rename(")
         .expect("the change lands by rename (M4-13, adopted (a))"); // (sem: SEM-gx-adapter-fs-178)
     let dir_sync = code[rename..]
-        .find("sync_all()")
+        .find("sync_parent_directory(")
         .map(|at| at + rename)
-        .expect("the containing directory is fsynced by the write path itself (LWN step 5)");
+        .expect(
+            "the containing directory's durability is handled by the write path itself (LWN step \
+             5, R-868-5 cfg-gated form)",
+        );
 
     println!("APPLY_STEPS temp_fsync@{temp_sync} rename@{rename} dir_fsync@{dir_sync}");
     assert!(

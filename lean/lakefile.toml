@@ -1,0 +1,15 @@
+name = "GxSpec"
+version = "0.1.0"
+defaultTargets = ["GxSpec"]
+
+[[lean_lib]]
+name = "GxSpec"
+
+# M8-c (`req/142` §1 M8-c item 2): the differential-test runner. A `lean_exe`, not part of the
+# `GxSpec` library, because it performs `IO` (reads `conformance/*.jsonl`, writes
+# `conformance/divergences/*.md`) -- the library stays exactly what AC-061's gate measures
+# (`lake build` + the proof-placeholder grep + import reachability), unaffected by the runner's
+# existence.
+[[lean_exe]]
+name = "runner"
+root = "GxSpec.Runner"

@@ -48,7 +48,7 @@ fn grow_ledger(layout: &gx_cli::layout::Layout, base: u64, to_size: u64) {
     let path = layout.ledger_path();
     std::fs::create_dir_all(path.parent().expect("has a parent")).expect("create ledger dir");
     let mut store = LedgerStore::open(&path).expect("open the ledger");
-    let mut at = store.log().len() as u64;
+    let mut at = store.log().len();
     while at < to_size {
         let (tid, cid) = leaf(base, at);
         store

@@ -19,6 +19,23 @@ export type { GxCode, ProblemDetail } from "./errors.js";
 export { verifyReceiptOffline } from "./verify.js";
 export type { OfflineVerifyResult, OfflineVerifyChecks, InclusionCheck } from "./verify.js";
 
+export {
+  readGxObject,
+  readGxObjectFile,
+  writeGxObject,
+  GxRefusalError,
+  GX_KIND_REGISTRY,
+  gxKindCode,
+  gxKindFromCode,
+  isShipped as isGxKindShipped,
+  MAGIC as GX_MAGIC,
+  FORMAT_VERSION as GX_FORMAT_VERSION,
+  HEADER_LEN as GX_HEADER_LEN,
+  DEFAULT_MAX_BODY_BYTES as GX_DEFAULT_MAX_BODY_BYTES,
+  RECEIPT_PAYLOAD_TYPE as GX_RECEIPT_PAYLOAD_TYPE,
+} from "./gxfile.js";
+export type { GxObjectFile, GxKind, GxRefusalReason } from "./gxfile.js";
+
 export type {
   Cid,
   TransformationId,
@@ -65,4 +82,9 @@ export type {
   CandidateRow,
   EscalationRow,
   TransformationRow,
+  // `req/841` P1-2 -- the attach-source registry surface (`req/824` A4's three live routes).
+  AttachSourceDeclaredCoverage,
+  AttachSourceRegisterRequest,
+  AttachSourceView,
+  AttachSourcePage,
 } from "./types.js";

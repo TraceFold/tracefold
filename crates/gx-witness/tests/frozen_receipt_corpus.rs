@@ -31,14 +31,30 @@
 //!
 //! ## Why, measured
 //!
-//! Eleven payload members (`0xab`, a CBOR map of eleven). Five members the current `ReceiptPayload`
+//! Eleven payload members (`0xab`, a CBOR map of eleven). Eight members the current `ReceiptPayload`
 //! names are absent, in two families:
+//!
+//! 🔴 **`req/901` (2026-08-26): the number in the sentence above was `Five` and is now `Six`.**
+//! Nothing about this document changed — the *current* payload gained a member and the difference
+//! was never recounted. `tools/receipt_generation_gate.mjs` now derives both halves (17 named here,
+//! 11 carried there, read from byte 0 of the specimen's DSSE payload) and refuses a stale one, so
+//! this sentence cannot drift again without a red run. The table below lists five rows and is left
+//! as it stands: which member the sixth is, and whether it belongs in a third family, is a reading
+//! of this corpus that lane did not take (it holds no `cargo`).
+//!
+//! 🔴 **`req/919` W5 (2026-08-29): `Six` is now `Seven` — the sixth is `payload_version`, and this
+//! lane names it because it is the one that caused the move.** F7 (`req/868` R-868-6) landed:
+//! `Option<u32>` with `#[serde(default)]`, so its absence here is `None` -- "this document predates
+//! the field", exactly the family `reversibility`/`verdict_digest`/`read_set` are already in. Which
+//! member the *original* sixth was (added between the two `req/901` counts) remains unidentified;
+//! this lane's cargo access answers only for the member it itself added.
 //!
 //! | absent member | how it was added | this document |
 //! |---|---|---|
 //! | `reversibility` (DR-46-26) | `Option`, written as an explicit null | decodes |
 //! | `verdict_digest` (DR-46-31) | `Option` | decodes |
 //! | `read_set` (DR-46-34) | `Option`, four spellings of absence | decodes |
+//! | `payload_version` (F7, `req/868` R-868-6) | `Option`, `#[serde(default)]` | decodes |
 //! | `fingerprint_scope` (P2, `req/350` §7-4) | **required**, no `serde` default | **refuses** |
 //! | `determinism_boundary` (DR-46-28) | **required**, no `serde` default | **refuses** |
 //!
@@ -175,12 +191,21 @@ fn the_2026_08_specimen_still_does_not_decode_and_limits_says_so() {
 /// measurement stops here.
 ///
 /// The name is now what the body does, and it is a claim worth having on its own: the gap is not
-/// only the two required members. `read_set`, `reversibility` and `verdict_digest` are absent too —
-/// they decode, because they were added as `Option`, which is the same-shaped change made
-/// correctly — so this is the evidence that the specimen predates all five and that nobody has
-/// edited it since. The re-encoding question moved to `crates/gx-cli/tests/r39_frozen_receipt_verdict.rs`,
-/// which attempts it, records that this build cannot perform it, and measures the size the limit
-/// does have: eleven members carried against fifteen named.
+/// only the two required members. `read_set`, `reversibility`, `verdict_digest` and (`req/919` W5,
+/// 2026-08-29) `payload_version` are absent too — they decode, because they were added as `Option`,
+/// which is the same-shaped change made correctly — so this is the evidence that the specimen
+/// predates all six and that nobody has edited it since. The re-encoding question moved to
+/// `crates/gx-cli/tests/r39_frozen_receipt_verdict.rs`, which attempts it, records that this build
+/// cannot perform it, and measures the size the limit does have: eleven members carried against
+/// eighteen named.
+///
+/// 🔴 **`req/901` (2026-08-26): "fifteen" here was stale and is now "seventeen".** Counted
+/// mechanically from `crates/gx-witness/src/receipt.rs` by `tools/receipt_generation_gate.mjs`,
+/// which fails the run rather than letting the sentence rot. 🔴 **`req/919` W5 (2026-08-29):
+/// "seventeen" is now "eighteen"** for the same reason, one member later. The test function's own
+/// name still says `five_members` — a test name is a historical record and is not renamed
+/// (`INHERITED_PRINCIPLES` §3d); what it measures is the absence of the members added after the
+/// specimen, and that set is now six.
 #[test]
 fn the_frozen_bytes_carry_none_of_the_five_members_added_after_them() {
     let receipt = specimen();

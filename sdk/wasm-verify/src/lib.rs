@@ -202,7 +202,7 @@ fn authenticate(
             let key = PublicKey::from_bytes(id.to_string(), &bytes)
                 .map_err(|e| format!("checkpoint_key: checkpoint_public_key_base64: {e}"))?;
             gx_witness::dsse::verify_checkpoint(head, &key.verifying()).map_err(|e| {
-                format!("checkpoint_key: the checkpoint did not verify under it: {e}")
+                format!("{}: {e}", gx_witness::dsse::CHECKPOINT_REFUSAL_PREFIX)
             })?;
             Ok(true)
         }
@@ -292,6 +292,12 @@ mod tests {
             fail_posture_engaged: false,
             precondition_fingerprint: FingerprintBytes([1u8; 32]),
             postcondition_fingerprint: None,
+            // F7 / R-868-6 (`req/919` W5): a fixture built by this crate's own current code
+            // carries the current version, same as any receipt this build issues.
+            payload_version: Some(gx_witness::CURRENT_PAYLOAD_VERSION),
+            // A2 (`req/919` W8): a fixture built by this crate's own current code names an
+            // engine the same way a receipt this build issues does.
+            engine_version: Some("gx-engine 0.1.0".to_string()),
         };
         let receipt = Receipt::issue(&payload, Timestamp(0), &key).expect("a legal payload signs");
         (receipt, key)
@@ -518,6 +524,12 @@ mod tests {
             fail_posture_engaged: false,
             precondition_fingerprint: FingerprintBytes([7u8; 32]),
             postcondition_fingerprint: Some(FingerprintBytes([8u8; 32])),
+            // F7 / R-868-6 (`req/919` W5): a fixture built by this crate's own current code
+            // carries the current version, same as any receipt this build issues.
+            payload_version: Some(gx_witness::CURRENT_PAYLOAD_VERSION),
+            // A2 (`req/919` W8): a fixture built by this crate's own current code names an
+            // engine the same way a receipt this build issues does.
+            engine_version: Some("gx-engine 0.1.0".to_string()),
         }
     }
 

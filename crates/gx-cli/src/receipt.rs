@@ -743,6 +743,12 @@ pub fn authenticate_anchor(anchor: &Checkpoint, key: &PublicKey) -> Result<()> {
 /// offered for it is the **verification** failing, not the binary. The object says which half
 /// refused, because "valid: false" (sem: SEM-gx-cli-325) alone would read as a bad receipt when the receipt was never
 /// reached.
+///
+/// 🔴 The `refusal` string is prefixed with [`gx_witness::dsse::CHECKPOINT_REFUSAL_PREFIX`] rather
+/// than a CLI-local sentence — `web_verify/src/verdict.js::CHECKPOINT_REFUTED` matches on that exact
+/// spelling, and a paraphrase here previously fell through to the classifier's default `hold` instead
+/// of `deny` (B1 / DIV-901-1, `req/914` §7, `req/874` R3: a checkpoint refusing its own signature
+/// check is one of R3's four `deny` triggers).
 #[must_use]
 pub fn anchor_refused(anchor_source: &'static str, refusal: &str) -> Outcome {
     Outcome::refused(
@@ -756,7 +762,7 @@ pub fn anchor_refused(anchor_source: &'static str, refusal: &str) -> Outcome {
             },
             "anchor": anchor_source,
             "anchor_authenticated": false,
-            "refusal": format!("the checkpoint did not verify under --checkpoint-key: {refusal}"),
+            "refusal": format!("{}: {refusal}", gx_witness::dsse::CHECKPOINT_REFUSAL_PREFIX),
         }),
         VERIFY_FAILED,
     )

@@ -295,9 +295,23 @@ fn ac6_bytes_with_no_confinement_key_still_decode() {
         "absent bytes read as an absent answer, not as `kernel_confined: false` — which would be a \
          claim about a process nobody observed"
     );
+    // 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)**: `PreErratumPayload` was already
+    // missing `catalogue_hash` (silently correct only because the fixture's value happens to be
+    // `None` too) and is now also missing `payload_version` (not silently correct: this build's
+    // fixtures always carry `Some(CURRENT_PAYLOAD_VERSION)`). This test isolates `confinement`'s
+    // addition specifically, not every later erratum's -- so both later fields are patched back
+    // from `now`, the same way `confinement` itself is, rather than added to the shadow struct
+    // (which would defeat the point: `payload_version` genuinely did not exist in this shape's era).
     assert_eq!(
         ReceiptPayload {
             confinement: now.confinement.clone(),
+            catalogue_hash: now.catalogue_hash.clone(),
+            payload_version: now.payload_version,
+            // 🔴 **A2 (`req/910`, `req/919` W8, 2026-08-30)**: the third later erratum this shadow
+            // predates, patched back for the same reason -- one field's addition is what this test
+            // isolates, and every later one that is genuinely absent from the shadow's era belongs
+            // on this list rather than in the struct above.
+            engine_version: now.engine_version.clone(),
             ..decoded
         },
         now,

@@ -51,6 +51,7 @@ pub mod gx_code;
 pub mod handlers;
 pub mod idempotency;
 pub mod list;
+pub mod observations;
 // 🔴 **R16 / `req/262` H-01** — this crate's one road to a standard stream. The window of the
 // census is the **binary**, and this crate is inside `gx`; see [`notes`] for why the road is per
 // crate and where the denominator is written down.
@@ -594,6 +595,13 @@ pub fn router(state: AppState) -> axum::Router {
             post(attach_sources::register).get(attach_sources::list),
         )
         .route("/attach-sources/{id}", get(attach_sources::get))
+        // 🔴 **`req/824` A5** (R2): the observation ingest road. Inside `guarded` for A4's
+        // reason; the returned candidate is an ordinary candidate, so every route above already
+        // answers about it (R-1: one road, not a second pipeline).
+        .route(
+            "/attach-sources/{id}/observations",
+            post(observations::ingest),
+        )
         // 🔴 **H-11 ①** (`req/189`): a known path asked with a method it has no handler for was
         // axum's bare `405` with an empty body — the fourth response writer outside 44 §2.3.
         // Named here, on the router that owns the routes, and answered in problem+json.

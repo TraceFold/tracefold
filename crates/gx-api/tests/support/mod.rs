@@ -233,6 +233,34 @@ impl Server {
         Self::build_in(project, target, policies, None)
     }
 
+    /// 🔴 A server whose policy set also permits the **observation substrate** (`req/824` A5).
+    ///
+    /// Cedar is default-deny and every shipped pack scopes its permit to its own substrate, so a
+    /// `custom:observation` transformation evaluated against the fs pack alone reaches Cedar's
+    /// third rule (nothing satisfied → Deny). No shipped pack carries this permit — the default
+    /// policy set and the default adapter registry are decided **as a pair** (`req/38` §60), and
+    /// A5 does not decide that pair — so the deployment composes its own statement, and this
+    /// fixture is that deployment. The composition road is `shipped_pack_set`'s own
+    /// (concatenate sources, one parse).
+    pub fn observing(name: &str) -> Self {
+        let root = scratch(name);
+        let project = root.join("project");
+        std::fs::create_dir_all(&project).expect("create the project");
+        let target = root.join("target.txt");
+        std::fs::write(&target, "before").expect("write the target");
+        let composed = format!(
+            "{}\n{}\n",
+            gx_gate::packs::FS_PACK_SOURCE,
+            "// req/824 A5's deployment-composed permit (see Server::observing).\n\
+             @id(\"observation-permit-default\")\n\
+             permit (\n    principal,\n    action,\n    resource\n)\n\
+             when { resource.substrate == \"custom:observation\" };"
+        );
+        let policies =
+            gx_gate::PolicyEngine::parse(&composed).expect("the composed observation set parses");
+        Self::build_in(project, target, policies, None)
+    }
+
     fn build_in(
         project: PathBuf,
         target: PathBuf,

@@ -45,6 +45,9 @@ import {
   VerifyOutcome,
   VerifyRequest,
   IssueVerdictCheckpointRequest,
+  AttachSourcePage,
+  AttachSourceRegisterRequest,
+  AttachSourceView,
 } from "./types.js";
 import { GxApiError, GxTransportError, ProblemDetail } from "./errors.js";
 
@@ -89,6 +92,13 @@ export const EXTENSION_METHODS = [
   "listCandidates",
   "listEscalations",
   "listTransformations",
+  // `req/841` P1-2: the attach-source registry (`req/824` A4) -- three live routes
+  // (`crates/gx-api/src/attach_sources.rs::ATTACH_SOURCE_ENDPOINTS`), 44 §2.6 extensions the same
+  // way the list family is; measured absent from this roster on 2026-08-26 while the routes were
+  // already guarded and serving, which is exactly the drift this named roster exists to make red.
+  "registerAttachSource",
+  "listAttachSources",
+  "getAttachSource",
   "raw",
 ] as const;
 
@@ -269,6 +279,38 @@ export class GxClient {
   // -- 15. GET /verdict-checkpoints/{window_end} --------------------------------------------
   async getVerdictCheckpoint(windowEnd: number): Promise<VerdictCheckpoint> {
     return this.request<VerdictCheckpoint>("GET", `/verdict-checkpoints/${windowEnd}`);
+  }
+
+  /** `POST /attach-sources` (44 §2.6 extension; `req/812` §3-R1, landed as `req/824` A4) --
+   * register an external executor (Vercel / GitHub Actions / generic CI) whose *reports* the
+   * pipeline will admit as observations. SS273: registering a source never grants Glovrex any
+   * write toward it; the returned row's `coverage_verified` is `false` and its `limits` are
+   * non-empty by construction. Retrying with the same `idempotencyKey` replays the SAME
+   * registration (w824-attach_source-00003), never a second source. */
+  async registerAttachSource(
+    body: AttachSourceRegisterRequest,
+    idempotencyKey?: string,
+  ): Promise<AttachSourceView> {
+    return this.request<AttachSourceView>("POST", "/attach-sources", body, idempotencyKey);
+  }
+
+  /** `GET /attach-sources` (44 §2.6 extension, `req/824` A4) -- the registry as a zero-inclusive
+   * census: an empty registry answers `total: 0` explicitly (F-B), and the number is never a
+   * billing input (F4/F6). Cursor is the numeric chain-index kind, as `listVerdictCheckpoints`. */
+  async listAttachSources(limit?: number, cursor?: number): Promise<AttachSourcePage> {
+    const q = new URLSearchParams();
+    if (limit !== undefined) q.set("limit", String(limit));
+    if (cursor !== undefined) q.set("cursor", String(cursor));
+    const qs = q.toString();
+    return this.request<AttachSourcePage>("GET", `/attach-sources${qs ? `?${qs}` : ""}`);
+  }
+
+  /** `GET /attach-sources/{id}` (44 §2.6 extension, `req/824` A4) -- inspect one registration. An
+   * id the registry never held is `404 SOURCE_UNKNOWN` -- deliberately a different word from
+   * `NOT_FOUND`, so "your source is unregistered" and "that deploy does not exist" are never the
+   * same sentence (44 §2.3 v0.5-s). */
+  async getAttachSource(id: string): Promise<AttachSourceView> {
+    return this.request<AttachSourceView>("GET", `/attach-sources/${encodeURIComponent(id)}`);
   }
 
   // -- 16. GET /stream -----------------------------------------------------------------------

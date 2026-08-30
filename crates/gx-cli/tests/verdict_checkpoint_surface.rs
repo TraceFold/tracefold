@@ -369,7 +369,11 @@ fn the_json_flag_does_not_soften_the_tamper_exit() {
         .arg("--key")
         .arg(&pub_path)
         .arg("--json"));
-    println!("JSON_TAMPERED code={} {}", refused.code, refused.stdout.trim());
+    println!(
+        "JSON_TAMPERED code={} {}",
+        refused.code,
+        refused.stdout.trim()
+    );
     assert_eq!(
         refused.code, 7,
         "the `--json` flag must not soften 44 §1.2's 7: {}",

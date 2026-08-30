@@ -48,7 +48,9 @@ const SUBJECT: &str = "/srv/world";
 // The fixture: an fs-shaped adapter that also declares an input-generation stage
 // ---------------------------------------------------------------------------
 
-/// The fs/git/postgres shape (`InvertOutcome::from_option` fixes `Vec::new()`), plus the optional
+/// A read-free shape (🔴 **DEFECT-892-1**, `req/895` §1: this used to say "the fs/git/postgres
+/// shape (`InvertOutcome::from_option` fixes `Vec::new()`)" — those adapters do read, and
+/// `from_option` is gone; this fixture holds its world in memory and reads no substrate), plus the optional
 /// `InputStageDeclaration` DR-46-33 wires. `declared` is the deployment's own statement, held so
 /// the test can register a `deterministic_replay` deployment and an `unknown` one apart.
 #[derive(Clone, Debug)]

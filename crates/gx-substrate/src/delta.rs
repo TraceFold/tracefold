@@ -56,6 +56,38 @@ pub struct PlannedDelta {
     substrate: SubstrateKind,
     payload: Vec<u8>,
     reference: DeltaRef,
+    /// 🔴 The prophecy seat (**M5H2-2, adopted (b)**; `req/919` A1).
+    ///
+    /// The post-state digest this plan promises, when the adapter can work one out from the
+    /// `{intent, pre}` it was handed — `None` for every adapter that cannot, which is all of them
+    /// on the day this field arrives. 41 §3 has declared `Transformation.target` ("the expected
+    /// post-state digest, fixed by `plan()`") since M1 and nothing has ever filled it: 41 §4's
+    /// seven methods return no predicted post-state, so `Engine::plan` fixed `target = None` and
+    /// said so in its own doc. This is where the value comes from now.
+    ///
+    /// **Why here and not an eighth trait method.** N-07/N-08/N-09 fix `SubstrateAdapter` at
+    /// seven, and §34 M4H6-4 reserved the refusal by name for this milestone ("if M5 wants state
+    /// in the signature, cite this § and refuse"). M4-05 and M4-07 were both refused the same way
+    /// and both landed as a wider return instead, as did E-DR4626-1's `InvertOutcome`. This is
+    /// that shape a third time: the method count does not move, `plan`'s signature does not move,
+    /// and the fifty-four existing `PlannedDelta::new` call sites read exactly as before.
+    ///
+    /// **It is outside the projection, and that is the ruling rather than an oversight.** 42 §1.3
+    /// row 4 now excludes two fields. `reference` is excluded for self-reference; this one is
+    /// excluded because a delta *is* the change it describes — two deltas with the same
+    /// `{substrate, payload}` are the same delta whatever either one predicts about the result —
+    /// and because 43 T-2 already binds the prophecy into identity one level up, where the
+    /// `TransformationId` is "the CID of the canonical form, **including delta/target**". Putting
+    /// it in both places would hash the same claim twice; putting it only here would move every
+    /// existing delta's CID for a field they all leave empty.
+    ///
+    /// **What that costs, stated rather than argued away.** `BlobStore::put` stores
+    /// `identity_view()` bytes, so a delta read back out of the blob store has `None` here even if
+    /// the adapter promised something. The engine does not read the promise back from a blob: it
+    /// copies it into `Transformation.target` at T-2, and a re-plan re-derives it from the same
+    /// `{intent, pre}` (43 T-2's idempotency column). A promise that did not survive that road
+    /// would change the `TransformationId`, which is the check rather than the loss.
+    promised_target: Option<Cid>,
 }
 
 /// The payload as it reaches the digest: a byte string, not a sequence of integers.
@@ -143,6 +175,10 @@ impl PlannedDelta {
                 substrate: substrate.clone(),
                 cid: Cid([0u8; 32]),
             },
+            // The seat starts empty and stays empty unless an adapter fills it through
+            // [`PlannedDelta::with_promised_target`]. `new`'s signature does not move, which is
+            // what keeps every existing call site reading as it did (M5H2-2, adopted (b)).
+            promised_target: None,
         };
         let cid = cid::compute(&delta).map_err(|e| Error::NotDigestible {
             detail: e.to_string(),
@@ -167,6 +203,32 @@ impl PlannedDelta {
     #[must_use]
     pub fn reference(&self) -> &DeltaRef {
         &self.reference
+    }
+
+    /// The same delta, carrying the post-state digest this plan promises (the prophecy seat
+    /// above). A builder rather than a third `new` argument, so that the fifty-four existing
+    /// constructor calls and the six shipped adapters read exactly as before (additive;
+    /// **M5H2-2, adopted (b)**, `req/919` A1 — the same shape `AppliedDelta::with_observation`
+    /// took for `req/38` §98 ruling 1).
+    ///
+    /// The reference is **not** re-minted, and it must not be: 42 §1.3 keeps this field out of the
+    /// projection, so the CID the constructor computed is still the CID of this value. Calling
+    /// this after `new` therefore cannot make `reference` name something the delta no longer is.
+    #[must_use]
+    pub fn with_promised_target(mut self, target: Cid) -> Self {
+        self.promised_target = Some(target);
+        self
+    }
+
+    /// What the plan promises the post-state digest will be, where the adapter worked one out.
+    ///
+    /// `None` is "this adapter makes no prediction" and is not a failure — it is what every
+    /// adapter in this workspace answers today, and it is the value that keeps `Engine::plan`'s
+    /// `target` at the `None` 41 §3 has always allowed. L5 (`gx-substrate-conformance`) is the
+    /// harness-side reading of the same question and answers `NotSupplied` for the same case.
+    #[must_use]
+    pub fn promised_target(&self) -> Option<Cid> {
+        self.promised_target
     }
 }
 

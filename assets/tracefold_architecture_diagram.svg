@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280" width="100%" height="100%">
+  <defs>
+    <linearGradient id="nodeBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1916"/>
+      <stop offset="100%" stop-color="#12100e"/>
+    </linearGradient>
+    <linearGradient id="gateBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d2215"/>
+      <stop offset="100%" stop-color="#1a140d"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#c9b998"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#e63946"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="280" rx="10" fill="#0b0a09" stroke="#26231f" stroke-width="1.5"/>
+
+  <!-- Title -->
+  <text x="35" y="32" fill="#c9b998" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">TRACEFOLD PRE-ACTION REVERSIBILITY PIPELINE</text>
+
+  <!-- Node 1: AI Agent Action -->
+  <g transform="translate(35, 70)">
+    <rect width="180" height="150" rx="8" fill="url(#nodeBg)" stroke="#332e27" stroke-width="1.5"/>
+    <rect x="15" y="15" width="28" height="28" rx="4" fill="#26231f"/>
+    <text x="29" y="34" fill="#c9b998" font-family="ui-monospace, monospace" font-size="14" font-weight="700" text-anchor="middle">01</text>
+    <text x="15" y="68" fill="#ece7da" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700">Autonomous Action</text>
+    <text x="15" y="92" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" line-height="1.4">AI Agent requests destructive change (file, DB, system state)</text>
+    <rect x="15" y="118" width="150" height="18" rx="3" fill="#141210"/>
+    <text x="22" y="131" fill="#c9b998" font-family="ui-monospace, monospace" font-size="10">Target State S(t)</text>
+  </g>
+
+  <!-- Line 1 -> 2 -->
+  <line x1="215" y1="145" x2="255" y2="145" stroke="#c9b998" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Node 2: Deterministic Gate -->
+  <g transform="translate(265, 55)">
+    <rect width="210" height="180" rx="8" fill="url(#gateBg)" stroke="#c9b998" stroke-width="1.5"/>
+    <rect x="15" y="15" width="28" height="28" rx="4" fill="#3a3128"/>
+    <text x="29" y="34" fill="#ece7da" font-family="ui-monospace, monospace" font-size="14" font-weight="700" text-anchor="middle">02</text>
+    <text x="15" y="68" fill="#ece7da" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="800">Deterministic Gate</text>
+    <text x="15" y="90" fill="#c9b998" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600">Can inverse S⁻¹ be built?</text>
+    
+    <!-- Path A: YES -->
+    <rect x="15" y="110" width="180" height="24" rx="4" fill="#1a2e1f" stroke="#2d6a4f" stroke-width="1"/>
+    <text x="25" y="126" fill="#74c69d" font-family="ui-monospace, monospace" font-size="11" font-weight="700">✓ YES: Inverse Sealed</text>
+
+    <!-- Path B: NO -->
+    <rect x="15" y="142" width="180" height="24" rx="4" fill="#2d1515" stroke="#6a2d2d" stroke-width="1"/>
+    <text x="25" y="158" fill="#e57373" font-family="ui-monospace, monospace" font-size="11" font-weight="700">✕ NO: Halt &amp; Escalate</text>
+  </g>
+
+  <!-- Line 2 -> 3 (Pass) -->
+  <line x1="475" y1="122" x2="515" y2="122" stroke="#52b788" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Node 3: Execution & Receipt -->
+  <g transform="translate(525, 70)">
+    <rect width="160" height="150" rx="8" fill="url(#nodeBg)" stroke="#332e27" stroke-width="1.5"/>
+    <rect x="15" y="15" width="28" height="28" rx="4" fill="#26231f"/>
+    <text x="29" y="34" fill="#c9b998" font-family="ui-monospace, monospace" font-size="14" font-weight="700" text-anchor="middle">03</text>
+    <text x="15" y="68" fill="#ece7da" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700">Action Lands</text>
+    <text x="15" y="92" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">Inverse held in hand; tamper-evident receipt emitted</text>
+    <rect x="15" y="118" width="130" height="18" rx="3" fill="#141210"/>
+    <text x="22" y="131" fill="#52b788" font-family="ui-monospace, monospace" font-size="10">Receipt Issued</text>
+  </g>
+
+  <!-- Line 3 -> 4 -->
+  <line x1="685" y1="145" x2="715" y2="145" stroke="#c9b998" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Node 4: Third-Party Offline Verifier -->
+  <g transform="translate(725, 70)">
+    <rect width="140" height="150" rx="8" fill="url(#nodeBg)" stroke="#332e27" stroke-width="1.5"/>
+    <rect x="15" y="15" width="28" height="28" rx="4" fill="#26231f"/>
+    <text x="29" y="34" fill="#c9b998" font-family="ui-monospace, monospace" font-size="14" font-weight="700" text-anchor="middle">04</text>
+    <text x="15" y="68" fill="#ece7da" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700">Offline Verify</text>
+    <text x="15" y="92" fill="#8c8275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11">WASM in tab or CLI</text>
+    <rect x="15" y="118" width="110" height="18" rx="3" fill="#141210"/>
+    <text x="22" y="131" fill="#c9b998" font-family="ui-monospace, monospace" font-size="10">0 Network Trust</text>
+  </g>
+</svg>

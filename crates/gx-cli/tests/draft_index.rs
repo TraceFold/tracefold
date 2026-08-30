@@ -162,6 +162,12 @@ fn the_draft_filename_is_derived_from_the_id_and_is_portable() {
 // ---------------------------------------------------------------------------
 
 /// The cache round-trips and the later learning wins, which is the engine's rule (Λ3(ii)).
+///
+/// 🔴 **Still true after `req/919` W7 (RESIDUAL-895-B1), and not edited** — but read the last
+/// assertion with its module's new paragraph in hand: `len()` counts **intents**, and one intent
+/// with a two-transformation branch is still one entry. What changed is that the branch is now
+/// *kept* rather than evicted; `get()` answering the later one is the part W7 deliberately left
+/// alone. `crates/gx-cli/tests/r919_index_branch_cache.rs` is where the branch itself is asserted.
 #[test]
 fn the_resolution_cache_round_trips_and_the_later_learning_wins() {
     let project = scratch("index_roundtrip");

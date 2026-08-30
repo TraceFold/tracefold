@@ -127,6 +127,12 @@ pub fn verdict_payload(kind: VerdictKind, key: &KeyPair, seed: u64) -> ReceiptPa
         fail_posture_engaged: true,
         precondition_fingerprint: fingerprint(7),
         postcondition_fingerprint: None,
+        // F7 / R-868-6 (`req/919` W5): fixtures built by this crate's own current code carry the
+        // current version, same as any receipt this build issues.
+        payload_version: Some(gx_witness::CURRENT_PAYLOAD_VERSION),
+        // A2 (`req/919` W8): a fixture built by this crate's own current code names an
+        // engine the same way a receipt this build issues does.
+        engine_version: Some("gx-engine 0.1.0".to_string()),
     }
 }
 
@@ -169,6 +175,12 @@ pub fn commit_payload(key: &KeyPair, seed: u64, inclusion: InclusionProof) -> Re
         fail_posture_engaged: false,
         precondition_fingerprint: fingerprint(11),
         postcondition_fingerprint: Some(fingerprint(12)),
+        // F7 / R-868-6 (`req/919` W5): fixtures built by this crate's own current code carry the
+        // current version, same as any receipt this build issues.
+        payload_version: Some(gx_witness::CURRENT_PAYLOAD_VERSION),
+        // A2 (`req/919` W8): a fixture built by this crate's own current code names an
+        // engine the same way a receipt this build issues does.
+        engine_version: Some("gx-engine 0.1.0".to_string()),
     }
 }
 

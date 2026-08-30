@@ -38,8 +38,8 @@
 //! this adapter declares no escrow ceiling — and the `Ok(None)` of 51 §7 contract 5 has a different
 //! instance instead.
 
-use gx_core::{ObjectSnapshot, SubstrateKind};
-use gx_substrate::{Error, PlannedDelta, Result};
+use gx_core::{ObjectSnapshot, ReadEntry, SubstrateKind};
+use gx_substrate::{Error, InvertOutcome, PlannedDelta, Result};
 
 use crate::delta::{GitDelta, GitOp};
 use crate::locator;
@@ -71,7 +71,23 @@ use crate::repo;
 /// [`Error::PayloadUnreadable`] for bytes this grammar did not write, [`Error::Unimplemented`] for a
 /// sequence v0.1 does not run, [`Error::NotAPosition`] for a payload whose locator is not a position,
 /// and [`Error::Unreadable`] when the repository will not answer.
-pub(crate) fn invert(delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<Option<PlannedDelta>> {
+///
+/// # 🔴 **DEFECT-892-1** (`req/895` §1) — the read this escrow performs, and the object it is about
+///
+/// This used to answer `Result<Option<PlannedDelta>>` and `adapter.rs` folded it through
+/// `InvertOutcome::from_option`, which fixed an empty read-set on the stated grounds that this
+/// adapter has "no read that could fail separately from the call itself". [`repo::tip`] below is
+/// that read, and its own failure road is an [`Error::Unreadable`] naming the branch. The empty
+/// list travelled into signed receipts as `ReadSet::Nothing`, which `gx-witness` documents as
+/// deciding "was this read?" with `Some(false)` for **every** locator.
+///
+/// The entry names [`crate::locator::Position::scope`] — the **branch** — and not the full locator,
+/// because the branch is what was read: `tip` resolves `position.reference()`, and the read's own
+/// `Unreadable` names the scope for the same reason. The path inside the tree is not touched on this
+/// road at all, so attesting the entry's locator would put an object in the signed bytes that this
+/// escrow did not read. That is DR-46-15's rule, applied to a substrate whose scope and object are
+/// different strings.
+pub(crate) fn invert(delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcome> {
     if delta.substrate() != &SubstrateKind::Git {
         return Err(Error::ForeignDelta {
             expected: SubstrateKind::Git,
@@ -94,12 +110,24 @@ pub(crate) fn invert(delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<Optio
     }
 
     let repository = repo::open(&position)?;
-    let Some(tip) = repo::tip(&repository, &position)? else {
-        // The unborn branch, and the whole of this adapter's `Ok(None)`.
-        return Ok(None);
+    let answered = repo::tip(&repository, &position)?;
+    // 🔴 **DEFECT-892-1** — built here, at the one place in this function where the read has
+    // answered, so that both roads below carry it. An unborn branch is an answer too, and its
+    // digest is [`repo::absent_digest`], whose collision with an empty value is disclosed there.
+    let reads = vec![ReadEntry {
+        digest: match answered {
+            Some(tip) => repo::content_digest(repo::object_text(tip).as_bytes()),
+            None => repo::absent_digest(),
+        },
+        locator: position.scope(),
+    }];
+    let Some(tip) = answered else {
+        // The unborn branch, and the whole of this adapter's "no inverse".
+        return Ok(InvertOutcome::none(reads));
     };
 
     let restore = GitOp::reset(position.locator(), repo::object_text(tip));
     let payload = GitDelta::one(restore).encode()?;
-    PlannedDelta::new(SubstrateKind::Git, payload).map(Some)
+    PlannedDelta::new(SubstrateKind::Git, payload)
+        .map(|inverse| InvertOutcome::inverted(inverse, reads))
 }

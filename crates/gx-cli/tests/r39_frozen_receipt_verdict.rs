@@ -31,7 +31,19 @@
 //! → canonical-encode → compare lengths`, and step one does not exist: the document does not
 //! decode, which is the limit itself. There is no build in the tree that produced 25 and no build
 //! this lane can reach that would. So the number came off the page and what replaced it is what
-//! this file measures: the specimen carries eleven members and this build's payload names fifteen.
+//! this file measures: the specimen carries eleven members and this build's payload names nineteen.
+//!
+//! 🔴 **`req/901` (2026-08-26): "fifteen" was stale — the count is seventeen, and it had been wrong
+//! since `confinement` and `catalogue_hash` landed.** The reason it went stale silently is worth
+//! keeping: this file's dynamic check asserts `named > carried`, which stays green at any number
+//! above eleven, so the sentence and the assertion could disagree for as long as they liked. The
+//! assertion is **not** changed here — that needs `cargo`, held by another lane — but
+//! `tools/receipt_generation_gate.mjs` now counts the struct and fails on a stale statement of the
+//! count, from outside the test suite. `req/901` §5 item 2 carries the equality repair.
+//!
+//! 🔴 **`req/919` W5 (2026-08-29): seventeen to eighteen — `payload_version` (F7, `req/868`
+//! R-868-6) landed.** Same discipline: the sentence above is edited to the live count, this
+//! paragraph is the additive record of the move.
 //!
 //! # The specimen is not copied here
 //!

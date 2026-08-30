@@ -145,21 +145,37 @@ impl InvertOutcome {
         }
     }
 
-    /// 🔴 The derivation for an adapter that has no third value to report.
-    ///
-    /// `Reversibility::Unknown` is the answer to "a **declared** read did not answer", and a
-    /// declared read is a `gx-adapter-mcp` catalogue's construct. The fs, git and postgres adapters
-    /// build their inverse out of the snapshot they were handed, so there is no read that could
-    /// fail separately from the call itself: `Some` is `True`, `None` is `False`, and `Unknown` is
-    /// **not reachable** rather than merely unused. Those three adapters build their outcome here,
-    /// in one line each, which keeps the derivation in one place where it can be argued with.
-    #[must_use]
-    pub fn from_option(inverse: Option<PlannedDelta>) -> Self {
-        match inverse {
-            Some(inverse) => Self::inverted(inverse, Vec::new()),
-            None => Self::none(Vec::new()),
-        }
-    }
+    // 🔴🔴 **RETRACTED — DEFECT-892-1 (`req/895` §1).** `InvertOutcome::from_option` stood here.
+    //
+    // What it did: fixed `Vec::new()` on both arms, for the fs, git, mysql and postgres adapters.
+    // What it said, verbatim, as its justification:
+    //
+    // > "The fs, git and postgres adapters build their inverse out of the snapshot they were
+    // > handed, so there is no read that could fail separately from the call itself."
+    //
+    // 🔴 **That sentence is false, and the counterexample was one file away from it the whole
+    // time.** `gx-adapter-fs/src/invert.rs`'s `read_if_present` calls `std::fs::read` on the
+    // position and returns [`Error::Unreadable`]; `gx-adapter-git`'s reads the branch tip through
+    // `repo::tip`; `gx-adapter-postgres`/`-mysql` open a connection, introspect the catalog and
+    // `SELECT` the row. All four perform a read that can fail on its own, and all four were
+    // reporting that they had performed none.
+    //
+    // What that cost, measured on a real lifecycle (`req/892`): a **signed** `CommitReceipt` for an
+    // fs change carried `read_set = Nothing`, and `gx-witness/src/receipt.rs` documents that member
+    // as answering `ReadSet::names` with `Some(false)` about **every** locator — "a *stronger*
+    // answer than G3 gives". So the receipt did not omit the read; it denied it, in the same turn
+    // as the read, under a signature. Not a fail-open and not an overclaim: a false positive with a
+    // signature over it.
+    //
+    // The repair is not a smaller `from_option`. A constructor whose only job is to assert a fact
+    // about its callers will be reached for by the next adapter too, so the assertion is deleted
+    // with the fact. Each adapter now mints its read entry **at the one place in its own `invert`
+    // where a read has answered**, which is the shape `gx-adapter-mcp` already had and the reason
+    // `gx-adapter-mcp` was the one adapter this defect never reached.
+    //
+    // Anything that needs the old behaviour deliberately — a fixture standing in for an adapter
+    // that genuinely reads nothing — calls [`InvertOutcome::inverted`] or [`InvertOutcome::none`]
+    // with an empty list and is thereby saying so in its own source.
 
     /// The inverse, when one was constructed. `Some` exactly when [`Self::verdict`] is
     /// [`Reversibility::True`].

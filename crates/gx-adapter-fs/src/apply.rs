@@ -133,8 +133,11 @@ fn write_whole_file(position: &str, content: &[u8]) -> Result<()> {
         // 4. rename it over the target. This is the step the atomicity comes from.
         std::fs::rename(&temp, target)?;
         // 5. fsync the containing directory, so that the entry naming the new file is durable too.
-        //    (Derivation, not citation: see the module documentation.)
-        std::fs::File::open(parent)?.sync_all()
+        //    (Derivation, not citation: see the module documentation.) `req/868` R-868-5: this call
+        //    used to run un-`cfg`-gated, so on native Windows `File::open` on a directory handle
+        //    fails and `apply` reported failure for a rename that had already landed -- see
+        //    [`sync_parent_directory`] and [`NAME_DURABILITY`].
+        sync_parent_directory(parent)
     };
 
     if let Err(e) = attempt() {
@@ -173,12 +176,101 @@ fn remove_whole_file(position: &str) -> Result<()> {
     let parent = target.parent().ok_or_else(|| Error::ApplyFailed {
         detail: format!("{position:?} has no directory to sync"),
     })?;
-    std::fs::File::open(parent)
-        .and_then(|dir| dir.sync_all())
-        .map_err(|e| Error::ApplyFailed {
-            detail: format!("the directory of {position:?} could not be synced: {e}"),
-        })
+    // `req/868` R-868-5 sibling site (sibling sweep: the same un-`cfg`-gated directory fsync that
+    // `write_whole_file` had). See [`sync_parent_directory`].
+    sync_parent_directory(parent).map_err(|e| Error::ApplyFailed {
+        detail: format!("the directory of {position:?} could not be synced: {e}"),
+    })
 }
+
+/// Fsync the directory that names a just-published or just-removed file, so the *entry* survives a
+/// crash as durably as the bytes/absence it names.
+///
+/// `req/868` **R-868-5**: this call used to run un-`cfg`-gated in both callers above, so on native
+/// Windows `File::open` on a directory handle fails (`FlushFileBuffers` is not a supported operation
+/// on a directory handle there either) and `apply`/`remove` reported failure for a change that had
+/// already landed on disk -- **the world and the report disagreed**. `req/868` G9 gave
+/// `crates/gx-engine/src/store.rs` the same fact for the journal's own directory and closed it as a
+/// **declaration, not a warning**: the honest Windows answer is not a translation of `fsync(dirfd)`,
+/// because "NTFS journals metadata so the entry is durable once the file's own flush returns" is a
+/// filesystem property this workspace has never measured. This crate's copy carries the same
+/// declaration rather than importing `gx-engine`'s: `gx-adapter-fs` has **zero** workspace
+/// dependencies beyond `gx-core`/`gx-canon`/`gx-substrate` (crate root, **E-M4-26**), and adapters sit
+/// below the engine in the layer doctrine, so the type is duplicated by design, not by oversight (the
+/// two sites answer the same platform fact for two different directories: the engine's journal and
+/// this adapter's target parent).
+///
+/// The operator-facing half (a line an adapter caller could show) is not wired here -- that is
+/// `req/868`'s own **Residual R-868-1** for the engine's copy, and the same residual applies to this
+/// one: printing it is a CLI/wire change out of this lane's scope (`req/919` W4's AC is the cfg-gate
+/// and the `docs/LIMITS.md` sync only). What this closes is that the platform boundary can no longer
+/// silently turn a landed change into a reported failure.
+#[cfg(unix)]
+fn sync_parent_directory(parent: &Path) -> std::io::Result<()> {
+    std::fs::File::open(parent)?.sync_all()
+}
+
+/// See [`sync_parent_directory`] on unix. Off unix, the directory entry's durability is
+/// [`NameDurability::NotHeldOnThisPlatform`]: the file's bytes are still `sync_all`'d by the caller
+/// before this runs, but there is no supported way to fsync the directory entry naming them, so this
+/// is a no-op rather than an `Ok(())` dressed up as a measurement.
+#[cfg(not(unix))]
+fn sync_parent_directory(_parent: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
+/// Whether the directory entry naming a file `apply`/`remove` just published is as durable as the
+/// file's own bytes, on the platform this binary was built for. `req/868` R-868-5 (adapter copy of
+/// G9's `NameDurability`; see [`sync_parent_directory`] for why this crate does not import
+/// `gx_engine::NameDurability`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NameDurability {
+    /// The parent directory is fsynced after every publish or removal, so the entry survives a
+    /// crash as durably as the bytes (or their absence) do. Measured platform: x86_64 Linux
+    /// (`req/52` §5, A-5); every other unix inherits the *call*, not the *measurement*.
+    ParentDirectorySynced,
+    /// There is no supported way to fsync a directory handle on this platform, so a just-published
+    /// or just-removed entry's durability is whatever the platform gives for free, and no more. The
+    /// file's own bytes are still `sync_all`'d; what is unheld is the directory entry.
+    NotHeldOnThisPlatform,
+}
+
+impl NameDurability {
+    /// Whether the guarantee holds. `false` is not a failure -- it is the honest answer on a
+    /// platform whose directory-entry durability this workspace has not measured.
+    #[must_use]
+    pub const fn is_held(self) -> bool {
+        matches!(self, Self::ParentDirectorySynced)
+    }
+
+    /// One sentence, fit to show an operator verbatim. Deliberately claims nothing about what
+    /// *does* hold on the unmeasured platform, because it is not known.
+    #[must_use]
+    pub const fn notice(self) -> &'static str {
+        match self {
+            Self::ParentDirectorySynced => {
+                "gx-adapter-fs: name durability is held -- parent directories are fsynced after \
+                 every apply/remove"
+            }
+            Self::NotHeldOnThisPlatform => {
+                "gx-adapter-fs: name durability is NOT held on this platform -- file contents are \
+                 fsynced, but the directory entry naming (or un-naming) them is not, and this \
+                 platform was never measured: a crash can lose the name of a change whose bytes \
+                 already reached the device"
+            }
+        }
+    }
+}
+
+/// This build's answer, decided by the same `cfg` that decides [`sync_parent_directory`], so the
+/// declaration and the implementation cannot drift apart (the same discipline `req/868` G9 used for
+/// `gx_engine::NAME_DURABILITY`).
+#[cfg(unix)]
+pub const NAME_DURABILITY: NameDurability = NameDurability::ParentDirectorySynced;
+
+/// See [`NAME_DURABILITY`] on unix.
+#[cfg(not(unix))]
+pub const NAME_DURABILITY: NameDurability = NameDurability::NotHeldOnThisPlatform;
 
 /// What the substrate holds at `position` **now**, as a digest (ASM-69-1: content only).
 ///

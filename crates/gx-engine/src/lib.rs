@@ -123,20 +123,22 @@ pub mod replay;
 pub mod store;
 
 pub use pipeline::{
-    CanonEncoder, Canonicalizer, Door, Engine, EvidenceSource, HeadAuthenticity, HeadKeys,
-    HumanRuling, InjectedEvidence, JournalDeparture, Lifecycle, ProjectAnchor, RecoverPartial,
-    Recovered, RecoveryPath, UndoRefusal, UndoRefusalRow, UndoWitness, Unobservable,
-    UnreachableEvidence, WitnessMissing, DEFAULT_ESCALATION_TTL_NANOS, DEFAULT_VERIFY_TTL_NANOS,
-    HEAD_WITNESS_PAYLOAD_TYPE, LIFECYCLE_STATES, RECOVERY_PATHS, UNDO_REFUSALS,
+    is_observation_substrate, observation_substrate, CanonEncoder, Canonicalizer, Door, Engine,
+    EvidenceSource, HeadAuthenticity, HeadKeys, HumanRuling, InjectedEvidence, JournalDeparture,
+    Lifecycle, ObservationIngest, ObservationRoad, ProjectAnchor, RecoverPartial, Recovered,
+    RecoveryPath, UndoRefusal, UndoRefusalRow, UndoWitness, Unobservable, UnreachableEvidence,
+    WitnessMissing, DEFAULT_ESCALATION_TTL_NANOS, DEFAULT_VERIFY_TTL_NANOS,
+    HEAD_WITNESS_PAYLOAD_TYPE, LIFECYCLE_STATES, OBSERVATION_SUBSTRATE, RECOVERY_PATHS,
+    UNDO_REFUSALS,
 };
 pub use replay::{
     reconstruct, replay, ChainBreak, CommittedRow, DraftRow, EscrowRow, JournalCreation,
     JournalFormat, Replay, Sigma, StateRow, JOURNAL_MAGIC,
 };
 pub use store::{
-    BlobStore, EngineJournal, EngineJournalRecord, EscrowedInverse, InverseStatus,
+    BlobStore, EngineJournal, EngineJournalRecord, EscrowedInverse, InverseStatus, NameDurability,
     NotAttemptedBecause, ObservationStore, PutOutcome, Rollback, SupersedeIndex, MAX_BLOB_BYTES,
-    MAX_OBSERVATION_BYTES, MAX_RECORD_BYTES,
+    MAX_OBSERVATION_BYTES, MAX_RECORD_BYTES, NAME_DURABILITY,
 };
 
 /// 🔴 **M6H5-12, adopted (a)** — this crate's version, as a value the HTTP surface can ask for.

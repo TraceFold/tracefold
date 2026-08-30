@@ -74,14 +74,22 @@ export type Lifecycle =
   | { Aborted: AbortReason }
   | "Superseded";
 
-/** 41 §3 / ASM-15's six reasons a `Committing` pipeline can end in `Aborted`. */
+/**
+ * 41 §3 / ASM-15's six reasons a `Committing` pipeline can end in `Aborted`, plus M5-11's seventh.
+ *
+ * `PostconditionMismatch` (`req/919` A1) is the plan's promised post-state digest disagreeing with
+ * the one `apply` observed. It can only reach a client from an engine whose adapter fills
+ * `PlannedDelta.promised_target`; no adapter shipped with gx does yet, so a client that has never
+ * seen this string is reading a true picture of today rather than a stale one.
+ */
 export type AbortReason =
   | "PreconditionChanged"
   | "ApplyFailed"
   | "VerifierUnavailable"
   | "Expired"
   | "OwnerCancelled"
-  | "InternalError";
+  | "InternalError"
+  | "PostconditionMismatch";
 
 /** The three-valued verdict kind (`GET /candidates/{id}`'s `verdict` field: a bare string or `null`). */
 export type VerdictKind = "Admit" | "Deny" | "Escalate";
@@ -580,4 +588,54 @@ export interface EscalationRow {
   required_approval: unknown;
   created_at: Rfc3339;
   deadline: Rfc3339 | null;
+}
+
+/** What an attach-source CLAIMS it reports (`req/wire/schema/attach_source.schema.json`,
+ * `registerRequest.declared_coverage`). Glovrex does not verify the claim -- the response's
+ * `coverage_verified: false` says so, and that marking is the whole honesty of the row
+ * (`req/824` A4 LIMITS; `req/841` §2-4a). */
+export interface AttachSourceDeclaredCoverage {
+  envset?: boolean;
+  deploys?: boolean;
+  logs?: boolean;
+  config?: boolean;
+}
+
+/** `POST /attach-sources` body (`req/812` §3-R1 / `req/824` A4). An attach-source is an external
+ * executor we can only *receive reports from* -- never a SubstrateAdapter (SS273 forbids the
+ * write half permanently; the schema's own header sentence). A `kind` outside the union is
+ * refused at decode server-side (`422 VALIDATION_ERROR`), never defaulted. */
+export interface AttachSourceRegisterRequest {
+  kind: "vercel" | "github-actions" | "generic-ci";
+  name: string;
+  declared_coverage: AttachSourceDeclaredCoverage;
+  /** Optional. Absent means observations from this source are authenticated by the membrane's
+   * Bearer token only -- and the registered row says so in its `limits`. */
+  pubkey?: string;
+}
+
+/** One registered attach-source, as `POST /attach-sources`, `GET /attach-sources` items and
+ * `GET /attach-sources/{id}` all render it (`registerResponse` in the wire schema). */
+export interface AttachSourceView {
+  id: string;
+  kind: string;
+  registered_at: Rfc3339;
+  declared_coverage: AttachSourceDeclaredCoverage;
+  /** Always `false` in this phase, and present ANYWAY: omitting it would let a reader take
+   * `declared_coverage` for a measured fact -- the single most likely misreading of this whole
+   * surface (wire schema, `coverage_verified`'s own description). */
+  coverage_verified: boolean;
+  /** What this attachment cannot observe, per P-12 (`req/805` P-19). Never empty. */
+  limits: string[];
+  pubkey?: string;
+}
+
+/** `GET /attach-sources` page. `total` is a zero-inclusive census (F-B: an empty registry answers
+ * `total: 0` explicitly), and constitutionally never a billing meter (F4/F6). The cursor is the
+ * numeric chain-index kind (`verdict_checkpoints` precedent), unlike the opaque-string cursor of
+ * the `Page<T>` lists. */
+export interface AttachSourcePage {
+  items: AttachSourceView[];
+  next_cursor: number | null;
+  total: number;
 }

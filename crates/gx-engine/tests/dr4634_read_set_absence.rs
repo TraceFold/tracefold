@@ -7,7 +7,7 @@
 //!
 //! | form | the coordinate `req/498` measured | what it means | before | after |
 //! |---|---|---|---|---|
-//! | ① **read nothing** | `gx-substrate/src/adapter.rs`'s `InvertOutcome::from_option` fixes `Vec::new()` on both arms; T-11 hands it to `ReadSet::from_reads` | the escrow ran and touched no object | `null` | `Nothing` |
+//! | ① **read nothing** | ~~`gx-substrate/src/adapter.rs`'s `InvertOutcome::from_option` fixes `Vec::new()` on both arms~~ 🔴 **retracted, DEFECT-892-1 (`req/895` §1)**; the road that remains is an adapter that names an empty list itself, and T-11 hands it to `ReadSet::from_reads` | the escrow ran and touched no object | `null` | `Nothing` |
 //! | ② **no escrow record** | `pipeline.rs`'s `rebuilt_attest` ended its `find_map` in `unwrap_or_default()` | a rebuild found no `InverseEscrowed` for this transformation at all | `null` | `NoEscrowRecord` |
 //! | ③ **reads not journalled** | `store.rs`'s `#[serde(default)]` on `InverseEscrowed.reads` | the record is there and predates 42 §3.13's `reads` | `null` | `ReadsNotJournalled` |
 //! | ④ **not asked** | `pipeline.rs`'s `issue_verdict_receipt` writes `None` by ASM-14 | the escrow is 43 T-10b and had not run when this was signed | `null` | `null` |
@@ -54,10 +54,24 @@ const SUBJECT: &str = "/srv/world";
 // The fixture: an adapter that reports an inverse and **no reads**
 // ---------------------------------------------------------------------------
 
-/// The shape the fs, git and postgres adapters have: the inverse comes out of the snapshot already
-/// in hand, so `InvertOutcome::from_option` fixes `Vec::new()` and form ① is the *ordinary* road
-/// rather than an exotic one. That is what makes this DR worth a wire change — `req/472` §6's
-/// "in v0.1 the read-set is always empty" was measured on exactly these three adapters.
+/// 🔴🔴 **RETRACTED by DEFECT-892-1 (`req/895` §1).** This doc said: "The shape the fs, git and
+/// postgres adapters have: the inverse comes out of the snapshot already in hand, so
+/// `InvertOutcome::from_option` fixes `Vec::new()` and form ① is the *ordinary* road rather than an
+/// exotic one. That is what makes this DR worth a wire change — `req/472` §6's 'in v0.1 the
+/// read-set is always empty' was measured on exactly these three adapters."
+///
+/// It was false of all three. They read (`std::fs::read`, `repo::tip`, a `SELECT`), and
+/// `from_option` was discarding the entries between the read and the receipt — so `req/472` §6's
+/// "always empty" had measured a bug and taken it for a property of the substrates. `req/895`
+/// deletes `from_option` and those adapters now answer `PerRead`.
+///
+/// 🔴 **This fixture is deliberately not repaired**, and the reason is the point: it never called
+/// a real adapter. It hand-builds `InvertOutcome::inverted(prior, Vec::new())`, which is still a
+/// legitimate thing for an escrow to say — it holds its world in a `Mutex<Vec<u8>>` and reads no
+/// substrate. So form ① below still has a producer and DR-46-34's four-way distinction still
+/// stands. What changed is that form ① is now **rare** rather than **ordinary**, and a test whose
+/// fixture agreed with the shipped adapters by construction is exactly the kind of green that could
+/// not have caught this: it was measuring its own stub.
 #[derive(Clone, Debug)]
 struct QuietAdapter {
     world: Arc<Mutex<Vec<u8>>>,

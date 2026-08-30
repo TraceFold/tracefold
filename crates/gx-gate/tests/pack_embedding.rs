@@ -236,9 +236,7 @@ fn nothing_ships_in_policies_that_no_build_loads() {
     // (req/832); a build without the feature never loads it and the published tree (req/817)
     // does not ship the file it names. Set the compiled-out road aside by name, loudly — with
     // `pg` on (the private default) nothing is removed.
-    if !cfg!(feature = "pg")
-        && embedded.remove("policies/postgres/deny-system-catalogs.cedar")
-    {
+    if !cfg!(feature = "pg") && embedded.remove("policies/postgres/deny-system-catalogs.cedar") {
         eprintln!(
             "NOTE pack_embedding: policies/postgres/deny-system-catalogs.cedar is embedded by a \
              road this build compiles out (`pg` feature off; published tree, req/817/832) and is \

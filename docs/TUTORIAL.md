@@ -1,8 +1,10 @@
 # Tutorial (10 minutes)
 
-`gx demo` (see the README) runs a version of this walk for you, offline, in a few seconds.
-This page drives the same stages by hand, so you see the actual commands rather than a black
-box. It ends where `gx demo` points you next: [`/limits`](LIMITS.md).
+This page drives the whole loop by hand — submit, plan, verify, commit, then verify the receipt
+offline and flip one byte of it to watch the verifier refuse it — so you see the actual commands
+rather than a black box. (Builds carrying the `mcp` feature also have `gx demo`, which runs a
+version of this walk for you in a few seconds; the published binary deliberately does not, and
+this page is the walk.) It ends at [`/limits`](LIMITS.md).
 
 There are **two** walks here and they are the same loop on two substrates. [§2](#2-the-same-loop-on-one-plain-file--no-server)
 is `--substrate fs`: one plain file, no server, and the shortest complete road from `submit` to

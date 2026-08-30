@@ -57,6 +57,64 @@ use gx_cli::session::Session;
 use gx_cli::{clock, keys, ledger, receipt, replay, rng, Error, Result};
 use gx_core::{Cid, EnforcementMode, TransformationId};
 
+/// 🔴 **req/850 (F-842-1)** — the `--help` banner, one variant per build shape.
+///
+/// The public distribution is compiled without the `mcp` and `confine` features (`req/817`), so
+/// `wrap` / `attach` / `demo` / `confine` do not exist in it — and until this const the shared
+/// banner still told that build's reader "`gx demo` walks the whole loop", which a fresh clone
+/// measured as "unrecognized subcommand", exit 1 (`req/842` F-842-1). Each variant names only
+/// the verbs its build carries; the public one closes on the loop that build CAN walk — the
+/// offline verify + one flipped byte — which is the same loop `docs/TUTORIAL.md` §2 drives by
+/// hand. `crates/gx-cli/tests/r21_help_is_user_facing.rs` reads the verb list off the compiled
+/// binary, so a variant that names a verb its build lacks is prose, and one that misses a verb
+/// its build has is red.
+#[cfg(feature = "mcp")]
+const LONG_ABOUT: &str = "gx is a guard the changes an AI agent makes go through.\n\
+                  \n\
+                  A change is submitted, planned against the object it names, and judged against \
+                  policy. It is then committed with a signed receipt, refused, or escalated to a \
+                  person to decide. gx escrows the inverse of a change before it applies anything, \
+                  so a commit can be undone; when it cannot build one, it says so and asks rather \
+                  than making a change nobody can take back. Every receipt can be checked \
+                  afterwards on a machine with no copy of the project and no network.\n\
+                  \n\
+                  Make a change:        submit, plan, verify, commit\n\
+                  Take one back:        undo, cancel, escalation\n\
+                  Read what happened:   receipt, object, log, checkpoint, replay, \
+                  verdict-checkpoint, repair\n\
+                  Put gx in the path:   attach (place gx's own directory on a project that is \
+                  already running, and print what was placed), wrap (an agent's tools), serve \
+                  (HTTP), demo\n\
+                  Hold it at the kernel: confine (Linux: run a command under a Landlock ruleset \
+                  the catalogue decides — `gx limits` says what that does and does not cover)\n\
+                  Set up and inspect:   key, policy, draft, limits\n\
+                  \n\
+                  `gx demo` walks the whole loop in a throwaway directory. `gx <command> --help` \
+                  describes one command. `gx limits` prints what this build does not cover yet.";
+
+/// The public build's banner (see the `mcp` variant above for why there are two).
+#[cfg(not(feature = "mcp"))]
+const LONG_ABOUT: &str = "gx is a guard the changes an AI agent makes go through.\n\
+                  \n\
+                  A change is submitted, planned against the object it names, and judged against \
+                  policy. It is then committed with a signed receipt, refused, or escalated to a \
+                  person to decide. gx escrows the inverse of a change before it applies anything, \
+                  so a commit can be undone; when it cannot build one, it says so and asks rather \
+                  than making a change nobody can take back. Every receipt can be checked \
+                  afterwards on a machine with no copy of the project and no network.\n\
+                  \n\
+                  Make a change:        submit, plan, verify, commit\n\
+                  Take one back:        undo, cancel, escalation\n\
+                  Read what happened:   receipt, object, log, checkpoint, replay, \
+                  verdict-checkpoint, repair\n\
+                  Put gx in the path:   serve (HTTP)\n\
+                  Set up and inspect:   key, policy, draft, limits\n\
+                  \n\
+                  To see the guarantee, walk docs/TUTORIAL.md: commit a change, run \
+                  `gx receipt verify --offline` (exit 0), flip one byte of the receipt and run \
+                  it again (exit 7). `gx <command> --help` describes one command. `gx limits` \
+                  prints what this build does not cover yet.";
+
 /// `gx` — the Glovrex command line.
 #[derive(Debug, Parser)]
 #[command(
@@ -81,38 +139,24 @@ use gx_core::{Cid, EnforcementMode, TransformationId};
     // hand" notes are the record of which hand settled which decision, and `req/306` §1 item 2
     // rules them out of scope by name. A banner is a user-facing string; a doc comment is
     // provenance. Neither is the other, and the same suite guards that half.
-    long_about = "gx is a guard the changes an AI agent makes go through.\n\
-                  \n\
-                  A change is submitted, planned against the object it names, and judged against \
-                  policy. It is then committed with a signed receipt, refused, or escalated to a \
-                  person to decide. gx escrows the inverse of a change before it applies anything, \
-                  so a commit can be undone; when it cannot build one, it says so and asks rather \
-                  than making a change nobody can take back. Every receipt can be checked \
-                  afterwards on a machine with no copy of the project and no network.\n\
-                  \n\
-                  Make a change:        submit, plan, verify, commit\n\
-                  Take one back:        undo, cancel, escalation\n\
-                  Read what happened:   receipt, log, checkpoint, replay, verdict-checkpoint, \
-                  repair\n\
-                  Put gx in the path:   attach (place gx's own directory on a project that is \
-                  already running, and print what was placed), wrap (an agent's tools), serve \
-                  (HTTP), demo\n\
-                  Hold it at the kernel: confine (Linux: run a command under a Landlock ruleset \
-                  the catalogue decides — `gx limits` says what that does and does not cover)\n\
-                  Set up and inspect:   key, policy, draft, limits\n\
-                  \n\
-                  `gx demo` walks the whole loop in a throwaway directory. `gx <command> --help` \
-                  describes one command. `gx limits` prints what this build does not cover yet.",
+    //
+    // 🔴 **req/850 (F-842-1)** — the banner is now `LONG_ABOUT`, a `cfg`-selected const: the
+    // public distribution is built without `mcp`/`confine` (req/817), so the same bytes that were
+    // honest here told a fresh-clone reader to run `gx demo` and the binary answered
+    // "unrecognized subcommand" (exit 1). Each build's banner names only the verbs it has.
+    long_about = LONG_ABOUT,
     subcommand_required = true,
     arg_required_else_help = false
 )]
 struct Cli {
     /// The project whose `.gx/` directory to use. Defaults to the working directory.
     #[arg(long, global = true, value_name = "DIR")]
+    #[arg(help = "The project whose `.gx/` directory to use. Defaults to the working directory.", long_help = None)]
     project: Option<PathBuf>,
 
     /// 44 §1.3: "the CLI offers additional human-readable formatting via `--pretty`" (sem: SEM-gx-cli-420).
     #[arg(long, global = true)]
+    #[arg(help = "Print human-readable output instead of a single JSON line.", long_help = None)]
     pretty: bool,
 
     /// 🔴 **P3** — the MCP server this invocation is connected to, as a command to start.
@@ -122,10 +166,12 @@ struct Cli {
     /// invocation names. `gx undo <TID>` above all needs it — 43 §5's inverse of a tool call is a
     /// call, so a process holding no transport can plan the undo and not perform it.
     #[arg(long, global = true, value_name = "CMD")]
+    #[arg(help = "The MCP server this invocation talks to, given as the command that starts it.", long_help = None)]
     mcp_server: Option<String>,
 
     /// An argument for `--mcp-server`, repeatable.
     #[arg(long, global = true, value_name = "ARG")]
+    #[arg(help = "An argument for --mcp-server. Repeatable.", long_help = None)]
     mcp_server_arg: Vec<String>,
 
     /// The `env` member an agent's configuration carries for that server, repeatable.
@@ -135,22 +181,26 @@ struct Cli {
     /// operator's configuration describes — and `gx undo` is the verb that most needs to reach the
     /// **same** server the change was made through.
     #[arg(long, global = true, value_name = "NAME=VALUE")]
+    #[arg(help = "An environment variable for that server, as NAME=VALUE. Repeatable.", long_help = None)]
     mcp_server_env: Vec<String>,
 
     /// The endpoint half of the locators this invocation reads and writes. Defaults to
     /// `stdio://<command>`, which is what `gx wrap` mints.
     #[arg(long, global = true, value_name = "URI")]
+    #[arg(help = "The endpoint half of the locators this invocation reads and writes. Defaults to stdio://<command>.", long_help = None)]
     mcp_endpoint: Option<String>,
 
     /// "a call to this tool is undone by a call to that one" (sem: SEM-gx-cli-421) — the declaration only the party
     /// running the server can make (`gx-adapter-mcp`'s `catalogue.rs`).
     #[arg(long, global = true, value_name = "TOOL=RESTORE_TOOL")]
+    #[arg(help = "Declare that a call to one tool is undone by a call to another, as TOOL=RESTORE_TOOL. Repeatable.", long_help = None)]
     mcp_restore: Vec<String>,
 
     /// The same declaration as a JSON file, template form included (A2, req/38 §92 ruling 1; sem: SEM-gx-cli-422): a map
     /// from forward tool to `{restored_by, arguments?}` — `Catalogue::from_json` is the one reader
     /// of the format. `--mcp-restore` entries are applied on top of it.
     #[arg(long, global = true, value_name = "FILE")]
+    #[arg(help = "The same declarations as a JSON file. --mcp-restore entries are applied on top of it.", long_help = None)]
     mcp_restore_catalogue: Option<std::path::PathBuf>,
 
     #[command(subcommand)]
@@ -164,78 +214,103 @@ struct Cli {
 #[derive(Debug, clap::Subcommand)]
 enum Command {
     /// T-1: create a Draft from an intent (44 §1.2).
+    #[command(about = "Record a change you want made, without touching anything yet.", long_about = None)]
     Submit {
         /// Which substrate the change is against.
         #[arg(long, value_name = "fs|git|mcp")]
+        #[arg(help = "Which kind of thing the change is against.", long_help = None)]
         substrate: String,
         /// The position inside it, in the adapter's own spelling (42 §3.3).
         #[arg(long, value_name = "STR")]
+        #[arg(help = "Which thing inside it, spelled the way that substrate spells it.", long_help = None)]
         locator: String,
         /// The intent body, or `-` for stdin. Carried opaquely — see [`intent_bytes`].
         #[arg(long, value_name = "FILE|-")]
+        #[arg(help = "The file holding the change you want, or - to read it from stdin.", long_help = None)]
         intent: String,
         /// 42 §3.2's `ChangeContext`.
         #[arg(
             long,
             value_name = "Time|Evidence|Policy|Model|Representation|Substrate|Custom:NAME"
         )]
+        #[arg(help = "Why the change is being made.", long_help = None)]
         context: String,
         /// The key id of the actor asking (42 §3.2: the DSSE `keyid` namespace).
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "The key id of whoever is asking.", long_help = None)]
         actor_key: String,
         /// Which of 42 §3.2's three actors this is.
         #[arg(long, value_name = "human|agent|process", default_value = "human")]
+        #[arg(help = "Whether the asker is a person, an agent, or the system.", long_help = None)]
         actor_kind: String,
         /// The model, for `--actor-kind agent`.
         #[arg(long, value_name = "STR")]
+        #[arg(help = "The model name, when --actor-kind is agent.", long_help = None)]
         actor_model: Option<String>,
         /// 44 §1.2's flag. v0.1 produces order 0 only; see `pipeline::submit`.
         #[arg(long, default_value_t = 0, value_name = "0|1|2")]
+        #[arg(help = "Reserved. This version produces order 0 only.", long_help = None)]
         order: u8,
         /// 44 §1.2's flag. v0.1 has one producer of parents and it is `undo`.
         #[arg(long, value_name = "TID")]
+        #[arg(help = "Reserved. This version's only producer of parents is undo.", long_help = None)]
         parent: Vec<String>,
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// T-2: snapshot and plan, fixing the `TransformationId` (44 §1.2).
+    #[command(about = "Look at the thing as it is now and work out exactly what would change.", long_about = None)]
     Plan {
         /// An `IntentId` or a `TransformationId` — 44 §0's id-resolution accepts both.
+        #[arg(help = "An intent id or a transformation id. Either is accepted.", long_help = None)]
         id: String,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// T-3 → T-4: collect evidence, ask the gate (44 §1.2).
+    #[command(about = "Collect evidence and ask policy whether the change may proceed.", long_about = None)]
     Verify {
         /// The `gx1:` transformation id.
+        #[arg(help = "The gx1: transformation id.", long_help = None)]
         transformation: String,
         /// Pre-collected `Evidence` (42 §3.7) as JSONL, added to what the gate computes.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "Extra evidence as JSONL, added to what is gathered automatically.", long_help = None)]
         evidence: Vec<PathBuf>,
         /// DR-2 record-only, **for this call** (M6-08 adopted (a); sem: SEM-gx-cli-423). Not a fail posture.
         #[arg(long)]
+        #[arg(help = "Judge but do not enforce, for this call only. This is not a failure posture.", long_help = None)]
         record_only: bool,
         /// 🔴 Decide with this pack instead of the shipped one — not in 44 §1.2 (**E-M6-12**).
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Decide with this policy pack instead of the one that ships.", long_help = None)]
         policy: Option<PathBuf>,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// T-8 → T-11: canonicalize, re-check the precondition, apply, append, issue (44 §1.2).
+    #[command(about = "Escrow the undo, re-check the precondition, apply the change, and issue a signed receipt.", long_about = None)]
     Commit {
         /// The `gx1:` transformation id.
+        #[arg(help = "The gx1: transformation id.", long_help = None)]
         transformation: String,
         /// 44 §1.2: "when unspecified, the CLI deterministically derives it from `transformation_id`" (sem: SEM-gx-cli-424).
         #[arg(long, value_name = "STR")]
+        #[arg(help = "A key that makes a repeated commit safe. Derived from the transformation id when not given.", long_help = None)]
         idempotency_key: Option<String>,
         /// 🔴 Not in 44 §1.2's synopsis — see `run`'s note and M6H3-7.
         #[arg(long)]
+        #[arg(help = "Record what would happen without enforcing the verdict.", long_help = None)]
         record_only: bool,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 **P3** — run the MCP proxy: an agent on stdin, a server as a child, a gate between them.
@@ -250,32 +325,49 @@ enum Command {
     /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — absent from the public distribution, which is
     /// built without `gx-mcp-wire` (`req/789` §3 holds it private).
     #[cfg(feature = "mcp")]
+    #[command(
+        about = "Run as a proxy between an agent and an MCP server, with the gate in between.",
+        long_about = "Run as a proxy between an agent and an MCP server, with the gate in between: \
+             an agent on stdin, a server as a child, and every tool call judged on the way \
+             through.\n\n\
+             While this verb runs, stdout carries MCP frames and nothing else, because the \
+             transport forbids anything else there. Everything this verb has to say about itself \
+             goes to stderr."
+    )]
     Wrap {
         /// The server command and its arguments, after `--`.
         #[arg(last = true, value_name = "CMD [ARGS]...")]
+        #[arg(help = "The server command and its arguments, after --.", long_help = None)]
         server: Vec<String>,
         /// The `env` member an agent's configuration carries for this server, repeatable.
         #[arg(long, value_name = "NAME=VALUE")]
+        #[arg(help = "An environment variable for this server, as NAME=VALUE. Repeatable.", long_help = None)]
         server_env: Vec<String>,
         /// The endpoint half of every locator this session mints. Defaults to `stdio://<command>`.
         #[arg(long, value_name = "URI")]
+        #[arg(help = "The endpoint half of every locator this session mints. Defaults to stdio://<command>.", long_help = None)]
         endpoint: Option<String>,
         /// Which argument of a `tools/call` names the resource the change is about.
         #[arg(long, default_value = "uri", value_name = "NAME")]
+        #[arg(help = "Which argument of a tool call names the thing being changed.", long_help = None)]
         resource_arg: String,
         /// `--restore <TOOL>=<RESTORE_TOOL>`, repeatable.
         #[arg(long, value_name = "TOOL=RESTORE_TOOL")]
+        #[arg(help = "Declare the tool that undoes another, as TOOL=RESTORE_TOOL. Repeatable.", long_help = None)]
         restore: Vec<String>,
         /// The catalogue as a JSON file, template form included (A2): the same format
         /// `--mcp-restore-catalogue` reads on `gx undo`. `--restore` entries apply on top.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The same declarations as a JSON file. --restore entries apply on top.", long_help = None)]
         restore_catalogue: Option<std::path::PathBuf>,
         /// The agent's key id (42 §3.2).
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "The agent's key id.", long_help = None)]
         actor_key: Option<String>,
         /// The agent's model. 42 §3.2 requires it for an `Agent`, and every change through this
         /// proxy is an agent's.
         #[arg(long, value_name = "STR")]
+        #[arg(help = "The agent's model. Required: every change through this proxy is an agent's.", long_help = None)]
         actor_model: Option<String>,
         /// 42 §3.2's `ChangeContext`.
         #[arg(
@@ -283,41 +375,50 @@ enum Command {
             default_value = "Substrate",
             value_name = "Time|Evidence|Policy|Model|Representation|Substrate|Custom:NAME"
         )]
+        #[arg(help = "Why changes made in this session are being made.", long_help = None)]
         context: String,
         /// Decide with this pack instead of the shipped set (**E-M6-12**).
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Decide with this policy pack instead of the one that ships.", long_help = None)]
         policy: Option<PathBuf>,
         /// DR-2's record-only, for every call of this session.
         #[arg(long)]
+        #[arg(help = "Judge but do not enforce, for every call in this session.", long_help = None)]
         record_only: bool,
         /// 🔴 **P3.1** — DR-2's other axis (ASM-13): what happens when the verifier cannot be
         /// reached. Same flag and vocabulary as `Serve`'s (closed|open); default unchanged
         /// (`FailClosed`). `req/38` §74 item③ (gotcha66): before this, `gx wrap` had no road to
         /// `FailOpen` at all.
         #[arg(long, value_name = "closed|open")]
+        #[arg(help = "What to do when the verifier cannot be reached: closed refuses, open proceeds. Defaults to closed.", long_help = None)]
         fail_posture: Option<String>,
         /// 🔴 **NFR-017** — append OTLP/JSON spans to this file. **Off** unless given, and the
         /// start-up line prints "otel: disabled" when it is not (R-114-4: "state zero telemetry
         /// explicitly"; sem: SEM-gx-cli-425).
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Append OpenTelemetry spans to this file. Off unless given.", long_help = None)]
         otel_file: Option<String>,
         /// Carry raw locators in those spans. Off, because a resource URI names a customer's file
         /// (`gx_cli::otel::NOT_EXPORTED`).
         #[arg(long)]
+        #[arg(help = "Include raw locators in those spans. Off, because a locator names somebody's file.", long_help = None)]
         otel_locators: bool,
         /// DR-V4B-3 (`req/189`): send the `--resource-arg` member to the server even when it is a
         /// `gx_*`-named member (by default such a member is gx's own and is stripped from the
         /// wire form of the call, because a strict-body server refuses it; a `--resource-arg`
         /// naming a real tool argument is never stripped, flag or no flag).
         #[arg(long)]
+        #[arg(help = "Send the --resource-arg member to the server even when its name starts with gx_.", long_help = None)]
         forward_resource_arg: bool,
         /// 🔴 **B-1** — rewrite an agent's config so its direct entry for the server is gone, and
         /// print the result. Nothing is served; `--server-name` says which entry.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Rewrite an agent's configuration so it reaches the server through gx, and print the result.", long_help = None)]
         adopt_config: Option<PathBuf>,
         /// 🔴 **B-1's machine check** — report whether that entry routes through gx and whether any
         /// entry still starts the server directly. exit 0 = the direct road is gone, 7 = it is not.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Report whether that configuration routes through gx. Exit 0 if the direct route is gone, 7 if it is not.", long_help = None)]
         check_config: Option<PathBuf>,
         /// 🔴 **P-1c** (`req/551` §2) — take gx back out of that entry, putting back the command it
         /// used to run, and print what did **not** come back with it. `.gx/` is not touched.
@@ -327,13 +428,16 @@ enum Command {
         /// opposite `gx attach` would read as the undo of the *placement* — which is the one thing
         /// it does not do (`req/551` D-3).
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Put the original command back in that configuration, and print what did not come back with it.", long_help = None)]
         detach_config: Option<PathBuf>,
         /// The entry in `mcpServers` that `--adopt-config` / `--check-config` / `--detach-config`
         /// is about.
         #[arg(long, value_name = "NAME")]
+        #[arg(help = "Which entry in the configuration --adopt-config, --check-config or --detach-config is about.", long_help = None)]
         server_name: Option<String>,
         /// Where the `gx` binary is, for the entry `--adopt-config` writes.
         #[arg(long, default_value = "gx", value_name = "PATH")]
+        #[arg(help = "Where the gx binary is, for the entry --adopt-config writes.", long_help = None)]
         gx_binary: String,
     },
     /// 🔴 **P-1a** (`req/535` §3 R-1) — put `.gx/` on a tree that is already running, and print
@@ -350,9 +454,18 @@ enum Command {
     ///
     /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — see `Wrap` above.
     #[cfg(feature = "mcp")]
+    #[command(
+        about = "Put a `.gx/` directory on a project that is already running, and print what was placed.",
+        long_about = "Put a `.gx/` directory on a project that is already running, and print what \
+             was placed: every declared path, filed as created, already there, or not placed.\n\n\
+             What it does not do: it points no route at gx, and it states nothing about what a \
+             route could observe. Placing the directory is not the same as putting gx in the path \
+             of anything."
+    )]
     Attach {
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
         /// 🔴 **P-1b / R-3e** — the agent configuration to read the route out of.
         ///
@@ -361,15 +474,18 @@ enum Command {
         /// it the table still prints, saying that this operation observes nothing — which is the
         /// truth about an attach that pointed no route.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "An agent configuration to read the route out of. Read, never written.", long_help = None)]
         route_config: Option<PathBuf>,
         /// The entry in `mcpServers` that `--route-config` is about.
         #[arg(long, value_name = "NAME")]
+        #[arg(help = "Which entry in that configuration --route-config is about.", long_help = None)]
         server_name: Option<String>,
         /// 🔴 **P-1b** — a file of declarations somebody wrote about this face.
         ///
         /// The **only** place a human sentence enters a coverage table. A file offering a measured
         /// value is refused by name: the receipt is the only address a measurement has.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "A file of declarations somebody wrote about this face.", long_help = None)]
         declared: Option<PathBuf>,
     },
     /// 🔴 **P5** (`req/134` §1 item 1, ruling 1; sem: SEM-gx-cli-426) — a disposable, network-free walk of req/114 §3's aha
@@ -381,10 +497,12 @@ enum Command {
     /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — the loop runs through the real `gx wrap`
     /// membrane, so it goes where `Wrap` goes. See `Wrap` above.
     #[cfg(feature = "mcp")]
+    #[command(about = "Walk the whole loop in a throwaway directory: break something, prove it, restore it, verify offline.", long_about = None)]
     Demo {
         /// 44 §1.2's flag. `gx demo` prints its own narrative regardless; this covers the trailing
         /// summary line only.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Covers the trailing summary line.", long_help = None)]
         json: bool,
     },
     /// 🔴 Hidden — the notes server `gx demo` (and the `gx undo` step inside it) spawn as **this
@@ -394,13 +512,16 @@ enum Command {
     /// 🔴 **`cfg(feature = "mcp")`** (`req/817`) — see `Wrap` above.
     #[cfg(feature = "mcp")]
     #[command(hide = true, name = "__demo-notes-server")]
+    #[command(about = "Internal. The notes server gx demo starts as its own child.", long_about = None)]
     DemoNotesServer,
     /// 🔴 **P5** (`req/134` §1 item 7, ruling 2; sem: SEM-gx-cli-429) — the eight lines 21 §10-4 fixes ("what this build
     /// does not cover yet"), printed for a terminal. `docs/LIMITS.md` prints the same eight for a
     /// browser (AC-P5-5: the two are checked to agree).
+    #[command(about = "Print what this build does not cover yet.", long_about = None)]
     Limits {
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 **S③** (`req/493` §0) — run a command under a kernel ruleset (Landlock) whose write face
@@ -421,6 +542,16 @@ enum Command {
     /// 🔴 **`cfg(feature = "confine")`** (`req/817`) — absent from the public distribution, which is
     /// built without `gx-confine` (`req/789` §3 holds it private).
     #[cfg(feature = "confine")]
+    #[command(
+        about = "Run a command under a kernel ruleset that limits where it may write (Linux).",
+        long_about = "Run a command under a kernel ruleset (Landlock) that limits where it may \
+             write. The gate answers before a call and the receipt attests after it; this asks the \
+             kernel to hold an answer while the call runs.\n\n\
+             What it enforces is narrower than it sounds, and it says so on every run: the \
+             catalogue supplies whether writing is permitted at all and the invocation supplies \
+             where, so the report carries `write_targets_are_declared: false` rather than leaving \
+             a reader to infer which half came from a file."
+    )]
     Confine {
         /// The tool whose declaration decides whether any write is permitted.
         ///
@@ -428,22 +559,33 @@ enum Command {
         /// a real road (confining a command the catalogue says nothing about) and is reported as
         /// `unasked` rather than as a `yes`.
         #[arg(long, value_name = "TOOL")]
+        #[arg(
+            help = "The tool whose declaration decides whether any write is permitted.",
+            long_help = "The tool whose declaration decides whether any write is permitted.\n\n\
+                 Without it the catalogue is never asked and every --allow-write is granted. That \
+                 is a real thing to do, confining a command the catalogue says nothing about, and \
+                 it is reported as `unasked` rather than as a `yes`."
+        )]
         tool: Option<String>,
         /// A directory the command may write beneath, if the catalogue permits writing at all.
         /// Repeatable.
         #[arg(long, value_name = "DIR")]
+        #[arg(help = "A directory the command may write beneath. Repeatable.", long_help = None)]
         allow_write: Vec<PathBuf>,
         /// Print what would be enforced and stop. Nothing is applied and nothing is run.
         #[arg(long)]
+        #[arg(help = "Print what would be enforced and stop. Nothing is applied and nothing is run.", long_help = None)]
         plan_only: bool,
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
         /// The command to run, after `--`.
         ///
         /// 🔴 It is `exec`ed, so this process **becomes** it. That is why the confinement report
         /// goes to stderr before the `exec` and stdout is left alone: there is no "after".
         #[arg(last = true, value_name = "CMD")]
+        #[arg(help = "The command to run, after --.", long_help = None)]
         cmd: Vec<String>,
     },
     /// 🔴 **P3 / FR-M04** — issue and check aggregate verdict checkpoints (`req/119` §4).
@@ -451,16 +593,29 @@ enum Command {
     /// Named `verdict-checkpoint` rather than `checkpoint` by ruling ⑤ (sem: SEM-gx-cli-430): `gx log checkpoint` is the
     /// ledger's signed **tree head** (42 §3.11) and this is a signed **count of verdicts**. One
     /// word for two objects is a trap.
+    #[command(about = "Issue and check signed counts of verdicts.", long_about = None)]
     VerdictCheckpoint {
         #[command(subcommand)]
         cmd: VerdictCheckpointCmd,
     },
     /// Read and check receipts (44 §1.2).
+    #[command(about = "Read and check receipts.", long_about = None)]
     Receipt {
         #[command(subcommand)]
         cmd: ReceiptCmd,
     },
+    /// 🔴 **R-922-F2 phase 1** — the `.gx` object file (`req/922` F5/F6).
+    ///
+    /// One group rather than the reqdef's top-level `gx export` + `gx verify <file>`: `gx verify`
+    /// is already 44 §1.2's T-3 → T-4 verb over a transformation id, and this phase changes no
+    /// existing verb. `crates/gx-cli/src/object.rs`'s header carries the argument in full.
+    #[command(about = "Write one signed record to a portable file, and check one.", long_about = None)]
+    Object {
+        #[command(subcommand)]
+        cmd: ObjectCmd,
+    },
     /// Read the ledger (44 §1.2), and publish a signed head (M6-24 adopted (b); sem: SEM-gx-cli-431).
+    #[command(about = "Read the ledger, and publish a signed head.", long_about = None)]
     Log {
         #[command(subcommand)]
         cmd: LogCmd,
@@ -472,24 +627,30 @@ enum Command {
     /// head**, which is the object 42 §3.11 defines. `gx log checkpoint` mints a new one and needs
     /// the ledger key; this copies the one the project already signed and needs no key at all,
     /// which is what makes it something an operator can run on a schedule.
+    #[command(about = "Copy this project's signed ledger head out of `.gx/`.", long_about = None)]
     Checkpoint {
         #[command(subcommand)]
         cmd: CheckpointCmd,
     },
     /// Generate and list signing keys (44 §1.2, req/56 §3).
+    #[command(about = "Generate, list, revoke and rotate signing keys.", long_about = None)]
     Key {
         #[command(subcommand)]
         cmd: KeyCmd,
     },
     /// T-12: commit the escrowed inverse of a committed transformation (44 §1.2, P-5).
+    #[command(about = "Apply the inverse gx escrowed before it committed a change. Undo an undo to redo it.", long_about = None)]
     Undo {
         /// The `gx1:` transformation id to take back.
+        #[arg(help = "The gx1: transformation id to take back.", long_help = None)]
         transformation: String,
         /// 44 §1.2's flag. v0.1 signs with the original actor's key — see `lifecycle::undo`.
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "Refused if given: an undo is signed with the original actor's key, so this flag would select nothing.", long_help = None)]
         actor_key: Option<String>,
         /// 44 §1.2: "when unspecified, the CLI deterministically derives it from `transformation_id`" (sem: SEM-gx-cli-432).
         #[arg(long, value_name = "STR")]
+        #[arg(help = "A key that makes a repeated undo safe. Derived from the transformation id when not given.", long_help = None)]
         idempotency_key: Option<String>,
         /// 🔴 Decide with this pack instead of the shipped one — not in 44 §1.2 (**E-M6-12**).
         ///
@@ -497,6 +658,7 @@ enum Command {
         /// can be `Deny` — 44 §1.4's 2. Reaching that from a `gx` invocation needs a pack that
         /// refuses a **writable** path, for the same reason `gx verify --policy` needs one.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Decide with this policy pack instead of the one that ships.", long_help = None)]
         policy: Option<PathBuf>,
         /// 🔴 Settle pre-flight budget in seconds; 0 disables it (`req/38` §98 ruling 2; sem: SEM-gx-cli-433).
         ///
@@ -508,6 +670,7 @@ enum Command {
         /// The default is the E2E-measured harness bound (`req/153` §6: poll 1-2 within 120s);
         /// in-process substrates match on the first poll and never wait.
         #[arg(long, value_name = "SECS", default_value_t = 120)]
+        #[arg(help = "Seconds to wait for the world to look the way the commit receipt says it was left. 0 disables the wait.", long_help = None)]
         settle: u64,
         /// 🔴 Re-fire the whole undo up to N more times on `Aborted(ApplyFailed)` (§98 ruling 2's (sem: SEM-gx-cli-434)
         /// D-complement — explicit flag, default off).
@@ -518,28 +681,36 @@ enum Command {
         /// pre-flight. Only exit 5 re-fires: a denial, an escalation or a precondition change is
         /// an answer, not a transient.
         #[arg(long, value_name = "N", default_value_t = 0)]
+        #[arg(help = "Re-fire the whole undo up to N more times if applying it fails. Off by default.", long_help = None)]
         retry: u32,
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// T-7: the owner stops a transformation before the critical section (44 §1.2, DR-11).
+    #[command(about = "Stop a transformation before it reaches the point of no return.", long_about = None)]
     Cancel {
         /// The `gx1:` transformation id.
+        #[arg(help = "The gx1: transformation id.", long_help = None)]
         transformation: String,
         /// 44 §1.2's flag. v0.1 has no authorization layer — see `lifecycle::cancel`.
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "Refused if given: this version has no authorization layer, so nothing would check the permission it names.", long_help = None)]
         actor_key: Option<String>,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// T-5 / T-5b: a person rules on an escalated transformation (44 §1.2, DR-11).
+    #[command(about = "Approve or reject a transformation that was escalated to a person.", long_about = None)]
     Escalation {
         #[command(subcommand)]
         cmd: EscalationCmd,
     },
     /// Check a Cedar policy pack, and run scenarios against it (44 §1.2).
+    #[command(about = "Check a policy pack, and run scenarios against it.", long_about = None)]
     Policy {
         #[command(subcommand)]
         cmd: PolicyCmd,
@@ -562,15 +733,25 @@ enum Command {
     ///
     /// Not a `--force`: it writes no transition the engine would not have written by itself, and a
     /// project that still disagrees afterwards is reported as such and exits 1.
+    #[command(
+        about = "Diagnose, and with --yes repair, a project whose journal and ledger disagree.",
+        long_about = "Diagnose, and with --yes repair, a project whose journal and ledger \
+             disagree. Without --yes the project is opened read-only and not one byte of it \
+             moves.\n\n\
+             This is not a --force: it writes no transition the engine would not have written by \
+             itself, and a project that still disagrees afterwards is reported as such and exits 1."
+    )]
     Repair {
         /// Run the repair. Without it this verb reads the project through DR-43-7's read-only door
         /// and writes nothing at all — no repair, no quarantine, no key needed (R4, `req/225`
         /// H-01).
         #[arg(long)]
+        #[arg(help = "Run the repair. Without it nothing is written and no key is needed.", long_help = None)]
         yes: bool,
         /// The key `recover` signs with, if it finishes an interrupted commit. Defaults to
         /// `.gx/config.toml`'s `engine_signing_keyid` (E-M6-7), as `gx serve` does.
         #[arg(long)]
+        #[arg(help = "The key to sign with if an interrupted commit is finished. Defaults to this project's configured key.", long_help = None)]
         signing_key: Option<String>,
         /// 🔴 **R6 / DR-43-10** — a signed checkpoint kept outside this machine
         /// (`gx checkpoint export`). The project is refused if its tree is behind that document.
@@ -578,6 +759,7 @@ enum Command {
         /// This is the only check in `gx` that cannot be defeated by write access to the project,
         /// because the evidence is not in the project (`req/229` §7-4).
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "A signed checkpoint kept outside this machine. The project is refused if its tree is behind it.", long_help = None)]
         against: Option<PathBuf>,
         /// 🔴 **R7 / `req/38` §171 ruling 2(c)** — take the shorter tree, on purpose and on the
         /// record.
@@ -590,6 +772,7 @@ enum Command {
         /// This makes it a decision. It requires `--yes` and `--against <FILE>`, the file has to be
         /// this project's, and the new head records what it replaced.
         #[arg(long, requires = "against")]
+        #[arg(help = "Accept a tree that has gone backwards, on the record. Requires --yes and --against.", long_help = None)]
         accept_rollback: bool,
         /// 🔴 **R8 / `req/234` H-01** — file the commit receipts this project's committed leaves
         /// have none of.
@@ -601,26 +784,34 @@ enum Command {
         /// nothing. It never asks the substrate to change anything. Requires `--yes`; the count it
         /// acts on is `receipts_missing` in the diagnosis.
         #[arg(long)]
+        #[arg(help = "File the commit receipts this project's committed entries are missing. Requires --yes.", long_help = None)]
         reissue_receipts: bool,
         /// Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// Deterministic replay of the engine journal (44 §1.2, E-M5-2).
+    #[command(about = "Replay the engine journal, deterministically, and report what it reconstructs.", long_about = None)]
     Replay {
         /// A `gx1:` transformation id. Omit it and use `--from`/`--to`, or neither for everything.
+        #[arg(help = "A gx1: transformation id. Omit it and use --from/--to, or neither for everything.", long_help = None)]
         transformation: Option<String>,
         /// First journal record index, inclusive (M6H2-8: of the **journal**).
         #[arg(long, requires = "to")]
+        #[arg(help = "First journal record index, inclusive.", long_help = None)]
         from: Option<usize>,
         /// Last journal record index, exclusive.
         #[arg(long, requires = "from")]
+        #[arg(help = "Last journal record index, exclusive.", long_help = None)]
         to: Option<usize>,
         /// Accepted for 44 §1.2's synopsis. Replay writes nothing (E-M5-2); see M6H2-9.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Replay writes nothing in any case.", long_help = None)]
         dry_run: bool,
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 Put down an intent that was never planned (**E-M6-14**; not in 44 §1.1's thirteen).
@@ -628,6 +819,7 @@ enum Command {
     /// The verb exists because **E-M6-1** took `Draft` out of `gx cancel`'s from-set: a draft has no
     /// `TransformationId`, no row in the state table (M5-17 adopted (b)) and no journal record that could
     /// carry an `Aborted`. "discarding a draft is an operation that does not land in the ledger" (sem: SEM-gx-cli-435) — 43 T-7 is a transition and this is not.
+    #[command(about = "List or discard intents that were never planned.", long_about = None)]
     Draft {
         #[command(subcommand)]
         cmd: DraftCmd,
@@ -640,29 +832,51 @@ enum Command {
     /// request declares, and 43 T-7's owner guard has no enforcement point. The default bind is
     /// therefore loopback (127.0.0.1:8787); binding anywhere else exposes an unauthorized surface and
     /// is refused without an explicit flag.
+    #[command(
+        about = "Serve the HTTP surface until a signal. Loopback only, behind a single bearer token.",
+        // 🔴 `req/895` §3 — this is the absence notice, and `tests/m6h6_cli.rs`
+        // (`m6h5_13_serve_help_renders_the_absence_notice`) holds it to the terminal. It is a
+        // limitation disclosure and not a citation: this lane's first pass replaced it with
+        // `long_about = None` and that suite caught it. Trimming private vocabulary must not trim
+        // the sentence that tells an operator what is not checked.
+        long_about = "Serve the HTTP surface until a signal.\n\n\
+             Authorization: the only check is a single static Bearer token. It answers whether the \
+             caller holds this server's token and nothing about who they are. There is no \
+             authorization layer in this version: `cancel` and `escalation` accept whichever actor \
+             the request declares, and the owner guard has no enforcement point. The default bind \
+             is therefore loopback (127.0.0.1:8787); binding anywhere else exposes an unauthorized \
+             surface and is refused without an explicit flag."
+    )]
     Serve {
         /// 44 §1.2's flag. Loopback only in v0.1 — see the note above (M6-10 adopted (b); sem: SEM-gx-cli-437).
         #[arg(long, value_name = "ADDR:PORT")]
+        #[arg(help = "Address to listen on. Loopback only in this version.", long_help = None)]
         bind: Option<String>,
         /// DR-2's `EnforcementMode` axis for this process (43 §4). **Not** a fail posture.
         #[arg(long)]
+        #[arg(help = "Judge but do not enforce, for this process. This is not a failure posture.", long_help = None)]
         record_only: bool,
         /// DR-2's other axis (ASM-13): what happens when the verifier cannot be reached.
         #[arg(long, value_name = "closed|open")]
+        #[arg(help = "What to do when the verifier cannot be reached: closed refuses, open proceeds.", long_help = None)]
         fail_posture: Option<String>,
         /// 44 §1.2's synopsis. Refused in v0.1 — 44 §2.5 puts mTLS in "v0.2 (announced)" (N-09; sem: SEM-gx-cli-438).
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Accepted and refused in this version.", long_help = None)]
         tls_cert: Option<PathBuf>,
         /// As `--tls-cert`.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Accepted and refused in this version.", long_help = None)]
         tls_key: Option<PathBuf>,
         /// 🔴 The file holding 44 §2.5's bearer token. Required; the **path** is the argument so
         /// that the secret is not in `ps` (not in 44 §1.2's synopsis — M6H6-8).
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "The file holding the bearer token. Required. The path is the argument so the secret stays out of the process list.", long_help = None)]
         token_file: Option<PathBuf>,
         /// The key this server signs receipts with (45 §1). Defaults to `.gx/config.toml`'s
         /// `engine_signing_keyid` (**E-M6-7**).
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "The key this server signs receipts with. Defaults to this project's configured key.", long_help = None)]
         signing_key: Option<String>,
     },
 }
@@ -684,17 +898,22 @@ enum DraftCmd {
     /// So the list is taken from the **journal** (Σ's `drafts` component) and each row says
     /// whether the body is on the disk, and the rows whose body is gone are counted separately.
     /// A read: no lock, no writer's door (`req/215` M-02's rule for `verdict-checkpoint list`).
+    #[command(about = "List the drafts this project holds, and say which have lost their body.", long_about = None)]
     List {
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 **E-M6-14** — discard a draft body. Writes nothing to the ledger.
+    #[command(about = "Discard a draft. Nothing is written to the ledger.", long_about = None)]
     Discard {
         /// The `gx1:` **intent** id `gx submit` printed.
+        #[arg(help = "The gx1: intent id that gx submit printed.", long_help = None)]
         intent: String,
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
 }
@@ -702,31 +921,41 @@ enum DraftCmd {
 #[derive(Debug, clap::Subcommand)]
 enum EscalationCmd {
     /// T-5 — "human ruling = Admit" (sem: SEM-gx-cli-439), to `Admitted` (AC-071).
+    #[command(about = "Rule that an escalated transformation may proceed.", long_about = None)]
     Approve {
         /// A `TicketId`, or the `TransformationId` 44 §2.2 uses for the same operation (M6-04 adopted (c); sem: SEM-gx-cli-440).
+        #[arg(help = "A ticket id, or the transformation id it is about.", long_help = None)]
         id: String,
         /// 44 §1.2: "`--reason`: reason for the ruling (required)" (sem: SEM-gx-cli-441).
         #[arg(long, value_name = "TEXT")]
+        #[arg(help = "Why. Required.", long_help = None)]
         reason: String,
         /// The ruler's key id. 43 T-5: "the ruler holds a valid signing key" (sem: SEM-gx-cli-442).
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "Required. The key id of the person ruling; they must hold a usable signing key.", long_help = None)]
         actor_key: Option<String>,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// T-5b — "human ruling = Deny" (sem: SEM-gx-cli-443), to `Denied` (AC-072).
+    #[command(about = "Rule that an escalated transformation may not proceed.", long_about = None)]
     Reject {
         /// A `TicketId`, or the `TransformationId` 44 §2.2 uses (M6-04 adopted (c); sem: SEM-gx-cli-444).
+        #[arg(help = "A ticket id, or the transformation id it is about.", long_help = None)]
         id: String,
         /// 44 §1.2: "`--reason`: reason for the ruling (required)" (sem: SEM-gx-cli-445).
         #[arg(long, value_name = "TEXT")]
+        #[arg(help = "Why. Required.", long_help = None)]
         reason: String,
         /// The ruler's key id.
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "Required. The key id of the person ruling.", long_help = None)]
         actor_key: Option<String>,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
 }
@@ -734,23 +963,30 @@ enum EscalationCmd {
 #[derive(Debug, clap::Subcommand)]
 enum PolicyCmd {
     /// 44 §1.2: "Cedar policy syntax/schema verification" (sem: SEM-gx-cli-446) — and the invariant half (FR-027, M6-21).
+    #[command(about = "Check a policy pack's syntax and schema, and the invariants it has to satisfy.", long_about = None)]
     Lint {
         /// The pack to read.
+        #[arg(help = "The pack to read.", long_help = None)]
         path: PathBuf,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 44 §1.2: "run Gate evaluation against the specified scenario … and check it against the
     /// expected value" (sem: SEM-gx-cli-447).
+    #[command(about = "Run the gate against scenarios and check each answer against the one expected.", long_about = None)]
     Test {
         /// The pack to decide with.
+        #[arg(help = "The pack to decide with.", long_help = None)]
         path: PathBuf,
         /// The scenarios: `Intent`/`Evidence`/expected `Verdict`, as JSON.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The scenarios as JSON: an intent, its evidence, and the verdict expected.", long_help = None)]
         scenario: PathBuf,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
 }
@@ -758,43 +994,98 @@ enum PolicyCmd {
 #[derive(Debug, clap::Subcommand)]
 enum VerdictCheckpointCmd {
     /// Close the current window, sign the counts, append them to the chain.
+    #[command(about = "Close the current window, sign the counts, and append them to the chain.", long_about = None)]
     Issue {
         /// The signing key. Required for `gx log checkpoint`'s reason (§47 M6-24: "only the ledger's
         /// owner can make one"; sem: SEM-gx-cli-448) — a count published about a deployment is a statement by that deployment.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "Required. The signing key: a count published about a deployment is a statement by that deployment.", long_help = None)]
         key: Option<PathBuf>,
         /// The namespace (42 §3.11's `origin`).
         #[arg(long, default_value = gx_cli::verdict::DEFAULT_VERDICT_ORIGIN)]
+        #[arg(help = "The namespace the counts are published under.", long_help = None)]
         origin: String,
         /// Also write it here, byte for byte as stdout carries it.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Also write it here, byte for byte as stdout carries it.", long_help = None)]
         out: Option<PathBuf>,
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// Check one checkpoint or a chain of them.
+    #[command(about = "Check one checkpoint, or a chain of them.", long_about = None)]
     Verify {
         /// The documents, in chain order. `-` reads one from stdin.
         #[arg(value_name = "FILE|-")]
+        #[arg(help = "The documents, in chain order. - reads one from stdin.", long_help = None)]
         files: Vec<String>,
         /// The public key the chain was signed with. Without it the signature check says `skipped`.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The public key the chain was signed with. Without it the signature check says skipped.", long_help = None)]
         key: Option<PathBuf>,
         /// A signed ledger head (`gx log checkpoint`) to bind the chain against.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "A signed ledger head to bind the chain against.", long_help = None)]
         ledger_checkpoint: Option<PathBuf>,
         /// Recount the verdicts from this project's journal and compare (AC-VC-2's half).
         #[arg(long)]
+        #[arg(help = "Recount the verdicts from this project's journal and compare.", long_help = None)]
         recount_from_journal: bool,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// The chain this deployment has published.
+    #[command(about = "List the chain this deployment has published.", long_about = None)]
     List {
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
+        json: bool,
+    },
+}
+
+/// 🔴 **R-922-F2 phase 1** — the two verbs the `.gx` object file ships with.
+///
+/// `import` and `inspect` are the next phase's and are deliberately absent: a verb that decoded a
+/// file and wrote it back into `.gx/` state is a road nothing in this phase has a preimage for.
+#[derive(Debug, clap::Subcommand)]
+enum ObjectCmd {
+    /// Write the receipt this project filed for a transformation to a `.gx` file.
+    #[command(about = "Write the signed record of one change to a portable file.", long_about = None)]
+    Export {
+        /// The `gx1:` transformation id.
+        #[arg(help = "The gx1: transformation id.", long_help = None)]
+        id: String,
+        /// Where to write it. Outside the project is the point: the file is for somebody else.
+        #[arg(long, value_name = "FILE")]
+        #[arg(help = "Where to write it. A path outside the project is the point.", long_help = None)]
+        out: PathBuf,
+        /// Accepted for compatibility with the other verbs. Output is JSON either way.
+        #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
+        json: bool,
+    },
+    /// Check one `.gx` file: its identity claim against its body, then its signature.
+    ///
+    /// No ledger is consulted and no project is opened, so this runs where the file is — which is
+    /// the whole point of exporting one.
+    #[command(about = "Check a portable file: that it is what it says it is, and that it is signed.", long_about = None)]
+    Verify {
+        /// The file to check.
+        #[arg(help = "The file to check.", long_help = None)]
+        file: PathBuf,
+        /// The public key. Without it, the key the record names is looked for in the local store,
+        /// which a third party does not have.
+        #[arg(long, value_name = "FILE")]
+        #[arg(help = "The public key. What `gx key gen` prints, or a gx key file.", long_help = None)]
+        key: Option<PathBuf>,
+        /// Accepted for compatibility with the other verbs. Output is JSON either way.
+        #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
 }
@@ -802,29 +1093,38 @@ enum VerdictCheckpointCmd {
 #[derive(Debug, clap::Subcommand)]
 enum ReceiptCmd {
     /// Show a stored receipt, at one of 48 §3.1's four disclosure levels (M6-16 adopted (a); sem: SEM-gx-cli-449).
+    #[command(about = "Show a stored receipt, at one of four levels of disclosure.", long_about = None)]
     Show {
         /// The `gx1:` transformation id.
+        #[arg(help = "The gx1: transformation id.", long_help = None)]
         transformation: String,
         /// 1=verdict badge, 2=summary, 3=full expansion, 4=raw signatures. Default 1.
         #[arg(long, default_value_t = 1, value_name = "1..4")]
+        #[arg(help = "1 = verdict badge, 2 = summary, 3 = full expansion, 4 = raw signatures. Default 1.", long_help = None)]
         level: u8,
         /// "`--json` is always the full amount" (M6-16 adopted (a); sem: SEM-gx-cli-450): equivalent to `--level 4`.
         #[arg(long)]
+        #[arg(help = "Print the full amount, the same as --level 4.", long_help = None)]
         json: bool,
     },
     /// Verify a receipt: DSSE signature, canonical CID, and inclusion against a known checkpoint.
+    #[command(about = "Verify a receipt: its signature, its content address, and its inclusion in a known ledger head.", long_about = None)]
     Verify {
         /// The receipt file, or `-` for stdin (44 §1.2).
+        #[arg(help = "The receipt file, or - to read it from stdin.", long_help = None)]
         file: String,
         /// Do not consult any ledger. AC-057's mode.
         #[arg(long)]
+        #[arg(help = "Do not consult any ledger.", long_help = None)]
         offline: bool,
         /// The known `Checkpoint` to check the inclusion proof against.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The known ledger head to check the inclusion proof against.", long_help = None)]
         checkpoint: Option<PathBuf>,
         /// 🔴 The key the `--checkpoint` was signed with (**M6H8-11 adopted (b)**, req/38 §55; sem: SEM-gx-cli-451). Without it
         /// the anchor is taken on trust and the answer says `anchor_authenticated: false`.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The key that head was signed with. Without it the answer says anchor_authenticated: false.", long_help = None)]
         checkpoint_key: Option<PathBuf>,
         /// 🔴 **H-09** — the `ConsistencyProof` (`gx log consistency --from <receipt's tree_size>
         /// --to <checkpoint's tree_size>`) that ties the tree this receipt names to the tree the
@@ -833,14 +1133,25 @@ enum ReceiptCmd {
         /// one. Without it such a receipt answers `inclusion: unbridged` — not a pass, and not a
         /// refutation.
         #[arg(long, value_name = "FILE")]
+        #[arg(
+            help = "A consistency proof tying the tree this receipt names to the tree the head names.",
+            long_help = "A consistency proof (`gx log consistency --from <the receipt's tree_size> \
+                 --to <the head's tree_size>`) tying the tree this receipt names to the tree the \
+                 head names. Needed only when the log has grown since the receipt was issued and \
+                 the head came from a file; on the default path the local ledger produces one.\n\n\
+                 Without it such a receipt answers `inclusion: unbridged`, which is not a pass and \
+                 not a refutation either."
+        )]
         consistency: Option<PathBuf>,
         /// The public key. `gx key gen`'s output, or a gx key file. See M6H2-6.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The public key. What `gx key gen` prints, or a gx key file.", long_help = None)]
         key: Option<PathBuf>,
         /// 🔴 **FR-M7-3**: the revocation list to consult (`gx key revoke`'s output). Without it the
         /// answer says `revocation: not_consulted`, which ASM-45-2 permits — "consulting the
         /// revocation list is optional on the verifier's side" (sem: SEM-gx-cli-452) — and which is a different word from `not_revoked`.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The revocation list to consult. Without it the answer says revocation: not_consulted, which is not the same as not_revoked.", long_help = None)]
         revocations: Option<PathBuf>,
         /// 🔴 How far back a revocation reaches. ASM-45-2's DEFAULT is `from-revocation`
         /// ("a receipt issued before revocation is not retroactively invalidated"; sem: SEM-gx-cli-453); `all` refuses every receipt the key ever
@@ -850,6 +1161,7 @@ enum ReceiptCmd {
             value_name = "from-revocation|all",
             default_value = "from-revocation"
         )]
+        #[arg(help = "How far back a revocation reaches. from-revocation leaves earlier receipts valid; all refuses every receipt the key ever signed.", long_help = None)]
         retroaction: String,
     },
     /// 🔴 **P-1b** (`req/544` §3 R-3c) — which of the four questions this receipt answers, and
@@ -863,14 +1175,18 @@ enum ReceiptCmd {
     /// With `--face`, the face's own claim is printed **beside** the receipt's answer, in a
     /// separate vocabulary. A face that claims it can observe reads and a receipt that answers
     /// `unknown` are both correct at once, and the answer says so rather than refusing.
+    #[command(about = "Say which of the four questions this receipt answers, and which it does not.", long_about = None)]
     Coverage {
         /// The receipt file.
+        #[arg(help = "The receipt file.", long_help = None)]
         file: String,
         /// A face declaration (`.gx/faces/<face>.json`) to print the claim from.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "A face declaration to print the claim from.", long_help = None)]
         face: Option<PathBuf>,
         /// 44 §1.2's flag. Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
 }
@@ -883,16 +1199,20 @@ enum CheckpointCmd {
     /// No key is needed: the document is already signed. What comes out is exactly what
     /// `gx receipt verify --offline --checkpoint <FILE>` reads, so the export is usable by somebody
     /// who holds no key of this project's at all.
+    #[command(about = "Copy this project's signed ledger head to a file outside `.gx/`. No key needed.", long_about = None)]
     Export {
         /// Where to write it. A path outside the project is the entire point (`req/229` §7-4).
+        #[arg(help = "Where to write it. A path outside the project is the entire point.", long_help = None)]
         file: PathBuf,
         /// 🔴 **AC-B5 / `req/682` §2-3** — also write the C2SP tlog-checkpoint **body** here, the
         /// three-line note text a public transparency log ingests. Generated only: this verb never
         /// publishes it (`req/682` §4). Omitted, only the JSON at `<FILE>` is written, as before.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Also write the checkpoint's note body here, in the form a public transparency log ingests. Generated only; nothing is published.", long_help = None)]
         note_out: Option<PathBuf>,
         /// Output is JSON either way (44 §1.3).
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 **AC-B5 / `req/682` §2-2** — name any contradiction across collected checkpoints, offline.
@@ -908,14 +1228,24 @@ enum CheckpointCmd {
     /// proof (`gx log consistency --from <old> --to <new>`), are classified as a genuine extension or
     /// a `fork` via `gx_log::classify_extension`. Omitted, `audit` answers exactly as before
     /// (equivocation only) — this is additive, not a behaviour change to the default road.
+    #[command(about = "Name any contradiction across collected checkpoints, offline. Exit 7 when one is found.", long_about = None)]
     Audit {
         /// The checkpoint files to audit (the JSON `gx checkpoint export` writes). At least one.
         #[arg(value_name = "FILE", required = true)]
+        #[arg(help = "The checkpoint files to audit. At least one.", long_help = None)]
         files: Vec<PathBuf>,
         /// 🔴 The public key to verify each checkpoint's signature under before auditing it. Omitted,
         /// the arithmetic still runs but `signatures_verified` is `false`: a forged checkpoint could
         /// then manufacture a false equivocation, which is why passing it is the stronger audit.
         #[arg(long, value_name = "FILE")]
+        #[arg(
+            help = "The public key to verify each checkpoint's signature under.",
+            long_help = "The public key to verify each checkpoint's signature under before \
+                 auditing it.\n\n\
+                 Omitted, the arithmetic still runs but `signatures_verified` is false, and a \
+                 forged checkpoint could then manufacture a contradiction that is not there. \
+                 Passing it is the stronger audit."
+        )]
         key: Option<PathBuf>,
         /// 🔴 **B-audit M-1 / N-47** — a `ConsistencyProof` (the JSON `gx log consistency` prints)
         /// bridging exactly the two `--files` given, by size. Requires exactly two files; `classify_extension`
@@ -923,9 +1253,11 @@ enum CheckpointCmd {
         /// bridges. Reuses `gx_cli::receipt::read_consistency` — one document, two commands (H-09's
         /// reasoning applied here).
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "A consistency proof bridging exactly the two --files given. Requires exactly two.", long_help = None)]
         proof: Option<PathBuf>,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
 }
@@ -933,15 +1265,19 @@ enum CheckpointCmd {
 #[derive(Debug, clap::Subcommand)]
 enum LogCmd {
     /// An inclusion proof for one leaf (44 §1.2).
+    #[command(about = "Produce an inclusion proof for one leaf.", long_about = None)]
     Proof {
         /// A leaf index or a `gx1:` transformation id.
         #[arg(long, value_name = "INDEX|TID")]
+        #[arg(help = "A leaf index, or a gx1: transformation id.", long_help = None)]
         leaf: String,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// A consistency proof between two tree sizes (44 §1.2).
+    #[command(about = "Produce a consistency proof between two tree sizes.", long_about = None)]
     Consistency {
         #[arg(long, value_name = "SIZE")]
         from: u64,
@@ -949,18 +1285,23 @@ enum LogCmd {
         to: u64,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 Publish a signed checkpoint of the current tree (**M6-24 adopted (b)**; not in 44 §1.1, M6H2-7; sem: SEM-gx-cli-454).
+    #[command(about = "Publish a signed checkpoint of the current tree.", long_about = None)]
     Checkpoint {
         /// The ledger signing key. Required: only the log's owner can publish its head.
         #[arg(long, value_name = "FILE")]
+        #[arg(help = "The ledger signing key. Required: only the log's owner can publish its head.", long_help = None)]
         key: Option<PathBuf>,
         /// The log's namespace (42 §3.11).
         #[arg(long, default_value = ledger::DEFAULT_ORIGIN)]
+        #[arg(help = "The log's namespace.", long_help = None)]
         origin: String,
         /// Also write the checkpoint here, byte for byte as stdout carries it.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Also write the checkpoint here, byte for byte as stdout carries it.", long_help = None)]
         out: Option<PathBuf>,
     },
 }
@@ -968,16 +1309,19 @@ enum LogCmd {
 #[derive(Debug, clap::Subcommand)]
 enum KeyCmd {
     /// Generate an Ed25519 signing key (44 §1.2, FR-020).
+    #[command(about = "Generate an Ed25519 signing key.", long_about = None)]
     Gen {
         #[arg(long, default_value = keys::ALGORITHM)]
         alg: String,
         /// Where to write the secret. Defaults to req/56 §3's `~/.gx/keys/<key_id>.key`.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Where to write the secret. Defaults to ~/.gx/keys/<key_id>.key.", long_help = None)]
         out: Option<PathBuf>,
         /// 🔴 **FR-M7-4**: record the generated id in the project's `.gx/config.toml` as
         /// `engine_signing_keyid`, which is where `gx serve` reads it (E-M6-7). Without this flag
         /// the slot has a reader and no writer (M6H7-8), and a fresh volume has no way to fill it.
         #[arg(long)]
+        #[arg(help = "Record the new id in this project's `.gx/config.toml`, where gx serve reads it.", long_help = None)]
         record: bool,
         /// 🔴 **P2 item2** (`req/130` §1, NFR-010): a **file** holding a passphrase. When given, the
         /// secret is written encrypted (argon2id + ChaCha20-Poly1305) instead of plaintext-0600.
@@ -985,37 +1329,48 @@ enum KeyCmd {
         /// argument and the passphrase is not, for `--token-file`'s reason (`crates/gx-cli/src/
         /// serve.rs`'s module header).
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "A file holding a passphrase. When given, the secret is written encrypted instead of in the clear.", long_help = None)]
         passphrase_file: Option<PathBuf>,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// List locally known key ids (44 §1.2).
+    #[command(about = "List the key ids this machine knows.", long_about = None)]
     List {
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 Revoke a key (**FR-M7-3**, ruling #6; not in 44 §1.2 — see `gx_cli::keys::revoke`; sem: SEM-gx-cli-456).
+    #[command(about = "Revoke a key.", long_about = None)]
     Revoke {
         /// The key to revoke. Its secret must still be in the store: a revocation is signed by the
         /// key it revokes.
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "The key to revoke. Its secret must still be in the store: a revocation is signed by the key it revokes.", long_help = None)]
         key_id: String,
         /// Why, in the operator's words. It travels inside the signed entry.
         #[arg(long, default_value = "revoked by the operator")]
+        #[arg(help = "Why, in your own words. It travels inside the signed entry.", long_help = None)]
         reason: String,
         /// Write the list here instead of `~/.gx/keys/revocations.json`.
         #[arg(long, value_name = "PATH")]
+        #[arg(help = "Write the list here instead of ~/.gx/keys/revocations.json.", long_help = None)]
         out: Option<PathBuf>,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
     /// 🔴 Generate a successor and revoke the predecessor, in one command (**FR-M7-3**).
+    #[command(about = "Generate a successor and revoke the predecessor, in one command.", long_about = None)]
     Rotate {
         /// The key being rotated out.
         #[arg(long, value_name = "KEY_ID")]
+        #[arg(help = "The key being rotated out.", long_help = None)]
         key_id: String,
         #[arg(long, default_value = keys::ALGORITHM)]
         alg: String,
@@ -1024,9 +1379,11 @@ enum KeyCmd {
         /// Record the **successor**'s id in `.gx/config.toml` (FR-M7-4). A rotation whose server
         /// keeps signing with the revoked key is a rotation that did nothing.
         #[arg(long)]
+        #[arg(help = "Record the successor's id in `.gx/config.toml`. A rotation whose server keeps signing with the revoked key did nothing.", long_help = None)]
         record: bool,
         /// 44 §1.2's flag.
         #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
         json: bool,
     },
 }
@@ -1222,9 +1579,8 @@ fn settled(code: u8) -> ExitCode {
     let wire_undelivered = gx_mcp_wire::notes::notes_undelivered();
     #[cfg(not(feature = "mcp"))]
     let wire_undelivered = 0;
-    let _sentences_with_nowhere_to_go = gx_cli::emit::notes_undelivered()
-        + gx_api::notes::notes_undelivered()
-        + wire_undelivered;
+    let _sentences_with_nowhere_to_go =
+        gx_cli::emit::notes_undelivered() + gx_api::notes::notes_undelivered() + wire_undelivered;
     ExitCode::from(code)
 }
 
@@ -1459,6 +1815,9 @@ fn reads_the_mcp_wiring(command: &Command) -> bool {
         | Command::Limits { .. }
         | Command::VerdictCheckpoint { .. }
         | Command::Receipt { .. }
+        // 🔴 **R-922-F2** — `gx object export` reads `.gx/receipts/` and `gx object verify` reads
+        // one file; neither opens a road to a server.
+        | Command::Object { .. }
         | Command::Log { .. }
         | Command::Key { .. }
         | Command::Checkpoint { .. }
@@ -1847,6 +2206,7 @@ fn run(cli: &Cli) -> Result<Outcome> {
         ),
         Command::VerdictCheckpoint { cmd } => verdict_checkpoint_cmd(cli, cmd),
         Command::Receipt { cmd } => receipt_cmd(cli, cmd),
+        Command::Object { cmd } => object_cmd(cli, cmd),
         Command::Log { cmd } => log_cmd(cli, cmd),
         Command::Key { cmd } => key_cmd(cli, cmd),
         Command::Repair {
@@ -2331,10 +2691,12 @@ fn verdict_checkpoint_cmd(cli: &Cli, cmd: &VerdictCheckpointCmd) -> Result<Outco
             out,
             json: _,
         } => {
+            // 🔴 **`req/895` §3** — a refusal body, so it says why in the reader's words. The
+            // provenance is §47 M6-24's ruling for a tree head, which holds for a count as well.
             let path = key.as_ref().ok_or_else(|| Error::Usage {
-                detail: "--key names the key these counts are signed with. §47 M6-24's rule for a \
-                         tree head holds for a count as well: a statement a deployment publishes \
-                         about itself is signed by that deployment and by nothing standing in for it"
+                detail: "--key names the key these counts are signed with, and it is required: a \
+                         statement a deployment publishes about itself is signed by that \
+                         deployment and by nothing standing in for it"
                     .to_string(),
             })?;
             let pair = gx_witness::KeyPair::load(path)?;
@@ -2450,6 +2812,22 @@ fn escalation_cmd(cli: &Cli, cmd: &EscalationCmd) -> Result<Outcome> {
         &mcp_wiring(cli)?,
     )?;
     gx_cli::lifecycle::escalation(&mut session, id, decision, reason, &ruler, clock::now())
+}
+
+/// 🔴 **R-922-F2 phase 1** — `gx object export|verify`.
+///
+/// The arguments are parsed before the project is opened, for `gx receipt show`'s reason: an id
+/// that is not an id is invalid input wherever it was typed. `verify` opens no project at all.
+fn object_cmd(cli: &Cli, cmd: &ObjectCmd) -> Result<Outcome> {
+    match cmd {
+        ObjectCmd::Export { id, out, json: _ } => {
+            let id = transformation_id(id)?;
+            let layout = Layout::open(&project(cli)?)?;
+            let store = ReceiptStore::in_layout(&layout);
+            gx_cli::object::export(&store, &id, out)
+        }
+        ObjectCmd::Verify { file, key, json: _ } => gx_cli::object::verify(file, key.as_deref()),
+    }
 }
 
 fn receipt_cmd(cli: &Cli, cmd: &ReceiptCmd) -> Result<Outcome> {

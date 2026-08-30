@@ -199,7 +199,7 @@ pub const READ_SET_SPILL_THRESHOLD: usize = 5;
 ///
 /// | the road | what it means | the remedy it calls for |
 /// |---|---|---|
-/// | `gx_substrate::InvertOutcome::from_option` fixes `Vec::new()` on **both** arms, and T-11 hands the empty list to [`ReadSet::from_reads`] | the escrow ran and touched no object | none; this is a property of the change |
+/// | ~~`gx_substrate::InvertOutcome::from_option` fixes `Vec::new()` on **both** arms, and T-11 hands the empty list to [`ReadSet::from_reads`]~~ 🔴 **retracted, DEFECT-892-1 (`req/895` §1)**: those adapters do read, and `from_option` is gone. The road that remains is an adapter answering `InvertOutcome::inverted(_, Vec::new())` in its own source | the escrow ran and touched no object | none; this is a property of the change |
 /// | `gx-engine`'s `rebuilt_attest` ends its `find_map` in `unwrap_or_default()` | a rebuild found **no** `InverseEscrowed` record for this transformation | the record is gone — `gx repair`, and the journal's own retention |
 /// | `gx-engine`'s `InverseEscrowed.reads` is `#[serde(default)]` (E-M5-13's shape) | the record is there and **predates** 42 §3.13's `reads` | nothing is wrong; this project is older than DR-46-26 |
 /// | `issue_verdict_receipt` writes `None` by ASM-14 | the escrow is 43 T-10b and had not run | none; the question was not asked yet |
@@ -263,13 +263,26 @@ pub enum ReadSet {
     /// 🔴 **DR-46-34** — the escrow ran, and read nothing.
     ///
     /// `ReadSet::from_reads` answers this for an empty entry list, which is where the fact used to
-    /// become `Ok(None)`. It is the ordinary answer on the fs, git and postgres adapters, whose
-    /// `invert` builds its inverse out of the snapshot already in hand:
-    /// `InvertOutcome::from_option` fixes `Vec::new()` on both arms and says why in its own
-    /// documentation ("there is no read that could fail separately from the call itself").
+    /// become `Ok(None)`.
+    ///
+    /// 🔴🔴 **RETRACTED by DEFECT-892-1 (`req/895` §1).** The sentence that stood here —
+    /// "it is the ordinary answer on the fs, git and postgres adapters, whose `invert` builds its
+    /// inverse out of the snapshot already in hand" — was **the defect stated as a feature**.
+    /// Those adapters read their substrate (`std::fs::read`, `repo::tip`, a `SELECT`), and
+    /// `InvertOutcome::from_option` was discarding the reads before they reached here. So the
+    /// ordinary fs commit was minting a **signed** receipt that carried this member, and this
+    /// member decides — see [`ReadSet::names`] — that **no** locator in the universe was read.
+    /// `from_option` is deleted; those four adapters mint their entries where the read answers, and
+    /// their ordinary answer is now [`ReadSet::PerRead`].
+    ///
+    /// What is left for this member: an escrow that genuinely touched no object. A fixture that
+    /// holds its answer in memory is one; so is any future adapter whose inverse is a pure function
+    /// of the delta.
     ///
     /// **A positive statement, not an absence.** It says the escrow was asked and answered — which
-    /// is exactly what the two members below cannot say, and is why they are not this one.
+    /// is exactly what the two members below cannot say, and is why they are not this one. 🔴 And
+    /// because it is positive, a road that reaches it without having earned it is not silent: it is
+    /// **wrong**, under a signature. That is what DEFECT-892-1 was.
     Nothing,
     /// 🔴 **DR-46-34** — a rebuild that found no `InverseEscrowed` record for this transformation.
     ///
@@ -991,7 +1004,165 @@ pub struct ReceiptPayload {
     pub precondition_fingerprint: FingerprintBytes,
     /// 42 §3.10: set only after something was applied, so `None` on a `VerdictReceipt`.
     pub postcondition_fingerprint: Option<FingerprintBytes>,
+    /// 🔴 **F7 (`req/871` §1.7, registered `req/868` **R-868-6**) — the receipt-format version field
+    /// that did not exist.** `RECEIPT_PAYLOAD_TYPE` carries no version component and the payload
+    /// schema had already moved (at least) four times under one type name before this field existed
+    /// -- `tools/receipt_generation_gate.mjs`'s derived generation identity (SS858 §⑤, sha256 over
+    /// the sorted member set) is the machine-checked stopgap this workspace built for *itself*
+    /// while this field did not exist, and that gate's own header says plainly what it does not do:
+    /// "it does not put a version on the wire... a third party holding a receipt still cannot tell
+    /// which generation wrote it". This field is the remedy that closes that sentence.
+    ///
+    /// # `Option<u32>`, and why this is not `DeterminismBoundary`'s question again
+    ///
+    /// `DR-46-28` (this file, `determinism_boundary`) is deliberately **not** an `Option`, because
+    /// `unknown` there is a first-class fact about the world -- a receipt can truthfully say "nobody
+    /// established which side of the boundary this crossed" -- and folding that fact into `null`
+    /// would give one fact two spellings (`null` and `Unknown`), which is exactly `DR-46-26`'s
+    /// defect reproduced. `payload_version` asks a different question: not "what happened", but
+    /// "which shape of this very struct wrote these bytes". There is no meaningful third state
+    /// between "a generation number was written" and "this predates the field" -- absence has
+    /// exactly **one** honest reading, the same shape `confinement`'s and `catalogue_hash`'s
+    /// `None` already have on this struct (`None` = "the bytes predate the erratum that asks"),
+    /// not `determinism_boundary`'s. `#[serde(default)]` keeps every receipt this workspace ever
+    /// signed decodable: a DAG-CBOR map missing this key is not malformed, it is simply older.
+    ///
+    /// # What this build emits, and what it does not retroactively claim
+    ///
+    /// This binary always writes `Some(`[`CURRENT_PAYLOAD_VERSION`]`)`. That constant starts at
+    /// `1` and is **not** a claim about the four historical generations `tools/receipt_generation_gate.mjs`'s
+    /// own comment names -- those were never numbered and this field cannot reach backward to
+    /// number them; it can only make every generation **from here forward** self-identifying. The
+    /// gate's own sha256-derived identity remains the mechanism that tells *this workspace* whether
+    /// the struct's shape moved since it was last registered; `payload_version` is the orthogonal,
+    /// hand-assigned integer that tells a **third party holding one signed receipt, with no access
+    /// to this repository's history,** which shape it is reading. The two are deliberately not tied
+    /// together (one is derived and cannot go stale by construction, the other is a small integer a
+    /// human bumps on a breaking change and can) -- `check_schema` does not enforce agreement
+    /// between them because nothing about a decoded receipt lets a reader ask the gate anything.
+    ///
+    /// # Kind-independent, and why
+    ///
+    /// The struct's *shape* does not change between a `VerdictReceipt` and a `CommitReceipt` --
+    /// only which fields are populated does -- so this is carried on both, unconditionally, the same
+    /// way `receipt_kind` itself is: it answers a question about the payload, not about the
+    /// transformation's outcome.
+    ///
+    /// # 🔴 Recorded, not silently decided: a primary source called the root remedy Owner-gated
+    ///
+    /// `req/38` SS858 §⑤ (2026-08-26), in the same breath that built the sha256 stopgap above,
+    /// wrote: "F7の根本remedy(wireにversionを載せる)はDRでOwner gate" -- read narrowly, as a claim
+    /// that *landing this field* needed the Owner's own hand, that sentence conflicts with
+    /// `req/919` §3 W5, which lists this exact field addition among the batch's non-Owner-gate
+    /// items. This crate's CC recommendation, recorded here rather than decided silently: every
+    /// other wire-additive field this struct carries (`read_set`, `fingerprint_scope`,
+    /// `reversibility`, `determinism_boundary`, `confinement`, `catalogue_hash`) was landed by a
+    /// lane/Fable ruling (`DR-46-2x`, `req/38 §NNN裁定`) without literal Owner sign-off, and this
+    /// workspace's own definition of the Owner-gate ceiling (`~/.claude` doctrine's "推奨自走":
+    /// publish / push / DOI / financial / legal / key rotation / destructive KILL) does not name
+    /// wire-additive schema design among it -- push and publish of anything built on this field
+    /// remain Owner-gated exactly as `req/38:2819` fixes unconditionally ("publish/push=Owner
+    /// gate(不変)"), and this lane neither commits nor pushes. The SS858 sentence most plausibly
+    /// reflects that lane's own time-boxed choice not to spend its remaining cargo budget on the
+    /// real field, phrased as a hedge, rather than a canon ruling that a lane may never land this
+    /// field -- but it is quoted here **verbatim** rather than paraphrased away, so a reviewer who
+    /// reads it the stricter way has everything needed to override this decision without re-deriving
+    /// it.
+    ///
+    /// 🔴 **`req/919` W8 (2026-08-30), additive correction — the attribute this field's own doc and
+    /// its own test both named was never on it.** The paragraph above says "`#[serde(default)]`
+    /// keeps every receipt this workspace ever signed decodable", and
+    /// `tests/r868_payload_version_attest.rs`'s failure message says "if this line is the failure,
+    /// `ReceiptPayload::payload_version` has lost its `#[serde(default)]`" -- and W5 landed the
+    /// field without it. The test was green anyway, and for a reason neither text names: serde's
+    /// derive routes a missing field through `missing_field`, which **succeeds for any type that
+    /// deserialises from `None`**, so an `Option` decodes from absent bytes with or without the
+    /// attribute. The compatibility claim was therefore true and its stated mechanism was not, which
+    /// is the shape this workspace calls a green that lies. Adding the attribute here makes the two
+    /// texts true rather than editing them to describe the accident: it is what `confinement` and
+    /// `catalogue_hash` already carry, and it is what keeps the promise if this field is ever
+    /// wrapped in a type that is not an `Option`.
+    #[serde(default)]
+    pub payload_version: Option<u32>,
+    /// 🔴 **A2 (`req/910` A. / `req/38` SS830, `req/919` W8, 2026-08-30) — which engine build
+    /// signed this.** The north star's (`#435`) core question, seated on the one artefact a third
+    /// party actually holds.
+    ///
+    /// # What was already true, and what was not — the ledger row this corrects
+    ///
+    /// `req/910` A2 reads, in the ledger's own Japanese, that this field "is never captured and
+    /// never rendered" (the original wording is in `req/910` section A. and is not restated here:
+    /// this crate's comments are English by the workspace's third principle, and the ledger row is
+    /// one grep away), inherited from `req/38` SS830. **Half of that is stale and this field is the
+    /// half that was not.** The
+    /// engine has captured a version since M5-25: `Engine::derive_provenance` writes
+    /// [`crate::provenance::Environment::engine_version`] into the `ProvenanceDerived` record
+    /// **before the world moves**, and `GET /healthz` has rendered it since M6H5-12 (44 §2.2,
+    /// pinned by `gx-api/tests/m6h7_api.rs`). What was missing is the binding SS830 actually asked
+    /// for: **the receipt could not say it**. Provenance lives in Σ (`StateRow::provenance`) and Σ
+    /// is this repository's; a reader holding one signed document offline — the only reader the
+    /// four pillars promise anything to — had no key to read for it. So the honest statement of
+    /// the defect is not "never captured" but "captured everywhere except on the wire", which is
+    /// the same shape F7 had and is closed the same way.
+    ///
+    /// # 🔴 Read out of Σ, never out of this process — the constraint that picks the value
+    ///
+    /// This is [`ReceiptPayload::confinement`]'s rule and it is not stylistic. 43 §7-3b compares a
+    /// **rebuilt** payload's digest against the leaf the ledger already holds, and the process that
+    /// repairs is not the process that committed. A rebuild road that answered this from its own
+    /// `gx_engine::VERSION` would report `payload_mismatch` — the word for tampering — on every
+    /// crash-window recovery performed by a build other than the one that committed, which is the
+    /// ordinary case for the upgrade 47 §4 describes. The value therefore comes from
+    /// `row.provenance.environment.engine_version` on both rebuild roads, exactly as `read_set`
+    /// comes out of the escrow row, and from the live constant only where `confinement` also takes
+    /// it live (T-4a and T-11, where the signing process *is* the deriving process).
+    ///
+    /// # `Option<String>`, and what `None` means
+    ///
+    /// One honest reading, as with `confinement`, `catalogue_hash` and `payload_version`: **"these
+    /// bytes predate the erratum that asks"**. `#[serde(default)]` keeps every receipt this
+    /// workspace has ever signed decodable (`req/38` §294 ruling 2 registered the cost of the
+    /// alternative in real receipts that stopped decoding). There is a second, rarer `None` on the
+    /// rebuild roads — a journal written before M5-25 carries no `ProvenanceDerived` — and it reads
+    /// the same way for the same reason: reproducing an absence rather than inventing a version
+    /// nobody recorded. A `String` rather than a structured type because 42 §3.9 already types the
+    /// value it mirrors as one, and a receipt that spelled the same fact differently from the
+    /// provenance it is rebuilt from would fail the digest comparison above.
+    ///
+    /// # 🔴 What this does **not** close, stated here rather than discovered later
+    ///
+    /// The seat is closed; the **question** is not. Today the value is `gx_engine::VERSION`, which
+    /// is `env!("CARGO_PKG_VERSION")` = the workspace version, and it has read `0.1.0` for every
+    /// build this project has ever produced. So a receipt now names *a* version and still cannot
+    /// distinguish two builds of it — `#435`'s "which implementation answered" is **narrowed, not
+    /// answered**. Naming that here is the point: a field that looks like the answer while not
+    /// being it is worse than the gap, and this workspace's own rule is that the disclosure lives
+    /// where the mechanism lives.
+    ///
+    /// A build script minting a git hash was considered and **rejected for now**, on three grounds
+    /// a later lane can overturn with evidence rather than taste. (1) There is no `build.rs`
+    /// anywhere in this workspace; adding the first one is a new mechanism, not a mirror of an
+    /// existing one, and `req/38` SS856's cost split puts that in the other category. (2) A git
+    /// hash is not available when the crate is built from a published tarball, which has no `.git`
+    /// — so the value would differ between a CI build and a third party's rebuild of the same
+    /// source, and a *verifier* reproducing a receipt is precisely who this field is for. (3) The
+    /// seat is source-agnostic: whenever a build identity does land, it lands in
+    /// `Engine::derive_provenance`'s one line, and this field, the spec row, the fixtures and the
+    /// wire shape do not move. Landing the seat first is therefore the cheap half done first, and
+    /// the residual is registered rather than absorbed.
+    ///
+    /// # No cross-field rule in `check_schema`
+    ///
+    /// Deliberately, and for W5's reason: a rule pairing this with `payload_version` would reject
+    /// hand-built combinations nobody has observed while buying no fail-closed guarantee, since a
+    /// forger who can set one key can set both. The producer is the defence.
+    #[serde(default)]
+    pub engine_version: Option<String>,
 }
+
+/// The `payload_version` this build writes into every `ReceiptPayload` it constructs. See the
+/// field's own doc comment for what incrementing this does and does not claim.
+pub const CURRENT_PAYLOAD_VERSION: u32 = 1;
 
 /// 42 §1.3: "`ReceiptPayload` | all fields | — | Receipt is a meta-witness and has no exclusion rule
 /// (`Receipt` itself is what is signed)".

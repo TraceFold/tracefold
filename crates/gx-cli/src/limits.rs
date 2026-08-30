@@ -97,6 +97,15 @@ pub const LIMITS: [Limit; 8] = [
     // a **line-start** count over `lean/`, and `crates/gx-cli/tests/limits_sync.rs` now recounts the
     // tree on every run and holds this line, `docs/LIMITS.md` and `README.md` to what it finds --
     // so the next lane that adds a theorem is red here rather than silently stale for a release.
+    // 🔴 **B8 / `req/910` / `req/908` / `req/38` ERRATA SS871 (2026-08-29)** — the tail clause used
+    // to say the checks "run automatically on every push today" in the present tense. That went
+    // false on 2026-08-15T17:25:29Z (commit `44571dfe`, three minutes forty-seven seconds after the
+    // last green run, `f65aac2f`) when the GitHub Actions account hit a billing/spending-limit
+    // lockout -- every job on every workflow since has been rejected by the scheduler before it
+    // starts (2-5s "duration", no log, because none ran), not a code defect. A present-tense claim
+    // does not self-correct when the world under it changes (SS868 "開示の段落こそ最初に腐る"), so the
+    // replacement below is dated rather than tenseless, and is bound to req/908's diagnosis rather
+    // than to memory. The struck original is kept in `docs/LIMITS.md` (no-delete).
     Limit {
         statement: "the Lean model under `lean/` proves 117 theorems about the F0 specification, 12 \
                      of them named counterexamples, over 13 files, with 0 `sorry` and 1 `axiom` \
@@ -104,12 +113,15 @@ pub const LIMITS: [Limit; 8] = [
                      re-takes on every run); the Rust implementation is \
                      compared against that model by a differential test -- 1,500 conformance vectors, \
                      six kinds, on every push -- and a comparison is a difference check, not a proof: \
-                     no refinement theorem connects the two. of the checks that run automatically on \
-                     every push today, 16 of this project's 17 workspace crates are covered \
-                     (`probes/doubt` runs by hand because its subject lives outside the repository) and \
-                     the TypeScript SDK's own tests are not run by CI at all -- their green is a \
-                     person's run, not a machine's.",
-        citation: "45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note)",
+                     no refinement theorem connects the two. as of 2026-08-29 (`req/908`), CI has run \
+                     zero jobs on any push since 2026-08-15T17:25:29Z -- 13 days and 2,245 commits \
+                     with no machine signal, because the GitHub Actions account is billing-blocked, \
+                     not because of a code defect; the last time it ran (commit `f65aac2f`), the \
+                     checks covered 16 of this project's 17 workspace crates automatically \
+                     (`probes/doubt` runs by hand because its subject lives outside the repository), \
+                     and the TypeScript SDK's own tests have never run under CI at all -- their green \
+                     has always been a person's run, not a machine's.",
+        citation: "45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note); req/908 (2026-08-29 CI diagnosis); req/38 ERRATA SS871",
     },
 ];
 

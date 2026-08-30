@@ -31,7 +31,7 @@ mod support;
 
 use std::sync::{Arc, Mutex};
 
-use gx_core::{Fingerprint, SubstrateKind, Timestamp};
+use gx_core::{Fingerprint, Reversibility, SubstrateKind, Timestamp};
 use gx_engine::store::{FingerprintRecord, ObservationStore};
 use gx_engine::{
     BlobStore, Engine, EngineJournal, EngineJournalRecord, Error, InjectedEvidence, InverseStatus,
@@ -377,6 +377,70 @@ fn a_completion_failure_folds_to_unavailable_and_the_commit_continues() {
         .undo(&id, &engine.attested_postcondition(&id), 8, AT)
         .expect_err("no inverse to consume");
     assert_eq!(refused.kind(), "NotFound");
+}
+
+/// 🔴 **`req/871` F1 — a signed receipt asserting a reversibility it does not have.**
+/// **(2026-08-26, seat=Opus, 暫定 — 再審査可. `req/868` R-868-4. MEASURED RED, NOT YET FIXED.)**
+///
+/// The test above proves `inverse_delta` folds to `None`. It never looks at `reversibility`, and
+/// nothing else in the workspace does over this road — `dr4626_invert_seam.rs` asserts
+/// `Reversibility::False`/`Unknown` but reaches them from `invert` answering directly, which is
+/// captured *before* the fold. So the fold's effect on the receipt's other reversibility field has
+/// never been measured. It is measured here.
+///
+/// `verdict_c25` is taken from `adapter.invert(..).verdict()` at `pipeline.rs:6744`, **before** the
+/// settle. `inverse_delta: final_inverse` (`:7189`) reflects the fold at `:7166`;
+/// `reversibility: Some(verdict_c25)` (`:7214`) ships the pre-settle answer unchanged. So one
+/// signed payload carries `reversibility: Some(True)` beside `inverse_delta: None` — two fields of
+/// **one signed artifact** giving opposite answers to "can this be undone". A holder who reads the
+/// field we added precisely so that `inverse_delta: null` would stop being ambiguous
+/// (`req/38` §198 ruling (b)) is told **yes** by the very field that was supposed to disambiguate.
+///
+/// **Why this probe is `#[ignore]`d rather than green or red.** It is not ignored because it is
+/// doubtful — it is ignored because it is *correct and the code is wrong*, and this lane could not
+/// responsibly choose the repair. `Reversibility` is `Serialize`/`Deserialize`, on the wire, with a
+/// frozen receipt corpus over it; and neither surviving variant is obviously right. `False` says
+/// "no inverse exists for this call", but one *was* constructed and then lost. `Unknown` is
+/// documented as "the prior could not be read", which is a different fact. The honest repair may
+/// need a fourth word, and minting a word in a signed vocabulary at the end of an overrun box is
+/// how a lane replaces one lie with another. Landing it un-ignored would make `main` red for every
+/// other lane, which is a worse tax than a declared, runnable falsifier.
+///
+/// **Run it with `cargo test -p gx-engine --test two_phase_escrow -- --ignored`.** Whoever takes
+/// R-868-4 deletes the `#[ignore]` in the same commit that decides the vocabulary.
+#[test]
+#[ignore = "req/871 F1 / req/868 R-868-4: measured red; the repair is a signed-vocabulary decision"]
+fn the_receipt_does_not_claim_reversible_beside_an_inverse_that_folded_away() {
+    let dir = scratch("two_phase_f1");
+    let adapter = TwoPhaseAdapter::new("before").answering(br#"{"id":"1","url":"not-a-path"}"#);
+    let mut engine = engine_over(&dir, &adapter, true);
+    let id = commit_one(&mut engine, "after");
+
+    assert_eq!(engine.inverse_status(&id), Some(InverseStatus::Unavailable));
+    let payload = engine
+        .receipt(&id)
+        .expect("issued")
+        .payload()
+        .expect("decodes");
+
+    println!(
+        "F1_INVERSE_DELTA={:?} F1_REVERSIBILITY={:?}",
+        payload.inverse_delta, payload.reversibility
+    );
+
+    assert!(
+        payload.inverse_delta.is_none(),
+        "the bed: this road is the fold, so the receipt names no inverse"
+    );
+    assert_ne!(
+        payload.reversibility,
+        Some(Reversibility::True),
+        "req/871 F1: one signed payload must not answer \"can this be undone\" both ways. \
+         `inverse_delta` is None because the completion folded to Unavailable, so `reversibility` \
+         cannot still be the pre-settle True captured at pipeline.rs:6744. Fixing this means \
+         deriving reversibility from the settled state, and deciding which word the settled state \
+         deserves -- see req/868 R-868-4 before changing the enum"
+    );
 }
 
 // ---------------------------------------------------------------------------

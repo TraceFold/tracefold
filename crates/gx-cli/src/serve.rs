@@ -519,14 +519,22 @@ pub fn build(
     }
     let bind = resolve_bind(spec.bind.as_deref())?;
 
+    // 🔴 **`req/895` §3** (`req/878` finding 2) — this is a **refusal body**, which a caller's
+    // script parses and logs. It used to name `44 §2.5`, `M4H4-2` and a `sem:` anchor, none of
+    // which its reader can open: this repository's `req/` tree is not shipped. The reason it gives
+    // is unchanged; the words it gives it in are now the reader's, and the provenance stays here in
+    // a comment, which is where provenance goes (`req/306` §1 item 2). The requirement is 44 §2.5's
+    // (`Authorization: Bearer <token>` on every endpoint except `/healthz`), hand 5's reading of
+    // M4H4-2 is why a missing token is a usage error rather than a 401, and the anchor is
+    // (sem: SEM-gx-cli-197).
     let token_file = spec.token_file.as_ref().ok_or_else(|| Error::Usage {
-        detail: "--token-file <PATH> is required: 44 §2.5 makes `Authorization: Bearer <token>` \
-                 mandatory on every endpoint except `/healthz`, and a server with no token would \
-                 answer every request with an internal error rather than a 401 (hand 5's reading of \
-                 M4H4-2: \"your token is wrong\" (sem: SEM-gx-cli-197) is not something to say to a caller when the \
-                 server has no token at all). The **path** is the argument and the token is not, so \
-                 that `ps` shows where the secret is and not what it is"
-            .to_string(),
+        detail: "--token-file <PATH> is required. Every endpoint except /healthz needs an \
+                 `Authorization: Bearer <token>` header, so a server started without a token could \
+                 only answer an internal error, and \"your token is wrong\" is not an honest thing \
+                 to tell a caller when the server holds no token at all. The path is the argument \
+                 and the token is not, so that `ps` shows where the secret is rather than what it \
+                 is"
+        .to_string(),
     })?;
     let token = std::fs::read_to_string(token_file)
         .map_err(crate::io("read", token_file))?

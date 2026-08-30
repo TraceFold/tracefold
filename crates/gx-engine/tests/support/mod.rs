@@ -1062,12 +1062,18 @@ impl gx_substrate::SubstrateAdapter for StubAdapter {
         delta: &gx_substrate::PlannedDelta,
         _pre: &gx_core::ObjectSnapshot,
     ) -> gx_substrate::Result<gx_substrate::InvertOutcome> {
-        // 🔴 **DR-46-26** — `from_option` and not a hand-built outcome, on purpose: this stub
-        // stands in for the read-free adapters, and `from_option` is the one place their
-        // `Some`→`True` / `None`→`False` derivation lives.
-        Ok(gx_substrate::InvertOutcome::from_option(
-            self.invertible.then(|| delta.clone()),
-        ))
+        // 🔴 **DR-46-26**, amended by **DEFECT-892-1** (`req/895` §1). This used to call
+        // `InvertOutcome::from_option` "on purpose: this stub stands in for the read-free
+        // adapters". There are no read-free adapters — fs, git, mysql and postgres all read their
+        // substrate, and `from_option` was deleted along with the sentence that said otherwise.
+        //
+        // The stub keeps an **empty** read-set, and that is now a statement it makes in its own
+        // source rather than one it inherits: this fixture reads nothing because it holds the
+        // answer in `self.invertible` and never touches a substrate at all.
+        Ok(match self.invertible.then(|| delta.clone()) {
+            Some(inverse) => gx_substrate::InvertOutcome::inverted(inverse, Vec::new()),
+            None => gx_substrate::InvertOutcome::none(Vec::new()),
+        })
     }
 
     fn commutation(

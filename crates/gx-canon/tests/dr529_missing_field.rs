@@ -44,7 +44,8 @@ struct MissingB {
 #[test]
 fn dr529_canon_missing_field_is_refused_not_panicked_not_silently_defaulted() {
     let partial = MissingB { a: 7, c: true };
-    let bytes = cbor::encode(&partial).expect("a record with 2 of 3 fields still has a canonical form");
+    let bytes =
+        cbor::encode(&partial).expect("a record with 2 of 3 fields still has a canonical form");
 
     // Sanity: these bytes really are strictly canonical (this test is about a missing field, not
     // about non-canonical framing, which `negative_vectors.rs` already covers).

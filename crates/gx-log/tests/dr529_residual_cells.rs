@@ -107,7 +107,8 @@ fn dr529_log_missing_field_is_treated_as_a_torn_tail_not_silently_accepted() {
         leaf_cid: cid(9_999),
         receipt_digest: cid(1_003),
     };
-    let payload = gx_canon::cbor::encode(&partial).expect("a partial record still has a canonical form (4 of 5 keys)");
+    let payload = gx_canon::cbor::encode(&partial)
+        .expect("a partial record still has a canonical form (4 of 5 keys)");
     write_raw_record(&path, &payload);
 
     let reopened = LedgerStore::open(&path).expect("reopen over a schema-incomplete record");

@@ -292,6 +292,29 @@ pub enum AbortReason {
     /// The engine's own fault: an invariant broke inside the pipeline (41 §6 makes a panic a
     /// bug, and this is the recorded shape of the abort that bug causes).
     InternalError,
+    /// 🔴 **M5-11 / blocker item 5, ruled** (`req/919` A1; `req/38` §37 filed it and §41 extended
+    /// it to "the prediction and its check together"). The plan promised a post-state digest and
+    /// the apply observed a different one: `Transformation.target` is `Some` and
+    /// `AppliedDelta.resulting_digest` is not it.
+    ///
+    /// # Only reachable when a prediction exists
+    ///
+    /// 41 §3's `target` is an `Option`, and it is `None` for every adapter that does not fill
+    /// `PlannedDelta::promised_target`. No prediction, no comparison, no road to this word — which
+    /// is why adding it moves nothing for the six shipped adapters. The engine-side refusal §37
+    /// asked for is written where the two values meet, and L5 (`gx-substrate-conformance`) keeps
+    /// answering the same question one layer down, for a harness rather than a commit.
+    ///
+    /// # Fail-closed, and what it does not claim
+    ///
+    /// It is recorded **after** the world has moved: a post-state can only be compared once there
+    /// is one. So this word says the transformation did not commit and its receipt was never
+    /// issued, and it does **not** say the object is back where it started. The escrowed inverse
+    /// is completed before the refusal so that the material for an undo survives; sending it
+    /// automatically would be acting on the very model of the world this abort has just measured
+    /// to be wrong, and naming that decision in `NotAttemptedBecause`'s vocabulary is a separate
+    /// ruling (raised in `req/919` A1's report rather than made here).
+    PostconditionMismatch,
 }
 
 #[cfg(test)]
@@ -300,6 +323,13 @@ mod tests {
 
     /// No AC covers `AbortReason` -- 41 §3 requires the type, and the M1 acceptance set
     /// (AC-001..008, AC-058) does not reach it. Recorded here rather than left untested.
+    ///
+    /// 🔴 The name says six and the list is seven, and the name is left alone on purpose: a test
+    /// name is a historical record. The seventh is **M5-11 / blocker item 5's**
+    /// `PostconditionMismatch`, ruled in `req/919` A1 and transcribed into 43 §1 and 35 ASM-15 in
+    /// the same window -- the one event `crates/gx-engine/tests/lifecycle_states.rs` said it would
+    /// "report rather than absorb". The count moved because a **ruling** moved it, which is the
+    /// only reason a count in a test may move.
     #[test]
     fn abort_reason_has_the_six_asm_15_variants_and_round_trips() {
         let all = [
@@ -309,8 +339,9 @@ mod tests {
             AbortReason::Expired,
             AbortReason::OwnerCancelled,
             AbortReason::InternalError,
+            AbortReason::PostconditionMismatch,
         ];
-        assert_eq!(all.len(), 6);
+        assert_eq!(all.len(), 7);
         for r in all {
             match r {
                 AbortReason::PreconditionChanged
@@ -318,7 +349,8 @@ mod tests {
                 | AbortReason::VerifierUnavailable
                 | AbortReason::Expired
                 | AbortReason::OwnerCancelled
-                | AbortReason::InternalError => {}
+                | AbortReason::InternalError
+                | AbortReason::PostconditionMismatch => {}
             }
         }
     }

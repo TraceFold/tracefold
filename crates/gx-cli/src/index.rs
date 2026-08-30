@@ -30,6 +30,34 @@
 //! [`gx_engine::Engine::resolved`] for the rule). This file stores **one** entry per intent — the
 //! most recently learned — for the same reason the engine answers one: a cache that answered a set
 //! would be a second, richer opinion than the thing it caches.
+//!
+//! ## 🔴 That paragraph stopped being true on the engine's side (**RESIDUAL-895-B1**, `req/919` W7)
+//!
+//! It is kept above rather than rewritten, because it records the reason the cache was single-valued
+//! and that reason was sound **while the engine answered one**. `DEFECT-891-1` (`req/895` §2,
+//! `req/38` SS861 ②) changed the thing being cached: [`gx_engine::Engine`]'s backing map became a
+//! journal-ordered `Vec<TransformationId>` per intent, because `undo` mints a `T_u` whose `parents`
+//! are inside a `Transformation`'s identity and outside an `Intent`'s — two undos restoring the same
+//! bytes at the same locator under the same context and actor are **one intent and two
+//! transformations**, a tree.
+//!
+//! After that change the argument above **inverts**: a single-valued cache is not a poorer copy of a
+//! single-valued authority, it is a copy that has *flattened a branch the authority keeps*. The
+//! defect this closes is exactly that asymmetry — this file now holds the same journal-ordered,
+//! deduplicated chain [`gx_engine::Engine::resolved_all`] holds, and [`ResolutionIndex::get`] still
+//! answers the last of it, so the **order of authority is unchanged**: the cache is still never a
+//! second opinion, it is now merely no longer a lossier one.
+//!
+//! ## Why there is no version key in the file
+//!
+//! req/56 §2 makes this directory "derived, declared safe to delete — regenerate if it goes
+//! missing", and §5 makes the recovery rule for it "a damaged index is regenerated, **and what was
+//! lost and what was regenerated is always declared**". A generation counter inside a file the
+//! layer contract already declares
+//! disposable would be a second, weaker answer to a question [`Freshness`] answers properly. So the
+//! compatibility is carried in the **shape** instead: [`Chain`] accepts both the pre-W7 spelling
+//! (one id) and the post-W7 one (a list), an existing `.gx/index/` written by any earlier build
+//! loads whole and reports [`Freshness::Loaded`], and the writer emits the list form.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -49,13 +77,47 @@ const FILE: &str = "intent_to_transformation.json";
 /// delete with confidence — which req/56 §2 explicitly invites them to do.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Wire {
-    resolutions: BTreeMap<String, String>,
+    resolutions: BTreeMap<String, Chain>,
+}
+
+/// 🔴 **RESIDUAL-895-B1** (`req/919` W7) — the on-disk value: one id, or the branch.
+///
+/// `untagged` rather than a tagged enum or a bumped file name, because the two spellings are not two
+/// kinds of fact: `One(x)` and `Many(vec![x])` mean the same thing, and the first is simply what
+/// every build before this one wrote. Untagged makes reading a pre-W7 `.gx/index/` a **parse** and
+/// not a migration, which is what req/56 §2's "regenerable" cell buys — the alternative (refuse the
+/// old shape, report [`Freshness::Unreadable`], rebuild) would be correct too, and is rejected
+/// because it throws away a cache that is not damaged in order to honour a version number nobody
+/// needs to write down.
+///
+/// The writer only ever emits [`Chain::Many`]. `One` exists to be read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum Chain {
+    /// What every build before `req/919` W7 wrote: the most recently learned id, alone.
+    One(String),
+    /// What this build writes: the whole journal-ordered chain, as
+    /// [`gx_engine::Engine::resolved_all`] holds it.
+    Many(Vec<String>),
+}
+
+impl Chain {
+    /// The ids in order, whichever spelling carried them.
+    fn ids(self) -> Vec<String> {
+        match self {
+            Chain::One(id) => vec![id],
+            Chain::Many(ids) => ids,
+        }
+    }
 }
 
 /// `.gx/index/`'s id-resolution cache.
+///
+/// 🔴 The value is a `Vec` as of `req/919` W7 — see this module's header for why the single-valued
+/// design it replaces was right when it was written and wrong afterwards.
 #[derive(Debug, Clone, Default)]
 pub struct ResolutionIndex {
-    entries: BTreeMap<IntentId, TransformationId>,
+    entries: BTreeMap<IntentId, Vec<TransformationId>>,
 }
 
 impl ResolutionIndex {
@@ -72,14 +134,48 @@ impl ResolutionIndex {
     }
 
     /// Learn a resolution. Later learnings win, which is the engine's rule (Λ3(ii)).
+    ///
+    /// 🔴 **RESIDUAL-895-B1** (`req/919` W7) — "win" now means "answer [`ResolutionIndex::get`]",
+    /// not "evict". This is `Engine::remember_resolution`'s fold, mirrored: append when unseen,
+    /// idempotent when seen, so that 43 T-2's "re-running against the same snapshot yields … the
+    /// same `TransformationId`" does not grow the chain. The mirror is deliberate — a cache that
+    /// folded differently from the map it caches would disagree with it after exactly the sequence
+    /// (`plan`, `undo`, `undo`) that `DEFECT-891-1` was found on.
     pub fn learn(&mut self, intent: IntentId, transformation: TransformationId) {
-        self.entries.insert(intent, transformation);
+        let seen = self.entries.entry(intent).or_default();
+        if !seen.contains(&transformation) {
+            seen.push(transformation);
+        }
     }
 
-    /// Look one up.
+    /// Look one up: the **last** transformation learned for this intent.
+    ///
+    /// Unchanged by `req/919` W7 on purpose. 44 §0's id-resolution takes this road and
+    /// [`gx_engine::Engine::resolved`] answers the same way (Λ3(ii)), so widening the return type
+    /// here would have made the cache answer a question the authority does not.
     #[must_use]
     pub fn get(&self, intent: &IntentId) -> Option<TransformationId> {
-        self.entries.get(intent).copied()
+        self.entries.get(intent).and_then(|ids| ids.last()).copied()
+    }
+
+    /// 🔴 **RESIDUAL-895-B1** (`req/919` W7) — every transformation cached for this intent, in the
+    /// order they were learned. [`gx_engine::Engine::resolved_all`]'s counterpart.
+    #[must_use]
+    pub fn get_all(&self, intent: &IntentId) -> &[TransformationId] {
+        self.entries.get(intent).map_or(&[], Vec::as_slice)
+    }
+
+    /// 🔴 **RESIDUAL-895-B1** (`req/919` W7) — was `transformation` cached under `intent`?
+    ///
+    /// [`gx_engine::Engine::resolves_to`]'s counterpart, and the predicate a caller ordering
+    /// candidates by the cache wants: comparing against [`ResolutionIndex::get`] asks "is this the
+    /// intent's *latest*", which answers `false` about a branch the cache is holding perfectly
+    /// well. That is `DEFECT-891-1`'s spelling, one layer down; here it costs an ordering hint
+    /// rather than a wrong answer (`Session::intent_of` still asks the engine before returning),
+    /// which is why this is the cache being made honest rather than a second defect.
+    #[must_use]
+    pub fn resolves_to(&self, intent: &IntentId, transformation: &TransformationId) -> bool {
+        self.get_all(intent).contains(transformation)
     }
 
     /// 🔴 Forget one — **E-M6-14**'s other half.
@@ -91,11 +187,19 @@ impl ResolutionIndex {
     /// It is a *removal from a cache* rather than a retraction of anything: the engine's own
     /// `resolved` map is the authority (M6-02 adopted (a); sem: SEM-gx-cli-033) and is rebuilt from the journal, which this
     /// does not touch.
+    /// 🔴 Whole-chain since `req/919` W7, and that is the same rule as before rather than a
+    /// widening of it: `gx draft discard` removes the **body**, and every transformation the
+    /// branch holds was planned from that body. Forgetting the last one and leaving its
+    /// siblings would leave the cache pointing at a draft that is gone — which is the exact
+    /// failure E-M6-14 wrote this method to prevent.
     pub fn forget(&mut self, intent: &IntentId) -> bool {
         self.entries.remove(intent).is_some()
     }
 
-    /// How many resolutions are cached.
+    /// How many **intents** have a cached resolution.
+    ///
+    /// Intents, not transformations: unchanged by `req/919` W7, which widened the value and not the
+    /// key. [`ResolutionIndex::get_all`] is where the branch's length is asked for.
     #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
@@ -126,14 +230,30 @@ impl ResolutionIndex {
         let Ok(wire) = serde_json::from_slice::<Wire>(&raw) else {
             return (Self::new(), Freshness::Unreadable);
         };
-        let mut entries = BTreeMap::new();
+        let mut entries: BTreeMap<IntentId, Vec<TransformationId>> = BTreeMap::new();
         let mut skipped = 0usize;
-        for (intent, transformation) in wire.resolutions {
-            match (Cid::from_text(&intent), Cid::from_text(&transformation)) {
-                (Ok(i), Ok(t)) => {
-                    entries.insert(IntentId(i), TransformationId(t));
+        for (intent, chain) in wire.resolutions {
+            let Ok(i) = Cid::from_text(&intent) else {
+                // An unreadable key drops the whole entry, one `skipped`, as it always has:
+                // there is no intent to hang the chain on.
+                skipped += 1;
+                continue;
+            };
+            // 🔴 `req/919` W7 — counted per **id**, not per entry. A chain with one bad element and
+            // two good ones is one loss and two survivors, and reporting it as a single dropped
+            // entry would be the flattening this erratum exists to stop, moved into the damage
+            // report. The intent survives while any of its chain parses; an intent whose every id
+            // is junk contributes its losses and no key, which is the pre-W7 behaviour on the only
+            // shape that existed then (a chain of one).
+            let mut ids = Vec::new();
+            for text in chain.ids() {
+                match Cid::from_text(&text) {
+                    Ok(t) => ids.push(TransformationId(t)),
+                    Err(_) => skipped += 1,
                 }
-                _ => skipped += 1,
+            }
+            if !ids.is_empty() {
+                entries.insert(IntentId(i), ids);
             }
         }
         let freshness = if skipped > 0 {
@@ -156,7 +276,16 @@ impl ResolutionIndex {
             resolutions: self
                 .entries
                 .iter()
-                .map(|(i, t)| (i.0.to_text(), t.0.to_text()))
+                .map(|(i, ids)| {
+                    (
+                        i.0.to_text(),
+                        // Always the list form, including for a chain of one: a writer that chose
+                        // its spelling by length would make the file's shape a fact about the
+                        // data, and a reader debugging a branch would have to know that rule
+                        // before `cat` told them anything.
+                        Chain::Many(ids.iter().map(|t| t.0.to_text()).collect()),
+                    )
+                })
                 .collect(),
         };
         let body =

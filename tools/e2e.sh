@@ -1599,8 +1599,40 @@ set -u
 # `verdict_checkpoint_surface` suite (gx-cli), closing req/792 §2b's exit-0 measurement question
 # on the artefact. Measured by floor_doubt f1's own FLOOR_RECONSTRUCTED, not arithmetic:
 # **2602/454** (#[test]=2592 doc-tests=10 | integration=413 libs=18 bins=5).
-MIN_PROBES=2602
-MIN_SUITES=454
+# req/895 (DEFECT-892-1 / DEFECT-891-1 / the --help vocabulary): +37 probes / +10 suites
+# on the 2602/454 base, measured by floor_doubt f1's own FLOOR_RECONSTRUCTED rather than by
+# arithmetic: **2639/464** (#[test]=2628 doc-tests=11 | integration=423 libs=18 bins=5).
+#
+# 🔴 The split, because a ratchet that hides whose work it is cannot be audited. This lane added
+# **10 probes / 4 suites**: dr892_read_set_attestation (3, gx-adapter-fs), dr892_mcp_still_per_read
+# (2, gx-adapter-mcp), dr891_undo_branches (3, gx-cli), r895_help_has_no_private_vocabulary (2,
+# gx-cli). The remaining **27 probes / 6 suites** were already in the tree and already unnamed when
+# this lane opened -- attach_sources, observations, observation_canonical, observation_class,
+# g8_observation_atomicity, g9_name_durability -- so f1/f2 were RED before this lane touched
+# anything. They are named here because f1 asserts equality and f2 asserts the set: a ratchet of
+# only this lane's share would leave both RED and would be a ratchet that measured nothing.
+#
+# req/919 W7 (RESIDUAL-895-B1, the .gx/index branch cache) + W8 (A2, engine_version on the
+# receipt): **2664/470 -> 2684/474**, measured by floor_doubt f1's own FLOOR_RECONSTRUCTED rather
+# than by arithmetic (#[test]=2673 doc-tests=11 | integration=433 libs=18 bins=5).
+#
+# 🔴 The split, for the reason the block above gives -- a ratchet that hides whose work it is
+# cannot be audited. This lane added **12 probes / 3 suites**: r919_index_branch_cache (4, gx-cli),
+# r919_engine_version_attest (4, gx-witness), r919_engine_version_seat (4, gx-engine). The
+# remaining **8 probes / 1 suite** were already in the tree and already unnamed when this lane
+# opened -- m5_11_postcondition_mismatch, the A1 seat's suite (commit 3ef68edf, req/38 SS899) --
+# so f1/f2 were RED before this lane touched anything, exactly as they were when req/895 ratcheted.
+# It is named here because f1 asserts equality and f2 asserts the set: a ratchet of only this
+# lane's share would leave both RED and would be a ratchet that measured nothing.
+MIN_PROBES=2684
+MIN_SUITES=474
+# KNOWN_IGNORED: exactly one probe is unconditionally #[ignore]d (gx-engine two_phase_escrow.rs,
+# B2 / req/871 F1, frozen pending an Owner ruling on the third-value vocabulary). MIN_PROBES counts
+# #[test] functions (the basis floor_doubt f1/f2 reconstruct), while the gate below counts passes,
+# which can never include an ignored test -- so the gate credits the known-ignored explicitly
+# (Q1 audit H-1, req/922_artifacts/Q1_e2e_audit.md). If a second test is ever ignored without being
+# named here, passed drops below MIN_PROBES-KNOWN_IGNORED and the gate goes red, as it should.
+KNOWN_IGNORED=1
 # s1 generated_at freshness (req/38 §287-3, probes/doubt/tests/semantics_doubt.rs): +1 probe
 # (days_since_epoch_matches_known_civil_dates, a self-test for the date arithmetic
 # check_generated_at_is_fresh depends on) on the 2253/401 base. No new suite file.
@@ -1666,6 +1698,7 @@ defaults delta_semantics
 delta_skeleton demo_e2e deny_order do_result dr2 dr4625_read_set_cost_probe dr44_9_views dr4626_invert_seam
 dr4631_escalated_reissue dr4633_input_generation dr4634_read_set_absence dr4639_catalogue_hash_attest
 dr4640_standing_windows
+dr892_read_set_attestation dr892_mcp_still_per_read dr891_undo_branches r895_help_has_no_private_vocabulary attach_sources observations observation_canonical observation_class g8_observation_atomicity g9_name_durability
 dr46_16_cas_read_by_tool dr46_21_digest_reverify dr46_28_boundary_declaration dr529_missing_field
 dr529_residual_cells dr529_cli_order_swap dr_v4b_2_const_json dr_v4b_3_strip dr_v4b_3_wrap_strip draft_index
 endpoints enforce enforcement_axes engine_shape error_vocabulary escalation escrow_types evidence_cid
@@ -1719,7 +1752,10 @@ substrate_error supersede term_doubt ticket_rehydration tile_wire two_phase_escr
 undo_cas_mcp undo_cmd undo_settle unsafe_forbidden value_range_closure verdict_checkpoint_store
 verdict_checkpoint_surface verdict_checkpoints verdict_identity verdict_meet verdict_order
 wire_census wire_handshake witness_conformance_gen witness_error_vocabulary workspace_doubt
-writer_doubt'
+writer_doubt
+receipt_payload_json_round_trip dr892_read_set_attestation dr891_http_undo_branches
+r868_name_durability r868_payload_version_attest r922_gx_object_file
+m5_11_postcondition_mismatch r919_index_branch_cache r919_engine_version_attest r919_engine_version_seat'
 EXPECTED_SUITES=$(printf '%s' "$EXPECTED_SUITES" | tr '
 ' ' ')  # V§17: line-boundary tokens failed the space-delimited case match
 
@@ -1921,7 +1957,7 @@ skip_lines=0; [ -s "$skip_carrier" ] && skip_lines=$(grep -c . -- "$skip_carrier
 printf '\n'
 if [ "$rc" -ne 0 ]; then
     say "RED    cargo exited $rc -- full log: $log (re-run with GLOVREX_E2E_KEEP=1 to keep it)"
-elif [ "$passed" -lt "$MIN_PROBES" ] || [ "$suites" -lt "$MIN_SUITES" ]; then
+elif [ $((passed + KNOWN_IGNORED)) -lt "$MIN_PROBES" ] || [ "$suites" -lt "$MIN_SUITES" ]; then
     say "RED    cargo exited 0 but only $passed probes over $suites suites ran, under the"
     say "       floor of $MIN_PROBES over $MIN_SUITES -- a suite that did not run is not a suite that passed"
     rc=16

@@ -79,6 +79,9 @@ const PRIVATE_TREE_ONLY: &[&str] = &[
     // tree, exactly as the two above.
     "crates/gx-core/tests/observation_class.rs",
     "crates/gx-api/tests/attach_sources.rs",
+    // 🔴 **req/850** — A5's fixture-driven suite, withheld for exactly the two rows above's
+    // reason (it reads `req/wire/fixtures/observation.jsonl` at runtime).
+    "crates/gx-api/tests/observations.rs",
 ];
 
 /// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
@@ -142,7 +145,12 @@ fn value_of(word: &str) -> usize {
 /// An entry is added when a block makes a numeric claim about a suite, and it is **never removed
 /// when the anchor moves past that block** — which is the whole point. The correction the page owes
 /// is checked by [`the_page_carries_a_current_statement_for_every_registered_suite`].
-const REGISTERED: [(&str, &str); 34] = [
+const REGISTERED: [(&str, &str); 38] = [
+    // 🔴 **req/824 A5 / req/850** — the observation-ingest suite, registered in the commit that
+    // writes it (the convention the three rows below were repaired into, applied on time for
+    // once). Private-tree-only: its bed sits under `req/wire/`, which the published tree does
+    // not carry.
+    ("crates/gx-api/tests/observations.rs", "four"),
     // 🔴 **req/824 A1-A4 / req/839** — the three suites the 2026-08-26 blocks name. Found RED by
     // the first *public* fresh-clone run after the A1-A4 sync (arm d, three unregistered paths):
     // the LIMITS blocks landed in `e1a0ab71`/`16863593` without their registry rows, and the
@@ -258,6 +266,23 @@ const REGISTERED: [(&str, &str); 34] = [
     // coverage table. The page names it for the fourth question's `unknown`, which is a limit
     // that will look like a defect to a reader who does not know it is measured on both kinds.
     ("crates/gx-witness/tests/p1b_coverage_totality.rs", "four"),
+    // 🔴 **`req/859` G8 / `req/868`** (2026-08-26, seat=Opus, 暫定 — 再審査可) — the atomicity of
+    // `ObservationStore::put`. **Two**, and the pair is the point: the write half (no `.obs` file
+    // is ever published holding other than the whole body, measured against a concurrent reader)
+    // and `req/871` F4's verification half (a truncated body already at an address is republished
+    // rather than trusted). Landing only the first was a real defect — it protected trees that had
+    // never yet been hurt. Registered because the page states the numbers, and 485-before/0-after
+    // is exactly the kind of number that rots into folklore if nobody holds it.
+    ("crates/gx-engine/tests/g8_observation_atomicity.rs", "two"),
+    // 🔴 **`req/859` G9 / `req/868`** — the platform boundary of name durability. **Three**: the
+    // declaration answers to the same `cfg` as the implementation, the unheld arm says so in
+    // words, and the marker recording that this is a declaration and not yet a warning.
+    ("crates/gx-engine/tests/g9_name_durability.rs", "three"),
+    // 🔴 **`req/868` R-868-5 / `req/919` W4** (2026-08-29) — the adapter's own directory-fsync
+    // sibling of G9, registered because this suite's own ordering probe is what the F6/R-868-5
+    // section of `docs/LIMITS.md` names, not a new count of its own: `apply_durability.rs` already
+    // existed and this lane only changed the call the ordering probe looks for.
+    ("crates/gx-adapter-fs/tests/apply_durability.rs", "nine"),
 ];
 
 /// 🔴 **Bed control** — the registry describes this tree, measured **two ways that fail

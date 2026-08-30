@@ -41,6 +41,21 @@ pub(crate) fn content_digest(content: &[u8]) -> Cid {
     cid::mint(Domain::Leaf, &[content])
 }
 
+/// The digest of "there is no file at this position".
+///
+/// 🔴 The same value as the digest of an **empty** file, and the same residue
+/// `gx_adapter_git::repo::absent_digest` and `gx_adapter_postgres::row::absent_digest` disclose for
+/// their own substrates: "digest = content only" leaves an adapter nothing with which to separate
+/// "nothing here" from "here, and empty", and any byte string a marker used would also be a
+/// possible content. The fix belongs with a wider `Fingerprint` (v0.2); this is the disclosure.
+///
+/// Reached by [`crate::invert`], which reads the position and has to say what the read answered
+/// even when the answer was an absence (**DEFECT-892-1**, `req/895` §1). Named rather than spelled
+/// `content_digest(&[])` at the call site so the disclosure travels with the value.
+pub(crate) fn absent_digest() -> Cid {
+    content_digest(&[])
+}
+
 impl FsAdapter {
     /// One adapter.
     #[must_use]
@@ -137,15 +152,27 @@ impl SubstrateAdapter for FsAdapter {
     /// `apply` (43 T-10b), because the inverse of an overwrite carries the old content and after the
     /// apply there is none.
     /// 🔴 **E-DR4626-1 (DR-46-26)** -- the free function is untouched and the outcome is derived
-    /// here, in one line, by [`InvertOutcome::from_option`].
+    /// here, in one line, by `InvertOutcome::from_option`.
     ///
-    /// This adapter builds its inverse out of the snapshot it was handed. There is no *declared*
-    /// read that could fail on its own, so C-25's `Unknown` -- "the prior could not be read, and
-    /// this deployment said it would rather have the effect" -- has no preimage on this road:
-    /// `Some` is `True` and `None` is `False`, and `reads` is empty because the escrow read nothing
-    /// through a transport. `tests/` holds that as an assertion rather than as this sentence.
+    /// 🔴🔴 **RETRACTED by DEFECT-892-1 (`req/895` §1).** The paragraph that stood here said:
+    ///
+    /// > "This adapter builds its inverse out of the snapshot it was handed. There is no *declared*
+    /// > read that could fail on its own … and `reads` is empty because the escrow read nothing
+    /// > through a transport."
+    ///
+    /// The second sentence is false. `crate::invert` does **not** build the inverse out of the
+    /// snapshot: `pre` carries a digest and not the bytes (42 §3.3, and `invert`'s own module
+    /// documentation says so), so the body of an inverse can only come from reading the position —
+    /// which `read_if_present` does, with `std::fs::read`. An empty `reads` on this road produced
+    /// signed receipts asserting `ReadSet::Nothing`, which is a positive claim about every locator
+    /// in the universe. `from_option` is gone and the outcome, entry included, is built where the
+    /// read answers. `tests/dr892_read_set_attestation.rs` holds that as an assertion.
+    ///
+    /// C-25's `Unknown` is still unreachable here, and that half of the old paragraph stands: an
+    /// `OnReadFailure::Unknown` posture is a `gx-adapter-mcp` catalogue's construct, and a read
+    /// failure on this substrate is an [`Error::Unreadable`] out of the function.
     fn invert(&self, delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcome> {
-        crate::invert::invert(delta, pre).map(InvertOutcome::from_option)
+        crate::invert::invert(delta, pre)
     }
 
     /// Delegates to [`crate::commutation`], which decides independence from the two payloads and

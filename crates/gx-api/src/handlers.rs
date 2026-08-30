@@ -2287,7 +2287,11 @@ fn witness_word(witness: &gx_engine::UndoWitness) -> String {
 /// deliberate: a receipt the archive could not take is still in the engine's table and still in the
 /// response, so failing the request would refuse a commit that happened. The idempotency record is
 /// the opposite — losing it changes what a **retry** does.
-fn archive_last_verdict_receipt(state: &AppState, id: &TransformationId, slot: ReceiptSlot) {
+pub(crate) fn archive_last_verdict_receipt(
+    state: &AppState,
+    id: &TransformationId,
+    slot: ReceiptSlot,
+) {
     let receipt = {
         let engine = state.engine();
         engine.verdict_receipts(id).last().cloned()

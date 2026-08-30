@@ -49,7 +49,14 @@ fn ac1a_no_hard_purge_shaped_method_name_exists_in_the_source() {
         .find("struct StandingEntry")
         .expect("StandingEntry is declared in keys.rs");
     let region = &source[start..];
-    let banned = ["fn purge", "fn delete", "fn clear", "fn remove", "fn reopen", "fn unclose"];
+    let banned = [
+        "fn purge",
+        "fn delete",
+        "fn clear",
+        "fn remove",
+        "fn reopen",
+        "fn unclose",
+    ];
     let mut hits = Vec::new();
     for word in banned {
         if region.contains(word) {
@@ -81,15 +88,14 @@ fn ac1b_a_reopen_shaped_second_statement_does_not_move_the_boundary() {
     let second = StandingEntry::new("claim-1", Timestamp(2_000 * SECOND), "later, same claim");
     let second_envelope = second.signed_by(&key).expect("signable");
 
-    let ledger = StandingLedger::from_signed(
-        &[first_envelope.clone(), second_envelope],
-        &key.verifying(),
-    )
-    .expect("both entries authenticate against the same authority");
+    let ledger =
+        StandingLedger::from_signed(&[first_envelope.clone(), second_envelope], &key.verifying())
+            .expect("both entries authenticate against the same authority");
 
     let effective = ledger.close_of("claim-1").expect("a close exists");
     assert_eq!(
-        effective.closed_at.0, 1_000 * SECOND,
+        effective.closed_at.0,
+        1_000 * SECOND,
         "AC-1b: a later-signed statement moved the effective boundary forward -- reopen-shaped \
          behavior leaked through"
     );
@@ -148,8 +154,7 @@ fn ac3_a_past_instant_query_returns_the_pre_close_view() {
     let key = keypair(3);
     let entry = StandingEntry::new("claim-3", Timestamp(5_000 * SECOND), "closes at t=5000");
     let envelope = entry.signed_by(&key).expect("signable");
-    let ledger =
-        StandingLedger::from_signed(&[envelope], &key.verifying()).expect("authenticates");
+    let ledger = StandingLedger::from_signed(&[envelope], &key.verifying()).expect("authenticates");
 
     assert_eq!(
         ledger.standing_at("claim-3", Timestamp(4_999 * SECOND)),
@@ -180,8 +185,7 @@ fn ac3_a_claim_with_no_close_statement_reads_open_at_every_instant() {
     let key = keypair(4);
     let unrelated = StandingEntry::new("claim-other", Timestamp(100 * SECOND), "not claim-4");
     let envelope = unrelated.signed_by(&key).expect("signable");
-    let ledger =
-        StandingLedger::from_signed(&[envelope], &key.verifying()).expect("authenticates");
+    let ledger = StandingLedger::from_signed(&[envelope], &key.verifying()).expect("authenticates");
     assert_eq!(ledger.standing_at("claim-4", Timestamp(0)), Standing::Open);
     assert_eq!(ledger.standing_now("claim-4"), Standing::Open);
 }
@@ -197,7 +201,7 @@ fn ac3_a_claim_with_no_close_statement_reads_open_at_every_instant() {
 fn ac4_a_close_statement_signed_by_the_wrong_authority_is_rejected() {
     let trusted = keypair(5);
     let attacker = keypair(6);
-    let entry = StandingEntry::new("claim-5", Timestamp(1 * SECOND), "forged close");
+    let entry = StandingEntry::new("claim-5", Timestamp(SECOND), "forged close");
 
     // `forged`: an envelope carrying the right entry and payload type, signed by a key the
     // verifier does NOT trust for this claim.
@@ -268,9 +272,7 @@ fn ac5_no_contact_with_receipt_payload_or_the_dsse_envelope_fixed_fields() {
     // Start counting AFTER the declaration line's own opening brace, so "pub struct" itself is
     // not mistaken for a field.
     let start = decl + "pub struct DsseEnvelope {".len();
-    let body_end = dsse_src[start..]
-        .find("\n}")
-        .expect("the struct body ends");
+    let body_end = dsse_src[start..].find("\n}").expect("the struct body ends");
     let body = &dsse_src[start..start + body_end];
     let field_count = body.matches("pub ").count();
     println!("DR4640_AC5 dsse_envelope_pub_field_count={field_count}");

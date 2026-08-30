@@ -114,6 +114,9 @@ pub mod layout;
 pub mod ledger;
 pub mod lifecycle;
 pub mod limits;
+/// 🔴 **R-922-F2 phase 1** — the `.gx` object file's two verbs. The format is
+/// `gx_witness::gxfile`; this module is only the surface over it.
+pub mod object;
 pub mod otel;
 pub mod pipeline;
 pub mod policy;

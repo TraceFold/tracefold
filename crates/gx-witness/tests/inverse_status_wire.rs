@@ -131,6 +131,45 @@ fn without_dr_46_39(now: &str) -> String {
     now.replacen(&contribution, "", 1).replacen("b1", "b0", 1)
 }
 
+/// 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)** — the sixth layer, outermost: today's
+/// bytes are a map of eighteen. `crates/gx-witness/tests/boundary_attest.rs` asserts what *this*
+/// key adds; here it is only removed, so DR-46-26's claim stays measurable through it.
+fn without_payload_version(now: &str) -> String {
+    let contribution = format!(
+        "6f{}{}",
+        hex(b"payload_version"),
+        hex(&cbor::encode(&Some(gx_witness::receipt::CURRENT_PAYLOAD_VERSION)).expect("canonical"))
+    );
+    assert!(
+        now.contains(&contribution),
+        "F7's key is not on the wire; this subtraction is measuring nothing"
+    );
+    now.replacen(&contribution, "", 1).replacen("b2", "b1", 1)
+}
+
+/// 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — the seventh layer, outermost: today's bytes
+/// are a map of nineteen. `crates/gx-witness/tests/r919_engine_version_attest.rs` asserts what
+/// *this* key adds; here it is only removed, so DR-46-26's claim stays measurable through it.
+///
+/// The contribution is derived from the fixture's own constant rather than re-spelled, for the
+/// reason `req/801`'s G-07 run recorded one erratum earlier: a tower that carries its own copy of a
+/// value goes on passing after the value it is subtracting has changed.
+fn without_engine_version(now: &str) -> String {
+    let contribution = format!(
+        "6e{}{}",
+        hex(b"engine_version"),
+        hex(
+            &cbor::encode(&Some(support::FIXTURE_ENGINE_VERSION.to_string()))
+                .expect("canonical")
+        )
+    );
+    assert!(
+        now.contains(&contribution),
+        "A2's key is not on the wire; this subtraction is measuring nothing"
+    );
+    now.replacen(&contribution, "", 1).replacen("b3", "b2", 1)
+}
+
 // ---------------------------------------------------------------------------
 // The type
 // ---------------------------------------------------------------------------
@@ -172,9 +211,13 @@ fn dr_46_26_the_payload_declares_an_inverse_status_field() {
     // static S① audits (`req/753`/`req/767`) could not see it because neither ran cargo. The first
     // live run did, on the first command. The count below is the corrected pin, and the genealogy
     // names the field that moved it.
+    // 🔴 **F7 (`req/868` R-868-6, `req/919` W5, 2026-08-29)** — seventeen became eighteen when
+    // `payload_version` seated.
+    // 🔴 **A2 (`req/910` A., `req/919` W8, 2026-08-30)** — eighteen became nineteen when
+    // `engine_version` seated.
     assert_eq!(
-        fields, 17,
-        "DR-46-24(A) took the count to thirteen, DR-46-26 the fourteenth, DR-46-28 the fifteenth,          and S③ (`req/493` §1 AC-6) the sixteenth, and DR-46-39 (`req/777` catalogue_hash) the seventeenth"
+        fields, 19,
+        "DR-46-24(A) took the count to thirteen, DR-46-26 the fourteenth, DR-46-28 the fifteenth,          and S③ (`req/493` §1 AC-6) the sixteenth, DR-46-39 (`req/777` catalogue_hash) the seventeenth, F7 (`req/868` R-868-6, payload_version) the eighteenth, and A2 (`req/910`, engine_version) the nineteenth"
     );
 }
 
@@ -191,10 +234,11 @@ fn dr_46_26_the_payload_declares_an_inverse_status_field() {
 #[test]
 fn the_wire_moved_by_exactly_the_one_key_dr_46_26_added() {
     let key = keypair(1);
-    let now = without_dr_46_28(&without_s3_confinement(&without_dr_46_39(&hex(&cbor::encode(
-        &verdict_payload(VerdictKind::Admit, &key, 5),
-    )
-    .expect("canonical")))));
+    let now = without_dr_46_28(&without_s3_confinement(&without_dr_46_39(
+        &without_payload_version(&without_engine_version(&hex(
+            &cbor::encode(&verdict_payload(VerdictKind::Admit, &key, 5)).expect("canonical"),
+        ))),
+    )));
     let before = VERDICT_PAYLOAD_HEX_BEFORE_DR_46_26.replace(['\n', ' '], "");
     let added = absent_reversibility_key();
 
