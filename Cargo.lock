@@ -1046,6 +1046,8 @@ dependencies = [
  "alpha-term",
  "gx-api",
  "gx-core",
+ "gx-engine",
+ "gx-gate",
  "gx-log",
  "gx-witness",
  "serde",

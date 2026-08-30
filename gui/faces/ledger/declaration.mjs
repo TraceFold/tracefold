@@ -119,6 +119,16 @@ export const MARKS = Object.freeze([
   { mark: 'standing/reversed', means: 'standing.reversed', from: 'the reversibility chip (req/768 F-I, retrofit round 2): a later row in this same read names this row as its predecessor, so its own escrowed inverse was already used' },
   { mark: 'standing/none', means: 'standing.none', from: 'the reversibility chip: whether this settled row can still be undone is not observable from what this window reads -- a declared hole in the membrane\'s own wire fields, not a guess' },
   { mark: 'undefined', means: 'mark.undefined', from: 'a word arrived where a known one was expected' },
+  {
+    mark: 'structure/outside',
+    means: 'provenance.inferred-here',
+    from: 'req/893: a line in an opened row that this window concluded from the rows it happens to be holding, rather than something the engine said. The reversal state is the only one on this face, and it is marked because the difference between what an engine stated and what a window worked out is the difference this whole product is about',
+  },
+  {
+    mark: 'structure/subject',
+    means: 'provenance.stated',
+    from: 'req/893: the counterpart mark, for a line an engine did state. Declared because the pair is what makes the first one readable -- a mark for "we worked this out" only means something if there is a mark for "they said it"',
+  },
 ]);
 
 /** Where this face sits, and why it sits there rather than wherever a sort put it. */
@@ -167,7 +177,24 @@ export const UNDRAWN = Object.freeze([
   },
   {
     what: 'a value wider than its column, in the row itself',
-    why: 'the row clips rather than wraps, so a long path is cut off on the line. Every value the row holds is repeated in full in the note underneath, and the note opens by itself for any row carrying a value long enough to be at risk, because a value that is only ever shown cut off is a record that has gone quiet.',
+    // req/893 rewrote this entry because the sentence that stood here was not true of
+    // the screen. It said the row clips rather than wraps; the render wrapped, mid-word,
+    // and the row it wrapped grew to five times the pitch while the verdict on that same
+    // row was cut short. A declaration that says the opposite of the drawing is worse
+    // than no declaration, because it is the thing a reviewer checks instead of looking.
+    why: 'the row clips and never wraps, so every row is exactly one pitch high and an appended ledger does not reflow while it is being read. A path is cut in the middle, keeping the file name, because the end of a path is the part that identifies it. Nothing is auto-opened to compensate: the whole value travels with the cut one on the line itself, and the opened row carries every member in full. The earlier policy of opening a row by itself whenever a value was at risk is what made one row five times the height of its neighbours.',
+  },
+  {
+    what: 'a count of members on the line',
+    why: 'req/893: the line used to carry one. It read the same number on every row of a half, because the member list is fixed and the count was therefore a constant wearing a figure\'s clothes. What varies, and so what is drawn, is the count of members that were looked for and not found -- and it is silent on the rows that have none.',
+  },
+  {
+    what: 'a reversibility chip on every settled row',
+    why: 'req/893: it used to be drawn on all of them, reading "unknown" on most, which is a column repeating that nothing was found out. It is drawn now only where there is something to say, and what is not observable is stated once inside the opened row, where there is room to say why it is not observable.',
+  },
+  {
+    what: 'the acts, anywhere except inside an open row',
+    why: 'req/893: they used to stand in a gutter beside the list, one control per settled row and three per held row, so a screen at rest carried eleven controls that could not line up with the rows they belonged to. A row at rest carries none. The line is itself the control that opens the row, and the acts are inside the row they act on.',
   },
 ]);
 

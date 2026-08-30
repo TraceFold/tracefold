@@ -132,8 +132,26 @@ const PROBE = `(() => {
       acts: gutter ? gutter.querySelectorAll('button').length : 0,
     };
   });
+  // The pitch, and whether it is one.
+  //
+  // The gutter measurement above has no subject any more: req/893 removed it, so on the rebuilt
+  // face it measures nothing and reads as a clean zero. An instrument whose subject has
+  // been deleted reports the same emptiness as an instrument finding nothing wrong, so
+  // this one measures the row itself: every drawn line, its height, and the distinct
+  // values across the screen. One distinct value is the invariant. The face this
+  // replaced measured three (49, 122 and 149 device pixels at the narrow viewport) --
+  // a row three times its neighbour, because a path was allowed to wrap.
+  const lineBoxes = [...document.querySelectorAll('[data-part="ledger-row"]')]
+    .filter(visible)
+    .map((n) => Math.round(n.getBoundingClientRect().height));
+  const rowPitch = {
+    count: lineBoxes.length,
+    heights: [...new Set(lineBoxes)].sort((a, b) => a - b),
+    ratio: lineBoxes.length > 0 ? Number((Math.max(...lineBoxes) / Math.min(...lineBoxes)).toFixed(2)) : null,
+  };
   const menus = document.querySelectorAll('[data-role="row-menu"]').length;
   return {
+    rowPitch,
     textBoxes: boxes.length,
     overlapCount: overlaps.length,
     overlaps: overlaps.slice(0, 10),
@@ -202,7 +220,7 @@ export async function shoot() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   shoot().then((report) => {
     for (const row of report) {
-      process.stdout.write(`${row.fixture} [${row.scheme} ${row.width}px] overlaps=${row.overlapCount} rows=${row.rowsDrawn} repeated=${row.repeatedRows.length} glyphs=${row.glyphs} oversize=${row.oversizeGlyphs.length} filled=${row.filledGlyphs.length} sprites=${row.sprites} overflow=${row.horizontalOverflow} clipped=${row.clippedCells} clippedWithoutFull=${row.clippedWithoutFull.length} controls=${row.interactiveControls} underTapBudget=${row.underTapBudget.length} overflowingControls=${row.overflowingControls.length} ellipsized=${row.ellipsized.length} menus=${row.menus} textChars=${row.visibleTextChars} bg=${row.background}\n`);
+      process.stdout.write(`${row.fixture} [${row.scheme} ${row.width}px] overlaps=${row.overlapCount} rows=${row.rowsDrawn} repeated=${row.repeatedRows.length} glyphs=${row.glyphs} oversize=${row.oversizeGlyphs.length} filled=${row.filledGlyphs.length} sprites=${row.sprites} overflow=${row.horizontalOverflow} clipped=${row.clippedCells} clippedWithoutFull=${row.clippedWithoutFull.length} pitch=${row.rowPitch.heights.join('/')}(x${row.rowPitch.ratio}) controls=${row.interactiveControls} underTapBudget=${row.underTapBudget.length} overflowingControls=${row.overflowingControls.length} ellipsized=${row.ellipsized.length} menus=${row.menus} textChars=${row.visibleTextChars} bg=${row.background}\n`);
       for (const o of row.overlaps) process.stdout.write(`    overlap ${o.area}px2: ${JSON.stringify(o.a)} / ${JSON.stringify(o.b)}\n`);
       for (const g of row.oversizeGlyphs) process.stdout.write(`    glyph ${g.mark} asked ${g.asked} drew ${g.w}x${g.h}\n`);
       for (const t of row.underTapBudget) process.stdout.write(`    under tap budget: <${t.tag}> "${t.text}" ${t.w}x${t.h}\n`);

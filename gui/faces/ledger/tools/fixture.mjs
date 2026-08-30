@@ -141,6 +141,13 @@ export const STATES = Object.freeze({
     acts: [],
     menu: { id: 'c-101', cell: 'path' },
     copied: { from: 'at', state: 'copied', why: null },
+    // req/893: this page's job has changed. It used to be a picture of the row menu,
+    // which was a second place a row's acts appeared. The rebuilt screen has one place,
+    // so what is worth photographing here is a row that is open -- the widest case, a
+    // held candidate, which offers three acts one of which is withheld. The menu state
+    // is left in place rather than deleted: the rebuilt screen does not draw it yet, and
+    // that is recorded as an open item in req/893 S6 rather than tidied away here.
+    selected: 'c-101',
   },
   'ledger-unread': {
     settled: { outcome: 'failed', reason: 'transport', status: null, detail: 'the socket was closed before an answer arrived' },

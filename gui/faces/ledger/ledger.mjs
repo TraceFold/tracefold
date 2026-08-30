@@ -32,6 +32,13 @@ import {
   DECLARATION, CONSUMES, READS, ACTS, ORDER, ROWS, UNDRAWN, QUESTION, FACE_ID,
 } from './declaration.mjs';
 import { parts as defaultParts } from './binding.mjs';
+// req/893: the drawing is not in this file any more. What is true and what it looks like
+// are two things that can be wrong separately, and while they were one set of functions
+// a defect in the picture could not be discussed without reading the code that decides
+// what a row is. This file decides; ./screen.mjs draws; ./roles.mjs is the rank between
+// a meaning and a token that this tree did not have.
+import { createScreen } from './screen.mjs';
+import { createModel } from './model.mjs';
 
 export const LEDGER_MESSAGES = {
   NO_HOST: 'a face is mounted into a host element, and none was given',
@@ -48,10 +55,10 @@ export const LEDGER_MESSAGES = {
   NOTHING_TO_SEAL: 'this has not happened yet, so there is no record of it to check',
   NO_VERIFIER_HERE: 'no verifier is present in this window, so nothing on this screen has been checked by anyone; the marks in the seal column say unsealed for that reason and not because anything is wrong',
   NOT_VERIFICATION: "this is the engine reporting on its own ledger. It is not offline re-verification: nothing here was checked without the issuer, and a window that drew this as checked would be drawing an unchecked record wearing a checked one's face",
-  // req/822_c7 (Owner #387/#388 冗長文字全掃): this used to read "this member was
-  // looked for on the item and was not there: <member>", built with the member's
-  // own name stitched onto the end of it in toRecord() below. Drawn as a note line,
-  // that put the member's name on the screen twice -- once as the row label beside
+  // req/822_c7 (Owner #387/#388, the redundant-word pass): this used to read "this
+  // member was looked for on the item and was not there: <member>", built with the
+  // member's own name stitched onto the end of it in toRecord() below. Drawn as a note
+  // line, that put the member's name on the screen twice -- once as the row label beside
   // the sentence, once again inside the sentence itself. The member is still the
   // row label; the sentence carries no second copy of it.
   MEMBER_ABSENT: 'not in this record',
@@ -71,6 +78,14 @@ export const LEDGER_MESSAGES = {
   COPIED: 'copied',
   COPY_REFUSED: 'this window has no clipboard to write to, so nothing was copied. Every value on this screen is also in the pane for its row, in full, where it can be taken by hand',
   COPY_FAILED: 'the clipboard refused the write, so nothing was copied',
+  // req/893. The rebuilt screen states four things the old one either left to a tooltip
+  // or did not say at all.
+  VERDICT_UNRECOGNISED: 'a word arrived where one of the engine\'s three was expected. It is drawn as the word that came, under the undefined mark: what the engine said is not this window\'s to correct, and a word it does not know is not the same fact as a member that was never sent',
+  CLIP_ONE_POLICY: 'this line clips and never wraps, so every row is the same height and an appended ledger does not reflow while it is being read. The whole of this value is in the row when it is opened',
+  CHILD_ROW: 'written under an earlier row',
+  INFERRED_HERE: 'concluded by this window from the rows it is holding, not stated by the engine',
+  UNREAD_DENOMINATOR: 'no denominator: nothing was read, so there is no count to state one against',
+  NO_CLAIMS: 'there are no rows to check anything about',
 };
 
 const HALF = Object.freeze({ settled: 'settled', held: 'held' });
@@ -440,7 +455,7 @@ export function createFace({ parts = defaultParts } = {}) {
       // width the pair could take the end of a line on its own, which was the
       // orphan Owner #348 (4) named.
       //
-      // req/822_c7 (Owner #387/#388 冗長文字全掃) goes further: the hint no longer
+      // req/822_c7 (Owner #387/#388, the redundant-word pass) goes further: the hint no longer
       // draws as its own visible span at all. `label` stays the default-visible
       // surface; `hint` rides the summary's own title (a hover) and a `data-hint`
       // attribute now.
@@ -1192,7 +1207,35 @@ export function createFace({ parts = defaultParts } = {}) {
     return answered.length > 0 ? LEDGER_MESSAGES.SOURCE_ENGINE : null;
   }
 
+  // req/893: the screen, rebuilt. Everything below the two constants is drawing that
+  // this file no longer does.
+  const MEMBER_KEYS = Object.freeze(MEMBERS.map((m) => m.key));
+  const screen = createScreen(P, {
+    MESSAGES: LEDGER_MESSAGES, QUESTION, FACE_ID, ORDER, UNDRAWN, ACTS, MEMBER_KEYS,
+  });
+  const model = createModel(P, screen, {
+    MESSAGES: LEDGER_MESSAGES, ORDER, ROWS, UNDRAWN, ACTS, HALF, ANSWERED, toRecord, MEMBER_KEYS,
+  });
+
+  /**
+   * Build the facts, draw them, then say what the drawing cost.
+   *
+   * The strip is appended here rather than inside the screen because it reports the time
+   * to build this tree, and a figure built into the tree it measures would have been
+   * written before the measuring finished. It is the cost of deciding and drawing, and
+   * nothing else -- no read, no paint -- and the strip names what it is rather than
+   * calling it a total.
+   */
   function view(state) {
+    const started = clock();
+    const built = model.build(state, null);
+    const node = screen.view(built);
+    const renderMs = started === null ? null : clock() - started;
+    node.children.push(P.runtimeFooter({ renderMs, source: sourceOf(state) }));
+    return node;
+  }
+
+  function retiredView(state) {
     const started = clock();
     const selected = state.selected ?? null;
     const settled = halfOf(state, HALF.settled, selected);

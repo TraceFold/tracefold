@@ -1,0 +1,92 @@
+{
+  "light": {
+    "at": "C:\\Users\\mhira\\OneDrive\\Desktop\\glovrex_app\\shell\\record\\req867_sidebar\\before_1440_light.png",
+    "facts": {
+      "theme": "light",
+      "bound": "false",
+      "realFaces": "3/3",
+      "sidebar": {
+        "w": 196,
+        "h": 900,
+        "x": 0,
+        "y": 0
+      },
+      "topbar": null,
+      "rail": {
+        "w": 195,
+        "h": 81,
+        "x": 0,
+        "y": 81
+      },
+      "launcher": {
+        "w": 195,
+        "h": 620,
+        "x": 0,
+        "y": 194
+      },
+      "stage": {
+        "w": 920,
+        "h": 595,
+        "x": 196,
+        "y": 0
+      },
+      "stageArea": 547400,
+      "railItems": 2,
+      "launcherItems": 6,
+      "tabs": [
+        "Atlas"
+      ],
+      "countSlots": 7,
+      "sideToggle": true,
+      "findAct": true,
+      "themeAct": true,
+      "innerWidth": 1440,
+      "innerHeight": 900
+    }
+  },
+  "dark": {
+    "at": "C:\\Users\\mhira\\OneDrive\\Desktop\\glovrex_app\\shell\\record\\req867_sidebar\\before_1440_dark.png",
+    "facts": {
+      "theme": "dark",
+      "bound": "false",
+      "realFaces": "3/3",
+      "sidebar": {
+        "w": 196,
+        "h": 900,
+        "x": 0,
+        "y": 0
+      },
+      "topbar": null,
+      "rail": {
+        "w": 195,
+        "h": 81,
+        "x": 0,
+        "y": 81
+      },
+      "launcher": {
+        "w": 195,
+        "h": 620,
+        "x": 0,
+        "y": 194
+      },
+      "stage": {
+        "w": 920,
+        "h": 595,
+        "x": 196,
+        "y": 0
+      },
+      "stageArea": 547400,
+      "railItems": 2,
+      "launcherItems": 6,
+      "tabs": [
+        "Atlas"
+      ],
+      "countSlots": 7,
+      "sideToggle": true,
+      "findAct": true,
+      "themeAct": true,
+      "innerWidth": 1440,
+      "innerHeight": 900
+    }
+  }
+}
