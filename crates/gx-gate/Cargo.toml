@@ -3,7 +3,7 @@
 # 42 §3.8 gives the field tables `verdict.rs` and `policy.rs` carry.
 [package]
 name = "gx-gate"
-description = "Cedar policy evaluation, invariant registry and verdict composition (41 §2 / §4, 42 §3.8)."
+description = "Cedar policy evaluation, invariant registry and verdict composition."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-gate-001) -- see the cedar-policy block below

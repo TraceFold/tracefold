@@ -1,39 +1,32 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-cli
 
-The `gx` command line: `.gx/` layout, draft store, id-resolution cache (44 §1, req/56).
+**The `gx` command line: `.gx/` layout, draft store, id-resolution cache.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> this crate holds no semantic authority ... M6 does not extend `Σ`. gx-cli / gx-api hold only
-> **observation** of `Σ = (L, J, E, Λ)` and **mapping** onto the engine's 8 entry points.
-> Therefore, if M6 adds semantics, that is an implementation defect and not a design choice.
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | The `gx` binary: the on-disk `.gx/` layout, a local draft store, and a cache that resolves short identifiers to full ones. |
+| **What it guarantees** | It holds **no semantic authority** — it observes engine state and maps commands onto the engine's entry points. If a command adds meaning of its own, that is an implementation defect and not a design choice. It parses textual content identifiers and never computes one, constructs no verdict, and keeps no lifecycle state of its own. |
+| **What it refuses to do** | One asymmetry is stated rather than hidden: the local draft store holds state that never enters the engine's algebra, so "the command line and the HTTP surface behave identically" has to be read as *identical from the candidate stage onward*. Separately, a group of verbs whose mechanism is not part of the public distribution is switched off in the public build — the feature names stay declared, with the reason, instead of being silently dropped. |
+| **How it is checked** | [`tests/`](tests) — [`receipt_verify_hermetic.rs`](tests/receipt_verify_hermetic.rs) proves offline verification touches nothing outside its inputs, [`exit_matrix_cli.rs`](tests/exit_matrix_cli.rs) pins every exit code, [`gx_layout.rs`](tests/gx_layout.rs) and [`draft_index.rs`](tests/draft_index.rs) the on-disk shape, [`secret_scan.rs`](tests/secret_scan.rs) with positive fixtures under [`tests/fixtures/`](tests/fixtures), [`limits_sync.rs`](tests/limits_sync.rs) re-counts the numbers printed on the public faces so they cannot drift silently. |
 
-> no canonical encoding. 41 §6: "every canonical encode goes through gx-canon only, bypass
-> forbidden". This crate parses `gx1:` text with `gx_core::Cid::from_text` and never computes
-> one. ... no `Verdict`. 41 §4 puts the one judgement in `Gate::verify`. ... no `Lifecycle`
-> write ... This crate reads states; it keeps none.
+---
 
-> The one asymmetry, stated rather than hidden (req/88 §3 Λ2): "the moment the CLI holds state
-> that does not enter `Σ`, equality breaks — M6-01(a)'s `.gx/drafts/` is exactly that." ...
-> AC-055's "identical" has to be read as "identical from `Candidate` onward".
+## Where it sits
 
-## What this crate does not guarantee
+The top surface of the workspace. It depends on the engine, the gate, the witness, the log, the
+substrate boundary and all three shipped adapters, and on [`gx-api`](../gx-api) for the `serve`
+path. Nothing in the workspace depends on it.
 
-> a `View` is a **borrow** type ... `Deserialize` produces an owned value out of bytes it does
-> not keep, so a borrowing struct can only implement it by borrowing from the input buffer ...
-> Measured rather than asserted: nine `…View` types are public in this workspace ... and eight
-> of the nine carry a `<'a>`. [This crate does not implement `Deserialize` for those types.]
+## Learn more
 
-## Position
-
-`req/spec/40-architecture/44-api-spec.md` §1 (the `gx` verb surface); `req/56` (the `.gx/`
-directory layout this crate declares). Rule 1 = req/88 §3 Λ1; the asymmetry = req/88 §3 Λ2.
-
-## Not covered
-
-The three verbs whose mechanism is not in the public distribution (`gx wrap`/`gx attach`/
-`gx confine`/postgres sessions — `req/817`) are feature-gated out of the public manifest
-(`public/crates/gx-cli/Cargo.toml`), not silently dropped — the feature names remain declared
-there with the reason.
+- [`src/lib.rs`](src/lib.rs) — the three absences and the one asymmetry, from the crate's own side.
+- [`docs/TUTORIAL.md`](../../docs/TUTORIAL.md) — the commands in the order a first user meets them.
+- [`docs/ERROR_TAXONOMY.md`](../../docs/ERROR_TAXONOMY.md) — what each exit code means.

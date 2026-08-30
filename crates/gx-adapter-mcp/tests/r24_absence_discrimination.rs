@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 //! 🔴 **`req/316` M-01 and M-02** (`req/317` §1 items 2 and 3, `req/38` §227 ruling 3) — how "the
 //! server answered, and its answer is that there is nothing here" crosses the adapter boundary, and

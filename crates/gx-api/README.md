@@ -1,39 +1,31 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-api
 
-The Glovrex HTTP surface (44 §2): thirteen synchronous endpoints, the gx_code map, Bearer auth and Idempotency-Key.
+**The Glovrex HTTP surface: thirteen synchronous endpoints, the gx_code map, Bearer auth and Idempotency-Key.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> this crate holds no semantic authority. The same three absences gx-cli carries, checked by
-> the same instrument (`crates/gx-canon/tests/authority_boundary.rs`): no canonical encode
-> (41 §6), no `Verdict` construction (41 §4), no `Lifecycle` write (42 §1.3-3).
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | The HTTP face of the engine: the synchronous endpoints, the map from refusal kinds onto stable numeric codes, static Bearer authentication with a loopback default, and a persisted `Idempotency-Key`. |
+| **What it guarantees** | It holds **no semantic authority**. It performs no canonical encoding, constructs no verdict, and writes no lifecycle state — the same three absences the command line carries, checked by the same authority-boundary test. The refusal-code map lists its folds rather than implying them, the auth module states the *absence* of a check as an explicit value, and the idempotency module says in one line what it does **not** protect. |
+| **What it refuses to do** | The endpoint table names fourteen rows and thirteen are implemented; the streaming endpoint, the server runtime with graceful shutdown, and the list endpoints belong to a later stage. That discrepancy is raised as a defect in the open rather than rounded off to a tidier number. |
+| **How it is checked** | [`tests/`](tests) — [`endpoints.rs`](tests/endpoints.rs) and [`router.rs`](tests/router.rs) for the surface, [`auth.rs`](tests/auth.rs) and [`idempotency.rs`](tests/idempotency.rs) for the two headers, [`wire_census.rs`](tests/wire_census.rs) for every field on the wire being accounted for, [`shutdown.rs`](tests/shutdown.rs) and [`stream.rs`](tests/stream.rs) for the parts that are not finished. |
 
-> `gx_code` — M6-09's one map, thirty-three refusal kinds onto twelve codes, with the folds
-> listed rather than implied; `auth` — M6-10's static Bearer, the loopback default, and "the
-> check's absence" as a string; `idempotency` — M6-11's hand-written `Idempotency-Key`,
-> persisted, with the one line that says what it does **not** protect; `state` — M6-06,
-> adopted (a)'s single lock, and 45 §1's two keys as two methods.
+---
 
-> req/88 §6.2 gives this hand "44 §2's synchronous face, **11** endpoints" and hand 1's
-> `SPECIFIED_ENDPOINTS` array — read off 44 §2.1 — has **fourteen** rows. Fourteen minus
-> `/stream` is **thirteen** ... thirteen are implemented and the discrepancy is raised as
-> **M6H5-1**.
+## Where it sits
 
-## What this crate does not guarantee
+A surface over [`gx-engine`](../gx-engine), [`gx-gate`](../gx-gate),
+[`gx-witness`](../gx-witness), [`gx-log`](../gx-log) and [`gx-core`](../gx-core). It sits beside
+[`gx-cli`](../gx-cli), not above it: both observe the same engine and neither extends it.
 
-> `GET /stream` (M6-12's event map, M6-13's resume cursor), `gx serve`'s runtime and graceful
-> shutdown, and M6-05's three list endpoints [are named in the doc comment as a separate hand's
-> scope — see `req/spec/40-architecture/44-api-spec.md` §2 and this crate's own module list for
-> current implementation status, which this README does not restate].
+## Learn more
 
-## Position
-
-`req/spec/40-architecture/41-architecture.md` §2 (crate); `44-api-spec.md` §2 (the endpoint
-table this crate implements). Rule 1 = req/88 §3 Λ1.
-
-## Not covered
-
-This crate never constructs a `Verdict` and never performs a canonical encode — both are
-mechanically checked by `crates/gx-canon/tests/authority_boundary.rs`, not by this crate itself.
+- [`src/lib.rs`](src/lib.rs) — the endpoint list and the three absences, from the crate's own side.
+- [`docs/ERROR_TAXONOMY.md`](../../docs/ERROR_TAXONOMY.md) — what each refusal code means to a caller.

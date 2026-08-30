@@ -1,37 +1,32 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-canon
 
-Canonical DAG-CBOR form, CID, and the JCS compatibility layer (41 §2 / 42).
+**Canonical DAG-CBOR form, CID, and the JCS compatibility layer.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> Two faces, kept apart on purpose (A-4, in `req/38_ERRATA_2026-08-07.md` §1): **wire** —
-> encode and decode every field, so a value survives the round trip byte for byte (AC-009,
-> AC-012). Whether bytes are canonical is decided by the encoder, never by the fact that a
-> decoder accepted them ... **identity** — project a value through `IdentityView`, encode that
-> projection on the wire face, hash it with BLAKE3 (AC-011, AC-013). `id` and `created_at` are
-> not in the projection, so the same transformation recorded at two times has one CID.
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | Two faces, deliberately kept apart. The **wire** face encodes and decodes every field, so a value survives a round trip byte for byte. The **identity** face projects a value, encodes that projection on the wire face, and hashes it with BLAKE3. |
+| **What it guarantees** | Whether bytes are canonical is decided by the encoder, never by the fact that a decoder accepted them. The projection drops the record's own id and creation time, so the same transformation recorded at two moments has one identifier. Identity is *defined* as that composition, which is what makes the projection unskippable: there is no second road to a content identifier. |
+| **What it refuses to do** | It does not treat surviving a round trip as evidence of being canonical — those are two different questions on purpose. Bytes the encoder would not have produced are refused rather than accepted. Every refusal is a returned value, never a panic, including refusals caused by input a caller controls. The type definitions themselves are not here. |
+| **How it is checked** | [`tests/`](tests) — [`canonical_bytes_road.rs`](tests/canonical_bytes_road.rs) and [`golden_vectors.rs`](tests/golden_vectors.rs) / [`negative_vectors.rs`](tests/negative_vectors.rs) for the encoder's decision, [`identity_view.rs`](tests/identity_view.rs) and [`hash_injectivity.rs`](tests/hash_injectivity.rs) for the projection, [`unsafe_forbidden.rs`](tests/unsafe_forbidden.rs) and [`authority_boundary.rs`](tests/authority_boundary.rs) for the two absences this crate polices workspace-wide. |
 
-> The identity face is defined as that composition, which is how the projection stops being
-> skippable: there is no second road to a `Cid` (AC-014).
+---
 
-## What this crate does not guarantee
+## Where it sits
 
-> 41 §6 types errors with `thiserror` and calls a panic a bug, which is why every refusal here
-> is a returned value — including the ones that come from input a caller can control.
+Directly above [`gx-core`](../gx-core), which supplies the types this crate projects and encodes.
+`gx-core` is not aware of this crate. Everything that needs a canonical form or an identifier —
+the log, the witness, the gate, the engine — reaches it through here.
 
-The wire face and the identity face are stated as deliberately separate questions (A-4); a
-value that survives the round trip is not thereby claimed canonical, and bytes the encoder
-would not have produced are refused (`Error::NotCanonicalizable`) rather than accepted.
+## Learn more
 
-## Position
-
-`req/spec/40-architecture/41-architecture.md` §2 (module list, dependency line);
-`req/spec/40-architecture/42-*.md` (the encoding rules this crate implements).
-
-## Not covered
-
-`gx-core` stays unaware of this crate's encoding logic by design (A-1) — this crate defines
-`IdentityView` and implements it for `gx-core` types, but the type definitions themselves live
-in `gx-core`, not here.
+- [`src/lib.rs`](src/lib.rs) — the two faces and why they are separate.
+- [`src/cid.rs`](src/cid.rs) — the identifier construction itself.
+- [`docs/TRACEFOLD_TR.md`](../../docs/TRACEFOLD_TR.md) — the encoding rules in full.

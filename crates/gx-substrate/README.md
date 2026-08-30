@@ -1,38 +1,33 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-substrate
 
-The SubstrateAdapter boundary and its delta types (41 §2 / §4, 42 §3.4).
+**The SubstrateAdapter boundary and its delta types.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> 41 §2 places this crate in the workspace and calls it "the point that secures P-6", 41 §4
-> gives the `SubstrateAdapter` trait, 42 §3.4 gives the field tables of `PlannedDelta` and
-> `AppliedDelta`.
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | The boundary every substrate meets: the `SubstrateAdapter` trait, the planned and applied delta types, and the normative rule for reading a locator. It is the point that keeps a delta's payload opaque to everything underneath the adapter. |
+| **What it guarantees** | Locator normalisation is **lexical only** — it folds dot segments, removes duplicate separators and applies one trailing-separator convention, and it performs no I/O while doing so. Nothing here reads a clock, opens a file or computes a digest; the trait states what an adapter promises and implements none of it. A test asserts that absence rather than leaving it to be noticed later. |
+| **What it refuses to do** | Symbolic-link and real-path resolution are **not** in this version, and the hole is named rather than papered over: a locator that reaches a protected path through a symbolic link is not closed by lexical normalisation, so an actor who can create links can still choose which spelling the gate sees. A crate that opens no file cannot be an adapter, and this one is not meant to be. |
+| **How it is checked** | [`tests/`](tests) — [`substrate_contract.rs`](tests/substrate_contract.rs) asserts the absence of I/O, [`adapter_contract.rs`](tests/adapter_contract.rs) the trait's shape, [`delta_semantics.rs`](tests/delta_semantics.rs) and [`planned_delta_identity.rs`](tests/planned_delta_identity.rs) the delta types, [`scope_elision.rs`](tests/scope_elision.rs) what a scope may leave out. |
 
-> Nothing here reads a clock, opens a file or computes a digest — the trait says what an
-> adapter promises and implements none of it; a crate that does none of those cannot be an
-> adapter, and it is not meant to be one. `crates/gx-substrate/tests/substrate_contract.rs`
-> asserts that absence rather than leaving it to be noticed later.
+---
 
-> Locator normalisation (normative): 1. **Lexical only** ... performs no I/O ... 2.
-> **Dot-segment folding** ... 3. **Duplicate-separator removal** ... 4. **Trailing-separator
-> convention** ... 5. **Symlink/realpath resolution is v0.2+.**
+## Where it sits
 
-## What this crate does not guarantee
+Between [`gx-core`](../gx-core) / [`gx-canon`](../gx-canon) and the substrate adapters —
+[`gx-adapter-fs`](../gx-adapter-fs), [`gx-adapter-git`](../gx-adapter-git),
+[`gx-adapter-mcp`](../gx-adapter-mcp) — each of which implements this trait. The harness that
+measures an implementation against this boundary is a separate crate,
+[`gx-substrate-conformance`](../gx-substrate-conformance).
 
-> Clause 5 leaves a hole and the hole is named rather than papered over. **TH-2 residue**: a
-> locator reaching a policy-protected path through a symbolic link is not closed by lexical
-> normalisation, so an actor who can create links can still choose which spelling the gate
-> sees.
+## Learn more
 
-## Position
-
-`req/spec/40-architecture/41-architecture.md` §2 (crate placement), §4 (`SubstrateAdapter`
-trait); `42-*.md` §3.4 (`PlannedDelta`/`AppliedDelta` field tables).
-
-## Not covered
-
-Symlink/realpath resolution (v0.2+, not this crate's obligation — see TH-2 residue above);
-the shared contract harness that measures an implementation against this boundary is a
-separate crate, `gx-substrate-conformance`.
+- [`src/lib.rs`](src/lib.rs) — the boundary and the normalisation clauses, stated normatively.
+- [`docs/LIMITS.md`](../../docs/LIMITS.md) — what this project does not cover, workspace-wide.

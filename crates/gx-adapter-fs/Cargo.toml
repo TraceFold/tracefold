@@ -6,7 +6,7 @@
 # `commutation` hand 6 (req/69 §6.2). N-05 keeps landlock out of v0.1 entirely.
 [package]
 name = "gx-adapter-fs"
-description = "The filesystem SubstrateAdapter: single-file whole replacement, lexical locators (41 §4, M4-13(a))."
+description = "The filesystem SubstrateAdapter: single-file whole replacement, lexical locators."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-adapter-fs-002)

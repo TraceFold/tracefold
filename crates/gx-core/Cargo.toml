@@ -2,7 +2,7 @@
 # the workspace and 41 §6 tells it what it may not do: no I/O, deterministic, no unsafe.
 [package]
 name = "gx-core"
-description = "Core types of the Glovrex transformation calculus. No I/O, deterministic (41 §3 / §6)."
+description = "Core types of the Glovrex transformation calculus. No I/O, deterministic."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-core-001)

@@ -1755,7 +1755,13 @@ wire_census wire_handshake witness_conformance_gen witness_error_vocabulary work
 writer_doubt
 receipt_payload_json_round_trip dr892_read_set_attestation dr891_http_undo_branches
 r868_name_durability r868_payload_version_attest r922_gx_object_file
-m5_11_postcondition_mismatch r919_index_branch_cache r919_engine_version_attest r919_engine_version_seat'
+m5_11_postcondition_mismatch r919_index_branch_cache r919_engine_version_attest r919_engine_version_seat
+r942_tui r939_kind_binding attach_externalized attach_interface h9_operational_disclosure_doubt inference_closed_doubt'
+# [bookkeeping-repair] (req/38 SS978/SS1000): the six suite files above landed over several lanes
+# (tui942 merge 787ec6bf, kind-binding batch1, X-band attach externalization, h9/inference-closed
+# doubt probes) without a matching EXPECTED_SUITES entry -- f2 caught the gap census-side, all six
+# suites run green. Names only, registered here; MIN_PROBES/MIN_SUITES (floor_doubt f1, README f6/f8)
+# are a separate ratchet row and are not touched by this edit.
 EXPECTED_SUITES=$(printf '%s' "$EXPECTED_SUITES" | tr '
 ' ' ')  # V§17: line-boundary tokens failed the space-delimited case match
 

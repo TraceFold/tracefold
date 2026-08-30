@@ -74,3 +74,17 @@ hand-list-only).
 ## This repository's floor
 
 2026-08-13 measured, `cargo test --workspace` on this staging tree (WSL, `rustc`/`cargo` 1.97.1): **1,160 passed / 216 suites, 0 failed.** ("Suites" here counts every `cargo test` harness invocation: one `unittests` run per crate that has one, one run per file under `tests/`, and one `Doc-tests` run per crate.) This is the number for this public repository as it stands today, not the development tree's 1,370/247.
+
+🔴 **2026-08-31 staleness flag (public-docs audit, Owner #146).** The 2026-08-13 figure above is
+now over two weeks old and has not been re-measured on this staging tree since. It is stale by
+construction, not by a found defect: the development tree's own floor has grown from the
+1,370/247 named above to a figure on the order of **2,700 passed / 470+ suites** as of
+2026-08-29/30 (`req/00-LOOP_STATE_2026-08-18.md`, 2026-08-30 tick; `crates/gx-witness` commit
+`0bba4837`, "floor 2684/474"; this is the private tree's number and is **not** the public
+repository's own count — the two have always differed, as the paragraph above already says).
+Dozens of test files named throughout `docs/LIMITS.md`'s changelog (the `r3*`/`r4*`/`g8`/`g9`
+suites, 2026-08-15 through 2026-08-29) postdate this measurement and are not reflected in
+**1,160 / 216**. This page's own convention (re-derive from the commands given, do not trust the
+table) applies to itself: the honest reading of this section today is "at least 1,160 / 216, most
+likely higher," not "1,160 / 216." A fresh `cargo test --workspace` on the public staging tree is
+the correction this note stands in for; nobody has run and recorded one since 2026-08-13.

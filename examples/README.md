@@ -3,22 +3,27 @@
 
 # examples/
 
-One example lives here today: a copy-paste GitHub Actions workflow that fails CI when a
-delivery has no `gx` receipt, or the receipt does not verify offline.
-
-## Contents
-
-- `ci/receipt-check.yml` — verifies a receipt + checkpoint + trusted-key bundle with
-  `gx receipt verify --offline`. It is a starting point to copy into your own
-  `.github/workflows/`, not a job wired into this repository's own CI (this repo verifies
-  its own receipts through its test suite instead). See the file's own header for what it
-  assumes and does not cover, and `docs/TUTORIAL.md`'s "Verify offline" section for the
-  same check walked by hand.
-
-This folder ships to the public repo unfiltered — `tools/pub_sync_dryrun.sh`'s
-`build_manifest()` stages everything `git ls-files -- examples/` returns, with no
-whitelist and no `_`-prefix exclusion. Whatever is added here later ships too; nothing
-beyond `ci/receipt-check.yml` is implied to exist yet.
+Copy-paste starting points. Nothing here is wired into this repository's own build — these are
+files you take away and adapt.
 
 ---
-Derived from: `git ls-files -- examples/` (1 file, 2026-08-30). req/968 P-968-4.
+
+| File | What it does | What it does not do |
+| :--- | :--- | :--- |
+| [`ci/receipt-check.yml`](ci/receipt-check.yml) | A GitHub Actions job that fails the build when a delivery carries no `gx` receipt, or carries one that does not verify offline. It runs `gx receipt verify --offline` over a receipt, a checkpoint and a trusted-key bundle. | It is not run by this repository (this repo verifies its own receipts through its test suite instead), and it assumes you supply the key bundle. The file's own header states what it assumes in full. |
+| `README.md` | This page. | — |
+
+---
+
+## Using it
+
+Copy `ci/receipt-check.yml` into your own `.github/workflows/`, point it at the receipt and key
+your delivery produces, and it will refuse a build whose evidence does not check out.
+[`docs/TUTORIAL.md`](../docs/TUTORIAL.md) walks the same verification by hand first, which is the
+faster way to find out what the three input files are before automating them.
+
+## Scope of this folder
+
+This folder is published whole: every file added here later is published too, with no allow-list
+filtering it. That is why it holds exactly the two files listed above and nothing incidental —
+there is no staging step to catch a stray file.

@@ -7,7 +7,7 @@
 # conformance harness hand 3, and `gx-adapter-fs` hand 4 (req/69 §6.2).
 [package]
 name = "gx-substrate"
-description = "The SubstrateAdapter boundary and its delta types (41 §2 / §4, 42 §3.4)."
+description = "The SubstrateAdapter boundary and its delta types."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the

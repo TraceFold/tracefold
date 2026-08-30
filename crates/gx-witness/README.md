@@ -1,35 +1,32 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-witness
 
-Provenance, evidence and DSSE-signed receipts (41 §2 / 42 §3.9-§3.10).
+**Provenance, evidence and DSSE-signed receipts.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> P-7's witness: after the gate has decided, something has to be able to say *afterwards, to a
-> third party, offline* what was decided and over what. That is a receipt — a DSSE envelope
-> over a canonical `ReceiptPayload` — and the provenance and evidence it refers to.
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | The part that can say *afterwards, to a third party, offline* what was decided and over what. That statement is a receipt — a DSSE envelope over a canonical payload — together with the provenance and evidence it refers to. |
+| **What it guarantees** | A receipt is verifiable without the issuer: the envelope, the canonical payload and the key are all a checker needs. The proof types are shared with the gate rather than defined a second time here, so the two crates cannot drift into two spellings of the same thing. |
+| **What it refuses to do** | **Receipt soundness and witness composition are not proved.** There is no Lean proof for either, and a receipt this crate issues is a signed record of what the engine decided — nothing stronger. Saying otherwise is exactly the overclaim this project forbids itself, so it is written here rather than left for a reader to discover. |
+| **How it is checked** | [`tests/`](tests) — [`frozen_receipt_corpus.rs`](tests/frozen_receipt_corpus.rs) re-verifies receipts issued by earlier versions from [`tests/fixtures/frozen_receipts/`](tests/fixtures/frozen_receipts), [`checkpoint_signature.rs`](tests/checkpoint_signature.rs) and [`leaf_from_signed_bytes.rs`](tests/leaf_from_signed_bytes.rs) for the signature path, [`revocation.rs`](tests/revocation.rs) for key withdrawal, [`witness_error_vocabulary.rs`](tests/witness_error_vocabulary.rs) for the refusal set being whole. |
 
-> FR-017 asks gx-witness for a `Proof` while 42 §0 files the nearly identical `ProofRef` under
-> gx-gate (M3). **E-M2-12** ... put the family in gx-core so the two crates share one set of
-> types, and this crate satisfies FR-017's MUST by re-exporting them rather than by defining a
-> second spelling.
+---
 
-## What this crate does not guarantee
+## Where it sits
 
-> **What this crate must never be said to prove.** 46 §2.5's T4 (receipt soundness) and T5
-> (witness lax composition) are **not proved**: `Receipt.lean` does not exist. A receipt this
-> crate issues is a signed record of what the engine decided. It is not backed by T4, and req/49
-> §1 N-10 marks saying otherwise as the overclaim 45 §4.1 forbids.
+Above [`gx-core`](../gx-core), [`gx-canon`](../gx-canon) and [`gx-log`](../gx-log).
+[`gx-gate`](../gx-gate), [`gx-engine`](../gx-engine) and the command line consume it; the offline
+verifier in the SDK checks what it produces.
 
-## Position
+## Learn more
 
-`req/spec/40-architecture/41-architecture.md` §2 (where this crate sits, what it may depend
-on); `42-*.md` §3.7 / §3.9 / §3.10 (field tables); `32-functional.md` FR-015..FR-020;
-`34-*.md` AC-015..AC-020 and AC-070.
-
-## Not covered
-
-A signed receipt is not a proof of T4 (receipt soundness) or T5 (witness lax composition) —
-neither is proved in Lean for this crate; see "What this crate must never be said to prove"
-above.
+- [`src/lib.rs`](src/lib.rs) — the receipt shape, and the sentence about what it must never be said to prove.
+- [`lean/README.md`](../../lean/README.md) — what *is* machine-checked, and what is not.
+- [`docs/LIMITS.md`](../../docs/LIMITS.md) — the same boundary from the project's side.

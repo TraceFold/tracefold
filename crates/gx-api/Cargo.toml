@@ -7,7 +7,7 @@
 # ("everything except `/stream` and the list family").
 [package]
 name = "gx-api"
-description = "The Glovrex HTTP surface (44 §2): thirteen synchronous endpoints, the gx_code map, Bearer auth and Idempotency-Key."
+description = "The Glovrex HTTP surface: thirteen synchronous endpoints, the gx_code map, Bearer auth and Idempotency-Key."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47; sem: SEM-gx-api-003): declared once, in the workspace

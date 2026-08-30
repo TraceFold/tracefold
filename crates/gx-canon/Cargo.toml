@@ -2,7 +2,7 @@
 # dependency line; 42 gives the encoding rules those dependencies are asked to carry out.
 [package]
 name = "gx-canon"
-description = "Canonical DAG-CBOR form, CID, and the JCS compatibility layer (41 §2 / 42)."
+description = "Canonical DAG-CBOR form, CID, and the JCS compatibility layer."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-canon-001)

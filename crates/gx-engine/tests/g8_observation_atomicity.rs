@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **`req/859` G8 (E-3) — the crash window in `ObservationStore::put`, opened from the reader's
 //! side** (`req/868`, 2026-08-26, seat=Opus, 暫定 — 再審査可).
 //!

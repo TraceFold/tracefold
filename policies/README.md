@@ -3,36 +3,40 @@
 
 # policies/
 
-Cedar policy packs (`.cedar` rule files + their `scenarios.json` conformance fixtures)
-that `gx-gate` embeds at build time. Three packs ship publicly: `fs`, `git`, `mcp`.
-
-## Ships to the public repo
-
-- `fs/deny-etc.cedar`, `fs/scenarios.json`
-- `git/deny-nonbranch-refs.cedar`, `git/scenarios.json`
-- `mcp/deny-etc-resources.cedar`, `mcp/scenarios.json`
-
-Each pack's `scenarios.json` ships beside its `.cedar` file since req/833 — `PACK_FORMAT.md`
-F1 asks every shipped pack to co-ship the scenario file it hands a third party, and two
-public tests (`pack_locators.rs`, `policy_cmds.rs::every_shipped_pack_passes_its_own_scenario_file`)
-hold the tree to that.
-
-## Present here, does not ship
-
-- `policies/postgres/` (`deny-system-catalogs.cedar` + `scenarios.json`) — the private
-  `pg`-feature adapter's pack.
-- `policies/PACK_FORMAT.md` — the format spec itself.
-
-`tools/pub_sync_dryrun.sh`'s `build_manifest()` names exactly the six files above and
-nothing else in this folder; `postgres/` and `PACK_FORMAT.md` exist in this working tree
-but do not reach `github.com/TraceFold/tracefold`. This is a selected subset, not the
-whole of what `policies/` locally holds.
-
-## Format
-
-What a `policies/<substrate>/` directory has to contain to land in the same shape as the
-three above — `PACK_FORMAT.md` (this local tree only, per the split above).
+Cedar policy packs. Each pack is a rule file plus the scenario file that proves the rules still
+say what they were written to say. [`gx-gate`](../crates/gx-gate) embeds them at build time and
+evaluates them for every transformation.
 
 ---
-Derived from: `tools/pub_sync_dryrun.sh`'s policies loop (fixed 6-file list, cross-checked
-against `git ls-files -- policies/`, 9 tracked files total locally), 2026-08-30. req/968 P-968-4.
+
+| Pack | Rules | Scenarios | What the rules refuse |
+| :--- | :--- | :--- | :--- |
+| **fs** | [`fs/deny-etc.cedar`](fs/deny-etc.cedar) | [`fs/scenarios.json`](fs/scenarios.json) | Writes into system configuration paths, for the [filesystem adapter](../crates/gx-adapter-fs). |
+| **git** | [`git/deny-nonbranch-refs.cedar`](git/deny-nonbranch-refs.cedar) | [`git/scenarios.json`](git/scenarios.json) | Changes aimed at references that are not branches, for the [git adapter](../crates/gx-adapter-git) — an adapter whose whole reversibility argument rests on a branch being resettable. |
+| **mcp** | [`mcp/deny-etc-resources.cedar`](mcp/deny-etc-resources.cedar) | [`mcp/scenarios.json`](mcp/scenarios.json) | Tool calls aimed at system-configuration resources, for the [MCP adapter](../crates/gx-adapter-mcp). |
+
+Every pack ships its `scenarios.json` beside its rules, because a pack handed to a third party
+without the cases it is supposed to decide is a pack nobody can check. Two tests in the workspace
+hold the tree to that: one asserts the locator shapes each pack claims, the other runs every
+shipped pack against its own scenario file.
+
+---
+
+## What a pack does and does not decide
+
+A policy sees the locator, the actor, the change context, the ordering, whether an inverse could
+be built, and the evidence. It does **not** see the contents of the change — a delta's payload is
+opaque below the adapter boundary, by construction. So a rule can say *this position must not be
+written by this actor*; it cannot say *this text must not be written*.
+
+A gate that was handed no packs at all answers with an error rather than admitting everything: an
+empty policy directory and a working deployment must not look the same.
+
+Policies encoding the wrong intent are enforced faithfully. Whether the intent is right is outside
+what this project can check — see [`docs/LIMITS.md`](../docs/LIMITS.md).
+
+## Adding a pack
+
+A pack is a directory holding one or more `.cedar` files and one `scenarios.json`. Both are
+required; the scenario file is what lets anyone other than the author confirm the rules behave.
+The three packs above are the working examples to copy the shape from.

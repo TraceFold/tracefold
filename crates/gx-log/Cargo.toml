@@ -3,7 +3,7 @@
 # Rekor v2); 42 §3.11 gives the hash rules and the field tables.
 [package]
 name = "gx-log"
-description = "Append-only Merkle tile log: inclusion and consistency proofs (41 §2 / 42 §3.11)."
+description = "Append-only Merkle tile log: inclusion and consistency proofs."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-log-002)

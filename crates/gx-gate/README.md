@@ -1,40 +1,32 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-gate
 
-Cedar policy evaluation, invariant registry and verdict composition (41 §2 / §4, 42 §3.8).
+**Cedar policy evaluation, invariant registry and verdict composition.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> `A(f)`: the predicate that decides whether a transformation is admissible.
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | The predicate that decides whether a transformation is admissible. It evaluates the Cedar policy set, runs every registered invariant, and composes the two into one verdict. |
+| **What it guarantees** | If either the policy set or an invariant refuses, the gate refuses. A gate that was never given a policy set still answers with an error, because an empty policy directory and a working deployment must not look the same. |
+| **What it refuses to do** | It is **not** the state machine: a verdict says what is true of a transformation; what a system *does* about that — refuse the commit, record it anyway, wait for a human — is decided one layer up. It also **cannot see the change it is judging**; a delta's payload is opaque below the adapter, so a policy may reason only over the locator, the actor, the change context, the order, whether an inverse exists, and the evidence. And admissibility does **not** compose for an arbitrary policy set: one policy forbidding any transformation that touches two given paths together is a standing counterexample, and this crate does not claim otherwise. |
+| **How it is checked** | [`tests/`](tests) — [`false_admit.rs`](tests/false_admit.rs) with its own vector directory for the failure that matters most, [`policy_determinism.rs`](tests/policy_determinism.rs) and [`deny_order.rs`](tests/deny_order.rs) for evaluation order, [`verdict_meet.rs`](tests/verdict_meet.rs) / [`verdict_order.rs`](tests/verdict_order.rs) for composition, [`pack_embedding.rs`](tests/pack_embedding.rs) and [`shipped_set.rs`](tests/shipped_set.rs) for the packs that actually ship. |
 
-> It is **not** the state machine. 43's transitions belong to gx-engine (M5): a `Verdict` says
-> what is true of a transformation, and what a system *does* about that — refuse the commit,
-> record it anyway under `EnforcementMode::RecordOnly`, wait for a human — is decided one layer
-> up.
+---
 
-> `Gate::verify` evaluates the policy set, runs every registered invariant, and refuses if
-> either refused. ... A gate that was never given a policy set still answers `Err`, because an
-> empty `policies/` directory and a working deployment must not look the same (req/29 §4).
+## Where it sits
 
-## What this crate does not guarantee
+Above [`gx-core`](../gx-core), [`gx-canon`](../gx-canon) and [`gx-witness`](../gx-witness), and
+below [`gx-engine`](../gx-engine), which asks it for a verdict and then acts on one. The shipped
+rule sets it evaluates live in [`policies/`](../../policies).
 
-> It also **cannot see the change it is judging**. 42 §3.4 makes a delta's payload opaque to
-> everything below the adapter (P-6), so what a policy may reason over is the locator, the
-> actor, the change context, the order, whether an inverse exists, and the evidence.
+## Learn more
 
-> **T1 is not a property of this crate (E-M3-5)** ... 51 §3 asks gx-gate for a property test
-> ... asserting `A(f) ∧ A(g) → A(g∘f)`, and **that statement is false of an arbitrary Cedar
-> policy set**. The counterexample is one policy: forbid any transformation that touches `/a`
-> and `/b` together.
-
-## Position
-
-`req/spec/40-architecture/41-architecture.md` §2 (crate, modules), §4 (`GateInput`,
-`InvariantCheck`, `Gate::verify`), §6 (what every crate here may not do); `42-*.md` §3.8
-(field tables); `34-*.md` §E (AC-025..029).
-
-## Not covered
-
-No state machine (43 belongs to `gx-engine`, N-01) and no `EnforcementMode`/`FailPosture`
-(N-02) — both are named in req/60 §1 as deliberately somebody else's.
+- [`src/lib.rs`](src/lib.rs) — what a verdict is, and what it deliberately is not.
+- [`policies/`](../../policies) — the three policy packs that ship, with their conformance scenarios.
+- [`docs/LIMITS.md`](../../docs/LIMITS.md) — including the boundaries a policy cannot be written to close.

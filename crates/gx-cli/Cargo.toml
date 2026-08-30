@@ -15,7 +15,7 @@
 # reader has to rule out (gx-engine's manifest says the same thing about `pipeline.rs` in M5 hand 1).
 [package]
 name = "gx-cli"
-description = "The `gx` command line: `.gx/` layout, draft store, id-resolution cache (44 §1, req/56)."
+description = "The `gx` command line: `.gx/` layout, draft store, id-resolution cache."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47; sem: SEM-gx-cli-383): declared once, in the workspace
@@ -86,6 +86,17 @@ mcp = []  # needs `gx-mcp-wire`, not in this distribution
 confine = []  # needs `gx-confine`, not in this distribution
 # `--substrate postgres` sessions.
 pg = []  # needs `gx-adapter-postgres`, not in this distribution
+# 🔴 **`tui` is not a fourth empty stub** (checked before adding, `pubsync-tui-feature-stub`):
+# `req/789` §3 holds four crates private (`gx-adapter-mysql`, `gx-adapter-postgres`, `gx-confine`,
+# `gx-mcp-wire`) and `tui`'s only external crate is `ratatui` — not one of the four, a plain
+# crates.io dependency already resolved in this workspace's one `Cargo.lock`. The six `src/tui/`
+# modules this feature gates (`cfg(feature = "tui")`, `crates/gx-cli/src/lib.rs`) shipped to the
+# public clone whole (SS977). Stubbing this to `[]` would silently turn off code and a dependency
+# a public clone actually has, which is not what the three `[]` stubs above are for (each of them
+# needs a crate this tree does not contain at all). So `tui` is declared with its real dependency,
+# matching `crates/gx-cli/Cargo.toml` (private) exactly, and left out of `default` below for the
+# same "public default build stays light" reason `default = []` already states.
+tui = ["dep:ratatui"]
 
 [dependencies]
 gx-core = { path = "../gx-core", version = "0.1.0" }  # ids, `Cid::from_text`, `Intent`, `b64`
@@ -261,6 +272,13 @@ gx-adapter-mcp = { path = "../gx-adapter-mcp", version = "0.1.0" }
 # rustc newer than 1.85, and `cargo deny check licenses` passes on the existing allow list without a
 # single new entry.
 clap = { version = "4", features = ["derive"] }
+
+# 🔴 `ratatui`, `tui`'s one external crate (`req/942` §13-2) — same version/features as the private
+# manifest. `default-features = false` with `crossterm` alone keeps this out of the offline
+# verifier's network-crate probe (`crates/gx-cli/tests/ac_057.rs`, seven literal names, `ratatui`
+# is not one of them) and off the termion/termwiz/termina/`palette` backends the default set would
+# otherwise pull in for a face this binary does not build with them.
+ratatui = { version = "0.30", optional = true, default-features = false, features = ["crossterm"] }
 
 # 🔴 **M6 hand 6** — `gx serve` calls into it, so it moves from `[dev-dependencies]` to here under the
 # rule this manifest has now applied five times (req/38 §38 adopted (a): "a shipping dependency

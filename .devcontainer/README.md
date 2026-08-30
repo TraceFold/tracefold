@@ -3,22 +3,31 @@
 
 # .devcontainer/
 
-One file: `devcontainer.json` — a Codespaces / VS Code Remote container definition so a
-contributor can open the repo and land on an already-built workspace instead of hitting
-the cargo-build activation wall cold (req/818 ATOM 1).
-
-The image ships `rustup`; `rust-toolchain.toml` (channel pinned there) is the single
-source of the toolchain version — nothing here re-declares it.
-
-## Not yet live
-
-As of the file's own header note (req/818 F1, 2026-08-25), this file is staged for the
-public sync set but has **not** been pushed to `TraceFold/tracefold`. The live public
-tree currently declares workspace members it does not carry (`probes/doubt`,
-`gx-adapter-postgres`, `gx-adapter-mysql`, `gx-mcp-wire`, `gx-confine`), so
-`cargo build --workspace` — this file's `postCreateCommand` — would fail at workspace
-load on a fresh public clone today. Ship this file publicly only after that manifest gap
-closes.
+A container definition so that opening this repository lands you on a built workspace instead of
+on a cold cargo build.
 
 ---
-Derived from: `.devcontainer/devcontainer.json` (1 file, 2026-08-30). req/968 P-968-4.
+
+| File | What it declares |
+| :--- | :--- |
+| [`devcontainer.json`](devcontainer.json) | Base image `mcr.microsoft.com/devcontainers/rust:1`; `postCreateCommand` runs `cargo build --workspace`; the `rust-analyzer` extension is installed for VS Code. Works with GitHub Codespaces and VS Code Remote Containers. |
+
+---
+
+## The toolchain version is not declared here
+
+The image ships `rustup`, and [`rust-toolchain.toml`](../rust-toolchain.toml) at the repository
+root is the single place the channel is pinned. `rustup` resolves it on the first cargo
+invocation. Nothing in this folder restates a version, because a version written in two places is
+two versions.
+
+## What to expect on first open
+
+`postCreateCommand` builds the whole workspace, so the first open is as slow as a cold build and
+every open after it is not. The workspace member list in the root
+[`Cargo.toml`](../Cargo.toml) matches the crates this repository carries, which is what
+`cargo build --workspace` needs in order to load at all — it is worth checking that first if the
+build stops before it reaches any Rust.
+
+If you would rather verify from outside a container, [`tools/e2e.sh`](../tools/e2e.sh) does the
+same build against a fresh clone.

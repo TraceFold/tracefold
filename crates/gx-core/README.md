@@ -1,35 +1,31 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-core
 
-Core types of the Glovrex transformation calculus. No I/O, deterministic (41 §3 / §6).
+**Core types of the Glovrex transformation calculus. No I/O, deterministic.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> Spec: ... §3 for the type signatures it is required to carry, §6 for what it is forbidden to
-> do — no I/O, deterministic, no `unsafe`.
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | The workspace's shared vocabulary of types: identifiers, intents, deltas, verdicts, ledger shapes, receipt shapes. Definitions, and nothing that acts on them. |
+| **What it guarantees** | No I/O, no clock, no `unsafe`. The same input always yields the same value. Nothing declared here signs, hashes, verifies or compares. |
+| **What it refuses to do** | It never computes a content identifier and never encodes anything. It does not know the encoding crate exists. The data comes down; the computation stays up — and because that rule is a shape in the dependency graph rather than a note someone has to remember, there is no cycle to forbid. |
+| **How it is checked** | [`tests/`](tests) — [`compose.rs`](tests/compose.rs) and [`compose_range.rs`](tests/compose_range.rs) for composition, [`scope_bound.rs`](tests/scope_bound.rs) and [`value_range_closure.rs`](tests/value_range_closure.rs) for the bounds these types are allowed to take, [`core_error_vocabulary.rs`](tests/core_error_vocabulary.rs) for the refusal vocabulary being whole. |
 
-> The dependency between the two implementation crates runs one way. `gx-canon` names
-> `gx-core`; `gx-core` never names `gx-canon`. That is what lets `Cid` be defined here while the
-> BLAKE3 computation that fills one in lives over there (`ASM-16`, and the A-1 ruling ...).
+---
 
-> One rule holds all four: **the data comes down, the computation stays up**. Nothing added
-> here signs, hashes, verifies or compares — that is A-1's shape (`Cid` here, BLAKE3 in
-> gx-canon) applied a second time, and it is what makes the cycle absent from the dependency
-> graph instead of forbidden by a rule someone has to remember.
+## Where it sits
 
-## What this crate does not guarantee
+The floor of the workspace. `gx-core` depends on no other crate here; every other crate depends
+on it. The content identifier type is defined here while the hash that fills one in is computed
+in [`gx-canon`](../gx-canon).
 
-This crate holds type definitions only. It performs no I/O, no hashing, no signing, no
-verification and no comparison — those operations live in the crates that depend on it
-(`gx-canon` for hashing/CID computation, `gx-witness` for signing).
+## Learn more
 
-## Position
-
-`req/spec/40-architecture/41-architecture.md` §2 (where this crate sits in the workspace),
-§3 (type signatures it must carry), §6 (what it may not do).
-
-## Not covered
-
-This crate does not define `IdentityView` or any encoding — those are `gx-canon`'s, and
-`gx-core` is deliberately unaware that `gx-canon` exists (A-1).
+- [`src/lib.rs`](src/lib.rs) — the crate's own account of why each type sits here and not elsewhere.
+- [`docs/TRACEFOLD_TR.md`](../../docs/TRACEFOLD_TR.md) — the calculus these types spell out.

@@ -7,7 +7,7 @@
 # M7 hand 3 builds all seven (req/98 §7-2, hand 3), ratified by `req/38` §59. (sem: SEM-gx-adapter-mcp-026)
 [package]
 name = "gx-adapter-mcp"
-description = "The MCP SubstrateAdapter: a tool call that cannot reach a server except through an admitted apply (41 §4, FR-046, AC-051)."
+description = "The MCP SubstrateAdapter: a tool call that cannot reach a server except through an admitted apply."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace only (sem: SEM-gx-adapter-mcp-027)

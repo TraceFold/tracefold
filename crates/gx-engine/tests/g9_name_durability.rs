@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Glovrex
 //! 🔴 **`req/859` G9 — the platform boundary of name durability, made machine-checked**
 //! (`req/868`, 2026-08-26, seat=Opus, 暫定 — 再審査可).
 //!

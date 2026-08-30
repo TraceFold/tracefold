@@ -168,7 +168,17 @@ pub const REGIONS: [Region; 4] = [
         role: RegionRole::Apparatus,
         priority: Priority::Three,
         recoverable: Recoverable::Route("GET /v1/healthz"),
-        min_rows: 4,
+        // 🔴 Three, and it was four. The fourth row was reserved against a `status_reason` long
+        // enough to wrap twice, and in every state measured against a live engine it was **never
+        // used**: the region drew two rows and held four at 46, 60, 80, 100 and 120 cells wide. A
+        // panel that is permanently part empty is furniture, and this one was furniture in the
+        // region that is dropped first — so the rows it was hoarding were the rows the screen went
+        // looking for when it ran out.
+        //
+        // Three is safe because the head is now wrapped rather than clipped and a head that still
+        // does not fit is cut **with a mark** (`super::renderer::apparatus`). Before that, cutting
+        // the apparatus was silent, so the fourth row was buying silence rather than safety.
+        min_rows: 3,
     },
     Region {
         intent: Intent::RecordsTheEngineProduced,

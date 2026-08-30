@@ -1,111 +1,52 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-substrate-conformance
 
-The adapter-independent contract harness 51 §7 asks for: seven contracts (1:1 with 51 §7's own
-table) plus the laws the rulings added (`req/69` §3.4's L-list, `K1`/`K2`). Every `SubstrateAdapter`
-implementation in this workspace (`gx-adapter-fs`, `gx-adapter-git`, `gx-adapter-mcp`,
-`gx-adapter-postgres`) is required to pass all sixteen obligations before it is considered complete
-(`Report::meets_51_7`).
+**The adapter contract harness: seven contracts and the laws the rulings added.**
 
-This file is the **third-party entry point** (`req/506_CONFORMANCE_REQDEF_2026-08-22.md` P0): how
-to run the same suite each adapter's own author runs, from outside this repository's implementation
-history, and how to read what comes back. It packages what already exists -- `contracts.rs` and
-`laws.rs` are unmodified, and no new obligation is added here.
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-## Run it
+---
 
-From WSL2 Ubuntu-24.04 (cargo is blocked on the Windows side by Smart App Control, `req/05` §5):
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | One adapter-independent test harness, sixteen obligations: seven contracts every `SubstrateAdapter` must satisfy, plus nine laws added by later rulings. An adapter inherits the whole set by calling `run_all` once from its own `#[test]`, so no adapter author writes their own version of these checks. |
+| **What it guarantees** | Three questions are kept **separate**, and that separation is the point of the crate. `conformant` = zero failures: nothing measured contradicted an obligation. `complete` = zero unmeasured: every obligation had a subject to run against. `meets_51_7` = both. A method an adapter has not implemented yet reports as **not supplied** — never a silent pass, and never a failure. Not-checked and checked-and-clean are different facts here, exactly as they are in the product. |
+| **What it refuses to do** | It measures adapters against the substrate boundary and nothing else. It is **not** a claim about receipt or wire-format conformance, and it is not the differential-vector suite that checks the Rust implementation against the Lean model — that is a different mechanism one word away in name and shares no code with this one. It adds no obligation of its own: `contracts.rs` and `laws.rs` are where the sixteen live. |
+| **How it is checked** | The harness's own standing negative control is [`tests/broken_fixture.rs`](tests/broken_fixture.rs) — eighteen deliberate flaws, one obligation broken at a time, each asserted to come back as a failure (or, for the one flaw meaning "not implemented yet", as not-supplied). Without it, an entry point that only ever printed green would be indistinguishable from one that ignores its own results. [`tests/contracts_seven.rs`](tests/contracts_seven.rs) and [`tests/laws.rs`](tests/laws.rs) cover the obligations themselves, [`tests/opacity.rs`](tests/opacity.rs) that the harness cannot see a delta's payload, [`tests/residual.rs`](tests/residual.rs) what is left unmeasured. |
 
-```bash
-bash tools/conformance_adapters.sh
-```
+---
 
-This runs the fs, git and mcp adapters' own `#[test]` (each inherits the harness by calling
-`gx_substrate_conformance::run_all` once, `src/lib.rs`'s documented shape) and prints one summary
-line per adapter plus a table. All three are expected to be **16/16 green** (7 contracts + 9 laws)
-with no live external service required.
+## Where it sits
 
-The postgres adapter needs a real server, so it is handled differently on purpose (see below).
+Beside [`gx-substrate`](../gx-substrate), which declares the boundary this crate measures against.
+The three shipped adapters each run it from their own test:
+[`gx-adapter-fs`](../gx-adapter-fs) in [`conformance.rs`](../gx-adapter-fs/tests/conformance.rs),
+[`gx-adapter-git`](../gx-adapter-git) in [`git_conformance.rs`](../gx-adapter-git/tests/git_conformance.rs),
+[`gx-adapter-mcp`](../gx-adapter-mcp) in [`mcp_conformance.rs`](../gx-adapter-mcp/tests/mcp_conformance.rs).
+It is a test-only crate and is not a publish target.
 
-### Reading the output
-
-Each adapter's own test prints a line shaped like:
-
-```
-CONFORMANCE <adapter>: CHECKS=16 PASS=16 FAIL=0 NOT_SUPPLIED=0 CONTRACT=7 LAW=9 conformant=true complete=true
-```
-
-Three questions, kept separate (**§31 M4H3-4 (b)**, `src/lib.rs`'s `Report`):
-
-- `conformant` -- zero **failures**. Nothing measured contradicted 51 §7 or a ruling.
-- `complete` -- zero **unmeasured**. Every obligation had a subject to run against (a partially
-  built adapter that has not implemented a method yet is "NOT_SUPPLIED", never a silent pass and
-  never a failure).
-- `meets_51_7` -- both of the above. 51 §7's own completion condition: "no adapter satisfies the
-  M4/M7 completion condition unless it passes all seven of the above contracts".
-
-`tools/conformance_adapters.sh` reduces this further, per adapter, to one of three row-states:
-**GREEN** (`meets_51_7` / the test's own assertions held), **FAIL** (a real defect -- something
-this adapter promises does not hold), or **NOT_RUN** (postgres only, see next section -- an
-environment the operator has not set up yet, never conflated with FAIL).
-
-## The postgres leg, specifically
-
-`crates/gx-adapter-postgres/tests/pg_conformance.rs` needs a live server reachable through
-`GX_ADAPTER_POSTGRES_DSN_DEFAULT` (`tools/pg_local.sh env` prints the line once the server is up).
-Without it, the fixture's own connection helper panics with a named "DSN must be set" message --
-which, read cold, looks exactly like a code defect to anyone who has not read this file.
-
-`tools/conformance_adapters.sh` checks for the environment variable **before** touching cargo:
-
-- **unset** -> a `NOT_RUN` row. Nothing about the adapter's code is asserted either way; this is
-  reported as an environment gap, not folded into "conformant" and not folded into "failed".
-- **set** -> the postgres leg runs for real, held to the identical 16/16 bar as fs/git/mcp
-  (`req/115` §A-3: "the same-shaped denominator as adapter-git's 16/16, fixed at connection time").
-
-To exercise the postgres leg for real:
+## Running it
 
 ```bash
-bash tools/pg_local.sh setup   # once: extracts a real, unmodified PostgreSQL 16 (no root needed)
-bash tools/pg_local.sh start
-eval "$(bash tools/pg_local.sh env)"
-bash tools/conformance_adapters.sh
+cargo test -p gx-adapter-fs --test conformance
+cargo test -p gx-adapter-git --test git_conformance
+cargo test -p gx-adapter-mcp --test mcp_conformance
+cargo test -p gx-substrate-conformance --test broken_fixture   # the negative control
 ```
 
-`tools/pg_local.sh` runs an unprivileged, real Postgres 16.14 server under `$HOME`, reachable only
-from the account that started it -- not docker, not a mock (see the script's own header for why).
+Each adapter's test prints one summary line carrying the three verdicts above, so a run tells you
+not only whether anything failed but whether everything was actually measured. All three adapters
+are expected green with no external service running.
 
-## Negative control
+An adapter that needs a live server to be measured is reported as **not run** rather than folded
+into either "conformant" or "failed" — an environment that has not been set up is not a defect in
+the code, and this crate refuses to let the two look the same.
 
-`crates/gx-substrate-conformance/tests/broken_fixture.rs` is the harness's own standing negative
-control: eighteen deliberate flaws, one obligation broken at a time, asserting that each is
-reported as `Fail` (or, for the one flaw that means "not implemented yet", `NotSupplied` --
-**never** a silent pass). Include it in a run with:
+## Learn more
 
-```bash
-bash tools/conformance_adapters.sh negctrl
-```
-
-This is what stands behind the claim that the packaging above is not decorative: an entry point
-that only ever prints GREEN would be indistinguishable from one that ignores its own test results.
-`broken_fixture.rs`'s eighteen flaws, run through the same `run_leg` path as the four adapters, are
-the proof that a real defect turns this script's exit code and summary row red -- P0's own
-verification exercised this directly by flipping one guard the same way `req/76` §2.2's cited
-mutant does (`laws.rs`'s L5 comparison, `applied.resulting_digest() == &target` -> unconditionally
-`true`) and confirming `tools/conformance_adapters.sh negctrl` reports `FAIL` for exactly that
-obligation before the guard was reverted; see `req/511_CONFORMANCE_P0_REPORT_2026-08-22.md` for the
-transcript. No such mutation is left in the tree -- this is a repeatable verification step, not a
-fixture that ships broken.
-
-## What this is not
-
-- Not `tools/conformance_gen.sh` / `tools/conformance_smoke.sh` -- those drive M8's Lean canon-model
-  differential-vector suite (`crates/gx-canon`, `crates/gx-gate`, `crates/gx-witness`'s
-  `*_conformance_gen` tests + `lake exe runner`). One word apart, one milestone apart, no shared
-  code (**N-12**, `src/lib.rs` documents the same distinction from the crate's own side).
-- Not a claim about receipt/wire-format conformance (docs/LIMITS.md's hermetic-verification claim,
-  the CRUD capability catalogue). Those are `req/506` P1/P2, out of this P0's scope, and will get
-  their own entry points under `crates/gx-witness/tests/`, `crates/gx-cli/tests/` and
-  `crates/gx-api/tests/` respectively.
-- Not a new crate, a new binary or a new `SubstrateAdapter` obligation. `contracts.rs` and
-  `laws.rs` are unmodified; this README and `tools/conformance_adapters.sh` are the entirety of
-  P0's write surface (`req/506` §3).
+- [`src/lib.rs`](src/lib.rs) — the report shape and the three questions, from the crate's own side.
+- [`src/contracts.rs`](src/contracts.rs) / [`src/laws.rs`](src/laws.rs) — the sixteen obligations.
+- [`docs/LIMITS.md`](../../docs/LIMITS.md) — what passing all sixteen does not tell you.

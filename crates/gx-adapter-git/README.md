@@ -1,42 +1,33 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (c) 2026 Glovrex -->
+
 # gx-adapter-git
 
-The git SubstrateAdapter: a file on a branch, moved by a commit, undone by a reference reset (41 §4, FR-045).
+**The git SubstrateAdapter: a file on a branch, moved by a commit, undone by a reference reset.**
 
-## What this crate guarantees
+Part of [Tracefold](../../README.md) — the workspace that holds a checked inverse for an agent's
+change before it lands.
 
-Quoted from `src/lib.rs`'s crate-level doc comment:
+---
 
-> An **object** is what a change is about; a **scope** is "the surrounding state that could
-> interfere with the target" ... | **object** | the file at one path, on one branch, in one
-> repository ... | **scope** | the **branch**. Its digest is the digest of the commit the branch
-> points at. |
+| Dimension | This crate |
+| :--- | :--- |
+| **What it is** | The git implementation of the substrate boundary. The **object** is the file at one path, on one branch, in one repository. The surrounding state that could interfere with it — the **scope** — is the branch, digested by the commit it points at. A locator spells all three parts: repository path, reference, file path. |
+| **What it guarantees** | All three locator parts are required; a spelling missing a separator is reported as *not a position*, rather than as a position that then fails to apply. Two locators name one position exactly when normalisation maps them to the same string, and that normalisation is **purely lexical** — a function of the text, performing no repository read at all. |
+| **What it refuses to do** | Because the scope is the whole branch, **two changes to two different files on one branch conflict**, and one of them waits. That is the true shape of a branch, not a limitation to be lifted later, and it is stated rather than hidden. The underlying git library is used through its public API only: its implementation is neither read nor reproduced here, and the delta grammar, the locator normalisation and the contract quantifiers are this project's own. |
+| **How it is checked** | [`tests/`](tests) — [`git_conformance.rs`](tests/git_conformance.rs) runs the shared harness, [`git_commutation.rs`](tests/git_commutation.rs) the branch-scope conflict rule, [`git_delta.rs`](tests/git_delta.rs) the delta grammar, [`git_plan_purity.rs`](tests/git_plan_purity.rs) that planning writes nothing, [`h2_normalised_before_the_gate.rs`](tests/h2_normalised_before_the_gate.rs) that the gate never sees an un-normalised spelling. |
 
-> What this costs is stated rather than hidden: **two changes to two different files on one
-> branch conflict**, and one of them waits. That is the true shape of a branch and not a
-> limitation of this version.
+---
 
-> locator := `<repository path> "#" <ref> ":" <path>` ... All three parts are required; a
-> spelling missing either separator is not a position (`gx_substrate::Error::NotAPosition`)
-> rather than a position that fails to apply.
+## Where it sits
 
-> Two locators are `≈` for this adapter — **they name one position** — exactly when
-> `locator::normalize` maps them to the same string ... it is **purely lexical**: a function of
-> the text, performing no repository read at all.
+An implementation of the trait in [`gx-substrate`](../gx-substrate), measured by
+[`gx-substrate-conformance`](../gx-substrate-conformance), and reached only through
+[`gx-gate`](../gx-gate)'s decision. It is a sibling of
+[`gx-adapter-fs`](../gx-adapter-fs) and [`gx-adapter-mcp`](../gx-adapter-mcp).
 
-## What this crate does not guarantee
+## Learn more
 
-> **Observed, never copied.** gitoxide's implementation is not read and not reproduced here:
-> what this crate uses is the public API ... and the delta grammar, the locator normalisation
-> and the quantifiers of the seven contracts are gx's own.
-
-## Position
-
-`req/spec/40-architecture/41-architecture.md` §2 (crate, dependency line), §4 (the seven
-methods); `42-*.md` §3.4 (delta), §3.5 (fingerprint). Obligation FR-045 (`32-functional.md`),
-measured by AC-050 (`34-*.md`). M7 requirement definition `req/98_M7_REQDEF_2026-08-11.md`
-§7-2 hand 1, ratified `req/38` §57.
-
-## Not covered
-
-Two changes to two different files on one branch are treated as conflicting, not as
-independent — this is documented as the branch's actual shape, not a gap to close.
+- [`src/lib.rs`](src/lib.rs) — object, scope, locator grammar, and what the branch scope costs.
+- [`policies/git/`](../../policies/git) — the shipped rule pack for this substrate, with its scenarios.
+- [`docs/LIMITS.md`](../../docs/LIMITS.md) — the changes this project cannot judge from the inside.

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 //
-// Dev container for Codespaces / VS Code Remote (req/818 ATOM 1, unlocked by
-// req/806 §ADOPT-NEW after the SS750 source push). Purpose: a contributor can
+// Dev container for Codespaces / VS Code Remote. Purpose: a contributor can
 // open the repo in a Codespace and land on an already-built workspace instead
 // of hitting the cargo-build activation wall cold.
 //
@@ -10,12 +9,13 @@
 // single source of the toolchain pin -- rustup resolves it on first cargo
 // invocation, so nothing here re-declares a version that could drift.
 //
-// NOTE (req/818 F1): as of 2026-08-25 this file is staged for the public sync
-// set but NOT yet pushed to TraceFold/tracefold -- the live public tree
-// declares 5 workspace members it does not carry (probes/doubt, gx-adapter-
-// postgres, gx-adapter-mysql, gx-mcp-wire, gx-confine), so `cargo build
-// --workspace` fails at workspace load on a public clone. Ship this file
-// publicly only after that manifest repair lands.
+// Status (2026-08-31): live in the public repo. The earlier hold -- the public
+// workspace root declaring five members the public tree does not carry, which
+// made `cargo build --workspace` (this file's postCreateCommand) fail at
+// workspace load on a fresh clone -- was lifted when the public root manifest
+// was cut down to the members that ship. Re-check that correspondence before
+// changing either file: this postCreateCommand cannot survive a member list
+// that names a crate the clone does not contain.
 {
   "name": "tracefold",
   "image": "mcr.microsoft.com/devcontainers/rust:1",

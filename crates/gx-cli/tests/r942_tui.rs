@@ -760,25 +760,63 @@ fn p2_the_six_marks_stay_pairwise_distinct_in_every_tier() {
 // P4 / AC-7 — degradation, and the disclosure of it.
 // ---------------------------------------------------------------------------------------------
 
+/// 🔴 **Amended 2026-08-31, design round 2 (`req/942`), by the ruling recorded in
+/// `super::layout::REGIONS`: the apparatus declared `min_rows: 4` and drew two rows, at 46, 60, 80,
+/// 100 and 120 cells wide against a live engine.** The fourth row was furniture, and it was
+/// furniture in the region that is dropped first — so the row it hoarded was a row the screen went
+/// looking for when it ran out. At three rows, forty by ten holds every region, and this probe's
+/// original size no longer drops one.
+///
+/// The test is neither renamed nor deleted (a test name is a historical record). Forty by ten is
+/// kept and now asserts the new fact in both directions, and the property this probe was written
+/// for — *a region that is let go of is named on the screen* — is measured at forty by **eight**,
+/// where the screen genuinely cannot hold the floor.
 #[test]
 fn p4_at_forty_by_ten_the_dropped_region_is_named_on_screen() {
     let fixture = Fixture::start();
     let screen = fixture.read();
     let measured = renderer::measured(&screen);
-    let plan = layout::resolve(40, 10, &measured, false);
+
+    // The amendment, pinned: at forty by ten nothing is dropped and every declared region is drawn.
+    let roomy = layout::resolve(40, 10, &measured, false);
+    println!("P4_40x10_DROPPED={:?} ROWS={:?}", roomy.dropped, roomy.rows);
+    println!(
+        "--- 40x10 ---\n{}",
+        renderer::buffer_text(&renderer::render_to_buffer(
+            &screen,
+            40,
+            10,
+            Tier::Mono,
+            false
+        ))
+    );
+    assert!(
+        roomy.dropped.is_empty(),
+        "🔴 P4: forty by ten held every region once the apparatus stopped hoarding a row. If it \
+         drops one again, a region grew and nothing declared the growth: {:?}",
+        roomy.dropped
+    );
+    assert_eq!(
+        roomy.rows.len(),
+        REGIONS.len(),
+        "🔴 P4: forty by ten does not draw all four regions: {:?}",
+        roomy.rows
+    );
+
+    let plan = layout::resolve(40, 8, &measured, false);
     let text = renderer::buffer_text(&renderer::render_to_buffer(
         &screen,
         40,
-        10,
+        8,
         Tier::Mono,
         false,
     ));
     println!("P4_DROPPED={:?}", plan.dropped);
-    println!("--- 40x10 ---\n{text}");
+    println!("--- 40x8 ---\n{text}");
 
     assert!(
         !plan.dropped.is_empty(),
-        "🔴 P4: forty by ten cannot hold everything; a plan that drops nothing is not measuring"
+        "🔴 P4: forty by eight cannot hold everything; a plan that drops nothing is not measuring"
     );
     let one_line = flat(&text);
     for role in &plan.dropped {
@@ -1792,4 +1830,472 @@ fn p13_the_screen_draws_the_fourth_mark_for_the_record_that_has_no_verdict() {
         "🔴 P13: the record carrying `verdict: null` is drawn with one of the three, which is the \
          rounding `super::tui`'s own documentation says this face does not do"
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// (e) g16 and p14 — the round-2 audit's one real gap, and the header that stood over a record.
+// ---------------------------------------------------------------------------------------------
+
+/// 🔴 **The gap the round-2 audit found by name** (`req/38` SS971, INJ-B): re-point the role -> token
+/// map — `mark.zero` to `thin`, say — and every one of the thirty-seven checks stayed green.
+///
+/// g14 is not the missing gate and was never claiming to be. It measures that the map is **total**
+/// and that no declared value is an orphan, and a re-pointing breaks neither: `thin` is a declared
+/// token, and `plain` keeps a role because `paint.body` still names it. What nothing measured is
+/// *which* value a role takes — which is the whole of what the map decides.
+///
+/// Two halves, because a pin on its own records the map without saying why it is that map:
+/// * **the pin** — all fourteen pairs by name, so a re-pointing is a red diff rather than a silent
+///   one;
+/// * **the reasons** — the four statements about nothing that the pin exists to protect. A later
+///   edit has to argue with these rather than renumber them.
+#[test]
+fn g16_every_role_takes_the_value_it_was_declared_to_take() {
+    use gx_cli::tui::tokens::{Role, Token};
+
+    /// The map, spelled. Sorted the way `tokens::ROLES` is, so the two can be read side by side.
+    const DECLARED: [(Role, Token); 14] = [
+        (Role::Head, Token::Accent),
+        (Role::Quiet, Token::Thin),
+        (Role::Body, Token::Plain),
+        (Role::Attend, Token::Attend),
+        (Role::MarkLoading, Token::Thin),
+        (Role::MarkUnknown, Token::Thin),
+        (Role::MarkAbsent, Token::Thin),
+        (Role::MarkFalse, Token::Thin),
+        (Role::MarkZero, Token::Plain),
+        (Role::MarkDeleted, Token::Refuse),
+        (Role::VerdictAdmit, Token::Affirm),
+        (Role::VerdictDeny, Token::Refuse),
+        (Role::VerdictEscalate, Token::Accent),
+        (Role::VerdictNone, Token::Thin),
+    ];
+
+    assert_eq!(
+        DECLARED.len(),
+        tokens::ROLES.len(),
+        "🔴 g16: the pin holds {} pairs and the face declares {} roles; a role added without a pin \
+         is a value nothing is watching",
+        DECLARED.len(),
+        tokens::ROLES.len()
+    );
+
+    let expect = |role: Role| -> Option<Token> {
+        DECLARED
+            .iter()
+            .find(|(pinned, _)| *pinned == role)
+            .map(|(_, token)| *token)
+    };
+
+    for role in tokens::ROLES {
+        let taken = role.token();
+        println!("G16 {} -> {}", role.name(), taken.name());
+        assert_eq!(
+            Some(taken),
+            expect(role),
+            "🔴 g16: {} resolves to {} and the pin says {:?}. If the new value is the right one, \
+             move the pin in the same commit and say in the message which reading of the screen \
+             changed — a value that moves without a sentence is a value nobody decided",
+            role.name(),
+            taken.name(),
+            expect(role).map(Token::name)
+        );
+    }
+
+    // The reasons. Each one is a fact about the screen, not about the table.
+    assert_eq!(
+        Role::MarkZero.token(),
+        Role::Body.token(),
+        "🔴 g16: a count of nought is a value the wire carried, and it is inked like every other \
+         value the wire carried. Ink it like an absence and `0` starts reading as `nothing here`"
+    );
+    assert_ne!(
+        Role::MarkZero.token(),
+        Role::MarkAbsent.token(),
+        "🔴 g16: zero and absent are told apart below the symbol layer as well as at it"
+    );
+    assert_ne!(
+        Role::MarkDeleted.token(),
+        Role::MarkAbsent.token(),
+        "🔴 g16: a line that was written and struck is not a line that was never written"
+    );
+    assert_ne!(
+        Role::VerdictNone.token(),
+        Role::VerdictDeny.token(),
+        "🔴 g16: the worst collapse this face could make. `the engine has not answered` drawn in \
+         the appearance of `the engine refused` is a verdict this face invented"
+    );
+
+    // 🔴 Negative control, because a check that cannot fail is a green that means nothing. The same
+    // comparison, run against the map with the one pair INJ-B re-pointed, has to disagree — and
+    // disagree about exactly one role, or it is finding something other than the injection.
+    let injected: Vec<(Role, Token)> = DECLARED
+        .iter()
+        .map(|(role, token)| {
+            if *role == Role::MarkZero {
+                (*role, Token::Thin)
+            } else {
+                (*role, *token)
+            }
+        })
+        .collect();
+    let caught: Vec<&str> = tokens::ROLES
+        .iter()
+        .filter(|role| {
+            injected
+                .iter()
+                .find(|(pinned, _)| pinned == *role)
+                .map(|(_, token)| *token)
+                != Some(role.token())
+        })
+        .map(|role| role.name())
+        .collect();
+    assert_eq!(
+        caught,
+        vec![Role::MarkZero.name()],
+        "🔴 g16: the negative control did not fire. The comparison above is not comparing"
+    );
+}
+
+/// 🔴 The grid's header stood over an opened record, naming columns that were not drawn.
+///
+/// Found on a real terminal rather than in a buffer: at 46x12 against the live engine the opened
+/// record said `1 of 10 members`, and one of the two rows it had was spent on `transformation
+/// verdict state` — a header for a table that was not on the screen. The reader is shown column
+/// names and then key/value pairs that do not line up under them.
+///
+/// The check is the discriminator and not the wording: only the header carries the first two column
+/// keys on one line, because a member line carries one key.
+#[test]
+fn p14_no_grid_header_stands_over_an_opened_record() {
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+
+    let frame = |open: bool| {
+        renderer::buffer_text(&renderer::render_view_to_buffer(
+            &screen,
+            100,
+            24,
+            Tier::Mono,
+            false,
+            &View { selected: 0, open },
+        ))
+    };
+    let header_rows = |text: &str| {
+        text.lines()
+            .filter(|line| line.contains("transformation") && line.contains("verdict"))
+            .count()
+    };
+
+    let closed = frame(false);
+    let opened = frame(true);
+    println!("--- closed ---\n{closed}\n--- opened ---\n{opened}");
+
+    // The control: the grid keeps its header, so this probe fails for the right reason when it
+    // fails. Without it, deleting the header everywhere would pass.
+    assert_eq!(
+        header_rows(&closed),
+        1,
+        "🔴 P14: the grid lost the header that says which columns it is drawing:\n{closed}"
+    );
+    assert_eq!(
+        header_rows(&opened),
+        0,
+        "🔴 P14: a column header is standing over an opened record, naming columns the frame does \
+         not draw:\n{opened}"
+    );
+
+    // And the row it stopped taking went to the record. The record's own note is what says so, and
+    // it is the number a reader acts on.
+    let members = |text: &str| -> usize {
+        flat(text)
+            .split(" of 10 members")
+            .next()
+            .and_then(|head| head.split(' ').next_back().map(str::to_string))
+            .expect("the note names how many members were drawn")
+            .parse()
+            .expect("the count is a number")
+    };
+    let cramped = renderer::buffer_text(&renderer::render_view_to_buffer(
+        &screen,
+        46,
+        12,
+        Tier::Mono,
+        false,
+        &View {
+            selected: 0,
+            open: true,
+        },
+    ));
+    println!("--- opened 46x12 ---\n{cramped}");
+    assert_eq!(
+        header_rows(&cramped),
+        0,
+        "🔴 P14: the size where the header cost the most still draws it:\n{cramped}"
+    );
+    assert!(
+        members(&cramped) >= 2,
+        "🔴 P14: the row the header gave back did not reach the record: {} members at 46x12\n{cramped}",
+        members(&cramped)
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// (f) g17 / g18 / p15 — the list's note, and the region that was hoarding rows while dropping text.
+// ---------------------------------------------------------------------------------------------
+
+/// 🔴 **g17 — every key the note spells comes out of the binding table.**
+///
+/// The defect this closes is not that the legend might be wrong today; it is that a legend is a
+/// second place where a key is written down, and two spellings of one binding disagree the day one
+/// of them is edited. `super::acts` is the declaration and `renderer::spelled` is required to be a
+/// projection of it — the act's own declared name and the first of its own declared keys, nothing
+/// composed by hand.
+///
+/// The negative control is a plausible hand-spelling (`open:Enter`), and what makes it a control is
+/// that `acts::for_key` does not resolve it: this face binds the name `return`, and a legend that
+/// said `Enter` would be teaching a key that does nothing.
+#[test]
+fn g17_every_key_the_note_spells_comes_from_the_binding_table() {
+    for act in renderer::NOTE_ORDER
+        .iter()
+        .chain(renderer::NOTE_ORDER_EMPTY.iter())
+    {
+        let text = renderer::spelled(*act);
+        let (name, key) = text
+            .split_once(':')
+            .expect("the note spells an act as name:key");
+        println!("G17 {} -> {text:?}", act.name());
+        assert_eq!(
+            name,
+            act.name().trim_start_matches("act."),
+            "🔴 g17: the note invented a name for {}",
+            act.name()
+        );
+        assert_eq!(
+            key,
+            act.keys()[0],
+            "🔴 g17: the note spells a key that is not the act's first declared key"
+        );
+        assert!(
+            !text.contains(' '),
+            "🔴 g17: {text:?} holds a space, so `layout::wrap` can break between the act and its \
+             key. A key severed from the act it produces reads as a typo, which is worse than no \
+             legend at all"
+        );
+        assert_eq!(
+            acts::for_key(key),
+            Some(*act),
+            "🔴 g17: the key {key:?} does not reach {} through the one binding table",
+            act.name()
+        );
+    }
+
+    // `act.close` is offered by neither list state: closing a record that is not open moves
+    // nothing, and the opened record's own note is what names it (asserted by P12).
+    assert!(!renderer::NOTE_ORDER.contains(&Act::Close));
+    assert!(!renderer::NOTE_ORDER_EMPTY.contains(&Act::Close));
+    assert_eq!(renderer::offered(0), renderer::NOTE_ORDER_EMPTY.as_slice());
+    assert_eq!(renderer::offered(2), renderer::NOTE_ORDER.as_slice());
+    for act in renderer::offered(2) {
+        assert!(
+            acts::ACTS.contains(act),
+            "🔴 g17: the note offers {} and the declaration does not carry it",
+            act.name()
+        );
+    }
+
+    // The negative control, and the assertion that makes it one.
+    let hand_spelled = "open:Enter";
+    assert_ne!(
+        renderer::spelled(Act::Open),
+        hand_spelled,
+        "the control has to differ from the real spelling or it measures nothing"
+    );
+    assert_eq!(
+        acts::for_key("Enter"),
+        None,
+        "🔴 g17: the negative control names a key this face actually binds, so it is not a control"
+    );
+}
+
+/// 🔴 **g18 — the note fits the rows it was given, and names what it folded away.**
+///
+/// A legend that quietly spells four of seven keys has taught the reader that there are four. So
+/// every fold carries its own count and the address that holds the rest, and `g12c` is what makes
+/// that address worth spelling: the help text names every declared act.
+///
+/// The head is a ladder for the same reason the disclosure has a long and a short form. The first
+/// build of this note had one head, and at 46x12 against a live engine the head alone needed three
+/// rows in the one row it had — so the line that says a record was let go of was itself cut,
+/// mid-address. That is the defect P12 guards against for the opened record, reintroduced beside it.
+#[test]
+fn g18_the_note_fits_its_rows_and_names_the_keys_it_folded() {
+    let offered = renderer::offered(2);
+    let head = "record 1 of 2".to_string();
+    // The ladder the renderer passes when nothing was let go of: the position, then no head at all.
+    let heads = vec![head.clone(), String::new()];
+    let mut by_rows: Vec<(u16, usize, usize)> = Vec::new();
+
+    for width in [30u16, 40, 46, 60, 80, 100, 120, 200] {
+        for rows in 1usize..=2 {
+            let note = renderer::fold_note(&heads, offered, width, rows);
+            let needed = layout::rows_needed(&note, width) as usize;
+            let spelled = offered
+                .iter()
+                .filter(|act| note.contains(&renderer::spelled(**act)))
+                .count();
+            println!("G18 width={width} rows={rows} needed={needed} spelled={spelled} {note:?}");
+            by_rows.push((width, rows, spelled));
+
+            // The head is kept whenever it fits. When it does not, the rung below it drops the
+            // head and not the keys — where the reader stands is also drawn by the attention mark,
+            // and the keys are drawn nowhere else.
+            assert!(
+                note.starts_with(&head) || note.starts_with(&format!("{} keys", offered.len())),
+                "🔴 g18: the fold produced a form that is on neither rung of the ladder:\n{note}"
+            );
+            // The floor is allowed not to fit — that is the named ceiling, and the screen is below
+            // its own floor there. Anything that spells a key has to fit.
+            if spelled > 0 {
+                assert!(
+                    needed <= rows,
+                    "🔴 g18: the note spelled {spelled} keys into {rows} row(s) and needs \
+                     {needed}:\n{note}"
+                );
+            }
+            if spelled < offered.len() {
+                // `more` only once there is something for it to be more than, so both spellings
+                // count — what is asserted is the number and that it is a number *of keys*.
+                let folded = offered.len() - spelled;
+                assert!(
+                    note.contains(&format!("{folded} keys"))
+                        || note.contains(&format!("{folded} more keys")),
+                    "🔴 g18: {folded} keys were folded away and the note does not say how \
+                     many:\n{note}"
+                );
+                assert!(
+                    note.contains(renderer::HELP_ADDRESS),
+                    "🔴 g18: keys were folded away with no address for them:\n{note}"
+                );
+            }
+        }
+    }
+
+    // Monotone in both arguments: a wider screen or a taller budget never teaches fewer keys.
+    for (width, rows, spelled) in &by_rows {
+        for (other_width, other_rows, other_spelled) in &by_rows {
+            if other_width >= width && other_rows >= rows {
+                assert!(
+                    other_spelled >= spelled,
+                    "🔴 g18: {other_width}x{other_rows} spells {other_spelled} keys and the \
+                     smaller {width}x{rows} spells {spelled}"
+                );
+            }
+        }
+    }
+
+    // The head ladder: when the long head does not fit, the short one is what is drawn.
+    let long = format!("record 1 of 9 | +7 more rows | {LEDGER_ADDRESS}");
+    let short = format!("+7 more rows | {LEDGER_ADDRESS}");
+    let ladder = vec![long.clone(), short.clone()];
+    assert!(
+        layout::rows_needed(&renderer::note_line(&long, offered, 0), 46) as usize > 1,
+        "the control is vacuous: the long head already fits one row at 46 cells"
+    );
+    let folded = renderer::fold_note(&ladder, offered, 46, 1);
+    println!("G18_LADDER={folded:?}");
+    assert!(
+        folded.starts_with(&short),
+        "🔴 g18: the long head did not fit and the short one was not reached:\n{folded}"
+    );
+
+    // The negative control: a fold that drops keys without counting them.
+    let honest = renderer::note_line(&head, offered, 3);
+    let silent = honest.replace(
+        &format!(
+            "{} more keys: {}",
+            offered.len() - 3,
+            renderer::HELP_ADDRESS
+        ),
+        "",
+    );
+    assert!(
+        honest.contains("more keys") && !silent.contains("more keys"),
+        "🔴 g18: the control did not change the line, so it is not measuring the count"
+    );
+}
+
+/// 🔴 **p15 — the apparatus wraps its head instead of dropping it off the right edge.**
+///
+/// Found on a real terminal at 46x12: the region drew `engine_version 0.1.0 status ok
+/// ledger_agrees` and the value of `ledger_agrees` and the whole of `journal_rows 3` were **gone**
+/// — two of the engine's five facts about itself, cut with no mark and no line in the disclosure.
+/// It was doing that while holding **two blank rows**, at every width measured from 46 to 120.
+///
+/// A face whose stated debt is disclosure cannot pay it and silently drop text off an edge, and a
+/// region that hoards rows is hoarding them from the region that goes looking for rows when the
+/// screen runs out — which is why the declaration went from four rows to three in the same change.
+#[test]
+fn p15_the_apparatus_head_is_wrapped_and_never_silently_clipped() {
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    let pairs = [
+        "engine_version gx-engine 0.1.0",
+        "status ok",
+        "ledger_agrees yes",
+        "journal_rows 0",
+    ];
+    // The probe is only worth running where the head cannot fit on one row. Measured, not assumed.
+    let head_width = pairs.join("  ").chars().count();
+    println!("P15_HEAD_WIDTH={head_width}");
+
+    for (width, height) in [(46u16, 24u16), (60, 24), (80, 24), (100, 24), (120, 24)] {
+        let text = renderer::buffer_text(&renderer::render_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+        ));
+        let one = flat(&text);
+        let missing: Vec<&&str> = pairs.iter().filter(|pair| !one.contains(**pair)).collect();
+        let vacuous = head_width <= width as usize;
+        println!("P15 {width}x{height} missing={missing:?} one_row_would_fit={vacuous}");
+        assert!(
+            missing.is_empty(),
+            "🔴 P15: at {width} cells the apparatus lost {missing:?} with no mark. The engine's \
+             account of itself is not a place to drop text quietly:\n{text}"
+        );
+    }
+    // And the discriminator: at the narrow end the head genuinely does not fit on one row, so the
+    // frames above are passing because of the wrap and not because there was nothing to wrap.
+    assert!(
+        head_width > 46,
+        "🔴 P15 is vacuous: the head is {head_width} cells and fits a 46-cell row without wrapping"
+    );
+
+    // The other half — a cut that cannot be avoided is **marked**, with the same trailing mark a
+    // table cell is cut with, rather than performed silently.
+    let narrow = renderer::buffer_text(&renderer::render_to_buffer(
+        &screen,
+        24,
+        24,
+        Tier::Mono,
+        false,
+    ));
+    println!("--- 24x24 ---\n{narrow}");
+    let apparatus_rows: Vec<&str> = narrow
+        .lines()
+        .take_while(|line| !line.trim_start().starts_with("transformation"))
+        .collect();
+    let head_lost = pairs.iter().any(|pair| !flat(&narrow).contains(*pair));
+    println!("P15_NARROW_HEAD_LOST={head_lost} ROWS={apparatus_rows:?}");
+    if head_lost {
+        assert!(
+            apparatus_rows.iter().any(|line| line.contains('~')),
+            "🔴 P15: the apparatus dropped part of its head at 24 cells and drew no cut mark:\n\
+             {narrow}"
+        );
+    }
 }

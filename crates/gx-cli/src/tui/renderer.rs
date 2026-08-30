@@ -164,8 +164,33 @@ fn apparatus(frame: &mut Frame, area: Rect, reading: &Reading, tier: Tier) {
         || wire::cell(&body, "status_reason").text(),
         |nothing| nothing.mark().to_string(),
     );
-    let mut lines = vec![Line::styled(head, paint(Role::Head, tier))];
-    for line in layout::wrap(&format!("status_reason {reason}"), area.width) {
+    // 🔴 The head is **wrapped**, not handed to the edge of the screen. It was clipped, silently,
+    // at every width below sixty-six: measured on a real terminal at 46x12 the region drew
+    // `engine_version 0.1.0  status ok  ledger_agrees` and the value of `ledger_agrees` and the
+    // whole of `journal_rows 3` were gone — two of the engine's five facts about itself, dropped
+    // with no mark and no line in the disclosure, by the region holding **two blank rows** at that
+    // very moment. A face whose debt is disclosure cannot pay it and drop text off the right edge.
+    //
+    // The reason is measured first because it is the region's load-bearing fact when the engine is
+    // not `ok`, and the head is what gives way. When the head does give way the cut is **marked**
+    // with the same trailing `~` a table cell is cut with, through the same `pad`.
+    let reason_lines = layout::wrap(&format!("status_reason {reason}"), area.width);
+    let head_lines = layout::wrap(&head, area.width);
+    let room = (area.height as usize)
+        .saturating_sub(reason_lines.len())
+        .max(1);
+    let kept = head_lines.len().min(room);
+    let mut lines: Vec<Line> = Vec::new();
+    for (index, line) in head_lines.iter().take(kept).enumerate() {
+        let cut = kept < head_lines.len() && index + 1 == kept;
+        let text = if cut {
+            pad(&format!("{line}~"), area.width)
+        } else {
+            line.clone()
+        };
+        lines.push(Line::styled(text, paint(Role::Head, tier)));
+    }
+    for line in reason_lines {
         lines.push(Line::raw(line));
     }
     frame.render_widget(Paragraph::new(lines), area);
@@ -179,18 +204,31 @@ fn apparatus(frame: &mut Frame, area: Rect, reading: &Reading, tier: Tier) {
 /// a value the token table resolves rather than the absence of a decision.
 fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: Tier, view: &View) {
     let mut lines: Vec<Line> = Vec::new();
-    // One space between columns and none after the last: the width the plan computed is
-    // `sum(width) + (n - 1)`, and a trailing separator would put the row one cell over the screen
-    // the plan was asked about.
-    lines.push(Line::from(spans(
-        plan.columns
-            .iter()
-            .map(|column| (pad(column.key, column.width), Role::Head)),
-        tier,
-    )));
-
     let items = reading.items();
-    let body_rows = area.height.saturating_sub(1) as usize;
+    // 🔴 The grid's header belongs to the grid. An opened record is a list of members, not a table
+    // of columns, and a header standing over it names columns that are not drawn — a signpost
+    // pointing down a road that is not there. Measured on a real terminal at 46x12: the row the
+    // header took was half of what the record had, `1 of 10 members` where two fit.
+    //
+    // The empty list keeps its header, and that is not an inconsistency: an empty **grid** is still
+    // a grid, and the header is what says which columns found nothing.
+    let open = view.open && !items.is_empty();
+    // The note is composed and budgeted **before** the rows it sits under, for the same reason the
+    // opened record's note is: it is the line that says where the reader is and what the screen let
+    // go of, and a line written after the thing it describes is a line that gets clipped.
+    if !open {
+        // One space between columns and none after the last: the width the plan computed is
+        // `sum(width) + (n - 1)`, and a trailing separator would put the row one cell over the
+        // screen the plan was asked about.
+        lines.push(Line::from(spans(
+            plan.columns
+                .iter()
+                .map(|column| (pad(column.key, column.width), Role::Head)),
+            tier,
+        )));
+    }
+
+    let body_rows = area.height.saturating_sub(u16::from(!open)) as usize;
     if items.is_empty() {
         // 🔴 `zero` only when the engine answered with the list and the list was empty. A refusal
         // has a body too, and drawing `0` for it would tell the reader there are no records when
@@ -202,7 +240,16 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
                 .map(|column| (pad(mark.mark(), column.width), mark.role())),
             tier,
         )));
-    } else if view.open {
+        let note_rows = body_rows.saturating_sub(1).min(2);
+        if note_rows > 0 {
+            for line in layout::wrap(
+                &fold_note(&[String::new()], offered(0), area.width, note_rows),
+                area.width,
+            ) {
+                lines.push(Line::styled(line, paint(Role::Quiet, tier)));
+            }
+        }
+    } else if open {
         // The attended record, every member of it, including the ones the grid has no column for.
         //
         // 🔴 Drawn **inside** the subject region rather than as a fifth region: the four regions are
@@ -246,14 +293,27 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
             lines.push(Line::styled(line, paint(Role::Quiet, tier)));
         }
     } else {
-        // The last body row is spent on the count when there is more than the screen holds, so the
-        // rows that were let go of are named with the route that brings them back.
-        let overflow = items.len() > body_rows;
-        let shown = if overflow {
-            body_rows.saturating_sub(1)
+        // 🔴 The list's note, which the first build did not have: it appeared **only** on overflow,
+        // so the entry face — the first thing anybody sees — named not one of the eight declared
+        // acts. Eight capabilities, advertised nowhere, on a screen a reader cannot leave without
+        // guessing. It now stands in every list state and carries the way out first.
+        //
+        // Two rows at most. A legend that grows to fill a screen is furniture, and the rows below it
+        // are the ledger honestly saying that this is all there is.
+        //
+        // 🔴 And it is paid for out of **spare** rows, never out of a record. The first build of
+        // this note took a row whenever it wanted one, and at 46x12 that turned a list of three into
+        // a list of two in order to print a legend that then had no room to name a single key — a
+        // strictly worse screen than the one it replaced. When the rows were already overflowing the
+        // note costs nothing new: the last row was being spent on the count before this existed, and
+        // the count now travels with the keys.
+        let overflowing = items.len() > body_rows;
+        let note_rows = if overflowing {
+            1
         } else {
-            items.len()
+            body_rows.saturating_sub(items.len()).min(2)
         };
+        let shown = body_rows.saturating_sub(note_rows).min(items.len());
         for (index, item) in items.iter().enumerate().take(shown) {
             let cells = plan.columns.iter().map(|column| {
                 if column.key == wire::VERDICT_KEY {
@@ -278,18 +338,187 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
                 line
             });
         }
-        if overflow {
-            lines.push(Line::styled(
-                format!(
-                    "+{} more rows | {}",
-                    items.len() - shown,
-                    layout::LEDGER_ADDRESS
-                ),
-                paint(Role::Quiet, tier),
-            ));
+        let index = view.selected.min(items.len() - 1);
+        let position = format!("record {} of {}", index + 1, items.len());
+        let heads = if shown < items.len() {
+            // The rows that were let go of, named with the route that brings them back — the line
+            // this build inherited — and the reader's position in front of it when there is room.
+            let cut = format!(
+                "+{} more rows | {}",
+                items.len() - shown,
+                layout::LEDGER_ADDRESS
+            );
+            vec![format!("{position} | {cut}"), cut]
+        } else {
+            // The empty rung is reachable only when nothing was let go of, so giving the position
+            // up for the keys costs the reader nothing that is not drawn elsewhere.
+            vec![position, String::new()]
+        };
+        if note_rows > 0 {
+            for line in layout::wrap(
+                &fold_note(&heads, offered(items.len()), area.width, note_rows),
+                area.width,
+            ) {
+                lines.push(Line::styled(line, paint(Role::Quiet, tier)));
+            }
         }
     }
     frame.render_widget(Paragraph::new(lines), area);
+}
+
+/// The address that carries every key.
+///
+/// 🔴 Spellable because it is **gated**: `g12c` in `crates/gx-cli/tests/r942_tui.rs` requires the
+/// help text to name every declared act. A note that folds can point here and be believed, which is
+/// the difference between disclosing a cut and waving at one.
+pub const HELP_ADDRESS: &str = "gx tui --help";
+
+/// The order the list's note spells acts in.
+///
+/// 🔴 [`Act::Leave`] first, and not as taste: the first thing a reader of a full-screen program
+/// needs is the way out, and it is the one act offered in every state — including the one where the
+/// engine answered with nothing at all.
+///
+/// [`Act::Close`] is in neither list. Closing a record that is not open moves nothing, and a legend
+/// that names an inert key is a promise the face does not keep; the opened record's own note is what
+/// names it.
+pub const NOTE_ORDER: [Act; 7] = [
+    Act::Leave,
+    Act::Open,
+    Act::Next,
+    Act::Prev,
+    Act::Read,
+    Act::First,
+    Act::Last,
+];
+
+/// The same, for a list the engine answered with nothing in.
+///
+/// Everything that moves the attention has nothing to move, and `act.open` opens nothing.
+pub const NOTE_ORDER_EMPTY: [Act; 2] = [Act::Leave, Act::Read];
+
+/// Which acts the list state offers, at this many rows.
+///
+/// 🔴 **Not the reducer's answer, and the disagreement is worth writing down.** `acts::apply`
+/// reports that `act.open` moves the view on an empty list — it flips the bool — and this face then
+/// declines to open anything, because [`subject`] opens only when `view.open && !items.is_empty()`.
+/// A note derived from the reducer would therefore promise a key that does nothing on that screen.
+/// The declaration lives in `super::acts` and reconciling the two is not a drawing decision, so the
+/// disagreement is recorded here rather than papered over.
+#[must_use]
+pub fn offered(rows: usize) -> &'static [Act] {
+    if rows == 0 {
+        &NOTE_ORDER_EMPTY
+    } else {
+        &NOTE_ORDER
+    }
+}
+
+/// One act, as the note spells it: the key that produces it, and the act's own declared name with
+/// the prefix off.
+///
+/// 🔴 Both halves come out of `super::acts`, so there is no second binding table and no second
+/// vocabulary. A hand-spelled `Enter` here would be a key this face does not bind.
+/// 🔴 And **no space inside it**, which is a wrapping fact rather than a style: `super::layout`'s
+/// `wrap` breaks at spaces, and the first build of this note spelled `G last` and had the screen
+/// break between the `G` and the `last`. A key severed from the act it produces is worse than no
+/// legend, because it reads as a typo. The name comes first to match the opened record's own note,
+/// which has spelled `close: escape` since before this line existed.
+#[must_use]
+pub fn spelled(act: Act) -> String {
+    format!(
+        "{}:{}",
+        act.name().trim_start_matches("act."),
+        act.keys()[0]
+    )
+}
+
+/// The note at one length: where the reader is, then the keys, then what was folded away.
+#[must_use]
+pub fn note_line(head: &str, acts: &[Act], spell: usize) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if !head.is_empty() {
+        parts.push(head.to_string());
+    }
+    // 🔴 The keys are one part, joined by the two spaces the apparatus head already joins its own
+    // key/value pairs with, rather than by the pipe that separates the parts. With a pipe between
+    // them the screen wrapped after a separator and left a bare `|` hanging at the end of a row,
+    // which reads as a defect. Two spaces group without punctuating.
+    let keys = acts
+        .iter()
+        .take(spell)
+        .copied()
+        .map(spelled)
+        .collect::<Vec<_>>()
+        .join("  ");
+    if !keys.is_empty() {
+        parts.push(keys);
+    }
+    // 🔴 The fold names its own count and the address that has the rest. A legend that quietly
+    // spells four of seven keys is a legend that has taught the reader there are four.
+    //
+    // `more` only once there is something for it to be more *than*. Dropping the word at the floor
+    // is not tidying: it is five cells, and five cells is the difference between `7 keys: gx tui
+    // --help` fitting a forty-cell row and the row being cut in the middle of `gx tui --he`, which
+    // reads as a command rather than as a cut.
+    if spell < acts.len() {
+        let count = acts.len() - spell;
+        if spell == 0 {
+            parts.push(format!("{count} keys: {HELP_ADDRESS}"));
+        } else {
+            parts.push(format!("{count} more keys: {HELP_ADDRESS}"));
+        }
+    }
+    parts.join(" | ")
+}
+
+/// The longest note that fits the rows it was given: the first `head` that fits at all, then the
+/// most acts that fit under it.
+///
+/// 🔴 `heads` is a ladder, longest first, for the same reason the disclosure has a long and a short
+/// form. The first build of this note had one head, and at 46x12 against the live engine the head
+/// alone needed three rows in the one row it had — so the line that says a record was let go of was
+/// itself cut, mid-address. The defect `p12` guards against for the opened record, reintroduced next
+/// to it.
+///
+/// **Named ceiling.** When no head fits, the shortest is drawn and the screen clips it, and nothing
+/// says so: the region that would say it is composed in `super::layout::resolve`, which is not told
+/// how many records there are. Same cause as the disclosure being wrong while a record is open.
+#[must_use]
+pub fn fold_note(heads: &[String], acts: &[Act], width: u16, rows: usize) -> String {
+    // 🔴 The last rung is the caller's, not this function's, and that is the whole of the ordering
+    // question. Where there is nothing to disclose the last rung is the **empty** head — the keys
+    // outrank the position, because the attention mark also says where the reader stands and
+    // nothing else says what the keys are (g18 caught the opposite arrangement dropping seven
+    // declared acts in silence at thirty cells). Where records **were** let go of the last rung is
+    // the line that says so, and it is never given up for a legend: a drop disclosure outranks a
+    // convenience.
+    //
+    // **Named ceiling**: when even the last rung cannot carry the keys, it is drawn alone and the
+    // keys go unmentioned. Nothing on the screen says so, for the same reason the disclosure is
+    // wrong while a record is open — the region that would say it is composed in
+    // `super::layout::resolve`, which is not told how many records there are.
+    let last = heads.last().map_or("", String::as_str);
+    let mut best = if layout::rows_needed(&note_line(last, acts, 0), width) as usize > rows {
+        last.to_string()
+    } else {
+        note_line(last, acts, 0)
+    };
+    for head in heads.iter().map(String::as_str) {
+        if layout::rows_needed(&note_line(head, acts, 0), width) as usize > rows {
+            continue;
+        }
+        best = note_line(head, acts, 0);
+        for spell in 1..=acts.len() {
+            let candidate = note_line(head, acts, spell);
+            if layout::rows_needed(&candidate, width) as usize > rows {
+                break;
+            }
+            best = candidate;
+        }
+        break;
+    }
+    best
 }
 
 /// One row's cells, each in its own role, separated by the single space the plan budgeted for.

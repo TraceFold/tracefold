@@ -6,7 +6,7 @@
 # M7 hand 1 builds all seven (req/98 §7-2 hand 1). `gx-adapter-mcp` is hand 3. (sem: SEM-gx-adapter-git-002)
 [package]
 name = "gx-adapter-git"
-description = "The git SubstrateAdapter: a file on a branch, moved by a commit, undone by a reference reset (41 §4, FR-045)."
+description = "The git SubstrateAdapter: a file on a branch, moved by a commit, undone by a reference reset."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47): declared once, in the workspace (sem: SEM-gx-adapter-git-003)

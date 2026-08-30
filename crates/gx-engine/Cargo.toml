@@ -11,7 +11,7 @@
 # rule out.
 [package]
 name = "gx-engine"
-description = "The Transformation lifecycle: engine journal, escrow store, deterministic replay (41 §2 / §5, 42 §3.12-3.13, 43)."
+description = "The Transformation lifecycle: engine journal, escrow store, deterministic replay."
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true         # blocker item 1, adopted (req/38 §47; sem: SEM-gx-engine-003): declared once, in the workspace
