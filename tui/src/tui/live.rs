@@ -265,7 +265,7 @@ pub const fn reopenings(opens: u64) -> u64 {
 /// critical section in this module is one assignment or one addition: [`set`]'s closures,
 /// [`record`]'s tally, [`Subscription::due`], [`Subscription::report`] and the one line in
 /// [`Subscription::start`]. There is no `unwrap`, no index, no allocation and no user code under a
-/// guard, so **on this code the branch is unreachable** (`req/38` SS996, read rather than run).
+/// guard, so **on this code the branch is unreachable** (`req/38` SS999, read rather than run).
 /// Unreachable is not absent: the branch exists, this is the report it produces, and gate `g25`
 /// requires it to go on existing and to go on saying `?`. An arm nothing can reach and nothing names
 /// is the shape a lie takes when someone later edits the critical sections.
@@ -356,6 +356,27 @@ impl LinkReport {
     }
 
     /// The short form. The counts only; the mark in front of the line carries the state.
+    ///
+    /// 🔴 **The unreadable count is spelled `unr` and not `?`** (`req/38` SS1005, gate `g32`). It
+    /// was `{n}?` until this repair, and `?` is [`Nothing::Unknown`]'s mark — so on a screen narrow
+    /// enough to take this rung, one provenance line read
+    /// `? 4 routes 14:17:16Z 3ms all 200 1ev 0re 4?`, carrying the same character twice with two
+    /// meanings: *this connection's state is not knowable*, and *four lines arrived that could not
+    /// be read*. Measured in a terminal, not reasoned about
+    /// (`req/942_artifacts/tui_r14_2026-08-31/pty/before_80.txt`).
+    ///
+    /// [`Nothing::mark`] is injective and `g20`/`g22` hold it so, but injectivity of the vocabulary
+    /// says nothing about the frame: the marks share a screen with everything else drawn on it, and
+    /// nothing was holding that union apart. `g32` is that missing statement.
+    ///
+    /// 🔴 **Why none of the seven words is the answer, rather than why this abbreviation is nice.**
+    /// `unreadable` is a **measurement**: the engine sent something and this face could not read it,
+    /// so something is there. The seven are a vocabulary of *absence*, and the one of them that is a
+    /// measurement — [`Nothing::False`] — is the one whose answer is negative. None of them says
+    /// *arrived, and unreadable*, so the count does not belong to that vocabulary at all. It belongs
+    /// with the other counts, which this line already spells with letters (`ev`, `re`, `att`), and
+    /// the repair moves it there rather than inventing an eighth word for nothing — which would be a
+    /// change to a frozen vocabulary and not a repair to a line that draws it.
     #[must_use]
     pub fn short(&self) -> String {
         let mut text = match self.link {
@@ -368,7 +389,7 @@ impl LinkReport {
             if !text.is_empty() {
                 text.push(' ');
             }
-            text.push_str(&format!("{}?", self.unreadable));
+            text.push_str(&format!("{}unr", self.unreadable));
         }
         text
     }

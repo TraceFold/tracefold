@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 //! `ReceiptPayload` JSON round-trip -- the test req/38 SS858 §④ named and left unwritten
-//! ("`ReceiptPayload`本体のtestは cargoが要るので開けたまま名指し (未走のまま書かない)"), and
+//! (the `ReceiptPayload` body test needs cargo, so SS858 named it and left it open rather than
+//! writing it unrun), and
 //! req/910 C7 / req/919 W1 ask to be identified and actually run.
 //!
 //! # Why this is a different claim than `tests/receipt_verdict_wire.rs` and `ac_018.rs`

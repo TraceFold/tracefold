@@ -76,8 +76,15 @@ export const LEDGER_MESSAGES = {
   MENU_NO_VALUE: 'this cell holds no value to copy',
   COPY_ASKED: 'the clipboard was asked to take this value and has not answered yet',
   COPIED: 'copied',
-  COPY_REFUSED: 'this window has no clipboard to write to, so nothing was copied. Every value on this screen is also in the pane for its row, in full, where it can be taken by hand',
+  // req/109: this sentence used to end "...in the pane for its row" -- a place req/893
+  // removed from the screen. A message that directs a reader to furniture that no
+  // longer exists is a doc that has drifted from the implementation; the whole value
+  // now lives in the row when it is opened, so that is where the sentence points.
+  COPY_REFUSED: 'this window has no clipboard to write to, so nothing was copied. Every value on this screen is also in the row when it is opened, in full, where it can be taken by hand',
   COPY_FAILED: 'the clipboard refused the write, so nothing was copied',
+  // req/109: the enabled copy control's own reason, stated on the control (title), so
+  // a reader knows the clipboard gets the member and not the cut the cell drew.
+  COPY_WHOLE: 'the whole of this member goes to the clipboard, never the cut the cell drew',
   // req/893. The rebuilt screen states four things the old one either left to a tooltip
   // or did not say at all.
   VERDICT_UNRECOGNISED: 'a word arrived where one of the engine\'s three was expected. It is drawn as the word that came, under the undefined mark: what the engine said is not this window\'s to correct, and a word it does not know is not the same fact as a member that was never sent',
@@ -1215,6 +1222,14 @@ export function createFace({ parts = defaultParts } = {}) {
   });
   const model = createModel(P, screen, {
     MESSAGES: LEDGER_MESSAGES, ORDER, ROWS, UNDRAWN, ACTS, HALF, ANSWERED, toRecord, MEMBER_KEYS,
+    // req/108: the legend is zero-inclusive over the declared marks (req/768 F-B, a
+    // property req/893 said the notes kept -- "all six still say what they said" --
+    // and the drawn-only rewrite had quietly dropped).
+    MARKS: DECLARATION.marks,
+    // req/109: the copy affordance, back on the rebuilt screen (req/893 D-8, §8 open
+    // TODO "reimplement copy"). The same copyOffer the clipboard queue reads resolves
+    // the strip's offer, so the two cannot disagree about the value.
+    copyOfferOf: copyOffer,
   });
 
   /**
@@ -1438,7 +1453,13 @@ export function createFace({ parts = defaultParts } = {}) {
     };
 
     const sendAct = (name, id) => enqueue(async () => {
-      state = { ...state, menu: null, sending: { act: name, id } };
+      // req/108: the model reads `sending` as a Set of "act:id" keys (model.mjs hands
+      // it to the screen, whose act bar asks `sending.has("commit:c-004")`). This line
+      // used to write `{ act, id }` -- an object the Set check silently rejected, so
+      // no act was ever drawn as in flight on the live path. Asking a shape the reader
+      // does not read is the same defect req/893 D-1 names for tags: a value nobody
+      // reads back is not a value you have.
+      state = { ...state, menu: null, sending: new Set([`${name}:${id}`]) };
       paint(view(state));
       try {
         state = { ...(await act(port, state, { act: name, id })), sending: null };

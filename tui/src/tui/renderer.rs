@@ -213,6 +213,52 @@ fn apparatus(frame: &mut Frame, area: Rect, reading: &Reading, tier: Tier) {
     for line in reason_lines {
         lines.push(Line::raw(line));
     }
+    // 🔴 **The breadcrumb, in the row this region was already holding and not using**
+    // (`req/988` §3-1). `REGIONS[Apparatus].min_rows` is three; at eighty cells the head takes one
+    // row and the reason takes one, so the third has been blank on every frame this face has ever
+    // drawn. A screen that never says which page it is on, holding an empty row to do it in.
+    //
+    // So the cost is **nought rows**: not one record leaves the ledger for it, and if the region
+    // has no row to spare the address is simply not drawn. The word is `layout::LEDGER_ADDRESS`,
+    // the same declared const the disclosure and the note already spell, so there is no second
+    // spelling of the page's address for the two to disagree about.
+    //
+    // 🔴 **The ceiling this paragraph used to name is repaired** (`req/984` R13-1, T-r22). It read:
+    // the spare row is a function of width, the head is sixty-seven characters, so at sixty-six
+    // cells and below it wraps to two rows, the third row is spent, and the breadcrumb is gone — at
+    // exactly the widths where a reader most needs to be told where they are. Below forty-six cells
+    // the disclosure also falls to its short form, which does not spell the address either, so the
+    // page's address was on **no row of the whole screen**. Gate g35 counted those shapes and
+    // printed them; g40 is the same measurement turned into an assertion.
+    //
+    // A spare **row** was the wrong unit. At forty by ten this region is not out of room, it is out
+    // of rows: the last row it draws is `status_reason ?` and twenty-five of its forty cells are
+    // empty. So the address is offered a whole row when one is spare and the last drawn row's spare
+    // cells when one is not — taken, in either case, only when it fits whole. The cost stays
+    // **nought rows** at every width, which is the ruling the breadcrumb was admitted under and not
+    // something this lane is free to spend.
+    //
+    // The row it lands on is always a reason row: `reason_lines` is `wrap` of a non-empty string so
+    // it is never empty, and it is pushed after the head. That is why the appended cell can be
+    // painted `Role::Quiet` and mean it — an unstyled `Line::raw` is what it joins.
+    //
+    // 🔴 **Named ceiling, and it is what this lane did not close.** A row whose spare cells are
+    // fewer than the address is long has nowhere to put it, and the address is then still on no
+    // row. Measured rather than assumed: g40 prints those shapes, and when it was written they were
+    // the widths of thirty and below — where `status_reason`'s own row cannot hold twenty-three
+    // cells — together with the shapes short enough for the fit loop to let go of this region
+    // altogether, which is `Priority::Three` doing what it is declared to do. Reaching them means
+    // widening the disclosure's short form, and that costs a whole region at forty rather than a
+    // row: a worse screen than the one it repairs, so it is not taken here.
+    let breadcrumb = Span::styled(layout::LEDGER_ADDRESS, paint(Role::Quiet, tier));
+    if lines.len() < area.height as usize {
+        lines.push(Line::from(breadcrumb));
+    } else if let Some(last) = lines.last_mut() {
+        if last.width() + 1 + layout::LEDGER_ADDRESS.chars().count() <= area.width as usize {
+            last.spans.push(Span::raw(" "));
+            last.spans.push(breadcrumb);
+        }
+    }
     frame.render_widget(Paragraph::new(lines), area);
 }
 
@@ -235,11 +281,17 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
     // 🔴 One classifier. `layout::resolve` reads this same function to compose the disclosure, so
     // the line that says what is not on the screen cannot disagree with the region about which
     // shape was drawn (`req/964` §16). A second `if` here would be a second answer.
-    let open = layout::subject_shape(reading, view) == layout::Subject::Record;
+    let shape = layout::subject_shape(reading, view);
+    let open = shape == layout::Subject::Record;
+    // The header belongs to the **grid** and to nothing else, which is why the test is for the
+    // grid rather than against the record. It was `!open`, which reads as "everything that is
+    // not an opened record is a table" -- true while there were two shapes and false the moment
+    // there were three.
+    let grid = shape == layout::Subject::Grid;
     // The note is composed and budgeted **before** the rows it sits under, for the same reason the
     // opened record's note is: it is the line that says where the reader is and what the screen let
     // go of, and a line written after the thing it describes is a line that gets clipped.
-    if !open {
+    if grid {
         // One space between columns and none after the last: the width the plan computed is
         // `sum(width) + (n - 1)`, and a trailing separator would put the row one cell over the
         // screen the plan was asked about.
@@ -251,8 +303,10 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         )));
     }
 
-    let body_rows = area.height.saturating_sub(u16::from(!open)) as usize;
-    if items.is_empty() {
+    let body_rows = area.height.saturating_sub(u16::from(grid)) as usize;
+    if shape == layout::Subject::Help {
+        help_lines(&mut lines, body_rows, area.width, tier);
+    } else if items.is_empty() {
         // 🔴 `zero` only when the engine answered with the list and the list was empty. A refusal
         // has a body too, and drawing `0` for it would tell the reader there are no records when
         // the truth is that this process was not allowed to see them.
@@ -265,7 +319,14 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         )));
         // One row is occupied by the kind-of-nothing above; the note is paid for out of what is left
         // over, by the same rule the list's note is (`note_rows`).
-        let note_rows = note_rows(1, body_rows);
+        //
+        // 🔴 **Read from the plan rather than recomputed** (`req/988` §3-2). The budget is still
+        // [`note_rows`] and it still lives here; what changed is that `layout::resolve_attended`
+        // calls it once and this region reads the answer. The disclosure has to say when this
+        // number is nought, so the number the disclosure spoke about and the number the region drew
+        // against must be the same one — and until this line they were not, because the plan was
+        // passing the record count where this call site passes one.
+        let note_rows = plan.note_rows;
         if note_rows > 0 {
             for line in layout::wrap(
                 &fold_note(&[String::new()], offered(0), area.width, note_rows),
@@ -329,9 +390,27 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         // 🔴 And it is paid for out of **spare** rows, never out of a record — the ruling, and the
         // named defect it leaves standing where the records fill the body exactly, are both in
         // [`note_rows`], where a gate can read them instead of a reader having to.
-        let note_rows = note_rows(items.len(), body_rows);
-        let shown = body_rows.saturating_sub(note_rows).min(items.len());
-        for (index, item) in items.iter().enumerate().take(shown) {
+        // 🔴 The plan's, for the reason the window below is (`req/988` §3-2): the line that says the
+        // legend went is composed in `layout::resolve_attended`, so the count it is composed from
+        // has to be the count this region spends.
+        let note_rows = plan.note_rows;
+        // 🔴 **The window is the plan's, not this region's** (`req/38` SS999, T-r4-B). This was
+        // `take(shown)` from the first record, so an attention moved past the bottom edge was drawn
+        // nowhere while the note went on reporting where it was — measured at 80x24 against a
+        // twenty-eight row ledger, where `G` produced a frame identical to the entry frame.
+        // `layout::window` is where the decision lives now, which is what lets a gate read it
+        // instead of inferring it from a picture.
+        //
+        // The count is unchanged: the window holds as many records as the rows the note left over,
+        // exactly as `shown` did. What moved is **where it starts**.
+        let window = plan.window;
+        let shown = window.rows;
+        for (index, item) in items
+            .iter()
+            .enumerate()
+            .skip(window.first)
+            .take(window.rows)
+        {
             let cells = plan.columns.iter().map(|column| {
                 if column.key == wire::VERDICT_KEY {
                     let verdict = wire::verdict(item);
@@ -357,23 +436,20 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         }
         let index = view.selected.min(items.len() - 1);
         let position = format!("record {} of {}", index + 1, items.len());
-        let heads = if shown < items.len() {
-            // The rows that were let go of, named with the route that brings them back — the line
-            // this build inherited — and the reader's position in front of it when there is room.
-            let cut = format!(
-                "+{} more rows | {}",
-                items.len() - shown,
-                layout::LEDGER_ADDRESS
-            );
-            vec![format!("{position} | {cut}"), cut]
-        } else {
-            // The empty rung is reachable only when nothing was let go of, so giving the position
-            // up for the keys costs the reader nothing that is not drawn elsewhere.
-            vec![position, String::new()]
-        };
+        let acts = offered(items.len());
+        let ladder = note_ladder(
+            &position,
+            items.len().checked_sub(shown).filter(|d| *d > 0),
+            acts,
+        );
         if note_rows > 0 {
             for line in layout::wrap(
-                &fold_note(&heads, offered(items.len()), area.width, note_rows),
+                &fold_note(
+                    &afford(&ladder, acts, area.width, note_rows),
+                    acts,
+                    area.width,
+                    note_rows,
+                ),
                 area.width,
             ) {
                 lines.push(Line::styled(line, paint(Role::Quiet, tier)));
@@ -381,6 +457,69 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         }
     }
     frame.render_widget(Paragraph::new(lines), area);
+}
+
+/// What this face can do, drawn from the declarations that already say so.
+///
+/// 🔴 **This face's two dead declarations, brought back to the screen.** `super::acts::Act::intent`
+/// and `super::layout::Intent::sentence` were both written, both gated for internal consistency,
+/// and called by **nothing that draws** — a sentence per act and a sentence per region, declared for
+/// a reader who had no way to reach them. This is where they are read.
+///
+/// Nothing here is a new word: every string comes from `Act::name`, `Act::keys`, `Act::intent`,
+/// `RegionRole::short` and `Intent::sentence`, so there is no second vocabulary to drift from the
+/// first. There is no border, no colour and no mark of its own — **the visual design of this face
+/// is deliberately nothing at all**, because the Owner's visual ruling on the sample has not been
+/// made and a new screen invented before it would be inventing an answer.
+fn help_lines(lines: &mut Vec<Line<'static>>, body_rows: usize, width: u16, tier: Tier) {
+    let mut entries: Vec<String> = acts::ACTS
+        .into_iter()
+        .map(|act| {
+            format!(
+                "{} {}  {}",
+                pad(act.name().trim_start_matches("act."), 6),
+                pad(&act.keys().join(" "), 14),
+                act.intent()
+            )
+        })
+        .collect();
+    entries.extend(layout::REGIONS.into_iter().map(|region| {
+        format!(
+            "{} {}",
+            pad(region.role.short(), 11),
+            region.intent.sentence()
+        )
+    }));
+
+    // Composed before the rows it sits under, like every other note in this face: a line that says
+    // how much was let go of, written after the letting go, is a line that gets clipped.
+    let note = |shown: usize| {
+        format!(
+            "{shown} of {} | close: {} | {HELP_ADDRESS}",
+            entries.len(),
+            spelled(Act::Help)
+        )
+    };
+    let note_rows = layout::rows_needed(&note(entries.len()), width) as usize;
+    let room = body_rows.saturating_sub(note_rows);
+    let mut spent = 0usize;
+    let mut shown = 0usize;
+    for entry in &entries {
+        let need = layout::rows_needed(entry, width) as usize;
+        if spent + need > room {
+            break;
+        }
+        for line in layout::wrap(entry, width) {
+            lines.push(Line::raw(line));
+        }
+        spent += need;
+        shown += 1;
+    }
+    // The obligation a renderer carries in place of `invert`: say what was let go of. The count is
+    // of declarations, and `HELP_ADDRESS` is where the ones that did not fit are spelled in full.
+    for line in layout::wrap(&note(shown), width) {
+        lines.push(Line::styled(line, paint(Role::Quiet, tier)));
+    }
 }
 
 /// The address that carries every key.
@@ -402,19 +541,29 @@ pub const HELP_ADDRESS: &str = "gx tui --help";
 /// [`Act::Close`] is in neither list. Closing a record that is not open moves nothing, and a legend
 /// that names an inert key is a promise the face does not keep; the opened record's own note is what
 /// names it.
-pub const NOTE_ORDER: [Act; 7] = [
+/// ?? [`Act::Help`] sits **second**, straight after the way out: the two things a reader of a
+/// full-screen program needs first are how to leave and how to find out what it does, and this
+/// note is folded from the right, so an act placed late is an act a narrow terminal never names.
+pub const NOTE_ORDER: [Act; 9] = [
     Act::Leave,
+    Act::Help,
     Act::Open,
     Act::Next,
     Act::Prev,
     Act::Read,
     Act::First,
     Act::Last,
+    Act::Wide,
 ];
 
 /// The same, for a list the engine answered with nothing in.
 ///
 /// Everything that moves the attention has nothing to move, and `act.open` opens nothing.
+///
+/// ?? **`act.help` and `act.wide` are deliberately absent** (`req/984` ?9-7). `super::acts::grounded`
+/// clamps both on a list with nothing in it, so naming them here would advertise two keys that do
+/// nothing -- exactly what gate g21 refuses, and exactly the defect this third rung was created
+/// for one row count up. The address `gx tui --help` still reaches the same text from a shell.
 pub const NOTE_ORDER_EMPTY: [Act; 2] = [Act::Leave, Act::Read];
 
 /// The same, for a list of exactly one record.
@@ -428,7 +577,7 @@ pub const NOTE_ORDER_EMPTY: [Act; 2] = [Act::Leave, Act::Read];
 /// from the other side.
 ///
 /// There is no fourth rung: from two records upward every declared act moves something.
-pub const NOTE_ORDER_ONE: [Act; 3] = [Act::Leave, Act::Open, Act::Read];
+pub const NOTE_ORDER_ONE: [Act; 5] = [Act::Leave, Act::Help, Act::Open, Act::Read, Act::Wide];
 
 /// Which acts the list state offers, at this many rows.
 ///
@@ -527,7 +676,7 @@ pub fn note_line(head: &str, acts: &[Act], spell: usize) -> String {
 /// legend existed, and the count now travels with the keys. Two rows at most, because a legend that
 /// grows to fill a screen is furniture. Gate g26 is that sentence, fired over every shape.
 ///
-/// 🔴 **A named defect, and it is left standing on purpose** (`req/964` §16, `req/38` SS996). At
+/// 🔴 **A named defect, and it is left standing on purpose** (`req/964` §16, `req/38` SS999). At
 /// `occupied == body_rows` the spare is nought, so the note is not drawn and **nothing on the screen
 /// says it was there to draw**. Closing it needs one of two things, and this lane took neither:
 /// letting the note take a record's row would reinstate exactly the 46x12 screen the ruling above
@@ -555,6 +704,148 @@ pub const fn note_rows(occupied: usize, body_rows: usize) -> usize {
     }
 }
 
+/// The list note's head ladder: what it would say at every length, longest first, and what each
+/// length is allowed to charge for itself.
+///
+/// 🔴 **The position is the floor of this ladder and the count of dropped rows is what gives way**
+/// (`req/38` SS999, T-r4-A2). It was the other way round, and a single character was enough to
+/// lose the position outright: at eighty cells
+/// `record 1 of 28 | +12 more rows | GET /v1/transformations | 7 keys: gx tui --help` is eighty
+/// characters and `record 28 of 28 | ...` is eighty-one, so the reader's position left the screen
+/// at the exact moment the attention left the window.
+///
+/// The order is a mechanism and not a preference. `record N of M` says where the reader stands
+/// *and*, against the rows a reader can count, that there are records not drawn — so it carries the
+/// cut. `+K more rows` says nothing at all about where the reader stands. One implies the other and
+/// not the reverse, so the one that survives is the position. The route the dropped rows come back
+/// from is spelled by the disclosure region, which is `Priority::One` and always names
+/// `LEDGER_ADDRESS` over a grid, because `LEDGER_PAGE_KEYS` is dropped at every width and that
+/// clause is never empty.
+///
+/// This reverses the rung order argued for in [`fold_note`]'s own comment. The reversal is named
+/// and dated rather than quiet: raised as T-r4-A2 in `req/38` SS999, repaired here, and gate g29 is
+/// what stops it drifting back.
+///
+/// 🔴 **Composed here rather than in [`subject`] so that a gate can read the same ladder the screen
+/// draws** (`req/984` §10-8). A gate that rebuilt these strings would be measuring its own copy,
+/// and this repository has already shipped one gate that checked a declaration nothing read.
+#[must_use]
+pub fn note_ladder(position: &str, dropped: Option<usize>, acts: &[Act]) -> Vec<Rung> {
+    match dropped {
+        Some(more) => vec![
+            // 🔴 **The one rung that may be asked to pay** (`req/984` §10-8). All this rung adds
+            // over the next one down is `LEDGER_ADDRESS`, and the disclosure region on the same
+            // screen spells that address too, so it is the only line in the ladder whose loss
+            // costs the reader nothing they cannot read a few rows lower. Its price is
+            // [`legend_floor`], and [`afford`] is where it is charged.
+            Rung {
+                head: format!(
+                    "{position} | +{more} more rows | {}",
+                    layout::LEDGER_ADDRESS
+                ),
+                keeps: legend_floor(acts),
+            },
+            // Free. `+K more rows` is the drop disclosure and is spelled nowhere else.
+            Rung {
+                head: format!("{position} | +{more} more rows"),
+                keeps: 0,
+            },
+            // Free. `record N of M` is where the reader stands and is spelled nowhere else — the
+            // floor T-r4-A2 reordered this ladder to protect.
+            Rung {
+                head: position.to_string(),
+                keeps: 0,
+            },
+        ],
+        // The empty rung is reachable only when nothing was let go of, so giving the position up
+        // for the keys costs the reader nothing that is not drawn elsewhere.
+        None => vec![
+            Rung {
+                head: position.to_string(),
+                keeps: 0,
+            },
+            Rung {
+                head: String::new(),
+                keeps: 0,
+            },
+        ],
+    }
+}
+
+/// One rung of the note's head ladder, and what it must still leave room for to earn its cells.
+///
+/// 🔴 **The price is what makes this a declaration rather than a branch** (`req/984` §10-8/§10-9).
+/// The ruling it carries is not about width: *what a line gives up may be given up only if the
+/// same screen spells it somewhere else.* A rung whose own contribution is spelled elsewhere may
+/// therefore be asked to pay for itself, and one whose contribution is spelled nowhere else may
+/// not. That is a property of the **rung**, known where the ladder is written, and it is why this
+/// face still contains no `if width < 80` — `super::layout`'s module documentation says why a
+/// screen that writes one cannot name what it dropped.
+///
+/// `keeps` is a floor on the acts the rung must still be able to spell, and `0` means free: the
+/// rung is taken whenever it fits, exactly as every rung was before this type existed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Rung {
+    /// The head this rung draws.
+    pub head: String,
+    /// Acts this rung must still spell to be worth taking, or it yields to the next rung down.
+    pub keeps: usize,
+}
+
+/// The floor a redundant rung pays: enough keys to reach the one that says what the program does.
+///
+/// 🔴 **Derived from the declared order rather than written as a number.** `NOTE_ORDER` puts the
+/// way out first and the way to find out what the program does second, and says why in its own
+/// documentation; this reads that order back rather than restating it, so moving [`Act::Help`]
+/// moves the floor with it and a hand-written `2` cannot drift from the list it describes.
+///
+/// A list of acts that does not offer help has no floor at all — `NOTE_ORDER_EMPTY` is that list,
+/// and a rung priced against it is free, which is the right answer: there is no help key to buy.
+#[must_use]
+pub fn legend_floor(acts: &[Act]) -> usize {
+    acts.iter()
+        .position(|act| *act == Act::Help)
+        .map_or(0, |at| at + 1)
+}
+
+/// How many acts a head can spell at this shape: `0` when the head does not fit at all.
+#[must_use]
+pub fn spellable(head: &str, acts: &[Act], width: u16, rows: usize) -> usize {
+    if layout::rows_needed(&note_line(head, acts, 0), width) as usize > rows {
+        return 0;
+    }
+    let mut most = 0;
+    for spell in 1..=acts.len() {
+        if layout::rows_needed(&note_line(head, acts, spell), width) as usize > rows {
+            break;
+        }
+        most = spell;
+    }
+    most
+}
+
+/// The ladder with the rungs that cannot pay their price removed.
+///
+/// 🔴 **Pruning rather than a second walk.** [`fold_note`] is unchanged and still takes the first
+/// rung that fits, longest first — g18 and g29 measure the same function they always did. What
+/// changes is the ladder it is handed: a rung that fits but cannot spell what it declared it would
+/// keep is not offered, so the walk arrives at the next rung down on its own. There is one
+/// selection rule in this face, not two.
+///
+/// The last rung is never removed. It is the floor of the ladder, and a floor that can be priced
+/// out is not a floor — at the narrowest shapes it is the only line left saying where the reader
+/// stands.
+#[must_use]
+pub fn afford(ladder: &[Rung], acts: &[Act], width: u16, rows: usize) -> Vec<String> {
+    let last = ladder.len().saturating_sub(1);
+    ladder
+        .iter()
+        .enumerate()
+        .filter(|(at, rung)| *at == last || spellable(&rung.head, acts, width, rows) >= rung.keeps)
+        .map(|(_, rung)| rung.head.clone())
+        .collect()
+}
+
 /// The longest note that fits the rows it was given: the first `head` that fits at all, then the
 /// most acts that fit under it.
 ///
@@ -576,6 +867,15 @@ pub fn fold_note(heads: &[String], acts: &[Act], width: u16, rows: usize) -> Str
     // declared acts in silence at thirty cells). Where records **were** let go of the last rung is
     // the line that says so, and it is never given up for a legend: a drop disclosure outranks a
     // convenience.
+    //
+    // 🔴 **Superseded in the caller, `req/38` SS999 T-r4-A2 -> [`subject`].** The paragraph above
+    // is right that the last rung is the caller's and right that a drop disclosure outranks a
+    // legend; it is wrong about which line is the drop disclosure. `record N of M` names the total
+    // against the rows a reader can count, so it *is* a drop disclosure and it is also the only
+    // line that says where the reader stands. The ladder `subject` now passes therefore ends with
+    // the position rather than with `+K more rows`. This function is unchanged — it still walks
+    // whatever ladder it is given, longest first — which is why g18 measures the same behaviour it
+    // always did.
     //
     // **Named ceiling**: when even the last rung cannot carry the keys, it is drawn alone and the
     // keys go unmentioned. Nothing on the screen says so, for the same reason the disclosure is
@@ -703,12 +1003,26 @@ pub fn render_live_to_buffer(
     link: live::LinkReport,
 ) -> Buffer {
     let measured = measured_with_link(screen, link);
-    let plan = layout::resolve(
+    let items = screen.transformations.items().len();
+    // 🔴 The question `acts::apply` asks after a key, asked here as well and by the same function.
+    // A reading can carry fewer records than the last one did and nothing about that goes through
+    // an act, so a view that was legal when the reader last touched it can arrive at the draw
+    // pointing past the end of the list (`req/38` SS999, T-r9-B). Asked **before** the plan,
+    // because the plan is resolved for this attention and a plan resolved for one view and drawn
+    // with another is two answers again.
+    let view = &acts::grounded(view, items);
+    let plan = layout::resolve_attended(
         width,
         height,
         &measured,
-        wide,
+        // The invocation's flag **or** the act the reader pressed since; either is a request for
+        // the long form and neither overrules the other. `resolve_attended` keeps its signature.
+        wide || view.wide,
         layout::subject_shape(&screen.transformations, view),
+        layout::Attention {
+            selected: view.selected,
+            items,
+        },
     );
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("the in-memory backend does not fail");
@@ -762,12 +1076,24 @@ pub fn interactive(options: &super::Options, tier: Tier) -> crate::Result<(u64, 
                 Err(e) => break Err(e),
             };
             let measured = measured_with_link(&screen, link);
-            let plan = super::layout::resolve(
+            let items = screen.transformations.items().len();
+            // 🔴 The subscription's road, closed. `Subscription::due` below re-reads and marks the
+            // frame dirty without any act being applied, so this is where a list that shrank
+            // between reads meets a view that was standing somewhere legal against the longer one.
+            // The same function every key goes through, and the view itself is moved rather than a
+            // grounded copy being drawn: the next key has to start from where the reader actually
+            // is (`req/38` SS999, T-r9-B).
+            view = acts::grounded(&view, items);
+            let plan = super::layout::resolve_attended(
                 size.width,
                 size.height,
                 &measured,
-                options.wide,
+                options.wide || view.wide,
                 super::layout::subject_shape(&screen.transformations, &view),
+                super::layout::Attention {
+                    selected: view.selected,
+                    items,
+                },
             );
             if let Err(e) = terminal.draw(|frame| draw(frame, &screen, &plan, tier, &view)) {
                 break Err(e);

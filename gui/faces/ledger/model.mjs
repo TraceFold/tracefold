@@ -15,12 +15,25 @@
 // on the screen.
 
 export function createModel(P, screen, {
-  MESSAGES, ORDER, ROWS, UNDRAWN, ACTS, HALF, ANSWERED, toRecord, MEMBER_KEYS,
+  MESSAGES, ORDER, ROWS, UNDRAWN, ACTS, HALF, ANSWERED, toRecord, MEMBER_KEYS, MARKS = [],
+  // req/109: what a copy of a cell would actually take, or null for a cell that holds
+  // no member. Resolved by the face (ledger.mjs copyOffer, the same function the
+  // clipboard write reads), so the strip that offers a value and the queue that takes
+  // it cannot disagree about what the value is.
+  copyOfferOf = () => null,
 }) {
   const { el, style, find } = P.element;
   const { prose, reading, pair } = screen;
 
   const nounFor = (count, one, many) => (count === 1 ? one : many);
+
+  /**
+   * One act entry, in words. req/108: the engine's own code (`gx_code`) travels with
+   * the outcome -- describeAct() had been carrying it in `entry.code` and both places
+   * that write an act to the screen were dropping it, so a refused act reached a
+   * reader without the one machine word the engine gave for the refusal.
+   */
+  const actWords = (entry) => `${entry.outcome}${entry.code ? ` ${entry.code}` : ''}: ${entry.detail ?? ''}`;
 
   /**
    * A half's denominator, in one line.
@@ -35,8 +48,14 @@ export function createModel(P, screen, {
     const noun = key === HALF.settled ? nounFor(drawn, 'record', 'records') : nounFor(drawn, 'candidate', 'candidates');
     const bits = [`${drawn} of ${received} ${noun}`];
     if (typeof envelope.pages === 'number') bits.push(`${envelope.pages} ${nounFor(envelope.pages, 'request', 'requests')}`);
-    if (envelope.stopped) bits.push(MESSAGES.TRUNCATED);
-    if (envelope.repeated) bits.push(MESSAGES.REPEATED);
+    // req/108: the wire's names, read off the fold envelope the membrane actually
+    // returns (membrane/src/pages.mjs: `stopped_at_budget`, `repeated_cursor`). This
+    // used to read `envelope.stopped` and `envelope.repeated` -- fields no envelope
+    // carries -- so a truncated walk was never announced on the live path. Asking the
+    // wire for a field it does not have is the defect class req/893's own AC-8 exists
+    // to keep visible.
+    if (envelope.stopped_at_budget) bits.push(MESSAGES.TRUNCATED);
+    if (envelope.repeated_cursor) bits.push(MESSAGES.REPEATED);
     return bits.join(' · ');
   }
 
@@ -60,6 +79,11 @@ export function createModel(P, screen, {
 
     const items = Array.isArray(envelope.items) ? envelope.items : [];
     const ordered = P.order(items.map((item) => toRecord(item, key)), { by: ROWS.order });
+    // req/109: this window's menu decision, resolved to an offer only for the row it
+    // names and only when a cell was under the pointer. A right-press on the row
+    // itself carries `cell: null` and resolves to nothing -- which is what keeps the
+    // req/893 D-8 tests true: a right-click on a row opens no second act surface.
+    const menuState = state.menu && state.menu.cell ? state.menu : null;
     const rows = ordered.rows.map((record) => {
       // Members looked for and not found. The seal hole is excluded: it is true of every
       // held row by construction, so counting it would put the same number on every row
@@ -73,6 +97,7 @@ export function createModel(P, screen, {
         // unknown is said once, inside the row, where there is room to say why.
         reversal: P.reversalOf(record, ordered.rows),
         holes,
+        menu: menuState && menuState.id === record.id ? copyOfferOf(record, menuState.cell) : null,
       };
     });
     return {
@@ -129,7 +154,11 @@ export function createModel(P, screen, {
       },
       {
         key: 'legend',
-        body: el('div', {}, drawnMarks.map(([name, count]) => pair(name, String(count), 'measure.figure'))),
+        // req/108: zero-inclusive over the declared marks (req/768 F-B). A declared
+        // mark this render drew none of still gets its line, with a zero -- a legend
+        // that only lists what happened to be drawn cannot say "this mark exists and
+        // is absent here", which is the absent/false distinction the face itself draws.
+        body: el('div', {}, MARKS.map((m) => pair(m.mark, String(drawnMarks.get(m.mark) ?? 0), 'measure.figure'))),
       },
       {
         key: 'claims',
@@ -167,7 +196,7 @@ export function createModel(P, screen, {
         key: 'where from',
         body: el('div', {}, [
           pair('read', state.source ?? MESSAGES.SOURCE_ENGINE),
-          ...(state.acts ?? []).map((a) => pair(`${a.act} ${a.id}`, `${a.outcome}: ${a.detail ?? ''}`)),
+          ...(state.acts ?? []).map((a) => pair(`${a.act} ${a.id}`, actWords(a))),
         ]),
       },
     ];
@@ -196,7 +225,7 @@ export function createModel(P, screen, {
   function actLogOf(acts) {
     if (!acts || acts.length === 0) return null;
     return el('section', { 'data-part': 'act-log', 'data-count': String(acts.length) },
-      acts.map((entry) => pair(`${entry.act} ${entry.id}`, `${entry.outcome}: ${entry.detail ?? ''}`,
+      acts.map((entry) => pair(`${entry.act} ${entry.id}`, actWords(entry),
         entry.outcome === ANSWERED ? 'value.full' : 'nothing.unknown')));
   }
 
@@ -227,9 +256,11 @@ export function createModel(P, screen, {
     return {
       figures,
       halves,
-      notes: notesOf(state, halves, [...drawnMarks.entries()].sort(), cutsOf(halves)),
+      notes: notesOf(state, halves, drawnMarks, cutsOf(halves)),
       asideOpen: (Array.isArray(state.opened) ? state.opened : []).includes('about this screen'),
       actLog: actLogOf(state.acts),
+      // req/109: what the last copy did. Carried whole; the screen decides the words.
+      copied: state.copied ?? null,
       source: state.source ?? null,
       renderMs,
     };

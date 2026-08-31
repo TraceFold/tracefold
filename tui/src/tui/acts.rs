@@ -45,12 +45,33 @@ pub enum Act {
     Close,
     /// Ask the engine again, now.
     Read,
+    /// See what this face can do, in its own declared words.
+    ///
+    /// 🔴 A **canon amendment**, not a runtime table. The ruling that fixed this set at eight
+    /// (`req/984` §8-7) fixed it against *runtime and theme*, not against a dated amendment to the
+    /// source — the same distinction `Nothing` was grown 6 -> 7 under (`req/38` SS974).
+    ///
+    /// Before this, the only road to the help text was to leave the process and type
+    /// `gx tui --help`: a face that declares its capabilities and offers no way to read the
+    /// declaration from inside itself.
+    Help,
+    /// Spell the disclosure in full, here, without restarting.
+    ///
+    /// 🔴 The flag `--wide` already existed and could only be answered by **relaunching the
+    /// process** (`req/984` §8-14). A face whose remedy for "I cannot read what was let go of" is
+    /// "start again" has put the cost of its own disclosure on the reader.
+    Wide,
     /// Stop reading and give the terminal back.
     Leave,
 }
 
 /// Every act this face declares. Gate g12 requires each one to move the state.
-pub const ACTS: [Act; 8] = [
+///
+/// 🔴 **The count is read from this array everywhere it is used**, which is the rule the sister
+/// vocabulary `super::wire::Nothing::ALL` already states of itself. A test that spelled the number
+/// as a literal was asserting the array's *length* rather than its *shape*, and the length is the
+/// one property no reader depends on (`req/984` §8-17).
+pub const ACTS: [Act; 10] = [
     Act::Prev,
     Act::Next,
     Act::First,
@@ -58,6 +79,8 @@ pub const ACTS: [Act; 8] = [
     Act::Open,
     Act::Close,
     Act::Read,
+    Act::Help,
+    Act::Wide,
     Act::Leave,
 ];
 
@@ -75,6 +98,10 @@ pub enum Effect {
     Close,
     /// Ask the engine now rather than at the next keypress.
     Read,
+    /// Show, or stop showing, what this face can do.
+    Help,
+    /// Spell the disclosure in full, or stop.
+    Wide,
     /// Give the terminal back.
     Leave,
 }
@@ -104,6 +131,8 @@ impl Act {
             Act::Open => "act.open",
             Act::Close => "act.close",
             Act::Read => "act.read",
+            Act::Help => "act.help",
+            Act::Wide => "act.wide",
             Act::Leave => "act.leave",
         }
     }
@@ -119,6 +148,8 @@ impl Act {
             Act::Open => "see everything this record carries",
             Act::Close => "stop seeing one record and see the list again",
             Act::Read => "ask the engine again, now",
+            Act::Help => "see what this face can do, and what each key is for",
+            Act::Wide => "spell what was let go of in full, without restarting",
             Act::Leave => "stop reading and give the terminal back",
         }
     }
@@ -134,6 +165,8 @@ impl Act {
             Act::Open => Effect::Open,
             Act::Close => Effect::Close,
             Act::Read => Effect::Read,
+            Act::Help => Effect::Help,
+            Act::Wide => Effect::Wide,
             Act::Leave => Effect::Leave,
         }
     }
@@ -152,6 +185,13 @@ impl Act {
             Act::Open => &["return", "l", "right"],
             Act::Close => &["escape", "h", "left"],
             Act::Read => &["r"],
+            // A bare `?` and not a modified key: `super::renderer::key_name` carries a
+            // `KeyCode` and no modifiers by design, so binding `Ctrl-O` -- the way
+            // `gemini-cli` spells this -- would be a change to the medium layer rather than
+            // to this declaration. The reference face's pixel is worth taking; its key is not.
+            Act::Help => &["?"],
+            // The first letter of the flag this act makes answerable in place.
+            Act::Wide => &["w"],
             Act::Leave => &["q"],
         }
     }
@@ -171,7 +211,7 @@ pub fn for_key(key: &str) -> Option<Act> {
 pub struct View {
     /// Which record is attended to, as an index into the records the read carried.
     ///
-    /// 🔴 **It said "the rows the subject region drew", and that was false** (`req/38` SS996). What
+    /// 🔴 **It said "the rows the subject region drew", and that was false** (`req/38` SS999). What
     /// [`apply`] clamps against is the number of records the list *holds*, which is what a reducer
     /// with no screen in front of it can know; the subject region draws as many of them as its rows
     /// allow and starts at the first one, so on a list that is being cut the attention can be moved
@@ -181,9 +221,31 @@ pub struct View {
     /// reducer — the same missing edge as `req/964` §16's third row — or a window that scrolls,
     /// which is a concept this face does not have. **Declared, not repaired**; the sentence above is
     /// corrected rather than the code, because the code is what a reducer is allowed to know.
+    ///
+    /// 🔴 **Repaired, and not here** (`req/38` SS999 T-r4-B). The paragraph above is still true of
+    /// this member — a reducer clamps against the records the list holds, and that is all it may
+    /// know — and it was wrong that the way out was a scrolling window this face does not have.
+    /// `super::layout::window` is a **function of this state**, computed where the row count is
+    /// already known, so nothing is remembered and no act learned about it. Gate g28 is the
+    /// invariant: whenever the region draws a record at all, it draws this one.
     pub selected: usize,
     /// Whether the attended record is opened in place.
     pub open: bool,
+    /// Whether the reader has asked what this face can do.
+    ///
+    /// 🔴 **Here, and not in the caller** (`req/984` §9-7). Opening the help face is something the
+    /// reader *did*, and this struct is defined as what the reader has done; a copy of it held in
+    /// `super::renderer::interactive` would put half of that answer outside the type whose whole
+    /// job is to be it. It would also put the help face out of reach of
+    /// `super::renderer::render_view_to_buffer`, which every gate and every capture draws through —
+    /// a screen no instrument can photograph.
+    pub help: bool,
+    /// Whether the reader has asked for the disclosure spelled in full.
+    ///
+    /// 🔴 Held here rather than as a [`Signal`], for the reason `Signal` exists: a signal is one
+    /// instruction to the caller about *now*, and this is a state that persists across frames,
+    /// reads and keypresses.
+    pub wide: bool,
 }
 
 /// What the caller has to do about an act, once the state has been moved.
@@ -195,6 +257,52 @@ pub enum Signal {
     Read,
     /// Give the terminal back.
     Leave,
+}
+
+/// Does what the view points at still exist? Asked once, here, by everything that asks it.
+///
+/// 🔴 The two lines this is made of used to sit at the bottom of [`apply`] and **nowhere else**, so
+/// the question was asked of a *key* and never of a *reading*. A key is not the only thing that can
+/// make the answer no: the list can come back shorter. `super::renderer::interactive` re-reads on
+/// `Subscription::due` and redraws with no act applied at all, and on that road the attention was
+/// left pointing past the end of a list nobody had pressed a key against — records on the screen and
+/// the mark on none of them, which is the shape `req/38` SS999 T-r4-B is named for, reached by a
+/// road that repair did not cover. Found by the r6 verification lane's probe V2 and out of its
+/// scope (`req/942_artifacts/tui_r6_verify_2026-08-31/00_VERIFY.md`).
+///
+/// 🔴 It is a function rather than two lines copied into the draw road, and that is the whole
+/// point: the same question spelled in two places is two answers the day one of them is edited,
+/// which is the defect this face has now walked into three times (`super::layout::window` reading
+/// `renderer::note_rows` rather than restating the budget is the same ruling, one axis over). Gate
+/// g31 is what measures that the draw road asks it.
+/// 🔴 **`help` and `wide` are clamped by the same line, and that is a ruling rather than a
+/// convenience** (`req/984` §9-7, 2026-08-31).
+///
+/// `req/988` §3-3-③ asked for the opposite: that the help face open on a list with nothing in it,
+/// on the argument that an empty screen is exactly the one a reader cannot work out by trying keys
+/// on. That argument was **retracted**, and the reason is gate g21. g21 is written over the whole
+/// of [`ACTS`] rather than over [`Act::Open`], expressly "so an act added later is measured by it
+/// without anybody remembering to add a line" — and it holds two things at once: that an empty list
+/// is a **fixed point** of this reducer, and that every act the note *offers* at a given row count
+/// **moves something** at that row count. An act that is inert on an empty list is therefore
+/// allowed; an act that is inert and *advertised* is not.
+///
+/// So the shape of the repair is: clamp both members here, and leave both acts out of
+/// `super::renderer::NOTE_ORDER_EMPTY`. Narrowing g21 to spare these two would have bought one
+/// screen and given up the invariant that catches the next act somebody adds — the defect
+/// `NOTE_ORDER_ONE` was created for (`req/38` SS974), one row count up.
+///
+/// **The cost is real and is not hidden**: on a reading with no records in it, `?` and `w` do
+/// nothing, and the note does not name them. `gx tui --help` is still the address, and the
+/// disclosure still spells it.
+#[must_use]
+pub fn grounded(view: &View, rows: usize) -> View {
+    let mut next = *view;
+    next.selected = next.selected.min(rows.saturating_sub(1));
+    next.open &= rows > 0;
+    next.help &= rows > 0;
+    next.wide &= rows > 0;
+    next
 }
 
 /// The single reducer: the declaration resolved, once.
@@ -236,13 +344,31 @@ pub fn apply(view: &View, act: Act, rows: usize) -> (View, Signal) {
             Signal::None
         }
         Effect::Read => Signal::Read,
+        // 🔴 Both **toggle**, so the key that opens is the key that closes and the note that names
+        // it is therefore also the way out. A one-way act would need a second act to undo it, and a
+        // second act nothing names is a room with no door. Both are then clamped by [`grounded`]
+        // below, which is what keeps the empty list a fixed point.
+        Effect::Help => {
+            next.help = !next.help;
+            Signal::None
+        }
+        Effect::Wide => {
+            next.wide = !next.wide;
+            Signal::None
+        }
         Effect::Leave => Signal::Leave,
     };
     // The list can shrink between reads; an index into rows that are gone would draw an attention
     // mark on a record nobody is looking at.
-    next.selected = next.selected.min(last);
+    //
+    // 🔴 Both of the lines that used to stand here are [`grounded`] now, and the paragraphs below
+    // are kept beside the reducer they were written for. What moved is only *who else may ask*:
+    // the question belongs to the draw road as much as to an act, because a reading can shrink the
+    // list without any act being applied (`req/38` SS999, T-r9-B). Leaving a copy of the clamp here
+    // as well would have been the two-answers defect the move exists to close.
+    //
     // 🔴 **`req/38` SS974, design round 2's third finding — and the repair is one line further than
-    // the finding was.**
+    // the finding was.** (The lines it produced are in [`grounded`]; this is why they exist.)
     //
     // The report said `act.open` moved the view on an empty list while `super::renderer::subject`
     // declined to open anything, so the declaration and the screen described two different
@@ -252,9 +378,9 @@ pub fn apply(view: &View, act: Act, rows: usize) -> (View, Signal) {
     // That repair is wrong, and gate g21 said so on the first run: it leaves `act.prev` carrying an
     // opened flag on a list that has emptied, because only the arm that was patched asks the
     // question. **The question is not "may this act open something", it is "does what the view
-    // points at still exist"** — and the line above has been asking exactly that about `selected`
-    // since the first build. So it is asked here, once, about both members. Every act inherits it,
-    // including the ones nobody has written yet.
-    next.open &= rows > 0;
-    (next, signal)
+    // points at still exist"** — and the clamp on `selected` has been asking exactly that since the
+    // first build. So it is asked once, about both members, and every act inherits it, including
+    // the ones nobody has written yet. It is asked in [`grounded`] rather than on the next line,
+    // which is the same sentence with one more caller in it: a reading inherits it too.
+    (grounded(&next, rows), signal)
 }

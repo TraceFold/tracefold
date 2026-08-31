@@ -24,6 +24,15 @@
 //! size — the same asymmetry `phase_b_witness_cli.rs`'s `signed_checkpoint` uses for equivocation,
 //! applied across sizes instead of within one.
 
+// 🔴 Ruling **D-999-F4** (2026-08-31, seat=Fable, filed `req/999_R_TESTS_CLI_WIRE_CENSUS_2026-08-31.md`
+// §3 F-4, registered in `req/00-LOOP_STATE_2026-08-18.md`): `ledger.key` was saved under `scratch()`
+// (CARGO_TARGET_TMPDIR), which on this machine's drvfs mount reads mode 777, so `KeyPair::load`
+// refused it and all four probes died at the fixture, not at the classifier ([DrvFs-777],
+// UNTESTABLE-on-DrvFs in `req/999`'s census). Key material now goes through `secure_scratch()` --
+// the repo's own precedent, `phase_b_witness_cli.rs`'s `signed_checkpoint` -- while the checkpoint
+// JSON artefacts stay in `scratch()` (they carry no permission requirement). This changes where a
+// test fixture writes a key; the classifier probes themselves are unchanged.
+
 mod support;
 
 use std::path::{Path, PathBuf};
@@ -31,7 +40,7 @@ use std::path::{Path, PathBuf};
 use gx_core::{Cid, Timestamp, TransformationId};
 use gx_log::LedgerStore;
 
-use support::{keypair, run, scratch};
+use support::{keypair, run, scratch, secure_scratch};
 
 /// A deterministic leaf, so two different `base`s produce ledgers sharing no leaf at any index.
 fn leaf(base: u64, i: u64) -> (TransformationId, Cid) {
@@ -109,7 +118,8 @@ fn consistency_to(project_dir: &Path, from: u64, to: u64, out: &Path) -> PathBuf
 fn fork_is_named_when_the_old_checkpoint_is_not_a_real_prefix_of_the_new_one() {
     let key = keypair(170);
     let out = scratch("b_audit_m1_fork");
-    let secret = out.join("ledger.key");
+    // D-999-F4: the key lives on a filesystem with unix permissions; see the header note.
+    let secret = secure_scratch("b_audit_m1_fork_key").join("ledger.key");
     key.save(&secret).expect("save the ledger key");
 
     // "A": a 6-leaf history seeded from base 0.
@@ -166,7 +176,8 @@ fn fork_is_named_when_the_old_checkpoint_is_not_a_real_prefix_of_the_new_one() {
 fn real_extension_across_two_sizes_is_not_a_false_fork() {
     let key = keypair(171);
     let out = scratch("b_audit_m1_no_fork");
-    let secret = out.join("ledger.key");
+    // D-999-F4: see the header note.
+    let secret = secure_scratch("b_audit_m1_no_fork_key").join("ledger.key");
     key.save(&secret).expect("save the ledger key");
 
     let (dir, layout) = support::project("b_audit_m1_real_ext");
@@ -207,7 +218,8 @@ fn real_extension_across_two_sizes_is_not_a_false_fork() {
 fn omitting_proof_leaves_the_default_road_unchanged() {
     let key = keypair(172);
     let out = scratch("b_audit_m1_omitted");
-    let secret = out.join("ledger.key");
+    // D-999-F4: see the header note.
+    let secret = secure_scratch("b_audit_m1_omitted_key").join("ledger.key");
     key.save(&secret).expect("save the ledger key");
 
     let (dir, layout) = support::project("b_audit_m1_omitted_proj");
@@ -239,7 +251,8 @@ fn omitting_proof_leaves_the_default_road_unchanged() {
 fn proof_with_one_file_is_a_usage_refusal() {
     let key = keypair(173);
     let out = scratch("b_audit_m1_onefile");
-    let secret = out.join("ledger.key");
+    // D-999-F4: see the header note.
+    let secret = secure_scratch("b_audit_m1_onefile_key").join("ledger.key");
     key.save(&secret).expect("save the ledger key");
 
     let (dir, layout) = support::project("b_audit_m1_onefile_proj");

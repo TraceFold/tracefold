@@ -297,7 +297,12 @@ const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2: &str =
 /// **re-encoded by this build**. Kept rather than overwritten for the reason the file states one
 /// constant up — a pin overwritten each time would record one wire state where there have been
 /// nine.
-const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_40: &str =
+///
+/// 🔴 Renamed from `…_AFTER_DR_46_40` (`req/994` §2 F-2, 2026-08-31): `req/973` §9-1 retracts the
+/// number `DR-46-40` for this erratum — that label was already minted for claim-standing
+/// retraction windows (`req/730`, `tests/dr4640_standing_windows.rs`) — and rules every remaining
+/// `DR-46-40` spelling of the undo seat read as `DR-46-45`. This identifier was the last leftover.
+const VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_45: &str =
     "gx1:wmesukp37j6szhubek6xmjv4dzykmmejfvgewh3lzjysnd4zny2a";
 
 // ---------------------------------------------------------------------------
@@ -454,11 +459,11 @@ fn the_ledger_digest_of_that_payload_is_the_one_the_ledger_already_holds() {
     // 🔴 **DR-46-45** — the pin moves a ninth time (`req/973` §B-1/§B-2, 2026-08-31), and the eight
     // values it moved through are all kept above.
     assert_eq!(
-        text, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_40,
+        text, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_45,
         "43 ASM-43-1 keys the ledger on this digest; moving it is a migration"
     );
     assert_ne!(
-        VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_40, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2,
+        VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_DR_46_45, VERDICT_PAYLOAD_LEDGER_DIGEST_AFTER_A2,
         "a twentieth map key cannot leave the digest where A2 left it"
     );
     assert_ne!(

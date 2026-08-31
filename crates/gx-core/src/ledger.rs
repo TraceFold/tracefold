@@ -153,6 +153,19 @@ impl VerdictTally {
 ///   two internally consistent chains for two verifiers. Detecting the fork needs the verifiers to
 ///   compare, which is the consistency-proof window `req/98` §9 row v-6 sends to v0.2.1 (sem:
 ///   SEM-gx-core-062).
+///   * 🔴 **`req/964` B-6, 2026-08-31 — the comparison exists now; the limit above is smaller, not
+///     spent.** `gx_log::detect_verdict_equivocation` is that comparison: hand it the union of two
+///     views and it names the window they sign to different tallies, the seam an operator moved to
+///     dodge that, and a ledger head that forked underneath the counts. The sentence above is kept
+///     unedited because its load-bearing half is still true -- **the pooling is not closed**. Two
+///     verifiers who never meet are still shown two consistent chains and nothing calls the
+///     detector, which is the same residue `gx_log::detect_equivocation` carries on the commit
+///     side (plain backticks, not a link: gx-core cannot depend on gx-log -- that is the E-M2-1
+///     direction this module exists to keep). The part that stayed open is still measured where it
+///     always was, by `crates/gx-engine/tests/ac_vc.rs::a_split_view_is_not_detected`, which is to
+///     this ruling what `policy_relaxation_is_not_detected` is to ruling #3; that test now also
+///     pools its two views and watches the detector name the fork, so one file holds both halves.
+///     No verb ships it: a caller pools and calls the function directly.
 ///
 /// # No hash chain, and why
 ///

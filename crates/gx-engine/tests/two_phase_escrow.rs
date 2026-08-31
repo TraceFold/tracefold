@@ -380,7 +380,7 @@ fn a_completion_failure_folds_to_unavailable_and_the_commit_continues() {
 }
 
 /// 🔴 **`req/871` F1 — a signed receipt asserting a reversibility it does not have.**
-/// **(2026-08-26, seat=Opus, 暫定 — 再審査可. `req/868` R-868-4. MEASURED RED, NOT YET FIXED.)**
+/// **(2026-08-26, seat=Opus, provisional — open to re-adjudication. `req/868` R-868-4. MEASURED RED, NOT YET FIXED.)**
 ///
 /// The test above proves `inverse_delta` folds to `None`. It never looks at `reversibility`, and
 /// nothing else in the workspace does over this road — `dr4626_invert_seam.rs` asserts

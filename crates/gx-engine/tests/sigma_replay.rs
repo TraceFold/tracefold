@@ -365,11 +365,11 @@ fn an_escrowed_inverse_is_rebuilt_from_the_index_and_the_store() {
     assert_eq!(refused.kind(), "NotFound");
 }
 
-/// The whole vocabulary reaches Σ: every one of the twelve records changes something.
+/// The whole vocabulary reaches Σ: every one of the fifteen records changes something.
 ///
 /// A reconstruction with a silently missing arm is a reconstruction that loses a fact per record.
-/// The catalogue in `tests/support` is the same twelve `tests/journal_identity.rs` uses, so a
-/// thirteenth variant added tomorrow arrives here as well.
+/// The catalogue in `tests/support` is the same fifteen `tests/journal_identity.rs` uses, so a
+/// sixteenth variant added tomorrow arrives here as well.
 #[test]
 fn every_record_in_the_vocabulary_reaches_sigma() {
     let mut unchanged: Vec<&'static str> = Vec::new();

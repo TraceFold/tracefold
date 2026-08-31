@@ -225,14 +225,14 @@ fn every_record_lands_on_the_canonical_wire_face() {
 // I-1: every field reaches the digest
 // ---------------------------------------------------------------------------
 
-/// 🔴 Each of the fifty-eight fields moves the record's digest.
+/// 🔴 Each of the sixty fields moves the record's digest.
 ///
 /// The half a key count cannot see (the B-3 shape, req/67 §2.1: every key declared, one of them
 /// filled with a constant). At least one mutant per field, each differing from its baseline in that
 /// field alone, and **the coverage is asserted against the field list** rather than against a
 /// number -- a field added without a mutant is a failing probe rather than a silent gap.
 ///
-/// Fifty-eight fields, sixty-two mutants. `Verdict.verdict_digest` has two, because M5 hand 2 made it
+/// Sixty fields, sixty-four mutants. `Verdict.verdict_digest` has two, because M5 hand 2 made it
 /// an `Option` and "a different digest" and "no digest at all" (sem: SEM-gx-engine-751) are
 /// different records: T-4e writes
 /// the second one, and a journal that hashed it like the first would lose INV-S5's distinction.
@@ -243,6 +243,8 @@ fn every_record_lands_on_the_canonical_wire_face() {
 /// 🔴 The three prose numbers above were stale before this lane (they read "forty-three" and
 /// "forty-four" while the asserts read 56/59) and are corrected here rather than left, because a
 /// doc that contradicts the assert three lines below it is where the next hand's count comes from.
+/// (Corrected again 2026-08-31, req/990: the pair read 58/62 while the asserts read 60/64 —
+/// DR-46-33 and DR-46-45 each added a `Planned` field with its mutant and the prose was not moved.)
 #[test]
 fn every_field_of_every_record_reaches_its_digest() {
     let baselines: BTreeMap<String, Cid> = every_variant()

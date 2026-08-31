@@ -18,6 +18,7 @@ See the Scope Exclusions table below and [docs/LIMITS.md](docs/LIMITS.md) for wh
 <a href="lean/"><img src="https://img.shields.io/badge/Lean%204-117%20Theorems-00dfd8?style=for-the-badge&logoColor=090a0f" alt="Lean 4 Proofs"></a>
 <a href="mailto:mahirohirakawa@glovrex.com"><img src="https://img.shields.io/badge/Contact-mahirohirakawa%40glovrex.com-26231f?style=for-the-badge&logo=minutemailer&logoColor=ffffff" alt="Email"></a>
 <a href="https://discord.gg/rtvXqYEQzr"><img src="https://img.shields.io/badge/Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=ffffff" alt="Discord"></a>
+<a href="https://buy.polar.sh/polar_cl_yO81NsWT1zDnCzfulaArcrpnS5GuPW5ac3gxf29LgLa"><img src="https://img.shields.io/badge/Support-Pay%20what%20you%20want-ff4f00?style=for-the-badge&logo=polar&logoColor=ffffff" alt="Support Tracefold"></a>
 </p>
 
 </div>
@@ -152,6 +153,18 @@ TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws
 - [The undo has to exist before the write does](https://dev.to/mahirhir/the-undo-has-to-exist-before-the-write-does-46on) — 30 Aug 2026
 - [What "undo" actually means when the target is a real repo, not a fixture](https://dev.to/mahirhir/what-undo-actually-means-when-the-target-is-a-real-repo-not-a-fixture-4l1c) — 30 Aug 2026
 - [I ran 10,373 mutations through a reversibility gate. Tamper detection caught 600 of 600.](https://dev.to/mahirhir/i-ran-10373-mutations-through-a-reversibility-gate-tamper-detection-caught-600-of-600-1bo6) — 31 Aug 2026
+
+---
+
+## Support
+
+Everything shipped here is free — verification, receipts, self-hosting — and stays free for as long as a single person uses it. Nothing is for sale, and paying changes nothing about what you get.
+
+If you want to fund the work anyway, there is exactly one channel:
+
+**[Support TraceFold — pay what you want, via Polar](https://buy.polar.sh/polar_cl_yO81NsWT1zDnCzfulaArcrpnS5GuPW5ac3gxf29LgLa)**
+
+Disclosure (1 Sep 2026): the payment account's onboarding is not yet finished, so a checkout may fail to complete. Nothing is promised in return either way. This section will be updated when that changes.
 
 ---
 

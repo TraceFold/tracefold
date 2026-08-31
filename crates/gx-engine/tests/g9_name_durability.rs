@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 //! 🔴 **`req/859` G9 — the platform boundary of name durability, made machine-checked**
-//! (`req/868`, 2026-08-26, seat=Opus, 暫定 — 再審査可).
+//! (`req/868`, 2026-08-26, seat=Opus, provisional — open to re-adjudication).
 //!
 //! `sync_parent_directory` is `#[cfg(not(unix))] -> Ok(())`. The gap was real and was declared in a
 //! doc comment, which is the one place a declaration cannot be checked. This suite makes the

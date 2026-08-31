@@ -376,23 +376,59 @@ pub enum NotAttemptedBecause {
     /// Fail-closed is the same either way: an inverse is not sent into a substrate that will not
     /// say where it is.
     WorldCouldNotBeRead,
+    /// 🔴 **R-1001-1 (`req/1001` §4, the else-arm of ruling D-999-F2, 2026-08-31)** — the forward
+    /// `apply` **succeeded**, and the post-state digest the plan promised
+    /// (`Transformation.target`) is not the post-state the apply itself reported
+    /// (`AppliedDelta::resulting_digest`) — so the escrowed inverse was **not** sent.
+    ///
+    /// # The seventh fact, and why the other six cannot carry it
+    ///
+    /// Every cause above is a spelling of *the inverse was unavailable or unsafe to send*: the
+    /// escrow was partial, or never built, or a repair rebuilt nothing, or the world never moved,
+    /// moved beneath us, or could not be read. On this road none of that is true. The apply
+    /// landed, the escrow is settled, the world was read and the two fingerprints compared — and
+    /// the comparison is the problem: the engine has just measured that **its model of this
+    /// object's post-state is wrong**. The escrowed inverse stands on exactly that model, and
+    /// sending it on the strength of a model this abort exists to distrust is what fail-closed
+    /// forbids. The inverse is *available*, and the engine *declines*.
+    ///
+    /// # What it guarantees
+    ///
+    /// The undo material survives: the two-phase escrow completes **before** this comparison is
+    /// taken (`pipeline.rs` orders it so on purpose), so a mispredicted world is one an operator
+    /// can still act on deliberately. The world holds what the apply put there — this is not a
+    /// missing escrow and not a third-party write.
+    ///
+    /// # What it does **not** guarantee
+    ///
+    /// It does not say *which* side was wrong — a plan that promised badly and an adapter that
+    /// answered badly are one observation here — and it does not say the object is back where it
+    /// started, because nothing was taken back. `crates/gx-core/src/error.rs`'s
+    /// `PostconditionMismatch` carries the abort's own account; this word is the roll-back's.
+    PromisedPostStateWasWrong,
 }
 
 impl NotAttemptedBecause {
-    /// The six, in declaration order. The proxy has one arm per entry and one for a word it does
+    /// The seven, in declaration order (six until R-1001-1 — the doc line below keeps the count's
+    /// history). The proxy has one arm per entry and one for a word it does
     /// not know, the same shape [`Rollback::ALL_KINDS`] carries for the same reason.
     ///
     /// 🔴 **R30 / `req/372` M-01** — three until this lane. Unlike [`Rollback::ALL_KINDS`], this
     /// list is **not** a journal-schema fact: this type is an annotation on *this process's*
     /// account (see the type's own doc), it is not a component of Σ, and no journal record carries
     /// it. Adding to it costs an upgrader nothing.
-    pub const ALL_CAUSES: [&'static str; 6] = [
+    ///
+    /// 🔴 **R-1001-1 (`req/1001` §4, D-999-F2, 2026-08-31)** — six until that ruling. The seventh
+    /// is [`NotAttemptedBecause::PromisedPostStateWasWrong`], and the property R30 named above is
+    /// the one being spent: adding it is one entry here, one `kind()` arm, one proxy arm.
+    pub const ALL_CAUSES: [&'static str; 7] = [
         "EscrowStillPartial",
         "NoInverseWasEscrowed",
         "RecoveredWithoutRebuilding",
         "WorldNeverMoved",
         "WorldMovedBeneath",
         "WorldCouldNotBeRead",
+        "PromisedPostStateWasWrong",
     ];
 
     /// Which of [`NotAttemptedBecause::ALL_CAUSES`] this is. No `_` arm.
@@ -405,6 +441,7 @@ impl NotAttemptedBecause {
             NotAttemptedBecause::WorldNeverMoved => "WorldNeverMoved",
             NotAttemptedBecause::WorldMovedBeneath => "WorldMovedBeneath",
             NotAttemptedBecause::WorldCouldNotBeRead => "WorldCouldNotBeRead",
+            NotAttemptedBecause::PromisedPostStateWasWrong => "PromisedPostStateWasWrong",
         }
     }
 }
@@ -2659,7 +2696,7 @@ fn barrier(file: &File, path: &Path, action: &'static str) -> Result<()> {
     file.sync_all().map_err(|e| io_error(action, path, &e))
 }
 
-/// 🔴 **`req/859` G9 / `req/868` (2026-08-26, seat=Opus, 暫定 — 再審査可)** — whether the *name* of
+/// 🔴 **`req/859` G9 / `req/868` (2026-08-26, seat=Opus, provisional — open to re-adjudication)** — whether the *name* of
 /// a newly written file is as durable as its bytes, on the platform this binary was built for.
 ///
 /// [`sync_parent_directory`] is `#[cfg(not(unix))] -> Ok(())`. That is a real gap and it was
@@ -2776,7 +2813,7 @@ fn sync_parent_directory(path: &Path) -> Result<()> {
 /// residue is `<cid>.<kind>.tmp.<pid>` rather than a fragment at the content address — a name no
 /// reader resolves and `gx repair` reports (`req/236` M-04's class, one directory over).
 ///
-/// 🔴 **`req/859` G8 / `req/868` (2026-08-26, seat=Opus, 暫定 — 再審査可)** — this was a private
+/// 🔴 **`req/859` G8 / `req/868` (2026-08-26, seat=Opus, provisional — open to re-adjudication)** — this was a private
 /// method on [`BlobStore`], so R9's repair reached exactly one of the two content-addressed
 /// stores in this file. [`ObservationStore::put`] wrote `File::create` → `write_all` straight at
 /// the final path and therefore still had the window R9 closed: a crash between the create and
@@ -3383,7 +3420,7 @@ impl ObservationStore {
 
     /// Store observed bytes under their own digest, or notice they are already here.
     ///
-    /// 🔴 **`req/859` G8 / `req/868` (2026-08-26, seat=Opus, 暫定 — 再審査可)** — the write goes
+    /// 🔴 **`req/859` G8 / `req/868` (2026-08-26, seat=Opus, provisional — open to re-adjudication)** — the write goes
     /// through [`write_atomically`], the same one body [`BlobStore::put`] uses. Before this it was
     /// `File::create` → `write_all` → fsync straight at the final path, which left R9's window
     /// (`req/236` H-01) open on this store after it had been closed on the other: a crash mid-write
@@ -3412,7 +3449,7 @@ impl ObservationStore {
         }
         let cid = Self::address(bytes);
         let path = self.path_of(&cid);
-        // 🔴 **`req/871` F4 / `req/868`** (2026-08-26, seat=Opus, 暫定 — 再審査可) — the *other*
+        // 🔴 **`req/871` F4 / `req/868`** (2026-08-26, seat=Opus, provisional — open to re-adjudication) — the *other*
         // half of G8, and landing only the first half was a real defect. `path.exists()` alone
         // trusts the **name**; content addressing is a promise about the **bytes**. A tree that
         // already holds a body truncated by a crash under the old writer would answer

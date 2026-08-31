@@ -107,8 +107,8 @@ pub const LIMITS: [Limit; 8] = [
     // replacement below is dated rather than tenseless, and is bound to req/908's diagnosis rather
     // than to memory. The struck original is kept in `docs/LIMITS.md` (no-delete).
     Limit {
-        statement: "the Lean model under `lean/` proves 117 theorems about the F0 specification, 12 \
-                     of them named counterexamples, over 13 files, with 0 `sorry` and 1 `axiom` \
+        statement: "the Lean model under `lean/` proves 154 theorems about the F0 specification, 14 \
+                     of them named counterexamples, over 14 files, with 0 `sorry` and 1 `axiom` \
                      carried rather than proved (a line-start count of the tree itself, which a test \
                      re-takes on every run); the Rust implementation is \
                      compared against that model by a differential test -- 1,500 conformance vectors, \

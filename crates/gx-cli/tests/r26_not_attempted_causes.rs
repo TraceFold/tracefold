@@ -226,6 +226,35 @@ fn the_recovery_cause_says_the_recovery_rebuilt_nothing() {
     );
 }
 
+/// 🔴 **R-1001-1 (`req/1001` §4, the else-arm of D-999-F2, 2026-08-31)** — the seventh cause is
+/// the one road on which the inverse **exists** and is declined: the plan's promised post-state
+/// and the apply's own answer disagree, so the model the escrowed inverse stands on has just been
+/// measured wrong. The sentence must say that, and must not borrow any of the six "unavailable"
+/// accounts — a reader on this road who is told the escrow was partial, or missing, has been
+/// handed a confident account of a decision nobody took.
+#[test]
+fn the_promised_post_state_cause_says_the_inverse_exists_and_is_distrusted() {
+    let said = clause("NotAttempted", Some("PromisedPostStateWasWrong"));
+    println!("R26_CLAUSE promised_post_state={said:?}");
+    assert!(
+        said.contains("no compensating inverse was sent"),
+        "the two facts that do not depend on the cause stay put: {said}"
+    );
+    assert!(
+        !said.contains("still partial"),
+        "🔴 the escrow on this road is settled, not partial: {said}"
+    );
+    assert!(
+        !said.contains("no inverse was escrowed"),
+        "🔴 the inverse on this road exists — saying it was never escrowed is the `req/324` §5(d) \
+         defect this whole file measures: {said}"
+    );
+    assert!(
+        said.contains("promised") && said.contains("not** sent"),
+        "and the arm names the road: a promise measured wrong, and a deliberate refusal: {said}"
+    );
+}
+
 /// 🔴 A cause this build does not know gets the arm R25 wrote for a value it does not know: the
 /// proxy declines to put words in the engine's mouth.
 #[test]

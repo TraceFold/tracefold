@@ -25,7 +25,7 @@
 //! | `proof.rs` | `ConsistencyProof`, proof generation and verification | 2 (done) | AC-022, AC-023 |
 //! | `store.rs` | persistence, fsync-on-append | 3 (done) | AC-069 (NFR-009) |
 //! | `head.rs` | `PersistedHead`, `HeadWitness`, `HeadFloor`, `AcceptedRollback`, `RolledBack` (R6/R7, not 42 §0) | req/230 R6 (done) | M-02 (req/232 H-01/H-02) |
-//! | `witness_audit.rs` | — (detector; no new type) | req/682 Phase B (done) | AC-B1, AC-B2, AC-B3, AC-B6, AC-B7 |
+//! | `witness_audit.rs` | `CheckpointContradiction`, `VerdictContradiction` (derived; 42 §0 names neither) | req/682 Phase B (done) + `req/964` B-6 (the verdict half's arithmetic; the pooling stays open) | AC-B1, AC-B2, AC-B3, AC-B6, AC-B7, FR-M04 ruling #14 |
 //!
 //! 🔴 Both rows are additive (registry gap closed, `req/964` §10 Z-B): 41 §2 fixed the module list
 //! as `src/{lib,tile,proof,store}.rs` before `head.rs` (`req/230`, R6 monotonicity) and
@@ -105,7 +105,10 @@ pub use head::{
 pub use proof::ConsistencyProof;
 pub use store::{AppendOutcome, LedgerStore, Recovery, MAX_RECORD_BYTES};
 pub use tile::{LedgerEntry, LedgerLeaf, Tile, TileLog, TILE_WIDTH};
-pub use witness_audit::{classify_extension, detect_equivocation, CheckpointContradiction};
+pub use witness_audit::{
+    classify_extension, detect_equivocation, detect_verdict_equivocation, CheckpointContradiction,
+    VerdictContradiction,
+};
 
 /// The retention floor `req/spec/30-requirements/33-non-functional.md` NFR-027 states and 35
 /// ASM-33-2 (§F, `req/38` §69) calls immovable: **180 days**, EU AI Act Art.19/26's "a minimum of 6 months" (sem: SEM-gx-log-034)

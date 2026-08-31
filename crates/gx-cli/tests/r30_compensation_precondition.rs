@@ -61,6 +61,9 @@
 //!    apply, with controls that an empty derivation and a reordered one both fail.
 //! 6. **the vocabulary** — six causes declared, six arms in `crates/gx-cli/src/wrap.rs`, so a
 //!    seventh cannot fall silently into the arm for a cause this build does not know.
+//!    (🔴 The seventh has since arrived *with* a declaration and an arm — R-1001-1, `req/1001`
+//!    §4, 2026-08-31: `PromisedPostStateWasWrong`. The count in item 6's test moved with that
+//!    ruling and cites it; the line above is R30's own account of its window.)
 //!
 //! # 🔴 Where the premises come from
 //!
@@ -789,6 +792,13 @@ fn clause(because: &str) -> String {
 /// * `NotAttemptedBecause::ALL_CAUSES` declares **six**, and the three this lane added are among
 ///   them by name. A count is the cheapest way for a seventh added without a declaration to be
 ///   caught.
+///
+/// 🔴 **The count moved, 6 → 7, because a ruling moved it** — **R-1001-1** (`req/1001` §4, the
+/// else-arm of D-999-F2, 2026-08-31) added `PromisedPostStateWasWrong`, *with* a declaration and
+/// an arm, which is exactly the addition the count exists to police rather than to forbid. The
+/// name of this test is a historical record and stays (the same discipline
+/// `crates/gx-core/src/error.rs`'s six-named-seven test records for `AbortReason`); the paragraph
+/// above is kept as R30's own account of its window.
 /// * every declared cause has an explicit `Some("<cause>")` arm in `wrap.rs`.
 /// * every declared cause produces a **distinct** sentence. Two causes sharing a sentence is the
 ///   `req/324` §5(d) defect with the arms present and the words wrong.
@@ -834,9 +844,12 @@ fn the_six_causes_each_have_an_arm_and_a_sentence_of_their_own() {
 
     assert_eq!(
         causes.len(),
-        6,
-        "🔴 three causes until this lane, and the repair added three roads on which a compensation \
-         is **refused rather than skipped**. Declared: {causes:?}"
+        // 🔴 6 until R-1001-1 (`req/1001` §4, D-999-F2's else-arm, 2026-08-31): a count in a test
+        // may move only because a ruling moved it, and that ruling did.
+        7,
+        "🔴 three causes until this lane, three more on which a compensation is **refused rather \
+         than skipped**, and a seventh — `PromisedPostStateWasWrong`, R-1001-1 — on which the \
+         inverse exists and the model it stands on is distrusted. Declared: {causes:?}"
     );
     for expected in [
         "WorldNeverMoved",
@@ -860,7 +873,8 @@ fn the_six_causes_each_have_an_arm_and_a_sentence_of_their_own() {
     assert_eq!(
         distinct.len(),
         causes.len(),
-        "🔴 and the six sentences must be six. Two causes sharing a sentence is `req/324` §5(d) \
+        "🔴 and the sentences must be as many as the causes (six when R30 wrote this; seven since \
+         R-1001-1). Two causes sharing a sentence is `req/324` §5(d) \
          with the arms present and the words wrong: a reader on one road is handed a confident \
          account of another"
     );

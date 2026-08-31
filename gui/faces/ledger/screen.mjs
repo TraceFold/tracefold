@@ -297,10 +297,14 @@ export function createScreen(P, {
   /** One hairline, asked for by purpose, so no length is spelled at a call site. */
   const HAIRLINE = `${metric('edge.hairline')} solid ${ink('boundary.rule')['border-color']}`;
 
-  function cellOf(intent, words, { exactType = false, title = null } = {}) {
+  // req/109: a cell names which column it is (`data-cell="at"`), the idiom the parts'
+  // own slotCell already uses. A bare boolean here rendered as `data-cell=""`, which is
+  // an address nothing can ask for -- and the copy affordance has to ask "which member
+  // is under the pointer" of exactly this attribute (ledger.mjs onContextMenu).
+  function cellOf(key, intent, words, { exactType = false, title = null } = {}) {
     const draw = exactType ? exact : reading;
     return el('span', {
-      'data-cell': true,
+      'data-cell': key,
       title,
       style: style({
         'min-width': '0',
@@ -317,9 +321,9 @@ export function createScreen(P, {
   }
 
   /** A member that is not there is drawn as a hole with its reason, never as blank. */
-  function holeCell(why) {
+  function holeCell(key, why) {
     return el('span', {
-      'data-cell': true,
+      'data-cell': key,
       'data-hole': true,
       title: why,
       style: style({ 'min-width': '0', overflow: 'hidden', 'white-space': 'nowrap' }),
@@ -328,12 +332,12 @@ export function createScreen(P, {
 
   function verdictCell(record) {
     const word = valueOf(record, 'verdict');
-    if (word === undefined) return holeCell(holeOf(record, 'verdict') ?? MESSAGES.MEMBER_ABSENT);
+    if (word === undefined) return holeCell('verdict', holeOf(record, 'verdict') ?? MESSAGES.MEMBER_ABSENT);
     const known = ['Admit', 'Deny', 'Escalate'].includes(word);
     const intent = known ? `verdict.${word.toLowerCase()}` : 'verdict.unrecognised';
     const { shown } = cutEnd(word, BUDGET.verdict);
     return el('span', {
-      'data-cell': true,
+      'data-cell': 'verdict',
       title: known ? null : MESSAGES.VERDICT_UNRECOGNISED,
       style: style({
         display: 'flex',
@@ -374,10 +378,10 @@ export function createScreen(P, {
       marks.push(mark('nothing.absent', `${holes} looked for, not found`), reading('nothing.absent', String(holes)));
     }
     if (marks.length === 0) {
-      return el('span', { 'data-cell': true, 'data-standing': 'nothing to say' }, []);
+      return el('span', { 'data-cell': 'standing', 'data-standing': 'nothing to say' }, []);
     }
     return el('span', {
-      'data-cell': true,
+      'data-cell': 'standing',
       'data-standing': reversal?.state ?? 'none',
       title: reversal?.why ?? null,
       style: style({
@@ -435,23 +439,23 @@ export function createScreen(P, {
     }, [
       // The spine: a child row says so here and nowhere else.
       record.childOf
-        ? el('span', { 'data-cell': true, title: MESSAGES.CHILD_ROW }, [mark('record.child', MESSAGES.CHILD_ROW)])
-        : el('span', { 'data-cell': true }, []),
+        ? el('span', { 'data-cell': 'spine', title: MESSAGES.CHILD_ROW }, [mark('record.child', MESSAGES.CHILD_ROW)])
+        : el('span', { 'data-cell': 'spine' }, []),
       valueOf(record, 'at') === undefined
-        ? holeCell(holeOf(record, 'at') ?? MESSAGES.MEMBER_ABSENT)
-        : cellOf('value.clipped', P.drawnTextFor('at', valueOf(record, 'at')), { exactType: true }),
+        ? holeCell('at', holeOf(record, 'at') ?? MESSAGES.MEMBER_ABSENT)
+        : cellOf('at', 'value.clipped', P.drawnTextFor('at', valueOf(record, 'at')), { exactType: true }),
       effect === undefined
-        ? holeCell(holeOf(record, 'effect') ?? MESSAGES.MEMBER_ABSENT)
-        : cellOf('value.clipped', cutEnd(effect, BUDGET.effect).shown),
+        ? holeCell('effect', holeOf(record, 'effect') ?? MESSAGES.MEMBER_ABSENT)
+        : cellOf('effect', 'value.clipped', cutEnd(effect, BUDGET.effect).shown),
       verdictCell(record),
       standingCell(record, reversal, holes),
       path === undefined
-        ? holeCell(holeOf(record, 'path') ?? MESSAGES.MEMBER_ABSENT)
+        ? holeCell('path', holeOf(record, 'path') ?? MESSAGES.MEMBER_ABSENT)
         // The whole value travels with the cut one. A value that is only ever shown cut
         // off is a record that has gone quiet, and this face exists to keep records from
         // going quiet -- so the full path is on the line as well as in the opened row,
         // and the line says which policy cut it.
-        : cellOf('value.clipped', pathCut.shown, {
+        : cellOf('path', 'value.clipped', pathCut.shown, {
           exactType: true,
           title: pathCut.cut ? `${path}\n\n${MESSAGES.CLIP_ONE_POLICY}` : path,
         }),
@@ -540,6 +544,87 @@ export function createScreen(P, {
         }),
       }, [P.glyph('act', spec.act, { size: P.minAct, label: spec.label }), spec.label]);
     }));
+  }
+
+  /**
+   * The copy affordance, reimplemented for the rebuilt screen (req/109; req/893 D-8:
+   * "copy was a real capability and its loss is a regression, not a simplification").
+   *
+   * The row menu the old screen drew was two things at once: a second act surface,
+   * which D-8 rules was correct to remove, and the one place a reader could take a
+   * member's whole value, which no ruling revoked. This is the second thing alone. It
+   * is drawn under the row a reader right-clicked, only while a copyable cell was under
+   * the pointer, and it carries exactly one control -- so acts still exist in exactly
+   * one place (the opened row) and the D-8 tests that hold that at one keep holding it.
+   *
+   * The value offered is the member off the record and never the text the cell drew:
+   * two of the columns draw a declared cut (the time of day of a timestamp, the middle
+   * of a path), and a copy of what the cell says would hand back something that is not
+   * the value, quietly. A member that is a declared hole keeps its control, dimmed,
+   * wearing the hole's own reason -- a control that vanishes when it cannot be used is
+   * indistinguishable from one that was never offered.
+   */
+  function rowMenu(record, offer) {
+    const usable = offer.value !== null;
+    return el('div', {
+      'data-role': 'row-menu',
+      'data-menu-row': record.id,
+      style: style({
+        display: 'flex',
+        'align-items': 'center',
+        gap: metric('gap.line'),
+        padding: `${metric('gap.hairline')} ${metric('pad.side')}`,
+        'border-bottom': HAIRLINE,
+        ...ink('ground.opened'),
+      }),
+    }, [
+      el('button', {
+        type: 'button',
+        'data-menu-item': 'copy',
+        'data-copy-from': offer.from,
+        'data-target': record.id,
+        disabled: usable ? null : '',
+        title: usable ? MESSAGES.COPY_WHOLE : offer.why,
+        style: style({
+          display: 'inline-flex',
+          'align-items': 'center',
+          gap: metric('gap.hairline'),
+          'min-height': metric('pitch.row'),
+          padding: `0 ${metric('pad.side')}`,
+          'border-style': 'solid',
+          'border-width': metric('edge.hairline'),
+          'border-radius': metric('corner.control'),
+          background: 'transparent',
+          cursor: usable ? metric('cursor.act') : metric('cursor.refuse'),
+          'font-family': metric('family.reading'),
+          'font-size': metric('type.record'),
+          ...ink(usable ? 'act.offered' : 'act.withheld'),
+        }),
+      }, [`copy ${offer.from}`]),
+    ]);
+  }
+
+  /**
+   * What the last copy did, stated rather than left to inference. A copy that reached
+   * a clipboard and one that found no clipboard to write to end in the same silence,
+   * and a reader who cannot tell them apart has been told the second one worked.
+   */
+  function copyReport(copied) {
+    if (!copied) return null;
+    const done = copied.state === 'copied';
+    const failed = copied.state === 'refused';
+    return el('div', {
+      'data-role': 'copy-report',
+      'data-copy-state': copied.state,
+      'data-copied': done ? copied.from : null,
+      'data-copy-failed': failed ? copied.from : null,
+      style: style({
+        padding: `${metric('gap.hairline')} 0`,
+        'border-bottom': HAIRLINE,
+      }),
+    }, [
+      reading('measure.label', done ? `${MESSAGES.COPIED}: ${copied.from}` : copied.why),
+    ]);
   }
 
   /**
@@ -650,6 +735,10 @@ export function createScreen(P, {
     } else {
       for (const entry of half.rows) {
         children.push(rowLine(entry.record, entry));
+        // req/109: the take strip, under its row, only while this window's menu state
+        // names this row and a copyable cell (the model resolved the offer; a row with
+        // no menu carries nothing extra, so a screen at rest is byte-identical).
+        if (entry.menu) children.push(rowMenu(entry.record, entry.menu));
         if (entry.open) children.push(rowDetail(entry.record, { half: half.key, reversal: entry.reversal, sending: half.sending }));
       }
     }
@@ -676,6 +765,7 @@ export function createScreen(P, {
       }),
     }, [
       head(model.figures.map((f) => figure(f.noun, f.count, f.said))),
+      copyReport(model.copied),
       aside(model.notes, model.asideOpen),
       ...model.halves.map(halfSection),
       model.actLog,
@@ -685,5 +775,5 @@ export function createScreen(P, {
   // that included the drawing of itself would be written before the thing it measured
   // had finished happening, and this face states a cost it actually took.
 
-  return { view, figure, rowLine, rowDetail, halfSection, aside, head, prose, reading, mark, pair, BUDGET, cutMiddle, cutEnd, TRACK, find };
+  return { view, figure, rowLine, rowDetail, rowMenu, copyReport, halfSection, aside, head, prose, reading, mark, pair, BUDGET, cutMiddle, cutEnd, TRACK, find };
 }

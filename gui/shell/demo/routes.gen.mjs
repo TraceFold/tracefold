@@ -21,6 +21,12 @@ export const ROUTES = [
     "kind": "single"
   },
   {
+    "name": "post_attach_sources_id_observations",
+    "verb": "POST",
+    "path": "/attach-sources/{id}/observations",
+    "kind": "single"
+  },
+  {
     "name": "post_candidates",
     "verb": "POST",
     "path": "/candidates",

@@ -84,9 +84,9 @@ pub fn provenance(seed: u64) -> Provenance {
 
 /// One sample of every variant of [`EngineJournalRecord`], in `JOURNAL_RECORD_KINDS` order.
 ///
-/// A catalogue rather than twelve literals repeated in four suites: the A-10 key counts, the I-1
+/// A catalogue rather than fifteen literals repeated in four suites: the A-10 key counts, the I-1
 /// digest sensitivities, the round-trip property and the vocabulary comparison all need the same
-/// twelve values, and twelve values written four times are four lists that can drift.
+/// fifteen values, and fifteen values written four times are four lists that can drift.
 pub fn every_variant() -> Vec<EngineJournalRecord> {
     vec![
         EngineJournalRecord::DraftCreated {
@@ -208,7 +208,7 @@ pub fn every_variant() -> Vec<EngineJournalRecord> {
     ]
 }
 
-/// The same twelve with **one field changed**, one entry per field: `(variant, field, record)`.
+/// The same fifteen with **one field changed**, one entry per field: `(variant, field, record)`.
 ///
 /// This is the I-1 half of the defence req/78 §6.0-5 asks for -- "two values that differ in exactly
 /// one field digest differently" (sem: SEM-gx-engine-929) -- for every field -- and it is written out rather than generated because a generator would

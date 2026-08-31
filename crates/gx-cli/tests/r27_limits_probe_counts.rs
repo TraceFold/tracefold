@@ -82,6 +82,12 @@ const PRIVATE_TREE_ONLY: &[&str] = &[
     // 🔴 **req/850** — A5's fixture-driven suite, withheld for exactly the two rows above's
     // reason (it reads `req/wire/fixtures/observation.jsonl` at runtime).
     "crates/gx-api/tests/observations.rs",
+    // 🔴 **req/999 F-3 (2026-08-31)** — the two `probes/doubt` read-surface suites, held for
+    // `declaration_writer_doubt.rs`'s reason exactly: `probes/doubt` is not in the public sync
+    // set at all (req/789 §3), so in the published tree these rows are set aside loudly and in
+    // the private tree their absence still fails.
+    "probes/doubt/tests/inference_closed_doubt.rs",
+    "probes/doubt/tests/read_surface_census_doubt.rs",
 ];
 
 /// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
@@ -145,7 +151,7 @@ fn value_of(word: &str) -> usize {
 /// An entry is added when a block makes a numeric claim about a suite, and it is **never removed
 /// when the anchor moves past that block** — which is the whole point. The correction the page owes
 /// is checked by [`the_page_carries_a_current_statement_for_every_registered_suite`].
-const REGISTERED: [(&str, &str); 38] = [
+const REGISTERED: [(&str, &str); 42] = [
     // 🔴 **req/824 A5 / req/850** — the observation-ingest suite, registered in the commit that
     // writes it (the convention the three rows below were repaired into, applied on time for
     // once). Private-tree-only: its bed sits under `req/wire/`, which the published tree does
@@ -216,6 +222,11 @@ const REGISTERED: [(&str, &str); 38] = [
     // the convention treats identically: `limits_sync.rs` pinned it at four and `v0.5-m` states
     // four, so the page owes a current statement and the registry is where that obligation lives.
     ("crates/gx-cli/tests/r26_refusal_remedy_parity.rs", "five"),
+    // 🔴 **R-1001-1 (`req/1001` §4, 2026-08-31)** — a suite that ruling **grew**, which the
+    // convention treats identically (the row above is the precedent): `limits_sync.rs` pins it at
+    // ten and the R-1001-1 correction block states ten, so the page owes a current statement and
+    // the registry is where that obligation lives.
+    ("crates/gx-cli/tests/r26_not_attempted_causes.rs", "ten"),
     // The three the page states and the tree contradicts, with nothing later correcting them.
     ("crates/gx-cli/tests/serve_runtime_r3.rs", "eight"),
     ("crates/gx-cli/tests/serve_runtime_r6.rs", "sixteen"),
@@ -255,7 +266,15 @@ const REGISTERED: [(&str, &str); 38] = [
     // attest. Registered because `docs/LIMITS.md`'s newest block names it, and it is named there
     // for the reason `req/329` L-01 gives: the page tells a buyer the field is not read back into
     // any decision, and the suite is where that is measured rather than promised.
-    ("crates/gx-witness/tests/boundary_attest.rs", "eleven"),
+    //
+    // 🔴 **req/999 F-3 (2026-08-31)** — "eleven" became "ten": the tree lost
+    // `the_boundary_does_not_reach_the_gate` in a merge resolution (mainline already counted ten
+    // at `72308d32` while the `r973_undo_attest` lane branch still carried eleven at `ffa05d0b`;
+    // no non-merge commit removes it, measured with `git log -S`). `req/999`'s census filed the
+    // divergence — its attribution to `b5e3f5f7` was wrong, `b5e3f5f7^` already counted ten —
+    // and this row syncs the registry to the tree the way the convention demands: the word and
+    // the page's current statement move in the same commit. The old word was "eleven".
+    ("crates/gx-witness/tests/boundary_attest.rs", "ten"),
     // 🔴 **P-1b / `req/544` AC-13** — the attach-face specimens of 2026-08-22, registered in the
     // commit that freezes them. The page names this suite for the same reason it names the corpus
     // one section up — it is the pair that keeps a declared limit honest — and the limit it holds
@@ -266,7 +285,7 @@ const REGISTERED: [(&str, &str); 38] = [
     // coverage table. The page names it for the fourth question's `unknown`, which is a limit
     // that will look like a defect to a reader who does not know it is measured on both kinds.
     ("crates/gx-witness/tests/p1b_coverage_totality.rs", "four"),
-    // 🔴 **`req/859` G8 / `req/868`** (2026-08-26, seat=Opus, 暫定 — 再審査可) — the atomicity of
+    // 🔴 **`req/859` G8 / `req/868`** (2026-08-26, seat=Opus, provisional — open to re-adjudication) — the atomicity of
     // `ObservationStore::put`. **Two**, and the pair is the point: the write half (no `.obs` file
     // is ever published holding other than the whole body, measured against a concurrent reader)
     // and `req/871` F4's verification half (a truncated body already at an address is republished
@@ -283,6 +302,19 @@ const REGISTERED: [(&str, &str); 38] = [
     // section of `docs/LIMITS.md` names, not a new count of its own: `apply_durability.rs` already
     // existed and this lane only changed the call the ordering probe looks for.
     ("crates/gx-adapter-fs/tests/apply_durability.rs", "nine"),
+    // 🔴 **H-9 / `req/954` §3-1 / `req/983`** (2026-08-31) — the C-25 vocabulary ruling and the
+    // spec corrections that follow from it. **Eight.** Registered in the commit that writes the
+    // suite, which is the convention this file exists to make mechanical: the newest block of
+    // `docs/LIMITS.md` names this suite as the half of the H-9 repair that *is* measured, beside a
+    // paragraph that says the other half is not repaired at all. A number standing next to an
+    // admission of a gap is exactly the number that must not be allowed to rot.
+    ("crates/gx-witness/tests/r964_c25_canon.rs", "eight"),
+    // 🔴 **req/999 F-3 / R-986-1 (2026-08-31)** — the two `probes/doubt` read-surface suites the
+    // newest block names by path (the R-986-1 merge, `req/999_R986_1_C10C11C12_MERGE_2026-08-31.md`,
+    // landed the naming without these rows; arm d caught it at the next full run, which is its
+    // job). Private-tree-only rows, see `PRIVATE_TREE_ONLY`.
+    ("probes/doubt/tests/inference_closed_doubt.rs", "fifteen"),
+    ("probes/doubt/tests/read_surface_census_doubt.rs", "five"),
 ];
 
 /// 🔴 **Bed control** — the registry describes this tree, measured **two ways that fail

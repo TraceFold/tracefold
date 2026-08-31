@@ -105,8 +105,9 @@ fn the_laws_that_need_a_subject_say_so_when_there_is_none() {
 
 /// One run, both sections, and the report keeps them apart.
 ///
-/// §30 M4H2-1 (a)'s whole purpose: "do not muddy the 1:1 correspondence's self-proof". Fifteen
-/// checks, of which exactly
+/// §30 M4H2-1 (a)'s whole purpose: "do not muddy the 1:1 correspondence's self-proof". Sixteen
+/// checks (the sentence said "Fifteen" until 2026-08-31, written before the K2 law landed; the
+/// assertions below were already 16 = 7 + 9), of which exactly
 /// seven are 51 §7's -- so the completion condition can still be read off the output.
 #[test]
 fn run_all_keeps_the_two_sections_distinguishable() {

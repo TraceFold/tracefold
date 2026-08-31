@@ -229,9 +229,9 @@ proptest! {
     }
 }
 
-/// The twelve variants, all of them, through a file.
+/// The fifteen variants, all of them, through a file.
 ///
-/// The property above draws from the same twelve but is not guaranteed to reach each one in any
+/// The property above draws from the same vocabulary but is not guaranteed to reach each one in any
 /// single run. This is the exhaustive companion — the same reason `every_variant()` exists.
 #[test]
 fn every_variant_survives_a_round_trip() {
@@ -240,7 +240,7 @@ fn every_variant_survives_a_round_trip() {
     println!("ROUND_TRIPPED_RECORDS={}", read.len());
     assert_eq!(
         written, read,
-        "the twelve records did not come back as written"
+        "the fifteen records did not come back as written"
     );
     assert_eq!(read.len(), 15);
 }
@@ -278,7 +278,7 @@ fn a_cut_journal_replays_its_prefix_and_reports_the_tail() {
     let whole = fs::read(&path).expect("read the journal back");
     // 🔴 **R5 / DR-43-9** — a frame is `[u32 length][payload][32-byte chain link]`.
     let last_len = 4
-        + cbor::encode(records.last().expect("twelve records"))
+        + cbor::encode(records.last().expect("fifteen records"))
             .expect("canonical")
             .len()
         + 32;

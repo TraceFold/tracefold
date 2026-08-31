@@ -868,7 +868,8 @@ impl RecoveryPath {
 /// will never write.
 ///
 /// The repair is the one this repository already uses where a fold is unavoidable:
-/// `gx_engine::NotAttemptedBecause` gives six causes six sentences and `gx-cli`'s
+/// `gx_engine::NotAttemptedBecause` gives each cause its own sentence (six when this was written;
+/// seven since R-1001-1, `req/1001` §4) and `gx-cli`'s
 /// `not_attempted_cause_clause` prints them one per arm. This is that shape for the journal.
 ///
 /// # One spelling, asked twice
@@ -7366,9 +7367,19 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         // its own (`req/38` §231 ruling 5's one-arm-per-cause gate, measured by
         // `crates/gx-cli/tests/r26_not_attempted_causes.rs`) and is raised in `req/919` A1's
         // report rather than made here.
+        //
+        // 🔴 **Superseded in part — R-1001-1 (`req/1001` §4, the else-arm of D-999-F2,
+        // 2026-08-31).** The paragraph above is kept as the record of the window in which the
+        // value travelled bare; the deferral it names has since been ruled. The cause now travels:
+        // `NotAttemptedBecause::PromisedPostStateWasWrong` names exactly the fact the paragraph
+        // spells out ("the inverse is available and the engine declines"), the r26 gate it cites
+        // measures the line below, and everything else the paragraph says — no compensation, the
+        // escrow completed first, fail-closed on a distrusted model — is unchanged.
         if let Some(promised) = self.table[id].transformation.target {
             let observed = *applied.resulting_digest();
             if promised != observed {
+                self.not_attempted_because
+                    .insert(*id, NotAttemptedBecause::PromisedPostStateWasWrong);
                 return self.abort(
                     id,
                     AbortReason::PostconditionMismatch,

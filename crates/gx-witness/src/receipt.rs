@@ -747,6 +747,13 @@ pub struct UndoAttestation {
 ///
 /// # Fourteen fields, and the count 42 §3.10 is read as having
 ///
+/// 🔴 **The heading above is stale, and deliberately not repaired by writing a new number**
+/// (`req/983`, L-6′, 2026-08-31). Four errata have added rows since it was written. A hand-written
+/// count in prose is a second copy of a number that is already measured mechanically — the same
+/// defect this lane retracted in 44 — so the count's one home is 42 §3.10's table plus
+/// `crates/gx-witness/tests/ac_018.rs`, which reads that table off the file. Every count in
+/// the paragraphs below is historical: they record what a given erratum found, not what is true now.
+///
 /// req/49 §2.1 and §3 M2-9 both call this table "15 fields". It had **eleven** rows -- counted
 /// mechanically by `tools/verify_m2h5.sh` off `req/spec/40-architecture/42-data-model.md`, not by
 /// eye. The miscount changes nothing E-M2-7 ruled (the flag really is absent from all eleven) and
@@ -1186,8 +1193,8 @@ pub struct ReceiptPayload {
     /// items. This crate's CC recommendation, recorded here rather than decided silently: every
     /// other wire-additive field this struct carries (`read_set`, `fingerprint_scope`,
     /// `reversibility`, `determinism_boundary`, `confinement`, `catalogue_hash`) was landed by a
-    /// lane/Fable ruling (`DR-46-2x`, `req/38 §NNN裁定`) without literal Owner sign-off, and this
-    /// workspace's own definition of the Owner-gate ceiling (`~/.claude` doctrine's "推奨自走":
+    /// lane/Fable ruling (`DR-46-2x`, `req/38 §NNN` rulings) without literal Owner sign-off, and this
+    /// workspace's own definition of the Owner-gate ceiling (the `~/.claude` doctrine's "recommended autonomy" rule:
     /// publish / push / DOI / financial / legal / key rotation / destructive KILL) does not name
     /// wire-additive schema design among it -- push and publish of anything built on this field
     /// remain Owner-gated exactly as `req/38:2819` fixes unconditionally ("publish/push=Owner

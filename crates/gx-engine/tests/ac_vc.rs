@@ -55,6 +55,7 @@ use gx_engine::{
     Engine, EngineJournalRecord, EvidenceSource, InjectedEvidence, Lifecycle, UnreachableEvidence,
 };
 use gx_log::proof::{audit_verdict_chain, ChainBreak};
+use gx_log::{detect_verdict_equivocation, VerdictContradiction};
 use gx_witness::dsse;
 use support::{
     gate, gate_refusing, intent, scratch, signing_key, CommitAdapter, StubAdapter, PERMIT_ALL,
@@ -700,6 +701,13 @@ fn policy_relaxation_is_not_detected() {
 /// signature attests is "this key stated these counts" and never "these are the only counts this
 /// key stated" (sem: SEM-gx-engine-606). Detecting the fork needs the two verifiers to compare,
 /// which is the consistency proof window `req/98` §9 row v-6 sends to v0.2.1.
+///
+/// 🔴 **`req/964` B-6, 2026-08-31 — that comparison exists now, and the assertions below are
+/// unchanged because they are still true.** What they measure is *single-view* blindness, which is
+/// the half of ruling #14 that stays open: each verifier, alone, finds nothing. The sentence above
+/// stays as written (no-delete) with this note carrying the correction. The closing block hands the
+/// **same two signed views** to `gx_log::detect_verdict_equivocation` and the fork is named, so this
+/// one test now holds both halves: alone, blind; pooled, seen. What no code closes is the pooling.
 #[test]
 fn a_split_view_is_not_detected() {
     let mut engine = mixed_engine("ac_vc_limit_split");
@@ -738,6 +746,23 @@ fn a_split_view_is_not_detected() {
     assert_ne!(
         honest.tally.deny, shrunk.tally.deny,
         "the two worlds disagree, and nothing inside either one can see it"
+    );
+
+    // 🔴 `req/964` B-6: the same two signed views, pooled. Each was clean on its own above; the
+    // union is not, and that is the whole content of "detecting the fork needs the verifiers to
+    // compare". Verifier B was shown the same `window_start` with a shorter `window_end`, so the
+    // shape named is the overlap rather than the equal-window case -- moving the seam is not an
+    // escape. This is a real engine's checkpoint signed by a real key, not a hand-built fixture.
+    let pooled = detect_verdict_equivocation(&[honest, shrunk]);
+    println!("ACVC_LIMIT_SPLIT_POOLED findings={}", pooled.len());
+    assert_eq!(
+        pooled.len(),
+        1,
+        "the pooled views contradict each other exactly once: {pooled:?}"
+    );
+    assert!(
+        matches!(pooled[0], VerdictContradiction::OverlappingWindows { .. }),
+        "a shorter window over the same start is two chains, not one: {pooled:?}"
     );
 }
 

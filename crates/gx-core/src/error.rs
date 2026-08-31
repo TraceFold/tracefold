@@ -314,6 +314,12 @@ pub enum AbortReason {
     /// automatically would be acting on the very model of the world this abort has just measured
     /// to be wrong, and naming that decision in `NotAttemptedBecause`'s vocabulary is a separate
     /// ruling (raised in `req/919` A1's report rather than made here).
+    ///
+    /// 🔴 That separate ruling has since been made — **R-1001-1** (`req/1001` §4, the else-arm of
+    /// D-999-F2, 2026-08-31): the decision is named
+    /// `NotAttemptedBecause::PromisedPostStateWasWrong`, declared in `gx-engine/src/store.rs`
+    /// beside the other six. The sentence above stays as the record of the window in which the
+    /// deferral was the honest answer.
     PostconditionMismatch,
 }
 

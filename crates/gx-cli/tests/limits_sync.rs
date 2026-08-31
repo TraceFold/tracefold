@@ -373,7 +373,11 @@ fn the_newest_limits_block_names_the_gates_of_the_release_that_wrote_it() {
         ("gx-adapter-mcp", "r26_preimage_funnel.rs", 6),
         ("gx-adapter-mcp", "r26_reach_census.rs", 4),
         ("gx-adapter-mcp", "r26_limits_family_sync.rs", 3),
-        ("gx-cli", "r26_not_attempted_causes.rs", 9),
+        // 🔴 **R-1001-1 (`req/1001` §4, D-999-F2's else-arm, 2026-08-31)** — nine until that
+        // ruling. It added the seventh `NotAttemptedBecause` cause and the behavioural probe for
+        // its sentence, and the rule this list exists for is that the block and the number move
+        // together: the 2026-08-31 R-1001-1 correction in `docs/LIMITS.md` carries it.
+        ("gx-cli", "r26_not_attempted_causes.rs", 10),
         // 🔴 **R29 / `req/361` L-02** — four until this window. R29 added the behavioural arm that
         // drives the repaired const walk (a spliced non-`";`-terminated declaration is refused
         // rather than swallowed), and the rule this list exists for is that the block and the
@@ -394,10 +398,12 @@ fn the_newest_limits_block_names_the_gates_of_the_release_that_wrote_it() {
     }
     println!("R26_PROBE_TOTAL={r26}");
     assert_eq!(
-        r26, 35,
+        r26, 36,
         "the newest block's total across the six suites it names (🔴 R29: 34 until this window; \
          `r26_refusal_remedy_parity.rs` gained the arm that drives the repaired const walk, and \
-         `docs/LIMITS.md` v0.5-p carries the correction the page owes for it)"
+         `docs/LIMITS.md` v0.5-p carries the correction the page owes for it. 🔴 R-1001-1, \
+         2026-08-31: 35 until that ruling; `r26_not_attempted_causes.rs` gained the seventh \
+         cause's behavioural probe, and the R-1001-1 correction on the page carries it)"
     );
 
     for (what, needle) in [
@@ -672,6 +678,120 @@ fn the_throughput_unit_and_the_fourth_outcome_s_cost_are_both_written_down() {
 /// says so in the same item. Two public faces are outside this crate and outside this lane's write
 /// scope, so they are **not** held here: `public/README.md` and `public/org_profile/README.md`
 /// (`req/289` §4 names them and what they still say).
+/// 🔴 **`req/38` ERRATA SS1001** — is `line` a **line-start** `theorem`/`lemma` declaration,
+/// tolerating any number of same-line `@[...]` attribute prefixes (`@[simp] theorem foo ...`)?
+///
+/// The naive form this suite used before SS1001, `line.starts_with("theorem") ||
+/// line.starts_with("lemma")`, is attribute-prefix blind: `lane/r10_lean_invs`'s
+/// `StateMachine.lean` added three column-zero declarations — `verdictEq_refl`,
+/// `ownEntriesFaithful_congr`, `rcptOk_congr` — written `@[simp] theorem ...`, and the naive
+/// predicate could not see any of them (154 real declarations undercounted as 151). The repair
+/// widens the predicate to strip leading `@[...]` attribute groups (nesting-tolerant, so
+/// `@[simp] @[reducible] theorem` and `@[simp, reducible] theorem` both work) before testing for
+/// `theorem`/`lemma` — it does **not** relax column zero: an indented line, `@[...]`-prefixed or
+/// not, is still inside a proof, a comment, or a block, and stays uncounted (that distinction is
+/// the whole finding this file's header names).
+fn is_theorem_or_lemma_declaration(line: &str) -> bool {
+    let mut rest = line;
+    loop {
+        if rest.starts_with("theorem") || rest.starts_with("lemma") {
+            return true;
+        }
+        let Some(after_open) = rest.strip_prefix("@[") else {
+            return false;
+        };
+        // Find this attribute's matching `]`, tolerating nested `[...]` inside the attribute
+        // arguments (Lean attribute syntax permits it, e.g. `@[simp (config := ...)]`-style args).
+        let mut depth = 1usize;
+        let mut close = None;
+        for (i, ch) in after_open.char_indices() {
+            match ch {
+                '[' => depth += 1,
+                ']' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        match close {
+            // Unterminated `@[` on this line -- not a declaration line (e.g. an attribute that
+            // is itself split across lines, which the per-line `theorem`/`lemma` check above
+            // already handles correctly on the line the keyword actually starts).
+            None => return false,
+            Some(i) => rest = after_open[i + 1..].trim_start(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod theorem_lemma_predicate {
+    use super::is_theorem_or_lemma_declaration as is_decl;
+
+    /// 🔴 **RED-FIRST (`req/38` ERRATA SS1001)** — before the attribute-stripping loop above
+    /// existed, this exact assertion failed: the naive `starts_with` form does not see
+    /// `@[simp] theorem ...` as a declaration. Recorded here as the naive form, side by side with
+    /// the fixed predicate below, so the flip is visible in one file rather than only in a commit
+    /// message.
+    #[test]
+    fn red_first_naive_starts_with_predicate_misses_attribute_prefixed_declarations() {
+        let line = "@[simp] theorem verdictEq_refl (a b : Verdict) : a = b := by rfl";
+        let naive = line.starts_with("theorem") || line.starts_with("lemma");
+        assert!(
+            !naive,
+            "SS1001 premise check: the naive predicate should NOT see this line as a declaration \
+             -- if it now does, the naive form changed and this probe's premise is stale (delete \
+             it, do not invert it)."
+        );
+    }
+
+    #[test]
+    fn fixed_predicate_counts_single_line_attribute_prefixed_theorem_and_lemma() {
+        assert!(is_decl(
+            "@[simp] theorem verdictEq_refl (a b : Verdict) : a = b := by rfl"
+        ));
+        assert!(is_decl("@[simp] lemma foo (x : Nat) : x = x := rfl"));
+    }
+
+    #[test]
+    fn fixed_predicate_counts_stacked_and_comma_separated_attributes() {
+        assert!(is_decl("@[simp] @[reducible] theorem stacked_attrs : True := trivial"));
+        assert!(is_decl("@[simp, reducible] theorem comma_attrs : True := trivial"));
+    }
+
+    #[test]
+    fn fixed_predicate_still_counts_plain_column_zero_declarations() {
+        assert!(is_decl("theorem plain_one : True := trivial"));
+        assert!(is_decl("lemma plain_two : True := trivial"));
+    }
+
+    /// 🔴 negative control — an indented `theorem`-shaped line, attribute or not, must stay
+    /// uncounted. This is the exact failure mode `README.md` used to have (`req/38` §207 ruling
+    /// 2): a whitespace-tolerant pattern counted English prose inside a block comment. The fix
+    /// must not reopen that hole while closing the attribute-prefix one.
+    #[test]
+    fn negative_control_indented_prose_is_never_counted_attribute_or_not() {
+        assert!(!is_decl(
+            "   theorem is a word this sentence uses, not a declaration."
+        ));
+        assert!(!is_decl("  @[simp] theorem indented_should_not_count : True := trivial"));
+        assert!(!is_decl("  lemma indented_should_not_count : True := trivial"));
+    }
+
+    /// 🔴 negative control — an attribute whose body is not followed by `theorem`/`lemma` (e.g. a
+    /// `def`) must not be counted, and a malformed/unterminated attribute must not panic or match.
+    #[test]
+    fn negative_control_attribute_prefixed_non_theorem_lines_are_never_counted() {
+        assert!(!is_decl("@[simp] def helper (x : Nat) : Nat := x"));
+        assert!(!is_decl("@[instance] def inst : Foo := ..."));
+        assert!(!is_decl("@[simp"));
+        assert!(!is_decl("@["));
+    }
+}
+
 #[test]
 fn the_lean_numbers_on_every_face_are_recounted_from_lean_itself() {
     let root = repo_root();
@@ -698,9 +818,11 @@ fn the_lean_numbers_on_every_face_are_recounted_from_lean_itself() {
         let text =
             std::fs::read_to_string(file).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
         for line in text.lines() {
-            // `^(theorem|lemma)` — a declaration starts at column zero; anything indented is inside
-            // a proof, a comment, or a block, and that distinction is the whole finding.
-            if line.starts_with("theorem") || line.starts_with("lemma") {
+            // `^(@[...] )*(theorem|lemma)` — a declaration starts at column zero, tolerating any
+            // number of same-line `@[...]` attribute prefixes (SS1001); anything indented is
+            // inside a proof, a comment, or a block, and that distinction is still the whole
+            // finding -- see `is_theorem_or_lemma_declaration`'s doc comment above.
+            if is_theorem_or_lemma_declaration(line) {
                 theorems += 1;
             }
             // `^theorem [^ ]*counterexample` — the naming convention is the classifier.

@@ -31,8 +31,18 @@
 //! `gx-core/src/ledger.rs:151` (ruling #14) declares that limit open, and this module does not claim
 //! to close it. Closing it needs the verifiers to pool their checkpoints — which is exactly the set
 //! this module then audits.
+//!
+//! 🔴 **`req/964` B-6, 2026-08-31 — the verdict half of that last paragraph now has an
+//! implementation, and the paragraph is kept because the rest of it is still true.**
+//! [`detect_verdict_equivocation`] is to [`gx_core::VerdictCheckpoint`] what
+//! [`detect_equivocation`] is to [`Checkpoint`]: the arithmetic over a **pooled** set, for a chain
+//! that had none. Before it, two verifiers each holding one of two forked verdict chains had
+//! nothing to run on the union at all — `proof::audit_verdict_chain` is handed one chain and
+//! returns empty on either. What stays open in both halves is the same thing and it is not code:
+//! **the pooling**. Verifiers who never meet are still shown two consistent chains, and no log
+//! closes that.
 
-use gx_core::{Checkpoint, Cid};
+use gx_core::{Checkpoint, Cid, VerdictCheckpoint, VerdictTally};
 
 use crate::proof::{verify_consistency, ConsistencyProof};
 use crate::Error;
@@ -174,4 +184,167 @@ pub fn classify_extension(
             new_root: new.root_hash,
         }))
     }
+}
+
+// ---------------------------------------------------------------------------
+// FR-M04 -- the verdict chain's half of the same judgement (ruling #14, req/964 B-6)
+// ---------------------------------------------------------------------------
+
+/// A contradiction between two signed **verdict** checkpoints that both claim one `origin`.
+///
+/// The verdict-chain counterpart of [`CheckpointContradiction`], and a second enum rather than
+/// three more variants on that one because the two chains commit to different things: ASM-14 keeps
+/// verdicts out of the tree, so a verdict checkpoint attests *counts over a window* where a
+/// [`Checkpoint`] attests a root over leaves, and the shapes a fork can take are not the same
+/// shapes. Every variant carries the values that disagree, for [`CheckpointContradiction`]'s
+/// reason. `#[non_exhaustive]` because a later ruling may name a fourth shape.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum VerdictContradiction {
+    /// Two checkpoints of one `origin` sign the **same** window to **different** tallies: two
+    /// attested counts of one range. Decisive in the signed fields alone -- a window is a half-open
+    /// range of verdict sequence numbers and it held what it held, so no proof, key or freshness
+    /// makes both true.
+    Equivocation {
+        /// The namespace both checkpoints claim.
+        origin: String,
+        /// The first verdict sequence number both speak for, inclusive.
+        window_start: u64,
+        /// One past the last, exclusive.
+        window_end: u64,
+        /// One signed count of that window.
+        tally_a: VerdictTally,
+        /// The other, incompatible signed count of the same window.
+        tally_b: VerdictTally,
+    },
+    /// Two checkpoints of one `origin` whose windows **overlap without being equal**.
+    ///
+    /// A single honest chain lays its windows end to end -- every later one opens where its
+    /// predecessor closed, which [`crate::proof::audit_verdict_chain`] enforces as its `Gap` --
+    /// so a partial overlap under one origin is two chains rather than one. This is the variant
+    /// that stops the boundary from being a hiding place: an operator who signs a second, different
+    /// set of counts and moves the seam to dodge [`Self::Equivocation`] lands here instead.
+    ///
+    /// It does not distinguish a fork from an honest deployment that **lost its verdict log and
+    /// re-published an overlapping window**, and it is not supposed to: FR-M04's premise is that a
+    /// signed count is a commitment, so re-issuing a window that a previous signature already
+    /// spoke for contradicts that signature whatever the cause. A verifier cannot tell the two
+    /// apart, which is the whole reason the count is signed.
+    OverlappingWindows {
+        /// The namespace both checkpoints claim.
+        origin: String,
+        /// One checkpoint's `(window_start, window_end)`.
+        a_window: (u64, u64),
+        /// The other's, which intersects it without matching it.
+        b_window: (u64, u64),
+    },
+    /// Two checkpoints of one `origin` bind to the same `ledger_tree_size` under **different**
+    /// ledger roots.
+    ///
+    /// The arithmetic [`CheckpointContradiction::Equivocation`] states, reached through the field
+    /// FR-M04 binds by (AC-VC-5). It is here rather than left to [`detect_equivocation`] because a
+    /// verifier pooling *verdict* checkpoints holds no [`Checkpoint`] to pass that function, and
+    /// would otherwise miss a fork it is holding the evidence of. Compared only when both roots are
+    /// present: `None` is the legitimate value for a window that committed nothing.
+    LedgerHeadEquivocation {
+        /// The namespace both checkpoints claim.
+        origin: String,
+        /// The ledger length both bind to.
+        ledger_tree_size: u64,
+        /// One signed ledger root at that length.
+        root_a: Cid,
+        /// The other, incompatible signed root at the same length.
+        root_b: Cid,
+    },
+}
+
+/// Detect a split view across verdict checkpoints pooled from more than one verifier (**FR-M04**,
+/// ruling #14's comparison half).
+///
+/// # What this answers
+///
+/// `gx-core/src/ledger.rs` states the limit: a signature attests "this key stated these counts",
+/// never "these are the only counts this key stated", so one key can sign two internally consistent
+/// chains for two verifiers and [`crate::proof::audit_verdict_chain`] -- which is handed one chain
+/// -- returns nothing on either. What that ruling says detection needs is *the verifiers to
+/// compare*, and comparing is what this function is: hand it the union of two views and it names
+/// what no key reconciles. `req/98` §9 row v-6 is the row that sent this to v0.2.1.
+///
+/// **Signatures are not checked here**, for [`detect_equivocation`]'s reason: the operator holds
+/// the key and will sign both chains, so a valid signature says nothing about which one is the
+/// history. The caller verifies with `gx_witness::dsse::verify_verdict_checkpoint` first.
+///
+/// # What stays open
+///
+/// The **pooling**. Two verifiers who never meet still hold two consistent chains, this function is
+/// never called, and no log closes that; a detector for the case where the views *did* meet is not
+/// a reason to say ruling #14 is spent. An empty result means "nothing in this set contradicts
+/// itself" and never "the counts are true" -- the note [`detect_equivocation`] and
+/// `audit_verdict_chain` both carry.
+///
+/// The scan is `O(n²)` in the number of views someone physically pooled, small by construction:
+/// the shape [`detect_equivocation`] uses, and for the same reason.
+#[must_use]
+pub fn detect_verdict_equivocation(checkpoints: &[VerdictCheckpoint]) -> Vec<VerdictContradiction> {
+    let mut found = Vec::new();
+    // Each unordered pair once, as `detect_equivocation` does: the predicates below are symmetric,
+    // so visiting a pair twice would report one contradiction twice.
+    for (i, a) in checkpoints.iter().enumerate() {
+        for b in &checkpoints[i + 1..] {
+            // A different `origin` is a different deployment (42 §3.11): its window collisions
+            // carry no meaning here, and folding them in is the "one key, two namespaces" false
+            // positive AC-B1b guards on the commit side.
+            if a.origin != b.origin {
+                continue;
+            }
+            if a.window_start == b.window_start && a.window_end == b.window_end {
+                // Same range, two counts. Equal tallies are two verifiers holding one checkpoint,
+                // which is the ordinary input and not a finding.
+                if a.tally != b.tally {
+                    found.push(VerdictContradiction::Equivocation {
+                        origin: a.origin.clone(),
+                        window_start: a.window_start,
+                        window_end: a.window_end,
+                        tally_a: a.tally,
+                        tally_b: b.tally,
+                    });
+                }
+            } else if a.window_start < b.window_end && b.window_start < a.window_end {
+                // Strict on both sides, so an empty window (`start == end`) sitting on a seam --
+                // a quiet period, a true statement -- intersects nothing.
+                found.push(VerdictContradiction::OverlappingWindows {
+                    origin: a.origin.clone(),
+                    a_window: (a.window_start, a.window_end),
+                    b_window: (b.window_start, b.window_end),
+                });
+            }
+            // Independent of the windows: a tree of one size has one root, whichever windows the
+            // two checkpoints happen to speak for.
+            found.extend(forked_ledger_head(a, b));
+        }
+    }
+    found
+}
+
+/// The [`VerdictContradiction::LedgerHeadEquivocation`] two checkpoints hold, if any.
+///
+/// Separate from the loop so the three refusals read as one sentence each: not the same length, no
+/// root to compare, the same root.
+fn forked_ledger_head(
+    a: &VerdictCheckpoint,
+    b: &VerdictCheckpoint,
+) -> Option<VerdictContradiction> {
+    if a.ledger_tree_size != b.ledger_tree_size {
+        return None;
+    }
+    let (root_a, root_b) = (a.ledger_root_hash?, b.ledger_root_hash?);
+    if root_a == root_b {
+        return None;
+    }
+    Some(VerdictContradiction::LedgerHeadEquivocation {
+        origin: a.origin.clone(),
+        ledger_tree_size: a.ledger_tree_size,
+        root_a,
+        root_b,
+    })
 }

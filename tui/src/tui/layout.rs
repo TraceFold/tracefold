@@ -409,6 +409,28 @@ pub struct Plan {
     pub disclosure: String,
     /// The screen was too small for even the floor, and says so.
     pub truncated: bool,
+    /// Which records of the list the subject region draws.
+    ///
+    /// 🔴 Decided **here** and not by the region that draws it, for the same reason
+    /// [`Plan::dropped_fields`] is: letting go of rows is a declared order, and a screen that chose
+    /// its own window would be hiding that order inside a branch (`req/942` §11-3). The property it
+    /// carries is that the attended record is one of the ones drawn, and gate g28 is that sentence
+    /// fired at [`window`] directly rather than inferred from a picture.
+    pub window: Window,
+    /// How many rows the subject region's note is given.
+    ///
+    /// 🔴 **One integer, and deliberately only one** (`req/988` §3-2). The budget is
+    /// `super::renderer::note_rows`, which stays where it is, and the ladder that chooses which head
+    /// and how many keys fit stays in the region as well — moving those here would be a second
+    /// binding table beside the one `req/38` SS999's r6 landed, and two tables disagree the day one
+    /// of them is edited. What crosses is the **number**, because the disclosure is composed here
+    /// and it is the disclosure that has to say the legend went.
+    ///
+    /// The region **reads** this rather than recomputing it, so the count the plan disclosed against
+    /// and the count the screen drew against are the same number by construction.
+    ///
+    /// Nought for an opened record, which carries its own closing line and no legend.
+    pub note_rows: usize,
 }
 
 impl Plan {
@@ -439,6 +461,13 @@ pub enum Subject {
     /// width here** — the members that do not fit are dropped by *height*, and the record's own
     /// line is the one that counts them.
     Record,
+    /// What this face can do, in the words `super::acts` declares it with.
+    ///
+    /// A third value of the one classifier and **not a fifth region**: the four regions are
+    /// declared, gated (g3, g4, g10) and given rows by priority, and a region that exists only
+    /// while a key is held would be a fifth declaration whose priority nothing has ruled on --
+    /// the reason already written down in `super::renderer::subject` for the opened record.
+    Help,
 }
 
 /// Which shape the subject region will take for this reading and this view.
@@ -447,11 +476,72 @@ pub enum Subject {
 /// and the header is what says which columns found nothing.
 #[must_use]
 pub fn subject_shape(reading: &super::wire::Reading, view: &super::acts::View) -> Subject {
-    if view.open && !reading.items().is_empty() {
+    if view.help {
+        Subject::Help
+    } else if view.open && !reading.items().is_empty() {
         Subject::Record
     } else {
         Subject::Grid
     }
+}
+
+/// The slice of a list the subject region draws.
+///
+/// 🔴 `first` is an index into the records the **read** carried rather than into the rows the
+/// screen has. The region is handed the window, so the region and the line that reports where the
+/// reader is standing cannot disagree about which record a row holds.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Window {
+    /// The first record drawn.
+    pub first: usize,
+    /// How many records are drawn.
+    pub rows: usize,
+}
+
+/// The list a plan is being resolved for: how many records it holds, and which one is attended.
+///
+/// 🔴 Two numbers rather than a `super::acts::View`, and the second one is the reason: a plan is
+/// resolved for a *reading* as much as for a reader, and a view carries no record count. The pair
+/// keeps [`resolve_attended`] a function of exactly what it needs.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Attention {
+    /// Which record the reader is attending to, as an index into the records the read carried.
+    pub selected: usize,
+    /// How many records the read carried.
+    pub items: usize,
+}
+
+/// Which records fit, and which one the window starts at.
+///
+/// 🔴 **The attended record is inside the window whenever a window exists**, and that is the whole
+/// of this function. `super::acts::View::selected` is clamped against the records the list *holds*
+/// — all a reducer with no screen in front of it can know — so before this existed the attention
+/// could be moved on to a record the region never drew, and the mark then appeared nowhere at all
+/// (`req/38` SS999, T-r4-B). Measured at 80x24 against a twenty-eight row ledger in
+/// `req/942_artifacts/visual_r5_2026-08-31/`: `G` moved the attention to record 28 and the frame
+/// came back identical to the entry frame, character for character.
+///
+/// The window is a **function of the state**, not a scroll position that is remembered: it sits at
+/// the top of the list until the attention passes the bottom edge, then follows it by the least it
+/// can. There is nothing to get out of step with, which is why no act had to learn about it and why
+/// `super::acts::apply` is untouched.
+///
+/// 🔴 A capacity of nought is **not** a window with the attention outside it. It is a region with
+/// no room for a record at all, and gate g28 holds that apart as the third value rather than
+/// folding it into the failing side; the position line is what speaks for the reader there.
+#[must_use]
+pub fn window(selected: usize, items: usize, capacity: usize) -> Window {
+    let rows = items.min(capacity);
+    if rows == 0 {
+        return Window { first: 0, rows: 0 };
+    }
+    let selected = selected.min(items - 1);
+    let first = if selected < rows {
+        0
+    } else {
+        selected + 1 - rows
+    };
+    Window { first, rows }
 }
 
 /// Which rung of the provenance ladder the width bought.
@@ -482,13 +572,45 @@ impl Rung {
     }
 }
 
+/// The order the regions are let go of, as [`REGIONS`] declares it.
+///
+/// `Priority::Four` first and `Priority::One` last, ties in the order they are declared. Not every
+/// role in it can be let go of — the subject is what the screen is *for* and the disclosure is the
+/// line that says what went — so a caller walks this and takes the first role it has a step for.
+///
+/// 🔴 It exists because [`resolve_attended`]'s loop used to name `RegionRole::Apparatus` and then
+/// the fold, in that order, by hand. The hand-written order agreed with the declaration, which is
+/// the worst version of the defect: `Region::priority` was declared on all four regions, checked by
+/// gate g10 for being *internally* honest, and **read by nothing**. Nothing on the screen, in a
+/// test, or in a gate would have said a word on the day the two stopped agreeing. Gate g30 is now
+/// the thing that would.
+#[must_use]
+pub fn letting_go_order() -> Vec<RegionRole> {
+    let mut regions = REGIONS;
+    // Stable, so regions of one priority keep the order they are declared in. `REGIONS` is in draw
+    // order rather than in priority order, so that tie is an accident rather than a ruling — it is
+    // harmless only because exactly one of the three `Priority::One` regions has a step at all.
+    regions.sort_by_key(|region| std::cmp::Reverse(region.priority));
+    regions.iter().map(|region| region.role).collect()
+}
+
 /// Which columns fit, and which wire keys are therefore not drawn.
 #[must_use]
 pub fn columns_for(width: u16) -> (Vec<Column>, Vec<&'static str>) {
     let mut drawn = Vec::new();
     let mut dropped: Vec<&'static str> = Vec::new();
     let mut used = 0u16;
-    for column in LEDGER_COLUMNS {
+    // 🔴 The declaration decides which column goes first, and this **reads** it. The fold below
+    // walks the array and gives up whatever is past the budget, so before this line the order was
+    // the order the array happened to be typed in; `LEDGER_COLUMNS` was typed in priority order, so
+    // the two agreed, and `Column::priority` was a member no code read. Reordering the array — for
+    // readability, for a new column, for anything — would have silently made it a lie.
+    //
+    // Ascending and stable: `Priority::One` is kept first, and among equals the column declared
+    // first is kept first, which is the "last first" order the array says of itself it is in.
+    let mut ordered = LEDGER_COLUMNS;
+    ordered.sort_by_key(|column| column.priority);
+    for column in ordered {
         let cost = if drawn.is_empty() {
             column.width
         } else {
@@ -569,6 +691,14 @@ pub fn wrap(text: &str, width: u16) -> Vec<String> {
 struct Shape {
     subject: Subject,
     counts_dropped: bool,
+    /// How many of the acts this state offers the note is not going to spell — because it was given
+    /// nought rows and is not drawn at all.
+    ///
+    /// 🔴 A member of the description rather than an eighth argument, for the reason the two above
+    /// it are. It is the second half of a partition: `super::renderer::note_line` already discloses
+    /// the keys it folded when it *is* drawn, and this is what discloses **all** of them when it is
+    /// not (`req/988` §3-2).
+    keys_not_drawn: usize,
 }
 
 /// The disclosure line, in whichever of its two forms fits.
@@ -593,6 +723,7 @@ fn compose_disclosure(
     let Shape {
         subject,
         counts_dropped,
+        keys_not_drawn,
     } = shape;
     let mut long: Vec<String> = Vec::new();
     // 🔴 The field count belongs to the **grid**. While a record is open there is no grid, every
@@ -611,6 +742,11 @@ fn compose_disclosure(
         Subject::Record => long.push(format!(
             "a record is open: its own line counts what it drew | {LEDGER_ADDRESS}"
         )),
+        // The help face draws the declaration, not the wire, so a count of wire fields would be
+        // describing a screen nobody is looking at -- the error the record arm exists to avoid.
+        Subject::Help => long.push(format!(
+            "what this face can do is on the screen; the records are not | {LEDGER_ADDRESS}"
+        )),
     }
     // 🔴 The bottom rung of the provenance ladder gives up the connection's counts, and those are
     // measured **here** — no route returns them, so a second read makes a new measurement rather
@@ -621,6 +757,56 @@ fn compose_disclosure(
             "the connection's counts are not drawn at this width | {NO_ADDRESS_PHRASE}"
         ));
     }
+    // 🔴 **The other half of the note's disclosure** (`req/988` §3-2). `super::renderer::note_line`
+    // says `{n} more keys: gx tui --help` when it spells some of them and runs out of room; there
+    // was no mouth at all for the case where it is given **nought rows** and spells none — the
+    // shapes `super::renderer::note_rows` names as its own bounded defect and gate g26 pins to
+    // exactly the diagonal where the records fill the body. Seven declared acts left the screen and
+    // nothing said a word.
+    //
+    // With this clause the face keeps a partition rather than a count: **declared = spelled +
+    // disclosed**, at every width, height and row count, with no third bucket for the ones that
+    // quietly went. Gate g34 is that sentence. The address is `HELP_ADDRESS`, which the consumer's
+    // gate g12c holds to naming every declared act — so it is an address that answers rather than a
+    // wave at a cut.
+    if keys_not_drawn > 0 {
+        long.push(format!(
+            "{keys_not_drawn} keys not drawn: {}",
+            super::renderer::HELP_ADDRESS
+        ));
+    }
+    // 🔴 **The region clause, with its sign inverted** (`req/988` §3-1). It said what was let go of
+    // and said nothing at all when nothing was, so a screen with all four of its regions drawn was
+    // the one screen that never named a single one of them — four roles declared, gated by g3/g4/g6
+    // and g10, and invisible to the reader they were declared for. `gitui` draws `Status | Log |
+    // Files` at every size; this face had the vocabulary and never spelled it.
+    //
+    // It is **not a fifth region and not a new row**: it is this clause, made total. The words are
+    // `RegionRole::short()`, the same declared function the dropped half already spells, so there
+    // is no second vocabulary and no hand-written abbreviation for gate g6 to catch.
+    //
+    // 🔴 **In the long form only, and that is a measured retreat rather than a preference.** The
+    // first build of this put it in the short form too. At forty by ten the short form is what is
+    // chosen, the clause pushed it from two rows to three, and the extra row came out of the
+    // ladder: the apparatus region was **dropped from a screen that had been holding all four** —
+    // caught by P4, which exists to hold exactly that. `req/988` §5 wrote the falsifier before the
+    // measurement ("if the rail costs a region at forty by ten, the rail comes out"), and this is
+    // it being honoured. The long form is only ever chosen when it fits whole, so the rail costs
+    // nothing where it is drawn, and below that width the screen still names what it **dropped**.
+    //
+    // **Named ceiling**: `kept` is read from the ladder's own decisions — what was dropped, and
+    // whether the provenance folded — and not from the row counts, because those are settled after
+    // this line runs and the disclosure's height is one of the inputs to settling them. On a screen
+    // too small for even the floor a region can therefore be named here and given nought rows
+    // below; that screen sets `truncated`, so it is a marked cut rather than a silent one.
+    let kept: Vec<&str> = REGIONS
+        .iter()
+        .filter(|region| {
+            !dropped_regions.contains(&region.role)
+                && !(region.role == RegionRole::Provenance && fold.is_some())
+        })
+        .map(|region| region.role.short())
+        .collect();
     if !dropped_regions.is_empty() {
         let names: Vec<&str> = dropped_regions.iter().map(|r| r.short()).collect();
         let addresses: Vec<&str> = dropped_regions
@@ -650,10 +836,27 @@ fn compose_disclosure(
     if let Some(measured) = fold {
         long.push(measured.folded());
     }
+    // 🔴 **The rail is offered last and only if it is free.** Two candidate long forms are built,
+    // the one with the rail is preferred, and it is taken **only when it fits in the same rows the
+    // form without it would have taken**. So the clause this lane adds can never displace a clause
+    // that was already there.
+    //
+    // Measured, not assumed. The first build of this put the rail in unconditionally: at
+    // forty-six cells the longer line stopped fitting the cap, the whole disclosure fell to its
+    // short form, and `LEDGER_ADDRESS` — which only the long form spells — left the screen
+    // entirely. A rail that says which parts the screen is made of, bought by deleting the address
+    // of the page, is a bad trade at any width. Gate g35 counts the widths where the address is on
+    // no row at all, which is how this was caught.
+    let mut with_rail = long.clone();
+    with_rail.push(format!("screen: {}", kept.join(" ")));
+    let with_rail = with_rail.join(" | ");
     let long = long.join(" | ");
 
     let cap = disclosure_cap(fold.is_some());
-    if wide || rows_needed(&long, width) <= cap {
+    if wide || rows_needed(&with_rail, width) <= cap {
+        return with_rail;
+    }
+    if rows_needed(&long, width) <= cap {
         return long;
     }
     // 🔴 The short form still **names** the regions it let go of. A count on its own would satisfy
@@ -676,14 +879,25 @@ fn compose_disclosure(
     let head = match subject {
         Subject::Grid => format!("{}/{total_fields} fields", dropped_fields.len()),
         Subject::Record => "record open".to_string(),
+        Subject::Help => "help open".to_string(),
     };
     let counts = if counts_dropped {
         format!(" | counts cut, {NO_ADDRESS_PHRASE}")
     } else {
         String::new()
     };
+    // The legend vanishing whole is a loss the reader can act on and the address is the act, so it
+    // is spelled in both forms — unlike the rail above, which is a long-form claim.
+    let keys = if keys_not_drawn > 0 {
+        format!(
+            " | {keys_not_drawn} keys not drawn: {}",
+            super::renderer::HELP_ADDRESS
+        )
+    } else {
+        String::new()
+    };
     let mut short = format!(
-        "{head} | {} routes | {} regions not drawn{named}{counts} | gx tui --wide",
+        "{head}{keys} | {} routes | {} regions not drawn{named}{counts} | gx tui --wide",
         READ_NOT_DRAWN.len(),
         dropped_regions.len()
     );
@@ -704,6 +918,17 @@ const fn disclosure_cap(folded: bool) -> u16 {
     }
 }
 
+/// Resolve the grid, for a reading with no records in it.
+///
+/// 🔴 Kept as its own name because the plan's other members — the columns, the dropped set, the
+/// disclosure, the provenance's rung — do not depend on the list at all, and the gates that measure
+/// those ask for them by this name. A frame that is going to be **drawn** goes through
+/// [`resolve_attended`], which is the only one of the two that can fill in the window.
+#[must_use]
+pub fn resolve(width: u16, height: u16, measured: &Measured, wide: bool, subject: Subject) -> Plan {
+    resolve_attended(width, height, measured, wide, subject, Attention::default())
+}
+
 /// Resolve the grid.
 ///
 /// The loop below is bounded at three passes because each pass takes one irreversible step
@@ -717,19 +942,38 @@ const fn disclosure_cap(folded: bool) -> u16 {
 /// and the rung was picked after the disclosure had already been written, so the rung that gives up
 /// the connection's counts gave them up with nothing on the screen saying so. One pass, and the
 /// line that says what is missing is composed from what the screen is going to be.
+///
+/// 🔴 And the window the subject region draws is decided here too, at the bottom, once the rows are
+/// known. `req/942` §11-3 is the reason it is not decided by the region: a screen that picks its own
+/// slice of the list cannot be asked what it let go of.
 #[must_use]
-pub fn resolve(width: u16, height: u16, measured: &Measured, wide: bool, subject: Subject) -> Plan {
+pub fn resolve_attended(
+    width: u16,
+    height: u16,
+    measured: &Measured,
+    wide: bool,
+    subject: Subject,
+    attention: Attention,
+) -> Plan {
+    // The parameter's name is spent further down on the row count the subject region gets, and the
+    // shape is wanted after that point, so it is held here rather than recomputed.
+    let shape = subject;
     let (columns, grid_dropped_fields) = columns_for(width);
     // While a record is open no field is dropped by **width**: the record draws every member the
     // wire carried, one per row. So the plan's dropped set is empty, and it is empty as a computed
     // fact rather than as a special case in whoever reads it.
+    // The help face is the same case one step further out: it draws no wire value at all, so a set
+    // of wire keys it "did not draw" would be counting a grid that is not on the screen.
     let dropped_fields = match subject {
         Subject::Grid => grid_dropped_fields,
-        Subject::Record => Vec::new(),
+        Subject::Record | Subject::Help => Vec::new(),
     };
     let total_fields = LEDGER_COLUMNS.len() + LEDGER_PAGE_KEYS.len();
     let subject_floor = region(RegionRole::Subject).min_rows;
     let apparatus_rows = region(RegionRole::Apparatus).min_rows;
+
+    // The declaration's order, read once. Three passes at most walk it, and it is four elements.
+    let order = letting_go_order();
 
     let mut dropped: Vec<RegionRole> = Vec::new();
     let mut folded = false;
@@ -764,6 +1008,12 @@ pub fn resolve(width: u16, height: u16, measured: &Measured, wide: bool, subject
                 // A folded provenance carries its counts into the disclosure; only the bottom rung
                 // of a provenance that still has a region of its own gives them up.
                 counts_dropped: !folded && !rung.carries_counts(),
+                // 🔴 Nought **inside the loop**, and the real count once below it. How many rows the
+                // note gets depends on how many rows the subject region gets, which depends on how
+                // tall this disclosure is — the order inversion `req/964` §16 named. So the loop
+                // settles the shape of the screen without this clause, and the clause is added
+                // afterwards against the rows the loop actually produced.
+                keys_not_drawn: 0,
             },
         );
         disclosure_rows = rows_needed(&disclosure, width).min(disclosure_cap(folded));
@@ -777,12 +1027,30 @@ pub fn resolve(width: u16, height: u16, measured: &Measured, wide: bool, subject
         if need <= height {
             break;
         }
-        if !dropped.contains(&RegionRole::Apparatus) {
-            dropped.push(RegionRole::Apparatus);
-            continue;
+        // 🔴 Which region goes next is [`letting_go_order`]'s answer and not this loop's. The two
+        // steps were spelled here in that order by hand and they were right; what was missing was
+        // anything that made them *have* to be. A role with no step is stepped over rather than
+        // stopping the walk: "cannot be let go of" and "has already been let go of" are different
+        // facts, and treating the first as the second would end the loop at the subject every time.
+        let mut stepped = false;
+        for &role in &order {
+            let took = match role {
+                RegionRole::Apparatus if !dropped.contains(&RegionRole::Apparatus) => {
+                    dropped.push(RegionRole::Apparatus);
+                    true
+                }
+                RegionRole::Provenance if !folded => {
+                    folded = true;
+                    true
+                }
+                _ => false,
+            };
+            if took {
+                stepped = true;
+                break;
+            }
         }
-        if !folded {
-            folded = true;
+        if stepped {
             continue;
         }
         truncated = true;
@@ -819,6 +1087,73 @@ pub fn resolve(width: u16, height: u16, measured: &Measured, wide: bool, subject
         rows.push((RegionRole::Disclosure, disclosure_rows));
     }
 
+    // 🔴 The window, decided beside everything else the screen is handed. The region's row count is
+    // read back out of the list that was just built, which is the same list `super::renderer::draw`
+    // splits the frame by — so the rows the window is computed against are the rows that exist.
+    //
+    // An opened record has no window: it is one record drawing every member it carries, the rows it
+    // gives up are given up by height rather than by count, and its own line is what says how many.
+    let subject_rows = rows
+        .iter()
+        .find(|(role, _)| *role == RegionRole::Subject)
+        .map_or(0, |(_, count)| *count) as usize;
+    // One row for the header, and the note is paid for out of what the records leave over.
+    // `super::renderer::note_rows` is that ruling as a function, and this **reads** it rather than
+    // restating it: a second copy of the budget here is a second answer, and the region and the plan
+    // would disagree the day one of them was edited.
+    //
+    // 🔴 `max(1)` is a repair the note's disclosure made necessary and worth naming. `occupied` is
+    // what the region draws *before* the note, and for a reading with no records in it that is the
+    // one kind-of-nothing row — which `super::renderer::subject` has always passed and this call
+    // site had not. The two were computing different budgets for the empty list; it was invisible
+    // because the only consumer was a window that is nought rows wide on an empty list either way.
+    // Disclosing the number makes it visible, so it is repaired rather than disclosed wrongly.
+    let body_rows = subject_rows.saturating_sub(1);
+    let note_rows = match shape {
+        Subject::Grid => super::renderer::note_rows(attention.items.max(1), body_rows),
+        Subject::Record | Subject::Help => 0,
+    };
+    let window = match shape {
+        Subject::Record | Subject::Help => Window::default(),
+        Subject::Grid => window(
+            attention.selected,
+            attention.items,
+            body_rows.saturating_sub(note_rows),
+        ),
+    };
+
+    // 🔴 **The second composition, and the only one there is.** The loop above settled how tall this
+    // region is without knowing whether the note would survive, because the note's budget is a
+    // function of the rows the loop was still deciding. Now the rows exist, so the count is known,
+    // and the one clause that depends on it is added against the screen that was actually produced.
+    //
+    // The height is **not** recomputed from the longer line: re-running the ladder here would let
+    // the disclosure grow itself a row and take it from the records, which is exactly the ruling
+    // `super::renderer::note_rows` was written from. The budget stands, and if the longer line no
+    // longer fits inside it the cut is marked — by the same check the first composition gets, fired
+    // again here, because a cut that happens after a check is a cut nothing checked.
+    if note_rows == 0 && matches!(shape, Subject::Grid) {
+        let keys_not_drawn = super::renderer::offered(attention.items).len();
+        if keys_not_drawn > 0 {
+            disclosure = compose_disclosure(
+                &dropped_fields,
+                total_fields,
+                &dropped,
+                folded.then(|| measured.clone()).as_ref(),
+                width,
+                wide,
+                Shape {
+                    subject: shape,
+                    counts_dropped: !folded && !rung.carries_counts(),
+                    keys_not_drawn,
+                },
+            );
+            if rows_needed(&disclosure, width) > disclosure_rows {
+                truncated = true;
+            }
+        }
+    }
+
     Plan {
         rows,
         dropped,
@@ -836,6 +1171,8 @@ pub fn resolve(width: u16, height: u16, measured: &Measured, wide: bool, subject
         provenance_rung: rung,
         disclosure,
         truncated,
+        window,
+        note_rows,
     }
 }
 

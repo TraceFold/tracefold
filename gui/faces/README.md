@@ -7,4 +7,4 @@
 | **notice** (F-5) | what the window has said | 着地済(詳細=`notice/README.md`) |
 | **receipt** (F-3) | can one delta be confirmed without asking this window | 着地 2026-08-24 — 69 test / 7 capture。台帳=`receipt/README.md` |
 | **graph** (F-4) | what has been touched twice or more | 着地 2026-08-25 — 70 test / 7 capture。genuine負対照実施(hash前後一致確認)。台帳=`graph/README.md`・placement=`req/100 §7`。`[◐]`(独立再走なし) |
-| atlas (F-6) | — | [ ] 未着手 |
+| **atlas** (F-6) | what subjects has this window read, and what was last said about each | 着地 2026-08-25(F-6 atlasレーン・最終面6/6) — 122 test / 7 capture + interaction pass 9 shot(2f6464d・2026-08-31)。台帳=`atlas/README.md`・placement=`req/100 §8`・composition=`req/09 §4`。`[◐]`(独立再走なし)。**訂正2026-08-31(G-7 lane)**: 本行は着地後6日間「[ ] 未着手」のまま残ったstale宣言だった(検出=`req/104` #20・照合と当日実測=`req/107`)——宣言は実体を作らない、の実例として旧文言をここに残す |

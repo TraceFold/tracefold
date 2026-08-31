@@ -113,6 +113,13 @@ const PUBLIC_FUNCTIONS: &[&str] = &[
     // FR-021's sense — a pure function over a slice, touching no log and deciding nothing about
     // storage — in `audit_verdict_chain`'s standing: it answers *what contradicts itself*.
     "detect_equivocation",
+    // 🔴 **`req/964` B-6**: `witness_audit::detect_verdict_equivocation` scans a set of signed
+    // *verdict* checkpoints pooled from more than one verifier for the three shapes one key cannot
+    // sign honestly -- one window with two tallies, two windows that overlap without matching, and
+    // one ledger size under two roots. A **read** in FR-021's sense, in `detect_equivocation`'s
+    // exact standing: a pure function over a slice that touches no log and decides nothing about
+    // storage. It is FR-M04 ruling #14's comparison half, which `req/98` §9 row v-6 sent to v0.2.1.
+    "detect_verdict_equivocation",
     "entries",
     "entry",
     // 🔴 **R6 / DR-43-11**: `PersistedHead::floor` takes the numbers a door compares off the

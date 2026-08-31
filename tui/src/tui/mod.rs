@@ -151,7 +151,7 @@ pub fn run(options: &Options) -> crate::Result<Answer> {
 fn dump(options: &Options, tier: Tier) -> crate::Result<Answer> {
     let screen = Screen::read(&options.base_url, options.token.as_deref());
     let measured = renderer::measured(&screen);
-    let plan = layout::resolve(
+    let plan = layout::resolve_attended(
         options.width,
         options.height,
         &measured,
@@ -160,6 +160,12 @@ fn dump(options: &Options, tier: Tier) -> crate::Result<Answer> {
         // computed by the one classifier rather than assumed, so a `--dump` that later carries a
         // view gets the right answer without this line being remembered.
         layout::subject_shape(&screen.transformations, &super::tui::acts::View::default()),
+        // 🔴 The same road the drawn frame takes. Resolving this plan for a reading with no records
+        // in it would make the JSON beside the lines a description of a different screen.
+        layout::Attention {
+            selected: super::tui::acts::View::default().selected,
+            items: screen.transformations.items().len(),
+        },
     );
     let buffer =
         renderer::render_to_buffer(&screen, options.width, options.height, tier, options.wide);

@@ -283,6 +283,21 @@ fn not_attempted_cause_clause(commit: &Value) -> &'static str {
              nobody looked, and an absolute inverse is not sent into a substrate that will not say \
              where it is. The change may stand; read the object and `gx log`"
         }
+        // 🔴 **R-1001-1 (`req/1001` §4, the else-arm of D-999-F2, 2026-08-31)** — the seventh
+        // road, and the only one on which the inverse exists, is complete, and is declined. The
+        // six arms above are all spellings of "the inverse was unavailable or unsafe to send";
+        // this one is "the inverse is available and the engine does not trust the model it
+        // stands on".
+        Some("PromisedPostStateWasWrong") => {
+            ": the apply **succeeded**, and the post-state the plan promised is not the post-state \
+             the apply itself reported — the engine's model of this object was just measured \
+             wrong. An escrowed inverse exists and was completed, but it stands on that same \
+             model, so it was **not** sent: acting on a model this abort exists to distrust is \
+             what fail-closed forbids. The world holds what the apply put there, the undo \
+             material survives, and which side promised wrong — the plan or the adapter's answer \
+             — is not a fact this sentence carries. Read the object and `gx log` before acting \
+             on it"
+        }
         other => {
             // The cause is absent after a restart and unknown if the engine grew a word this
             // build has not been taught. Both are the same honest answer: say what the value
