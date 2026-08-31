@@ -135,6 +135,27 @@ pub const REOPEN_AFTER: Duration = Duration::from_secs(2);
 /// connected is not one of them.
 pub const OPEN_MARK: &str = "<<";
 
+/// What being up **means**, spelled once so that the badge on the provenance line can be believed.
+///
+/// 🔴 Owner #227 (2026-09-01): *"if you are going to print LIVE, the meaning of that LIVE has to be
+/// defined"*. It is not a general claim about the ledger. Events reach this face over
+/// [`STREAM_ROUTE`], the event bus that feeds that route is **in the serve process**, and a write
+/// another process makes straight to the journal never touches it (`req/38` SS987, measured). So a
+/// bare `LIVE` would be this face saying it knows something it has no way to know.
+///
+/// Two things follow, and both are in this build. The badge is qualified — [`LinkReport::long`]
+/// spells `ENGINE LIVE` and never `LIVE` alone — and the qualification is explained where a reader
+/// can reach it, which is the help face.
+pub const LIVE_MEANS: &str =
+    "ENGINE LIVE = events emitted by this serve process. A journal written by another process is \
+     not observed.";
+
+/// The badge for a connection that is up, in the one spelling this face may use.
+///
+/// 🔴 `ENGINE` is the load-bearing word and not an ornament: it names **whose** events these are.
+/// Gate g43 refuses a frame that spells `LIVE` without it.
+pub const LIVE_BADGE: &str = "ENGINE LIVE";
+
 /// Whether this run is subscribed to the engine's events, and what has become of the connection.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Link {
@@ -339,7 +360,13 @@ impl LinkReport {
             // 🔴 `0 events` on an open connection is a **measurement** and is drawn as one. The mark
             // in front of it says the connection is up, so the nought is the answer to a question
             // that was actually asked.
-            Link::Open => format!("{} events", self.events),
+            // 🔴 The badge leads, and it is [`LIVE_BADGE`] rather than the word on its own. Owner
+            // #227: a face that says `LIVE` without saying *whose* events it is counting is
+            // claiming to observe writes it cannot see. The count that follows is a measurement —
+            // `0 events` on an open connection is the answer to a question that was actually
+            // asked, which is why the mark in front of the line carries the state and this arm
+            // carries the number.
+            Link::Open => format!("{LIVE_BADGE}, {} events", self.events),
             // 🔴 No `events` count and no `reconnects` count, because both would be nought and both
             // would read as measurements. What this state can honestly report is how many times it
             // tried, which is the one number it did observe.

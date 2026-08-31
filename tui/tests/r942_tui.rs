@@ -714,9 +714,18 @@ fn p9_a_refused_route_draws_unknown_and_not_zero() {
     // real zero from a false one is measuring the wrong thing, which is the same defect it was
     // written to catch, one layer up.
     let lines: Vec<&str> = text.lines().collect();
+    // 🔴 **The locator names two columns, and it named one.** `starts_with("transformation")` was
+    // unambiguous while the subject region's first row was the grid's header; the heading strip
+    // (`layout::heading`) begins with the page's name, `transformations`, and starts with the same
+    // fifteen characters. The probe then read the row *below the heading*, which is the header
+    // itself, and reported the header as the row for a refused route. This is a repair to the
+    // instrument and not to the floor: the assertions below are untouched, and the header is now
+    // identified by two of its own column keys rather than by a prefix a second row shares.
     let header_at = lines
         .iter()
-        .position(|line| line.trim_start().starts_with("transformation"))
+        .position(|line| {
+            line.trim_start().starts_with("transformation") && line.contains(wire::VERDICT_KEY)
+        })
         .expect("the subject table draws its header");
     let row = lines[header_at + 1];
     println!("P9_ROW={row:?}");
@@ -833,18 +842,65 @@ fn p4_at_forty_by_ten_the_dropped_region_is_named_on_screen() {
             false
         ))
     );
-    assert!(
-        roomy.dropped.is_empty(),
-        "🔴 P4: forty by ten held every region once the apparatus stopped hoarding a row. If it \
-         drops one again, a region grew and nothing declared the growth: {:?}",
-        roomy.dropped
-    );
-    assert_eq!(
-        roomy.rows.len(),
-        REGIONS.len(),
-        "🔴 P4: forty by ten does not draw all four regions: {:?}",
-        roomy.rows
-    );
+    // 🔴 **Amended again, 2026-09-01 (Owner #227), and the amendment is the sentence this probe is
+    // named for.** It pinned `dropped.is_empty()` at forty by ten and said in its own message what
+    // the pin was for: *if it drops one again, a region grew and nothing declared the growth*. A
+    // region did grow — the subject region's floor went from four rows to five, to carry the
+    // heading that says which screen this is — and the growth **is** declared, in `REGIONS`, with
+    // the reason. So the condition the message names is the one asserted here, rather than the
+    // outcome that happened to follow from it when it was written: a drop at forty by ten is
+    // allowed exactly when the declared floors do not fit, and the screen has to say what went.
+    //
+    // The pin is not weakened into "anything may be dropped". An *undeclared* growth still fires
+    // this: the floors are summed from `REGIONS`, so a region that starts taking a row it did not
+    // declare leaves the sum fitting and the drop unexplained.
+    let floors: u16 = REGIONS.iter().map(|region| region.min_rows).sum();
+    println!("P4_40x10_DECLARED_FLOORS={floors}");
+    if roomy.dropped.is_empty() {
+        assert_eq!(
+            roomy.rows.len(),
+            REGIONS.len(),
+            "🔴 P4: forty by ten drops nothing and does not draw all four regions: {:?}",
+            roomy.rows
+        );
+    } else {
+        // 🔴 The disclosure is charged what its **text** needs rather than its declared floor of
+        // one: it is the region whose height is a function of what the other three did, and a sum
+        // that gave it one row would say ten rows were enough when they were not. Every other
+        // region is charged its declaration, so a region that quietly takes a row it never
+        // declared still leaves this sum fitting and the drop unexplained.
+        let need: u16 = REGIONS
+            .iter()
+            .map(|region| {
+                if region.role == RegionRole::Disclosure {
+                    layout::rows_needed(&roomy.disclosure, 40).max(region.min_rows)
+                } else {
+                    region.min_rows
+                }
+            })
+            .sum();
+        println!("P4_40x10_NEED={need}");
+        assert!(
+            need > 10,
+            "🔴 P4: forty by ten dropped {:?} while the declared floors need {need} rows and fit \
+             in ten — a region grew and nothing declared the growth (floors sum {floors})",
+            roomy.dropped
+        );
+        let roomy_text = flat(&renderer::buffer_text(&renderer::render_to_buffer(
+            &screen,
+            40,
+            10,
+            Tier::Mono,
+            false,
+        )));
+        for role in &roomy.dropped {
+            assert!(
+                roomy_text.contains(role.short()),
+                "🔴 P4: {} was dropped at forty by ten and the screen does not say so",
+                role.name()
+            );
+        }
+    }
 
     let plan = layout::resolve(40, 8, &measured, false, layout::Subject::Grid);
     let text = renderer::buffer_text(&renderer::render_to_buffer(
@@ -935,6 +991,19 @@ fn p5_every_column_label_drawn_is_a_key_the_wire_carried() {
 /// drawing rule, which is the wrong trade in this product. So the offender set is "outside the
 /// budget **and** not present in the bytes the wire sent" — everything the face itself chose has
 /// to be in the budget, and everything the engine said is drawn as the engine said it.
+///
+/// 🔴 **The budget grew by declaration, and the property did not change** (Owner #227, 2026-09-01,
+/// `req/OWNER_VERBATIM_2026-08-29.md`; TUI faces only). This test asserted `U+0020..=U+007E` as a
+/// literal range, so it refused a glyph the ruling admits — a test that requires the behaviour a
+/// dated ruling has called a defect, which is the one condition under which a gate may be
+/// rewritten. It is rewritten and not deleted: the set is now `ASCII` **plus**
+/// [`tokens::GLYPHS`], read out of the source rather than restated here, so the tofu property this
+/// gate exists for still holds over an enumerated set and a glyph nobody declared still fails.
+///
+/// The ruling's own admission test — a glyph earns its place by carrying a meaning that deletes a
+/// word — is not machine-checkable and is not claimed to be: what is checked is that every
+/// non-ASCII codepoint on the screen is one somebody wrote down, with its meaning and the words it
+/// replaced, in `tokens::GLYPHS`.
 #[test]
 fn p6_every_codepoint_the_face_itself_chose_is_inside_the_declared_budget() {
     let fixture = Fixture::start();
@@ -945,6 +1014,19 @@ fn p6_every_codepoint_the_face_itself_chose_is_inside_the_declared_budget() {
         .filter_map(|reading| reading.body.as_ref())
         .flat_map(|body| body.to_string().chars().collect::<Vec<char>>())
         .collect();
+    // The declared glyphs, read out of the array the face draws them from.
+    let declared: BTreeSet<char> = tokens::GLYPHS
+        .iter()
+        .flat_map(|glyph| glyph.text.chars())
+        .collect();
+    // Each declaration has to say what it means and what it replaced; a blank one is a glyph
+    // admitted without an argument, which is what the ruling refuses.
+    for glyph in tokens::GLYPHS {
+        assert!(
+            !glyph.means.is_empty() && !glyph.instead_of.is_empty(),
+            "🔴 P6: {glyph:?} is declared without a meaning or without the words it replaced"
+        );
+    }
     let mut offenders: Vec<(char, u32)> = Vec::new();
     for (width, height) in [(40u16, 10u16), (80, 24), (200, 40), (40, 6)] {
         let text = renderer::buffer_text(&renderer::render_to_buffer(
@@ -958,21 +1040,25 @@ fn p6_every_codepoint_the_face_itself_chose_is_inside_the_declared_budget() {
             if character == '\n' {
                 continue;
             }
-            if !(' '..='~').contains(&character) && !from_wire.contains(&character) {
+            if !(' '..='~').contains(&character)
+                && !declared.contains(&character)
+                && !from_wire.contains(&character)
+            {
                 offenders.push((character, character as u32));
             }
         }
     }
     println!(
-        "P6_OFFENDERS={offenders:?} P6_WIRE_CHARSET={}",
-        from_wire.len()
+        "P6_OFFENDERS={offenders:?} P6_WIRE_CHARSET={} P6_DECLARED_GLYPHS={}",
+        from_wire.len(),
+        declared.len()
     );
     assert!(
         offenders.is_empty(),
-        "🔴 P6 (`req/942` §12-2): the budget is U+0020..=U+007E. A terminal draws a codepoint its \
-         font is missing as a box, and the reader reads a box as 'this program is broken' — which \
-         is the worst possible reading of the mark that means 'measured, and not knowable'. \
-         {offenders:?}"
+        "🔴 P6 (`req/942` §12-2, widened by Owner #227): the budget is U+0020..=U+007E plus \
+         `tokens::GLYPHS`. A terminal draws a codepoint its font is missing as a box, and the \
+         reader reads a box as 'this program is broken' — which is the worst possible reading of \
+         the mark that means 'measured, and not knowable'. {offenders:?}"
     );
 }
 
@@ -2204,6 +2290,21 @@ fn g17_every_key_the_note_spells_comes_from_the_binding_table() {
 #[test]
 fn g18_the_note_fits_its_rows_and_names_the_keys_it_folded() {
     let offered = renderer::offered(2);
+    // 🔴 **The address this note may spell is now the key, when the key works here** (Owner #227
+    // 2026-09-01 by way of `req/942_artifacts/sidebyside_round3_2026-09-01.md` §8-2: the mechanism
+    // moved to `?` and the words did not). This gate held `HELP_ADDRESS` as the only acceptable
+    // address, so it required the process-exiting command the ruling calls a defect — the one
+    // condition under which a gate is rewritten rather than obeyed. What it asserts is unchanged:
+    // a fold names its count **and** an address for what it folded. Which address is honest is a
+    // property of the act list, and it is read from that list here rather than assumed.
+    let in_place = offered.contains(&Act::Help);
+    let address = if in_place {
+        renderer::spelled(Act::Help)
+    } else {
+        renderer::HELP_ADDRESS.to_string()
+    };
+    // An address that is itself a key is a key on the screen, so it is not among the folded ones.
+    let foldable = offered.len() - usize::from(in_place);
     let head = "record 1 of 2".to_string();
     // The ladder the renderer passes when nothing was let go of: the position, then no head at all.
     let heads = vec![head.clone(), String::new()];
@@ -2224,7 +2325,7 @@ fn g18_the_note_fits_its_rows_and_names_the_keys_it_folded() {
             // head and not the keys — where the reader stands is also drawn by the attention mark,
             // and the keys are drawn nowhere else.
             assert!(
-                note.starts_with(&head) || note.starts_with(&format!("{} keys", offered.len())),
+                note.starts_with(&head) || note.starts_with(&format!("{foldable} keys")),
                 "🔴 g18: the fold produced a form that is on neither rung of the ladder:\n{note}"
             );
             // The floor is allowed not to fit — that is the named ceiling, and the screen is below
@@ -2247,7 +2348,7 @@ fn g18_the_note_fits_its_rows_and_names_the_keys_it_folded() {
                      many:\n{note}"
                 );
                 assert!(
-                    note.contains(renderer::HELP_ADDRESS),
+                    note.contains(&address),
                     "🔴 g18: keys were folded away with no address for them:\n{note}"
                 );
             }
@@ -2284,12 +2385,14 @@ fn g18_the_note_fits_its_rows_and_names_the_keys_it_folded() {
 
     // The negative control: a fold that drops keys without counting them.
     let honest = renderer::note_line(&head, offered, 3);
+    // 🔴 The count the honest line carries is not `offered.len() - 3`. An address that is itself a
+    // key is a key on the screen and is not among the folded ones (Owner #227) — but only while it
+    // is not *also* spelled among the three, in which case nothing is subtracted. The control
+    // computes the same number the line does rather than assuming one, which is what keeps it a
+    // control and not a second implementation of the rule.
+    let spoken = usize::from(in_place && !offered.iter().take(3).any(|act| *act == Act::Help));
     let silent = honest.replace(
-        &format!(
-            "{} more keys: {}",
-            offered.len() - 3,
-            renderer::HELP_ADDRESS
-        ),
+        &format!("{} more keys: {address}", offered.len() - 3 - spoken),
         "",
     );
     assert!(
@@ -5264,16 +5367,46 @@ fn note_parts(note: &str) -> Vec<String> {
 /// clause is the one that ends in the help address, and the key clause is the one whose every
 /// token is an act spelled by [`renderer::spelled`].
 fn head_parts(note: &str, acts: &[Act]) -> Vec<String> {
-    let fold = format!("keys: {}", renderer::HELP_ADDRESS);
+    // 🔴 The fold clause is identified by **whichever** address it is honestly allowed to name
+    // (Owner #227): `help:?` while the key opens the help face on this reading, and the shell
+    // command on the one reading where `super::acts::grounded` clamps it. Naming only the shell
+    // command left `8 keys: help:?` looking like a part of the head that the note gave up, which
+    // is the legend being bought — the exact confusion the paragraph above was written about, with
+    // the other address in it.
+    let folds = [
+        format!("keys: {}", renderer::HELP_ADDRESS),
+        format!("keys: {}", renderer::spelled(Act::Help)),
+    ];
     note_parts(note)
         .into_iter()
         .filter(|part| {
-            !part.ends_with(&fold)
+            !folds.iter().any(|fold| part.ends_with(fold.as_str()))
                 && !part
                     .split_whitespace()
                     .all(|token| acts.iter().any(|act| renderer::spelled(*act) == token))
         })
         .collect()
+}
+
+/// Whether the note's **legend** spells this act, as opposed to the note merely containing the
+/// string somewhere.
+///
+/// 🔴 The difference was nothing until Owner #227 and is load-bearing now. The fold clause's
+/// address is `help:?` on every reading where the key works, so `note.contains("help:?")` is true
+/// on lines where the legend spells no keys at all — and g38's whole subject is what the legend
+/// was *bought* with. The legend is the part whose every token is an act spelled by
+/// [`renderer::spelled`], which is the same structural test [`head_parts`] already uses to remove
+/// it; this asks whether the act is one of that part's tokens.
+fn legend_names(note: &str, acts: &[Act], act: Act) -> bool {
+    let wanted = renderer::spelled(act);
+    note_parts(note).into_iter().any(|part| {
+        let tokens: Vec<&str> = part.split_whitespace().collect();
+        !tokens.is_empty()
+            && tokens
+                .iter()
+                .all(|token| acts.iter().any(|a| renderer::spelled(*a) == *token))
+            && tokens.contains(&wanted.as_str())
+    })
 }
 
 /// A ladder's heads with their prices dropped: the walk that was made before a rung could be
@@ -5340,18 +5473,31 @@ fn read_note(screen: &Screen, width: u16, height: u16, records: usize) -> Option
     None
 }
 
-/// 🔴 **g38 — the help key is bought with a duplicate or it is not bought.**
+/// 🔴 **g38 — the help key is on the note, and what the note gave up is spelled elsewhere.**
 ///
 /// `req/984` §10-9 in one predicate. For each shape: what the note gave up against the ladder
-/// walked at full length has to still be on the screen somewhere else, **and** if some rung could
-/// have bought the help key at that price it has to have been bought. The second half is the one
-/// that refuses on the unrepaired face — a gate that only checked the first half would have been
-/// green before this lane started and green after it, and would have measured nothing.
+/// walked at full length has to still be on the screen somewhere else, **and** the note has to
+/// name the help key.
+///
+/// 🔴 **The second half was changed by `T-r28-owner-attach` (2026-09-01), and this paragraph is
+/// the record of what it used to say.** It read: *"if some rung could have bought the help key at
+/// that price it has to have been bought"*, measured with [`legend_names`] — the **legend**
+/// spelling `help:?`, deliberately not the note merely containing it. That form required the
+/// legend to spell `help:?` on exactly the lines whose fold clause also spells `help:?`, so the
+/// two halves of this face together *forced* `help:?` to appear twice on one row, four cells
+/// apart. That duplicate is the defect the lane was sent to repair, and it was this gate that made
+/// it mandatory.
+///
+/// The repair moves `Act::Help` out of the legend wherever a fold clause exists, so the note now
+/// names the help key at **every** shape rather than at the shapes where a trade was affordable.
+/// The assertion is therefore unconditional, which is strictly stronger than the equality it
+/// replaces: no shape may leave the reader without the way in, whether or not a trade was going.
+/// The affordability walk is kept and reported — it is the reasoning the ruling was made from, and
+/// deleting it would delete the record of why the trade used to be conditional.
 #[test]
 fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
     let records = 28;
     let screen = ledger(records);
-    let help = renderer::spelled(Act::Help);
     let mut shapes: Vec<(u16, u16)> = RULED_SHAPES.to_vec();
     for width in SWEEP_WIDTHS {
         for height in SWEEP_HEIGHTS {
@@ -5363,6 +5509,9 @@ fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
 
     let mut table: Vec<String> = Vec::new();
     let mut untestable: Vec<String> = Vec::new();
+    // Shapes where the note is at `renderer::fold_note`'s declared ceiling and carries no clause at
+    // all. Neither measured nor failed -- see the third-value note below.
+    let mut no_clause: Vec<String> = Vec::new();
     let mut checked = 0usize;
     let mut bought = 0usize;
 
@@ -5401,7 +5550,7 @@ fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
             }
             let candidate =
                 renderer::fold_note(&unpriced(&note.ladder[at..]), note.acts, width, note.rows);
-            if !candidate.contains(&help) {
+            if !legend_names(&candidate, note.acts, Act::Help) {
                 continue;
             }
             let parts = head_parts(&candidate, note.acts);
@@ -5416,23 +5565,45 @@ fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
             }
         }
 
-        let names_help = note.now.contains(&help);
-        if names_help {
+        // Kept for the report: which shapes still spell the key inside the legend, and where a
+        // trade was affordable. Neither decides the verdict any more -- see this gate's own doc.
+        let names_help = legend_names(&note.now, note.acts, Act::Help);
+        // 🔴 The verdict. `Act::Help` is not in `NOTE_ORDER_EMPTY`, and on that reading the road
+        // is the shell command rather than the key, so the question is only asked where the state
+        // offers the act at all -- an absent act is not an unspelled one.
+        let offers_help = note.acts.contains(&Act::Help);
+        let note_names_help = flat(&note.now).contains(&renderer::spelled(Act::Help));
+        if note_names_help {
             bought += 1;
         }
-        assert_eq!(
-            names_help,
-            affordable.is_some(),
-            "🔴 g38 (`req/984` §10-8): at {width}x{height} the note {} the help key and an \
-             affordable trade {}. Affordable means every line it would cost is spelled elsewhere \
-             on the same screen; the cost here was {:?}. The note reads {:?}",
-            if names_help { "names" } else { "does not name" },
-            if affordable.is_some() {
-                "exists"
-            } else {
-                "does not"
-            },
-            affordable,
+        // 🔴 **A third value, and it is not a pass and not a failure.** `renderer::fold_note`
+        // declares a ceiling of its own: when not even the shortest rung can carry the keys clause
+        // at this width, the head is drawn alone and the keys go unmentioned. At 20x8 the note is
+        // the four words `record 1 of 28` and there is nowhere for an address to stand.
+        //
+        // That is a **named** limitation of the face, identical on the unrepaired binary, and
+        // folding it into this gate's failing side would report a defect this lane did not cause
+        // and cannot repair from here. It is counted and printed instead, so the bound stays
+        // visible rather than becoming an exemption nobody can see.
+        //
+        // The predicate is the face's own: the same comparison `fold_note` makes against its last
+        // rung, asked here rather than restated -- a gate that rebuilt this arithmetic would be
+        // measuring its own copy of it.
+        let floor_head = note
+            .ladder
+            .last()
+            .map_or(String::new(), |rung| rung.head.clone());
+        let carries_clause =
+            layout::rows_needed(&renderer::note_line(&floor_head, note.acts, 0), width) as usize
+                <= note.rows;
+        if !carries_clause {
+            no_clause.push(format!("{width}x{height}"));
+        }
+        assert!(
+            !offers_help || !carries_clause || note_names_help,
+            "🔴 g38 (`req/984` §10-8, as moved by T-r28-owner-attach 2026-09-01): at \
+             {width}x{height} the state offers the help act and the note does not spell it \
+             anywhere. legend_names={names_help}, affordable={affordable:?}. The note reads {:?}",
             note.now
         );
         if RULED_SHAPES.contains(&(width, height)) {
@@ -5446,7 +5617,8 @@ fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
     println!("G38_RULED_TABLE={table:?}");
     println!(
         "G38_SHAPES_CHECKED={checked} G38_SHAPES_NAMING_HELP={bought} \
-         G38_UNTESTABLE_NOTE_NOT_DRAWN={untestable:?}"
+         G38_UNTESTABLE_NOTE_NOT_DRAWN={untestable:?} \
+         G38_NO_CLAUSE_AT_CEILING={no_clause:?}"
     );
     assert_eq!(
         table.len(),
@@ -5623,5 +5795,463 @@ fn g40_the_page_address_stands_on_a_row_at_every_ruled_shape() {
          the screen says what it let go of and not where to go and get it. The shapes are {missing:#?}",
         missing.len(),
         RULED_SHAPES.len()
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// g41 / g42 / g43 — Owner #227: which screen am I on, what can I do next, and what does the badge
+// on the provenance line actually claim.
+// ---------------------------------------------------------------------------------------------
+
+/// Every act this frame spells as `name:key`, in the order they are declared.
+///
+/// 🔴 The predicate is [`renderer::spelled`], which is the same string the note draws, so a key
+/// counted here is a key a reader can read off the screen and press. A bare `q` inside a record id
+/// is not a key and is not counted; that is the whole reason the note spells the act's name and its
+/// key with no space between them.
+fn keys_on_frame(frame: &str, rows: usize) -> Vec<Act> {
+    let flattened = flat(frame);
+    renderer::offered(rows)
+        .iter()
+        .filter(|act| flattened.contains(&renderer::spelled(**act)))
+        .copied()
+        .collect()
+}
+
+/// 🔴 **g41 — the screen says which screen it is, at every ruled shape and in all three of them.**
+///
+/// Owner #227 (2026-09-01): what is missing from this face is not a field, it is *where am I, what
+/// am I looking at, and what can I do next*. The third round of the superiority gate measured the
+/// first two as absent — `border 0.0 / tab 0 / region heading 0` at all five common shapes, against
+/// six of twelve reference faces that keep a named structure at forty by ten
+/// (`req/942_artifacts/sidebyside_round3_2026-09-01.md` §3-1). The face had the vocabulary the whole
+/// time: `layout::Subject` declares three shapes and `layout::subject_shape` computes which one is
+/// drawn, and nothing put that answer on a row.
+///
+/// What is asserted, in order: the heading exists; it names **every** declared shape, so the reader
+/// is shown the ones they are not on as well as the one they are; **exactly one** cell is attended
+/// and it is the shape the classifier says is drawn; and the three names reach the **frame** rather
+/// than only the plan. The last of those is what separates a declaration from a screen — this
+/// repository has already shipped a gate that checked a declaration nothing read.
+#[test]
+fn g41_the_heading_names_which_screen_this_is_at_every_shape() {
+    let screen = ledger(28);
+    let mut table: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+
+    for (width, height) in RULED_SHAPES {
+        for subject in layout::SUBJECTS {
+            let measured = renderer::measured(&screen);
+            let plan = layout::resolve(width, height, &measured, false, subject);
+            checked += 1;
+
+            assert!(
+                !plan.heading.is_empty(),
+                "🔴 g41: {width}x{height} {subject:?}: the heading is empty, so the screen does \
+                 not say which screen it is"
+            );
+            let names: Vec<&str> = plan.heading.iter().map(|cell| cell.text.as_str()).collect();
+            for shape in layout::SUBJECTS {
+                assert!(
+                    names.contains(&shape.name()),
+                    "🔴 g41: {width}x{height} {subject:?}: the heading does not name {:?}. A tab \
+                     strip that hides the tabs you are not on answers nothing",
+                    shape.name()
+                );
+            }
+            let attended: Vec<&str> = plan
+                .heading
+                .iter()
+                .filter(|cell| cell.role == tokens::Role::Attend)
+                .map(|cell| cell.text.as_str())
+                .collect();
+            assert_eq!(
+                attended,
+                vec![subject.name()],
+                "🔴 g41: {width}x{height} {subject:?}: the attended cells are {attended:?} and the \
+                 classifier says the screen is {:?}. Exactly one, and it is the one being drawn",
+                subject.name()
+            );
+
+            // 🔴 And it is on the **frame**, not only in the plan. Each shape is reached the way a
+            // reader reaches it — through a view — so this draws the road rather than the switch.
+            let view = match subject {
+                layout::Subject::Grid => View::default(),
+                layout::Subject::Record => View {
+                    open: true,
+                    ..View::default()
+                },
+                layout::Subject::Help => View {
+                    help: true,
+                    ..View::default()
+                },
+            };
+            let frame = renderer::buffer_text(&renderer::render_view_to_buffer(
+                &screen,
+                width,
+                height,
+                Tier::Mono,
+                false,
+                &view,
+            ));
+            let heading_row = frame
+                .lines()
+                .find(|line| {
+                    layout::SUBJECTS
+                        .iter()
+                        .all(|shape| line.contains(shape.name()))
+                })
+                .map(str::to_string);
+            assert!(
+                heading_row.is_some(),
+                "🔴 g41: {width}x{height} {subject:?}: no row of the frame carries all three \
+                 names. The plan has them and the screen does not, which is a declaration nothing \
+                 reads.\n{frame}"
+            );
+            if width == 40 && height == 10 {
+                table.push(format!("{width}x{height} {subject:?}: {heading_row:?}"));
+            }
+        }
+    }
+    println!("G41_CHECKED={checked} G41_40x10={table:?}");
+    assert!(checked > 0, "🔴 g41: nothing was measured");
+}
+
+/// 🔴 **g42 — at every ruled shape the reader can see at least one thing they can do.**
+///
+/// The measured floor, and it was nought. `req/942_artifacts/sidebyside_round3_2026-09-01.md` §3-2
+/// read the note line off the r19 captures at all seven shapes: `120x32=3`, `100x30=4`, `80x24=2`,
+/// and **`66x20`, `60x20`, `46x12` and `40x10` all zero** — nine declared acts and the screen naming
+/// none of them, while `gitui` spells six at forty by ten, `rainfrog` five and `claude-squad` four.
+/// A face that offers no key at the size a reader is most stuck at has, for that reader, no keys.
+///
+/// One is the floor and not the target: the assertion is `>= 1` and the per-shape counts are
+/// printed, so a fall from three keys to one at a wide shape is visible in the output even though
+/// it does not fail here. A gate that asserted the exact counts would be pinning today's widths.
+#[test]
+fn g42_every_ruled_shape_spells_at_least_one_key() {
+    let records = 28;
+    let screen = ledger(records);
+    let mut table: Vec<String> = Vec::new();
+    let mut barren: Vec<String> = Vec::new();
+
+    for (width, height) in RULED_SHAPES {
+        let frame = renderer::buffer_text(&renderer::render_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+        ));
+        let keys = keys_on_frame(&frame, records);
+        table.push(format!(
+            "{width}x{height}={} {:?}",
+            keys.len(),
+            keys.iter()
+                .map(|act| renderer::spelled(*act))
+                .collect::<Vec<_>>()
+        ));
+        if keys.is_empty() {
+            barren.push(format!("{width}x{height}\n{frame}"));
+        }
+    }
+
+    println!("G42_TABLE={table:?}");
+    assert!(
+        barren.is_empty(),
+        "🔴 g42 (Owner #227): {} of the {} ruled shapes spell no key at all. Nine acts are declared \
+         and the reader is told about none of them:\n{}",
+        barren.len(),
+        RULED_SHAPES.len(),
+        barren.join("\n---\n")
+    );
+}
+
+/// 🔴 **g43 — the badge never claims more than this process can see.**
+///
+/// Owner #227, and it is a claim about the engine rather than about a word. Events reach this face
+/// over `live::STREAM_ROUTE`, the bus that feeds it lives **in the serve process**, and a write
+/// another process makes straight to the journal never touches it (`req/38` SS987, measured on a
+/// running engine). So `LIVE` on its own would say *the ledger is being kept fresh*, which this face
+/// has no way to know; `ENGINE LIVE` says *this serve process is emitting events*, which is exactly
+/// what was measured.
+///
+/// The gate is written over the frame rather than over the constant, and it is written **now**,
+/// while the connection is the only thing that could carry such a badge — a rule that arrives after
+/// the second badge arrives too late. Every occurrence of the word on any frame this face can draw
+/// has to be an occurrence of the qualified one; the two counts are equal, or the screen is claiming
+/// something it did not measure.
+#[test]
+fn g43_the_live_badge_is_never_drawn_unqualified() {
+    let records = 28;
+    let screen = ledger(records);
+    let bare = "LIVE";
+    let qualified = live::LIVE_BADGE;
+    assert!(
+        qualified.contains(bare) && qualified != bare,
+        "🔴 g43: the control is vacuous — the qualified badge {qualified:?} has to be the bare word \
+         plus what qualifies it"
+    );
+
+    let mut checked = 0usize;
+    let mut seen = 0usize;
+    let mut offenders: Vec<String> = Vec::new();
+    for (width, height) in RULED_SHAPES {
+        for link in live::LINKS {
+            for help in [false, true] {
+                let report = live::LinkReport {
+                    link,
+                    events: 145,
+                    unreadable: 0,
+                    reconnects: 0,
+                    attempts: 1,
+                };
+                let view = View {
+                    help,
+                    ..View::default()
+                };
+                let frame = flat(&renderer::buffer_text(&renderer::render_live_to_buffer(
+                    &screen,
+                    width,
+                    height,
+                    Tier::Mono,
+                    false,
+                    &view,
+                    report,
+                )));
+                checked += 1;
+                let all = frame.matches(bare).count();
+                let good = frame.matches(qualified).count();
+                seen += all;
+                if all != good {
+                    offenders.push(format!(
+                        "{width}x{height} {} help={help}: {all} occurrences of {bare:?} and {good} \
+                         of {qualified:?}",
+                        link.name()
+                    ));
+                }
+            }
+        }
+    }
+    println!(
+        "G43_CHECKED={checked} G43_BADGES_SEEN={seen} G43_OFFENDERS={}",
+        offenders.len()
+    );
+    // A gate that never met the word would be green on a face that had removed the badge entirely,
+    // which is a different program and not a repaired one.
+    assert!(
+        seen > 0,
+        "🔴 g43: the badge was drawn on no frame in the sweep, so this gate measured nothing"
+    );
+    assert!(
+        offenders.is_empty(),
+        "🔴 g43 (Owner #227): a frame spells {bare:?} without saying whose events it is counting. A \
+         journal written by another process is not observed, so the bare word is a claim this face \
+         cannot make. {offenders:#?}"
+    );
+}
+
+/// 🔴 **g44 — no act is spelled twice on one note.**
+///
+/// `T-r28-owner-attach` (2026-09-01), defect 2. At a hundred cells the list note read
+/// `record 1 of 29 | +8 more rows | GET /v1/transformations | leave:q  help:?  | 7 more keys: help:?`
+/// — `help:?` twice on one row, four cells apart, because the legend spelled the act and the fold
+/// clause spelled the same act as its address. A signpost printed twice is not two signposts: the
+/// second one costs six cells that could have carried a key the reader cannot otherwise see.
+///
+/// The predicate is deliberately about **any** act rather than about `Act::Help`. The duplicate
+/// arose from two independently correct rules meeting, and the next pair of rules to meet will not
+/// be these two.
+///
+/// Composed from the same three functions the region draws with — `note_ladder`, `afford`,
+/// `fold_note` — rather than from a rebuilt string, so it measures the line the screen draws.
+#[test]
+fn g44_no_act_is_spelled_twice_on_one_note() {
+    let mut findings: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    for records in [2usize, 5, 28, 29] {
+        let acts = renderer::offered(records);
+        for width in SWEEP_WIDTHS {
+            for rows in [1usize, 2] {
+                for shown in [1usize, 3, 8, 21] {
+                    if shown >= records {
+                        continue;
+                    }
+                    let position = format!("record 1 of {records}");
+                    let ladder = renderer::note_ladder(&position, Some(records - shown), acts);
+                    let note = renderer::fold_note(
+                        &renderer::afford(&ladder, acts, width, rows),
+                        acts,
+                        width,
+                        rows,
+                    );
+                    checked += 1;
+                    for act in acts {
+                        let spelling = renderer::spelled(*act);
+                        let times = note.matches(spelling.as_str()).count();
+                        if times > 1 {
+                            findings.push(format!(
+                                "{width} cells, {rows} row(s), {records} records: {spelling:?} \
+                                 drawn {times} times in {note:?}"
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    println!("G44_CHECKED={checked} G44_FINDINGS={}", findings.len());
+    assert!(
+        checked > 100,
+        "g44 measured almost nothing ({checked} notes), so a green here means nothing"
+    );
+    assert!(
+        findings.is_empty(),
+        "🔴 g44 (T-r28-owner-attach 2026-09-01): an act is spelled twice on one note in {} cases. \
+         The first few are {:?}",
+        findings.len(),
+        &findings[..findings.len().min(6)]
+    );
+}
+
+/// 🔴 **g45 — one cutting policy: a declared road is never broken across two rows.**
+///
+/// `T-r28-owner-attach` (2026-09-01), defect 3. At a hundred cells the disclosure ended one row
+/// with `... 2 routes read and not drawn: GET` and opened the next with `/v1/candidates,`. A method
+/// and a path are one name; a row that ends in a bare `GET` reads as a defect rather than as a
+/// wrap.
+///
+/// 🔴 **The roads are listed here from the four declarations that already existed, and not from
+/// `layout::unbreakable()`.** A gate that read the repair's own list would measure whether the list
+/// agrees with itself. These four are the addresses this face spells, and the property is stated
+/// about them directly.
+///
+/// A road wider than the screen is skipped rather than failed: `wrap` breaks inside a word that
+/// cannot fit, that is declared behaviour, and it is a different question from this one.
+#[test]
+fn g45_no_declared_road_is_broken_across_two_rows() {
+    let roads: Vec<String> = {
+        let mut roads = vec![
+            layout::LEDGER_ADDRESS.to_string(),
+            layout::WIDE_ADDRESS.to_string(),
+            renderer::HELP_ADDRESS.to_string(),
+        ];
+        roads.extend(
+            layout::READ_NOT_DRAWN
+                .iter()
+                .map(|road| (*road).to_string()),
+        );
+        roads
+    };
+    assert!(
+        roads.len() >= 5,
+        "the denominator came from nowhere: {roads:?}"
+    );
+
+    let screen = ledger(29);
+    let measured = renderer::measured(&screen);
+    let mut findings: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    let mut skipped_too_narrow = 0usize;
+
+    for width in SWEEP_WIDTHS {
+        for height in SWEEP_HEIGHTS {
+            let plan = layout::resolve(width, height, &measured, false, layout::Subject::Grid);
+            let acts = renderer::offered(29);
+            let ladder = renderer::note_ladder("record 1 of 29", Some(8), acts);
+            let note =
+                renderer::fold_note(&renderer::afford(&ladder, acts, width, 2), acts, width, 2);
+            for text in [plan.disclosure.clone(), plan.provenance.clone(), note] {
+                for road in &roads {
+                    let wanted = text.matches(road.as_str()).count();
+                    if wanted == 0 {
+                        continue;
+                    }
+                    if road.chars().count() > width as usize {
+                        skipped_too_narrow += 1;
+                        continue;
+                    }
+                    checked += 1;
+                    let drawn: usize = layout::wrap(&text, width)
+                        .iter()
+                        .map(|row| row.matches(road.as_str()).count())
+                        .sum();
+                    if drawn != wanted {
+                        findings.push(format!(
+                            "{width}x{height}: {road:?} whole {wanted} time(s) in the text and \
+                             {drawn} time(s) after wrapping -- {:?}",
+                            layout::wrap(&text, width)
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    println!(
+        "G45_CHECKED={checked} G45_SKIPPED_ROAD_WIDER_THAN_SCREEN={skipped_too_narrow} \
+         G45_FINDINGS={}",
+        findings.len()
+    );
+    assert!(
+        checked > 50,
+        "g45 measured almost nothing ({checked} placements), so a green here means nothing"
+    );
+    assert!(
+        findings.is_empty(),
+        "🔴 g45 (T-r28-owner-attach 2026-09-01): a declared road was broken across two rows in {} \
+         cases. The first few are {:?}",
+        findings.len(),
+        &findings[..findings.len().min(4)]
+    );
+}
+
+/// 🔴 **g46 — a resize is an event this face answers.**
+///
+/// `T-r28-owner-attach` (2026-09-01), found by measurement rather than by reading. The interactive
+/// loop reads `terminal.size()` only when the frame is dirty, and its event match sent everything
+/// that was not a key press to `Ok(_) => {}`. A resize therefore marked nothing, so the face went
+/// on drawing the plan it had resolved for the **old** size until something else happened to dirty
+/// the frame — on a quiet engine, never.
+///
+/// Measured (`req/942_artifacts/tui_r28_2026-09-01/RESIZE_PROOF.txt`), resizing a running process
+/// from 80x24 to 120x32: without the arm, the face did not follow within 10s in two runs against a
+/// live engine and took 3181ms against no engine at all; with it, 5ms, 7ms and 6ms.
+///
+/// 🔴 A third run without the arm **did** follow within 3s. That is not a contradiction, it is the
+/// shape of the defect: without the arm the frame is redrawn only when something else dirties it,
+/// so the face follows a resize by luck — whenever a subscription event or a change of link state
+/// happens to arrive. The first version of this paragraph said the face stayed at 80 "until the
+/// process was replaced", which is what one run looked like and is more than the measurements
+/// support.
+///
+/// 🔴 **Why this is a source gate and not a shape sweep.** Every shape measurement in this suite
+/// and in every capture this repository takes starts a *new* process at the shape it is measuring.
+/// None of them resizes anything, which is exactly why 493 measured shapes did not see this. A
+/// gate built the same way would not see it either. What is asserted here instead is the one line
+/// that makes the answer possible, in the idiom g1/g7/g11 already use for facts about this face's
+/// own source.
+#[test]
+fn g46_a_resize_is_an_event_this_face_answers() {
+    let path = tui_dir().join("renderer.rs");
+    let src = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let arms: Vec<&str> = src
+        .lines()
+        .filter(|line| !is_comment(line))
+        .filter(|line| line.contains("Event::Resize"))
+        .collect();
+    println!("G46_ARMS={arms:?}");
+    assert_eq!(
+        arms.len(),
+        1,
+        "🔴 g46 (T-r28-owner-attach 2026-09-01): this face answers a resize in {} places. It has \
+         to be exactly one -- nought means a window can be made wider and the face goes on drawing \
+         the old plan, and two means there are two answers to the same event.",
+        arms.len()
+    );
+    assert!(
+        arms[0].contains("dirty = true"),
+        "🔴 g46: the resize arm exists but does not mark the frame dirty, so `terminal.size()` is \
+         never asked again and the arm changes nothing: {:?}",
+        arms[0]
     );
 }

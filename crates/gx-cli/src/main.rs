@@ -557,6 +557,8 @@ enum Command {
                       \x20 return  see everything this record carries\n\
                       \x20 escape  stop seeing one record and see the list again\n\
                       \x20 r    ask the engine again, now\n\
+                      \x20 ?    see what this face can do, and what each key is for\n\
+                      \x20 w    spell what was let go of in full, without restarting\n\
                       \x20 q    stop reading and give the terminal back\n\
                       \n\
                       Marks. A cell is never blank when the answer is a kind of nothing, and the \

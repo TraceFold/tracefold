@@ -15,7 +15,7 @@ See the Scope Exclusions table below and [docs/LIMITS.md](docs/LIMITS.md) for wh
 <a href="https://doi.org/10.5281/zenodo.22168558"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22168558-00dfd8?style=for-the-badge&logo=doi&logoColor=090a0f" alt="Zenodo DOI"></a>
 <a href="https://www.npmjs.com/package/@mahirhir/tracefold"><img src="https://img.shields.io/badge/npm-SDK%20v0.1-0070f3?style=for-the-badge&logo=npm&logoColor=ffffff" alt="npm SDK"></a>
 <a href="rust-toolchain.toml"><img src="https://img.shields.io/badge/Rust-1.97.1-7928ca?style=for-the-badge&logo=rust&logoColor=ffffff" alt="Rust 1.97.1"></a>
-<a href="lean/"><img src="https://img.shields.io/badge/Lean%204-117%20Theorems-00dfd8?style=for-the-badge&logoColor=090a0f" alt="Lean 4 Proofs"></a>
+<a href="lean/"><img src="https://img.shields.io/badge/Lean%204-154%20Theorems-00dfd8?style=for-the-badge&logoColor=090a0f" alt="Lean 4 Proofs"></a>
 <a href="mailto:mahirohirakawa@glovrex.com"><img src="https://img.shields.io/badge/Contact-mahirohirakawa%40glovrex.com-26231f?style=for-the-badge&logo=minutemailer&logoColor=ffffff" alt="Email"></a>
 <a href="https://discord.gg/rtvXqYEQzr"><img src="https://img.shields.io/badge/Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=ffffff" alt="Discord"></a>
 <a href="https://buy.polar.sh/polar_cl_yO81NsWT1zDnCzfulaArcrpnS5GuPW5ac3gxf29LgLa"><img src="https://img.shields.io/badge/Support-Pay%20what%20you%20want-ff4f00?style=for-the-badge&logo=polar&logoColor=ffffff" alt="Support Tracefold"></a>
@@ -122,7 +122,7 @@ TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws
 | Dimension | Measured Value | Conditions & Scope |
 | :--- | --: | :--- |
 | **Test Floor** | **2,602** probes | 454 suites + SDK 36 passed &middot; fresh clone &middot; 25 Aug 2026 |
-| **Lean Formal Proofs** | **117** theorems | Lean 4, `sorry` 0, 12 counterexamples |
+| **Lean Formal Proofs** | **154** theorems | Lean 4, 14 files: **154 theorems, 14 of them counterexamples, 1 axiom, sorry 0** |
 | **Open High Holes** | **0** | After 44 adversarial audit rounds |
 | **Unmeasured Platforms** | 3 environments | Windows native, OneDrive, SMB |
 

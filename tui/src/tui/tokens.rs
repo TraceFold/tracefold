@@ -235,6 +235,49 @@ impl Token {
     }
 }
 
+/// A glyph this face draws that is **outside** `U+0020..=U+007E`, the meaning it carries, and the
+/// words that are not on the screen because it is.
+///
+/// 🔴 **A declaration, because what it widens is a gate.** Until Owner #227 (2026-09-01, the TUI
+/// session's entry in `req/OWNER_VERBATIM_2026-08-29.md`) this face's own vocabulary was ASCII by
+/// rule and `P6` refused everything else. That rule bought a real property — a terminal draws a
+/// codepoint its font is missing as a box, and a reader reads a box as *this program is broken*,
+/// which is the worst available reading of a mark that means "measured, and not knowable". The
+/// ruling did not throw the property away; it moved it. The budget is now `U+0020..=U+007E`
+/// **plus this array**, so the set is still small, still enumerated, and still the thing a gate
+/// reads rather than something a screen may reach for.
+///
+/// The admission test is [`Glyph::instead_of`] and it is not decoration: a glyph earns its place
+/// only when it carries a meaning and **thereby deletes a word**. A glyph beside a word that stays
+/// is weight, and this face spends cells on weight last.
+///
+/// 🔴 The seven words for nothing (`super::wire::Nothing::mark`) are **not** in scope here and are
+/// not to be respelled. They are the one vocabulary where a substitution destroys a distinction.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Glyph {
+    /// What is drawn.
+    pub text: &'static str,
+    /// What it means, in the reader's words.
+    pub means: &'static str,
+    /// The words that are not on the screen because this glyph is.
+    pub instead_of: &'static str,
+}
+
+/// Every glyph outside the ASCII budget this face may draw. Gate `P6` reads this array.
+///
+/// One entry, and the count is the point: the ruling opened a door, not a room.
+pub const GLYPHS: [Glyph; 1] = [Glyph {
+    text: "\u{2502}",
+    means: "a boundary between two parts of one screen",
+    instead_of: "the labels that would otherwise have to name each part in words",
+}];
+
+/// The boundary between two parts of one screen.
+///
+/// 🔴 Read out of [`GLYPHS`] rather than typed a second time: a second spelling is a glyph the
+/// gate's allow-list does not cover, which is the failure the array exists to make impossible.
+pub const RULE: &str = GLYPHS[0].text;
+
 /// One resolved value: a colour in the spelling this tier can carry, and the emphasis.
 ///
 /// 🔴 At most one of the three colour members is ever `Some`. They are three spellings of one

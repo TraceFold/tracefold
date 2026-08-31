@@ -282,6 +282,18 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
     // the line that says what is not on the screen cannot disagree with the region about which
     // shape was drawn (`req/964` §16). A second `if` here would be a second answer.
     let shape = layout::subject_shape(reading, view);
+    // 🔴 **The heading, and it stands over all three shapes** (Owner #227, 2026-09-01). It is the
+    // row that answers *which screen is this, and which of the three am I on* — the question this
+    // face could not answer below eighty cells, measured against twelve reference faces of which
+    // six keep a named structure at forty by ten. Composed in `super::layout::heading` and only
+    // bound here, so what a reader sees is a value a gate can read rather than a branch in a
+    // drawing loop.
+    lines.push(Line::from(spans(
+        plan.heading
+            .iter()
+            .map(|cell| (cell.text.clone(), cell.role)),
+        tier,
+    )));
     let open = shape == layout::Subject::Record;
     // The header belongs to the **grid** and to nothing else, which is why the test is for the
     // grid rather than against the record. It was `!open`, which reads as "everything that is
@@ -303,9 +315,13 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         )));
     }
 
-    let body_rows = area.height.saturating_sub(u16::from(grid)) as usize;
+    // One row for the heading, which every shape draws, and one more for the grid's own header.
+    let body_rows = area
+        .height
+        .saturating_sub(1)
+        .saturating_sub(u16::from(grid)) as usize;
     if shape == layout::Subject::Help {
-        help_lines(&mut lines, body_rows, area.width, tier);
+        help_lines(&mut lines, body_rows, area.width, tier, plan);
     } else if items.is_empty() {
         // 🔴 `zero` only when the engine answered with the list and the list was empty. A refusal
         // has a body too, and drawing `0` for it would tell the reader there are no records when
@@ -471,18 +487,22 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
 /// first. There is no border, no colour and no mark of its own — **the visual design of this face
 /// is deliberately nothing at all**, because the Owner's visual ruling on the sample has not been
 /// made and a new screen invented before it would be inventing an answer.
-fn help_lines(lines: &mut Vec<Line<'static>>, body_rows: usize, width: u16, tier: Tier) {
-    let mut entries: Vec<String> = acts::ACTS
-        .into_iter()
-        .map(|act| {
-            format!(
-                "{} {}  {}",
-                pad(act.name().trim_start_matches("act."), 6),
-                pad(&act.keys().join(" "), 14),
-                act.intent()
-            )
-        })
-        .collect();
+fn help_lines(
+    lines: &mut Vec<Line<'static>>,
+    body_rows: usize,
+    width: u16,
+    tier: Tier,
+    plan: &Plan,
+) {
+    let mut entries: Vec<String> = Vec::new();
+    entries.extend(acts::ACTS.into_iter().map(|act| {
+        format!(
+            "{} {}  {}",
+            pad(act.name().trim_start_matches("act."), 6),
+            pad(&act.keys().join(" "), 14),
+            act.intent()
+        )
+    }));
     entries.extend(layout::REGIONS.into_iter().map(|region| {
         format!(
             "{} {}",
@@ -490,12 +510,45 @@ fn help_lines(lines: &mut Vec<Line<'static>>, body_rows: usize, width: u16, tier
             region.intent.sentence()
         )
     }));
+    // 🔴 **The disclosed half of the provenance, and it stands last** (Owner #227: keep the four
+    // measured facts, and separate what stands on every frame from what is reached on demand). The
+    // provenance region has three rungs and the bottom one gives the connection's counts up; this
+    // is the line in full, and the badge's meaning beside it, because neither is spelled anywhere
+    // else on any screen.
+    //
+    // Last, and that is a **measured retreat**. They were first — a rung-price argument: what is
+    // spelled nowhere else outranks what the address below carries. At forty by ten the provenance
+    // line wraps to three of the four body rows, so first meant the help face read `1 of 16` and a
+    // reader who pressed `?` for the keys got a clock. The rule the ordering was serving is real
+    // and the screen it produced was worse than the one it replaced, so the ordering yields and
+    // the **note** carries the honesty instead: it names what the shell address answers for rather
+    // than implying it answers for all sixteen.
+    //
+    // Both labels are declared words. `RegionRole::short` is the region this belongs to and
+    // `Link::name` is the state whose badge it explains, so the help face still introduces no
+    // vocabulary of its own — the property that lets it be believed.
+    entries.push(format!(
+        "{} {}",
+        pad(layout::RegionRole::Provenance.short(), 11),
+        plan.provenance_full
+    ));
+    entries.push(format!(
+        "{} {}",
+        pad(live::Link::Open.name(), 11),
+        live::LIVE_MEANS
+    ));
 
     // Composed before the rows it sits under, like every other note in this face: a line that says
     // how much was let go of, written after the letting go, is a line that gets clipped.
+    //
+    // 🔴 `acts in full:` and not a bare address. `gx tui --help` spells every declared act — gate
+    // g12c in the consumer's suite is what makes that worth saying — and it spells **neither** of
+    // the two lines above, which are measurements of this run. An address offered against a count
+    // of sixteen would be claiming to answer for all sixteen; naming what it carries is four words
+    // and the difference between a road and a wave.
     let note = |shown: usize| {
         format!(
-            "{shown} of {} | close: {} | {HELP_ADDRESS}",
+            "{shown} of {} | close: {} | acts in full: {HELP_ADDRESS}",
             entries.len(),
             spelled(Act::Help)
         )
@@ -635,9 +688,32 @@ pub fn note_line(head: &str, acts: &[Act], spell: usize) -> String {
     // key/value pairs with, rather than by the pipe that separates the parts. With a pipe between
     // them the screen wrapped after a separator and left a bare `|` hanging at the end of a row,
     // which reads as a defect. Two spaces group without punctuating.
-    let keys = acts
+    // 🔴 **`help` is spelled in the road slot or in the legend, never in both.**
+    //
+    // At a hundred cells this line read `... | leave:q  help:? | 7 more keys: help:?` -- `help:?`
+    // twice on one row, four cells apart. A signpost printed twice is not two signposts.
+    //
+    // The first repair of this deleted the road and kept the legend, and two gates refused it and
+    // were right to: g34's partition (`declared = spelled + disclosed`) fell to `disclosed 0` in
+    // 135 of 479 shapes, and g18's control stopped moving the line. `{n} more keys` says how many
+    // went and not where they went, and *the line* disclosing them is not *the clause* disclosing
+    // them. So the road stays and the **duplicate** goes: wherever there is a fold clause to carry
+    // it, `Act::Help` comes out of the legend, because the clause is about to spell it anyway.
+    //
+    // The clause's text is unchanged at every shape -- the count below already discounted the act
+    // the address spells. What changes is that the cells the duplicate held are spent on a key the
+    // reader could not otherwise see.
+    let folds = spell < acts.len();
+    let in_place = acts.contains(&Act::Help);
+    let hoisted = folds && in_place;
+    let shown: Vec<Act> = acts
         .iter()
         .take(spell)
+        .copied()
+        .filter(|act| !(hoisted && *act == Act::Help))
+        .collect();
+    let keys = shown
+        .iter()
         .copied()
         .map(spelled)
         .collect::<Vec<_>>()
@@ -652,12 +728,40 @@ pub fn note_line(head: &str, acts: &[Act], spell: usize) -> String {
     // is not tidying: it is five cells, and five cells is the difference between `7 keys: gx tui
     // --help` fitting a forty-cell row and the row being cut in the middle of `gx tui --he`, which
     // reads as a command rather than as a cut.
-    if spell < acts.len() {
-        let count = acts.len() - spell;
-        if spell == 0 {
-            parts.push(format!("{count} keys: {HELP_ADDRESS}"));
+    if folds {
+        let count = acts.len() - shown.len();
+        // 🔴 **The address is the key when the key works here** (`req/942_artifacts/
+        // sidebyside_round3_2026-09-01.md` §8-2). `?` has opened the help face in place since
+        // `Act::Help` landed, and this line went on sending the reader to a command that ends the
+        // process — the mechanism moved and the words did not. `HELP_ADDRESS` is still the road
+        // when the list has nothing in it, because `super::acts::grounded` clamps `?` there and an
+        // address that does nothing is worse than a long one.
+        //
+        // It is decided from `acts` rather than passed in: this function is handed the very list
+        // the reducer offers, so the line cannot name a road the state does not have.
+        let address = if in_place {
+            spelled(Act::Help)
         } else {
-            parts.push(format!("{count} more keys: {HELP_ADDRESS}"));
+            HELP_ADDRESS.to_string()
+        };
+        // 🔴 **An address that is itself a key is a key on the screen, and the count says so.**
+        // `help:?` is `spelled(Act::Help)` character for character, so a line reading
+        // `9 keys: help:?` was spelling one of the nine and counting all nine as missing — the
+        // reader is told the way in and told, in the same breath, that they cannot see it. The
+        // partition g34 measures (`declared = spelled + disclosed`) would also have come to ten
+        // out of nine, which is how a count like this gets caught rather than argued about.
+        // 🔴 It is `hoisted` rather than a search of the legend, which is the same fact read
+        // from the other end: the legend no longer holds `Act::Help` wherever this clause exists,
+        // because this clause is where it is drawn.
+        let spoken = usize::from(hoisted);
+        let count = count - spoken;
+        if count == 0 {
+            // The one act left over is the one the address spells, so the clause is the address.
+            parts.push(address);
+        } else if shown.is_empty() {
+            parts.push(format!("{count} keys: {address}"));
+        } else {
+            parts.push(format!("{count} more keys: {address}"));
         }
     }
     parts.join(" | ")
@@ -1138,6 +1242,31 @@ pub fn interactive(options: &super::Options, tier: Tier) -> crate::Result<(u64, 
                         Signal::None => {}
                     }
                 }
+                // 🔴 **A resize is not a key, and it is not nothing.** The loop reads
+                // `terminal.size()` only on a dirty frame, and this arm was `Ok(_) => {}` -- so a
+                // window made wider went on being drawn against the plan resolved for the old one,
+                // for as long as nothing else happened to mark the frame dirty. On a quiet engine
+                // that is indefinitely.
+                //
+                // Measured, and the first statement of this was too strong and is corrected here.
+                // `req/942_artifacts/tui_r28_2026-09-01/RESIZE_PROOF.txt`, resizing a running
+                // process from 80x24 to 120x32:
+                //
+                //   engine live, this arm absent : did not follow within 10s (2 of 2 runs)
+                //   engine live, this arm present:  5ms, 7ms
+                //   no engine,   this arm absent : 3181ms
+                //   no engine,   this arm present:    6ms
+                //
+                // A third run of the absent case *did* follow within 3s, and that is the shape of
+                // the defect rather than a contradiction: without this arm the frame is redrawn
+                // only when something **else** dirties it, so the face follows a resize by luck --
+                // whenever a subscription event or a change of link state happens to arrive. On an
+                // idle engine nothing arrives and nothing is redrawn.
+                //
+                // Every ruled shape in this repository is measured by starting a *new* process at
+                // that shape. No measurement anywhere in it resizes anything, which is why a suite
+                // of 493 shapes could not see this.
+                Ok(Event::Resize(..)) => dirty = true,
                 Ok(_) => {}
                 Err(e) => break Err(e),
             },

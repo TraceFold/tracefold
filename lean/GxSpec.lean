@@ -9,6 +9,7 @@ import GxSpec.InjectionRng
 import GxSpec.MinimalityF0
 import GxSpec.EffectAlgebra
 import GxSpec.Attribution
+import GxSpec.StateMachine
 
 /-!
 # GxSpec — root import (all modules gathered) (sem: SEM-lean-001)
@@ -73,4 +74,18 @@ bridge showing that the pre/post pair `GxSpec.EffectAlgebra`'s laws are stated m
 reconstructible from a journal exactly when the post value is recorded. The proved-versus-not
 inventory and the five denominators (no-collision hypothesis, two hypotheses not the full lifecycle,
 three modelled kinds and formats, no window size, the Rust bridge is prose) are owned by that file's
-header; this root carries import reachability only. (sem: SEM-lean-204) -/
+header; this root carries import reachability only. (sem: SEM-lean-204)
+
+Q10 stage (`req/38` §SS889's Lean-coverage census, narrowed to the Lean half by §SS894; queue row
+R-10 of `req/964` §2): `GxSpec.StateMachine` joins here -- the lifecycle transition system of
+`43-state-machine.md` §1/§3 and the seven safety invariants of its §9, which that section's own
+preamble names as the direct obligation of the Lean lemmas and which nothing under `lean/` had
+touched. Same gate shape as every stage before it (import-reachable from this root and
+type-checks), same house form (a breakage theorem paired with a recovery theorem on the same
+model). It also carries the first refinement statement in this tree: `Simulates` names the
+hypothesis under which the model's invariants transport to an implementation, and
+`refinement_transports_safety` proves the transport. **That hypothesis is not discharged for
+`crates/gx-engine` anywhere**, so `docs/LIMITS.md` item 8 stands unretracted -- what changed is
+that the proposition now exists and can be aimed at. The four liveness rows (INV-L1..L4) are
+deliberately absent and `liveness_needs_a_clock_counterexample` states why in the model rather than
+in prose; the denominators live in that file's header. (sem: SEM-lean-273) -/

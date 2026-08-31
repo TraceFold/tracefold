@@ -48,21 +48,45 @@ the source rather than restating this page's own authority.
    cannot invent one.
    (req/38 §78 (census v2 stage1, first measurement))
 
-8. the Lean model under `lean/` proves 117 theorems about the F0 specification, 12 of
-   them named counterexamples, over 13 files, with 0 `sorry` and 1 `axiom` carried
+8. the Lean model under `lean/` proves 154 theorems about the F0 specification, 14 of
+   them named counterexamples, over 14 files, with 0 `sorry` and 1 `axiom` carried
    rather than proved (a line-start count of the tree itself, which a test re-takes on
    every run); the Rust implementation is
    compared against that model by a differential test -- 1,500 conformance vectors,
    six kinds, on every push -- and a comparison is a difference check, not a proof: no
-   refinement theorem connects the two. as of 2026-08-29 (`req/908`), CI has run zero
-   jobs on any push since 2026-08-15T17:25:29Z -- 13 days and 2,245 commits with no
-   machine signal, because the GitHub Actions account is billing-blocked, not because of
-   a code defect; the last time it ran (commit `f65aac2f`), the checks covered 16 of
-   this project's 17 workspace crates automatically (`probes/doubt` runs by hand because
-   its subject lives outside the repository), and the TypeScript SDK's own tests have
-   never run under CI at all -- their green has always been a person's run, not a
-   machine's.
-   (45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note); req/908 (2026-08-29 CI diagnosis); req/38 ERRATA SS871)
+   refinement theorem connects the two. CI has run zero jobs on any push since
+   the GitHub Actions account went billing-blocked at 2026-08-15T17:25:29Z
+   (`req/908`), not because of a code defect; the last time it ran (commit `f65aac2f`),
+   the checks covered 16 of this project's 17 workspace crates automatically
+   (`probes/doubt` runs by hand because its subject lives outside the repository), and
+   the TypeScript SDK's own tests have never run under CI at all -- their green has
+   always been a person's run, not a machine's.
+   (45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note); req/908 (2026-08-29 CI diagnosis); req/38 ERRATA SS871; req/979 D4; req/1006 (R-979-3 clock-drift repair, 2026-09-01))
+
+   > 🔴 **R-979-3 correction (2026-09-01, `req/979` D4, `req/1006`)** — the live sentence above
+   > used to say "as of 2026-08-29 (`req/908`) ... 13 days and 2,245 commits with no machine
+   > signal". That elapsed count is kept, struck, immediately below (no-delete) because a limits
+   > page that quietly rewrites its own history is asking to be trusted about the present the
+   > same way the B8 correction two notes below was just caught not being:
+   > ~~as of 2026-08-29 (`req/908`), CI has run zero jobs on any push since 2026-08-15T17:25:29Z
+   > -- 13 days and 2,245 commits with no machine signal, because the GitHub Actions account is
+   > billing-blocked~~
+   >
+   > **Why this changed.** The count had already been re-measured once (15 days / 2,496 commits,
+   > 2026-08-31 correction, below) and would need re-measuring on every later read after that --
+   > a sentence anchored to `today` cannot stay true without someone re-counting it each time, and
+   > nobody re-counts it on every read. That is the structural defect, not a one-off staleness:
+   > the two machine-checked faces (`crates/gx-cli/src/limits.rs` and this page) can be perfectly
+   > in sync with **each other** while both are false about the world, because
+   > `crates/gx-cli/tests/limits_sync.rs` only checks that the two say the same thing, never that
+   > either is current. The replacement states only what does not move -- the fixed timestamp CI
+   > stopped signalling at -- so the sentence stays true without anyone re-counting it (the
+   > elapsed-days/elapsed-commits framing is not reintroduced; a reader who wants today's count
+   > has `req/908`/`req/979`/the git log, not a number this page would have to chase).
+   > This note does not withdraw the B8 correction's premise or the 2026-08-31 correction's three
+   > points below -- both stand as the dated historical record they already were. It withdraws
+   > only the *live* sentence's habit of stating an elapsed count, which those two notes did not
+   > have (they are themselves dated snapshots, not the machine-checked line).
 
    > 🔴 **The two numbers in the first clause are stale, and this note is the correction**
    > (v0.5-f, `req/279` L-01). `README.md` says **92 theorems**, this line says **eight**, and a

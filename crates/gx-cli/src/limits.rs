@@ -106,6 +106,15 @@ pub const LIMITS: [Limit; 8] = [
     // does not self-correct when the world under it changes (SS868 "開示の段落こそ最初に腐る"), so the
     // replacement below is dated rather than tenseless, and is bound to req/908's diagnosis rather
     // than to memory. The struck original is kept in `docs/LIMITS.md` (no-delete).
+    // 🔴 **R-979-3 (`req/979` D4, `req/1006`, 2026-09-01)** — the tail clause used to state an
+    // elapsed count ("as of 2026-08-29 ... 13 days and 2,245 commits") anchored to the date the
+    // sentence was written. That count cannot stay true: it already had to be re-measured twice
+    // (15 days/2,496 commits on 2026-08-31, per the correction note in `docs/LIMITS.md`) and would
+    // need re-measuring again on every later read, which is exactly the clock-drift `docs/LIMITS.md`
+    // SS866 warns about ("a statement built from `today` drifts by construction"). The replacement
+    // below states only what does not move -- the fixed timestamp CI stopped signalling at -- so the
+    // sentence stays true without anyone re-counting it. The old wording is kept, struck, in
+    // `docs/LIMITS.md` (no-delete).
     Limit {
         statement: "the Lean model under `lean/` proves 154 theorems about the F0 specification, 14 \
                      of them named counterexamples, over 14 files, with 0 `sorry` and 1 `axiom` \
@@ -113,15 +122,14 @@ pub const LIMITS: [Limit; 8] = [
                      re-takes on every run); the Rust implementation is \
                      compared against that model by a differential test -- 1,500 conformance vectors, \
                      six kinds, on every push -- and a comparison is a difference check, not a proof: \
-                     no refinement theorem connects the two. as of 2026-08-29 (`req/908`), CI has run \
-                     zero jobs on any push since 2026-08-15T17:25:29Z -- 13 days and 2,245 commits \
-                     with no machine signal, because the GitHub Actions account is billing-blocked, \
-                     not because of a code defect; the last time it ran (commit `f65aac2f`), the \
-                     checks covered 16 of this project's 17 workspace crates automatically \
+                     no refinement theorem connects the two. CI has run zero jobs on any push since \
+                     the GitHub Actions account went billing-blocked at 2026-08-15T17:25:29Z \
+                     (`req/908`), not because of a code defect; the last time it ran (commit `f65aac2f`), \
+                     the checks covered 16 of this project's 17 workspace crates automatically \
                      (`probes/doubt` runs by hand because its subject lives outside the repository), \
                      and the TypeScript SDK's own tests have never run under CI at all -- their green \
                      has always been a person's run, not a machine's.",
-        citation: "45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note); req/908 (2026-08-29 CI diagnosis); req/38 ERRATA SS871",
+        citation: "45 §4.2 (v0.2.3 note; v0.4-l present-tense note); 51 §11.1 (v0.2.3 note; v0.4-l present-tense note); req/908 (2026-08-29 CI diagnosis); req/38 ERRATA SS871; req/979 D4; req/1006 (R-979-3 clock-drift repair, 2026-09-01)",
     },
 ];
 
