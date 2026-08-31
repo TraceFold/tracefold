@@ -1,0 +1,4 @@
+# Funding channel for TraceFold (pay-what-you-want via Polar).
+# The `polar:` platform field is deliberately NOT used: it renders the org slug,
+# which is a retired handle. The opaque checkout URL below carries no handle.
+custom: ["https://buy.polar.sh/polar_cl_yO81NsWT1zDnCzfulaArcrpnS5GuPW5ac3gxf29LgLa"]
