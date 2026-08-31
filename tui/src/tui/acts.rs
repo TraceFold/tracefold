@@ -169,7 +169,18 @@ pub fn for_key(key: &str) -> Option<Act> {
 /// What the reader has done. Not what was measured — that is `super::wire`'s.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct View {
-    /// Which record is attended to, as an index into the rows the subject region drew.
+    /// Which record is attended to, as an index into the records the read carried.
+    ///
+    /// 🔴 **It said "the rows the subject region drew", and that was false** (`req/38` SS996). What
+    /// [`apply`] clamps against is the number of records the list *holds*, which is what a reducer
+    /// with no screen in front of it can know; the subject region draws as many of them as its rows
+    /// allow and starts at the first one, so on a list that is being cut the attention can be moved
+    /// on to a record that is not drawn and the mark then appears nowhere. Measured at 100x5 against
+    /// the two-record fixture: nought records drawn, and the note reporting `record 2 of 2`
+    /// (`req/942_artifacts/tui_r4_2026-08-31/`). Closing it needs the drawn row count to reach this
+    /// reducer — the same missing edge as `req/964` §16's third row — or a window that scrolls,
+    /// which is a concept this face does not have. **Declared, not repaired**; the sentence above is
+    /// corrected rather than the code, because the code is what a reducer is allowed to know.
     pub selected: usize,
     /// Whether the attended record is opened in place.
     pub open: bool,

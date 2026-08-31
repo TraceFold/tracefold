@@ -1499,6 +1499,36 @@ impl Session {
     /// came from is gone — which is the one durable consequence of `.gx/drafts/` being
     /// `Nature::Source` (req/56 §2: "is lost"; sem: SEM-gx-cli-243). [`Error::Usage`] if the world has moved and the
     /// plan now names a different transformation. Anything the engine refuses, unchanged.
+    ///
+    /// # 🔴 **`req/981` F2 (and `req/222` H-03's twin on this face)** — the question is asked
+    /// **before** the engine is allowed to write, and both of the sentences below are now reachable
+    ///
+    /// This used to call `Engine::plan` and compare afterwards. Two things followed, and `req/981`
+    /// measured both against a built binary rather than reasoning about them:
+    ///
+    /// 1. **A refused resume left a committable row behind.** `plan` mints a *different*
+    ///    `TransformationId` on the stale road, finds `rehydrating` false, and appends a `Planned`
+    ///    for it. Measured on `gx verify <stale TID>`: the journal went **496 → 859 bytes and one
+    ///    `Planned` record → two**, for a transformation the caller never named — the exact defect
+    ///    `req/222` H-03 measured over HTTP and R3 repaired in `gx_api::handlers::rebuilt`, left
+    ///    standing on this face because nobody had asked the CLI the same question.
+    /// 2. **The sentence below never reached the case it was written for.** Once the recorded row
+    ///    has left `Candidate`, `Engine::plan`'s own guard (43 T-2: "a re-plan is allowed only
+    ///    while the row is still where T-2 left it") refuses *first*, with a state-machine message
+    ///    naming an opaque id, and `gx-cli` folded that to `INTERNAL` — "the operation could not be
+    ///    completed" for a world that had been correctly protected. `req/981` §6 F2 measured
+    ///    `gx commit` answering `gx_code:INTERNAL` on exit 1 after a human edited the target
+    ///    between `verify` and `commit`.
+    ///
+    /// [`gx_engine::Engine::planned_id`] answers the same question out of 41 §4's read-only three —
+    /// it is the same `plan_shape` code `plan` runs (R3, `req/222` H-03) — so asking it first costs
+    /// one extra read of the substrate on the rebuild road and buys a refusal that writes nothing.
+    ///
+    /// 🔴 The **remedy** in the sentence branches on the recorded state, because `req/981` §6 F2
+    /// measured that the old one-size remedy is false half the time: with the row still a
+    /// `Candidate` a re-plan does work (`gx plan` exits 0 and names the new transformation), and
+    /// once the row is `Admitted` or past it the same re-plan is refused. Printing "run `gx plan`
+    /// again" at a row that will refuse it is an instruction that fails when followed.
     pub fn resume(&mut self, id: &TransformationId, at: Timestamp) -> Result<()> {
         if self.engine.transformation(id).is_some() {
             return Ok(());
@@ -1511,20 +1541,53 @@ impl Session {
             what: "draft for transformation",
             id: id.0.to_text(),
         })?;
-        let planned = self.engine.plan(&intent, at)?;
-        if planned == *id {
-            return Ok(());
+        // 🔴 Read-only first (R3's shape), so that a refusal from here is a refusal that wrote
+        // nothing.
+        let planned = self.engine.planned_id(&intent, at)?;
+        if planned != *id {
+            // The state's **name** rather than the value: nothing below branches on the state
+            // machine, it only prints and picks a sentence, so there is no reason to carry a
+            // `Lifecycle` past this line.
+            let recorded = self
+                .recorded(id)
+                .and_then(|row| row.state)
+                .map(|s| s.name());
+            return Err(Error::Usage {
+                detail: format!(
+                    "{} was planned against a state of the substrate that no longer holds; planning it \
+                     now names {} instead. 43 §8: \"`Fingerprint₀` has gone stale, so a re-`plan()` \
+                     (re-fingerprint) is forced\" (sem: SEM-gx-cli-244). The journal has this row at \
+                     {}, and {}. Nothing was written to either row",
+                    id.0.to_text(),
+                    planned.0.to_text(),
+                    // 🔴 The state is printed rather than implied: an operator deciding what to do
+                    // next needs to know *which* row they are looking at, and the remedy below is a
+                    // function of it. Naming only the remedy would leave them unable to check it.
+                    recorded.unwrap_or("no state this journal records"),
+                    stale_remedy(recorded),
+                ),
+            });
         }
-        Err(Error::Usage {
-            detail: format!(
-                "{} was planned against a state of the substrate that no longer holds; planning it \
-                 now names {} instead. 43 §8: \"`Fingerprint₀` has gone stale, so a re-`plan()` \
-                 (re-fingerprint) is forced\" (sem: SEM-gx-cli-244) — run `gx plan` again and verify the transformation that \
-                 comes back",
-                id.0.to_text(),
-                planned.0.to_text()
-            ),
-        })
+        // The identity holds, so this re-plan is 43 T-2's idempotent one: `plan` finds
+        // `recorded == Some(id)` with the row absent from the table and takes its rehydrating
+        // branch, seating the body without appending a second `Planned`.
+        let replanned = self.engine.plan(&intent, at)?;
+        if replanned != *id {
+            // Unreachable by construction: `planned_id` and `plan` derive the identity through one
+            // `plan_shape`. Answered rather than asserted for the reason `gx-api` gives at the same
+            // line — 41 §6 counts a panic as a bug, and a binary that reached this line would be one
+            // where the engine held two definitions of one identity.
+            return Err(Error::Usage {
+                detail: format!(
+                    "rebuilding {} named {} after {} was measured read-only; the engine has two \
+                     answers for one identity (R3, req/222 H-03)",
+                    id.0.to_text(),
+                    replanned.0.to_text(),
+                    planned.0.to_text()
+                ),
+            });
+        }
+        Ok(())
     }
 
     /// 🔴 Put a **`Committed`** row back — the state [`Session::resume`] cannot reach.
@@ -1595,5 +1658,47 @@ impl Session {
             },
             other => other,
         })
+    }
+}
+
+/// 🔴 **`req/981` §6 F2** — what an operator can actually do about a stale plan, chosen by the
+/// state the journal holds rather than printed one-size.
+///
+/// The two arms were **measured** against a built binary — `req/981` §7's `controls2` and
+/// `dup_repro2` arms, driven through the binary again in
+/// `crates/gx-cli/tests/req981_stale_plan_road.rs`, where each arm runs the remedy it prints rather
+/// than reading it (`r19_escalation_road.rs`'s M-07 rule) — not reasoned about:
+///
+/// * the recorded row is still a `Candidate` — a re-plan is 43 T-2's legal one, `gx plan` exits
+///   **0** and names the transformation the moved world produces. "Run `gx plan` again" is true.
+/// * the recorded row has left `Candidate` — `Engine::plan`'s guard ("a re-plan is allowed only
+///   while the row is still where T-2 left it") refuses, and the measured `gx plan` on that road
+///   exits non-zero. Printing "run `gx plan` again" there is an instruction that **fails when
+///   followed**, which `req/981` §6 F2 caught by running the remedy the message named.
+///
+/// The second arm therefore names the road that does work — a different intent — and discloses why
+/// re-submitting the identical one does not: 42 §3.3 puts substrate, locator, goal, context and
+/// actor in the `IntentId`, so an identical request is the **same** intent and resolves back to the
+/// same transformation. `req/981` §6 F1 measured that on a deletion, whose goal is fixed at zero
+/// bytes and therefore carries no free bits at all: 140 of 300 census runs met this refusal.
+///
+/// 🔴 What this deliberately does **not** say: it does not tell the operator to change `--context`
+/// or `--actor-key`. Both do unstick the intent (`req/981` `controls3`) and both are fields that
+/// record *why* a change is being made and *who* is asking — an operator who renames their reason
+/// to get past a refusal has corrupted the record this system exists to keep.
+fn stale_remedy(recorded: Option<&'static str>) -> &'static str {
+    match recorded {
+        // `None` is "the journal holds no state for it", which is not the same fact as `Candidate`
+        // and is not evidence that the re-plan will refuse — so it takes the arm that suggests the
+        // cheap thing to try rather than the one that asserts a refusal nobody measured.
+        Some("Candidate") | None => {
+            "run `gx plan` again and verify the transformation that comes back"
+        }
+        Some(_) => {
+            "this row has left `Candidate`, and 43 T-2 allows a re-plan only from there, so `gx \
+             plan` will refuse this one too: look at the target, then submit a **different** intent \
+             — 42 §3.3 puts the locator, the goal, the context and the actor in the `IntentId`, so \
+             re-submitting an identical request names this same transformation back (`req/981` F1)"
+        }
     }
 }

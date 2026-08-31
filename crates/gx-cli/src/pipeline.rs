@@ -167,6 +167,8 @@ pub fn submit(
 /// # Errors
 /// [`Error::NotFound`] (44 §1.4's 6) if neither reading names anything this `.gx/` has seen.
 /// [`Error::Engine`] for an adapter that cannot plan — 44 §1.2's "1 = adapter error (unable to plan)" (sem: SEM-gx-cli-256).
+/// [`Error::Usage`] when 43 T-2's re-plan guard refuses because this intent's transformation has
+/// left `Candidate` (`req/981` F1 — see the arm below).
 pub fn plan(session: &mut Session, id: &str, at: Timestamp) -> Result<Outcome> {
     // 🔴 **DR-43-4's entry sweep** (`req/38` §148 ruling 1(iv)) — see [`Session::sweep`].
     session.sweep(at)?;
@@ -187,7 +189,65 @@ pub fn plan(session: &mut Session, id: &str, at: Timestamp) -> Result<Outcome> {
         });
     };
 
-    let transformation = session.engine().plan(&intent, at)?;
+    // 🔴 **`req/981` §6 F1** — 43 T-2's re-plan guard, wearing the fact instead of `INTERNAL`.
+    //
+    // `Engine::plan` refuses with `InvalidState` when this intent already resolved to a
+    // transformation that has left `Candidate`, and this crate carried every `Engine(_)` it did not
+    // name to `ROW_INTERNAL` — 44 §2.3's word for what **cannot be classified**. `req/981` measured
+    // what that costs at the surface an operator types at: `gx plan` answering
+    // `{"gx_code":"INTERNAL","title":"the operation could not be completed",
+    // "detail":"TransformationId(Cid(opaque)) is Committed, and 43 §3 has no `plan` from there"}`
+    // — an opaque id, an unclassified word, and no road out — on **140 of 300** census runs, for
+    // the most ordinary thing an agent does: submitting the same deletion twice.
+    //
+    // The condition is completely classified, which is exactly `INTERNAL`'s complement: the state
+    // machine named the state and named the transition it does not offer. It is the same argument
+    // `ROW_LAYOUT_BLOCKED`, `ROW_JOURNAL_UNREADABLE` and R23's `NOT_FOUND` arm each made one
+    // condition over, and it costs no new word and no new status: 44 §1.2 already gives `gx plan`
+    // **1**, `VALIDATION_ERROR` declares 1, and `ROW_VALIDATION_ERROR`'s own `why` already claims
+    // this shape ("the arguments … do not describe an operation" — this request names an intent
+    // whose only remaining transition is one nobody can ask for).
+    //
+    // 🔴 What is **not** taken here, and why, so that the next lane does not have to re-derive it:
+    // `gx-api` answers this same `gx_engine::Error::InvalidState` with `INVALID_STATE` (409), whose
+    // `gx-api` row declares `cli_exit` **2**. Wearing that word on this face is the right end state
+    // — the two faces of one system should not hold two names for one refusal (R21, `req/304` D5) —
+    // but `EXIT_AGREEMENT` (`r21_refusal_map_is_whole.rs`) would then force this verb to exit 2, and
+    // 44 §1.4's 2 is "refused (denied)", which on `gx verify` and `gx commit` already means *the
+    // gate said no*. One number with two meanings on one verb is discipline 52's failure, and
+    // `req/306` §1 forbids moving an exit status without a ruling. Filed rather than taken.
+    let transformation = match session.engine().plan(&intent, at) {
+        Ok(transformation) => transformation,
+        Err(gx_engine::Error::InvalidState {
+            state,
+            attempted: "plan",
+            ..
+        }) => {
+            // What a plan of this intent would name now, measured rather than described: it is the
+            // read-only half of the same `plan_shape` (R3, `req/222` H-03) and it writes nothing.
+            let names_now = session.engine().planned_id(&intent, at).map_or_else(
+                |_| "a transformation this substrate would not answer for".to_string(),
+                |t| t.0.to_text(),
+            );
+            return Err(Error::Usage {
+                detail: format!(
+                    "{id} names an intent this project has already planned, and its transformation \
+                     is {state}: 43 T-2 allows a re-plan only while the row is still a `Candidate`, \
+                     so this one is refused and **nothing was written**. Planning it now would name \
+                     {names_now} instead, which is 43 §8's stale `Fingerprint₀` seen from the \
+                     intent's side. The road forward is a **different** intent: 42 §3.3 puts the \
+                     substrate, the locator, the goal, the context and the actor in the `IntentId`, \
+                     so submitting the identical request again names this same intent back. \
+                     🔴 `req/981` F1 measured this on a deletion, whose goal is fixed at zero bytes \
+                     and therefore carries no free bits — the two fields that would unstick it \
+                     (`--context`, `--actor-key`) are the record of *why* the change is being made \
+                     and *who* is asking, and renaming either to get past a refusal corrupts the \
+                     record this system exists to keep"
+                ),
+            });
+        }
+        Err(e) => return Err(e.into()),
+    };
     session.remember(intent_id, transformation);
 
     let engine = session.read();

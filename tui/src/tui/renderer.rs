@@ -263,7 +263,9 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
                 .map(|column| (pad(mark.mark(), column.width), mark.role())),
             tier,
         )));
-        let note_rows = body_rows.saturating_sub(1).min(2);
+        // One row is occupied by the kind-of-nothing above; the note is paid for out of what is left
+        // over, by the same rule the list's note is (`note_rows`).
+        let note_rows = note_rows(1, body_rows);
         if note_rows > 0 {
             for line in layout::wrap(
                 &fold_note(&[String::new()], offered(0), area.width, note_rows),
@@ -324,18 +326,10 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         // Two rows at most. A legend that grows to fill a screen is furniture, and the rows below it
         // are the ledger honestly saying that this is all there is.
         //
-        // 🔴 And it is paid for out of **spare** rows, never out of a record. The first build of
-        // this note took a row whenever it wanted one, and at 46x12 that turned a list of three into
-        // a list of two in order to print a legend that then had no room to name a single key — a
-        // strictly worse screen than the one it replaced. When the rows were already overflowing the
-        // note costs nothing new: the last row was being spent on the count before this existed, and
-        // the count now travels with the keys.
-        let overflowing = items.len() > body_rows;
-        let note_rows = if overflowing {
-            1
-        } else {
-            body_rows.saturating_sub(items.len()).min(2)
-        };
+        // 🔴 And it is paid for out of **spare** rows, never out of a record — the ruling, and the
+        // named defect it leaves standing where the records fill the body exactly, are both in
+        // [`note_rows`], where a gate can read them instead of a reader having to.
+        let note_rows = note_rows(items.len(), body_rows);
         let shown = body_rows.saturating_sub(note_rows).min(items.len());
         for (index, item) in items.iter().enumerate().take(shown) {
             let cells = plan.columns.iter().map(|column| {
@@ -518,6 +512,47 @@ pub fn note_line(head: &str, acts: &[Act], spell: usize) -> String {
         }
     }
     parts.join(" | ")
+}
+
+/// How many rows the note is given, out of the rows the body was not going to spend on content.
+///
+/// `occupied` is what the region draws before the note: the records of a list, or the single
+/// kind-of-nothing row an empty read draws.
+///
+/// 🔴 **The ruling, in a form a gate can read.** It is paid for out of **spare** rows and never out
+/// of a record. The first build of this note took a row whenever it wanted one, and at 46x12 that
+/// turned a list of three into a list of two in order to print a legend that then had no room to
+/// name a single key — a strictly worse screen than the one it replaced. When the rows were already
+/// overflowing the note costs nothing new: the last row was being spent on the count before the
+/// legend existed, and the count now travels with the keys. Two rows at most, because a legend that
+/// grows to fill a screen is furniture. Gate g26 is that sentence, fired over every shape.
+///
+/// 🔴 **A named defect, and it is left standing on purpose** (`req/964` §16, `req/38` SS996). At
+/// `occupied == body_rows` the spare is nought, so the note is not drawn and **nothing on the screen
+/// says it was there to draw**. Closing it needs one of two things, and this lane took neither:
+/// letting the note take a record's row would reinstate exactly the 46x12 screen the ruling above
+/// was written from, and saying so in the disclosure needs the drawn row count to reach
+/// `super::layout::resolve`, which composes the disclosure that decides how many rows this region
+/// gets — the order inversion §16 named. So the defect is **bounded** instead: g26 holds the set of
+/// shapes where the note vanishes to exactly `occupied == body_rows`, and a reversal of the ruling
+/// fires the same gate rather than passing quietly.
+///
+/// The budget never exceeds the rows that exist. It could before: an overflowing list one row tall
+/// was handed a note row it did not have, and the terminal cut it without saying so.
+#[must_use]
+pub const fn note_rows(occupied: usize, body_rows: usize) -> usize {
+    let want = if occupied > body_rows {
+        1
+    } else if body_rows - occupied > 2 {
+        2
+    } else {
+        body_rows - occupied
+    };
+    if want > body_rows {
+        body_rows
+    } else {
+        want
+    }
 }
 
 /// The longest note that fits the rows it was given: the first `head` that fits at all, then the

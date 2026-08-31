@@ -41,6 +41,8 @@ Three files on that terminal: a receipt, a signed checkpoint, a public key. No a
 
 [▶ View Asciinema Cast (Raw Timings)](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.cast) &middot; [Read Offline Verification Mechanics](docs/articles/verify-ai-agent-actions-offline.md)
 
+**Reproduction:** [`examples/demo_one_screen.sh`](examples/demo_one_screen.sh) runs the longer, 8-stage version of the same idea end to end — commit → receipt → tamper → verify → undo → redo — against a real cloned repository, not a fixture.
+
 ---
 
 ## Quickstart
@@ -142,6 +144,14 @@ TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws
 - **Recoverability Mechanics**: Reversible execution state definitions: [docs/RECOVERABILITY.md](docs/RECOVERABILITY.md).
 - **Development Tree Tests**: Full-spectrum test probe taxonomy: [docs/DEVELOPMENT_TREE_TESTS.md](docs/DEVELOPMENT_TREE_TESTS.md).
 </details>
+
+---
+
+## Writing
+
+- [The undo has to exist before the write does](https://dev.to/mahirhir/the-undo-has-to-exist-before-the-write-does-46on) — 30 Aug 2026
+- [What "undo" actually means when the target is a real repo, not a fixture](https://dev.to/mahirhir/what-undo-actually-means-when-the-target-is-a-real-repo-not-a-fixture-4l1c) — 30 Aug 2026
+- [I ran 10,373 mutations through a reversibility gate. Tamper detection caught 600 of 600.](https://dev.to/mahirhir/i-ran-10373-mutations-through-a-reversibility-gate-tamper-detection-caught-600-of-600-1bo6) — 31 Aug 2026
 
 ---
 

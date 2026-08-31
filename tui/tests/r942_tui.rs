@@ -3593,3 +3593,238 @@ fn g22_never_is_carved_out_of_closed_and_the_partition_is_only_ever_finer() {
         "🔴 g22: two states are indistinguishable once the line is shortened: {shorts:?}"
     );
 }
+
+// =============================================================================================
+// `req/38` SS996 — the three rows of round 4: the arm nothing can reach, the ruling that was
+// only prose, and the declaration table nothing was holding closed.
+// =============================================================================================
+
+/// 🔴 **g25 — the report for a record this face cannot read exists, and says `?`.**
+///
+/// `Subscription::report` has an arm for a poisoned lock. Reading every critical section in
+/// `live` settles that **nothing on this code can reach it**: `set`, `record`, `due`, `report` and
+/// the one line in `start` hold the guard across an assignment or an addition and nothing else, so
+/// there is no panic under a guard and therefore no poisoning. That is a reason to *name* the arm,
+/// not a reason to leave it unnamed — an arm nothing can fire and nothing spells is what a later
+/// edit to those critical sections turns into a silent lie.
+///
+/// So the arm is [`live::unreadable_record`] and this gate is its existence proof, fired every run.
+/// The first half is the precondition, measured rather than assumed: a mutex whose holder panicked
+/// answers `Err` for the rest of the process's life. **The panic printed by that thread is the
+/// point of the test, not a failure of it.**
+#[test]
+fn g25_the_arm_for_a_record_this_face_cannot_read_exists_and_says_unknown() {
+    // The precondition class is real and reproducible, which is what makes the arm a branch rather
+    // than a decoration.
+    let lock = Arc::new(Mutex::new(0u8));
+    let other = Arc::clone(&lock);
+    println!("G25: the panic below is deliberate — it is how a lock becomes poisoned.");
+    let died = std::thread::spawn(move || {
+        let _held = other
+            .lock()
+            .expect("the lock is clean before this thread takes it");
+        panic!("g25 poisons the lock on purpose");
+    })
+    .join();
+    assert!(
+        died.is_err(),
+        "🔴 g25: the thread that had to panic did not"
+    );
+    assert!(
+        lock.lock().is_err(),
+        "🔴 g25: a mutex whose holder panicked answered Ok, so the arm's precondition is not what \
+         this gate says it is"
+    );
+
+    let report = live::unreadable_record();
+    println!(
+        "G25_UNREADABLE={:?} MARK={:?} LONG={:?}",
+        report.link,
+        report.link.mark(),
+        report.long()
+    );
+    assert_eq!(
+        report.link,
+        Link::Closed,
+        "🔴 g25: a record that cannot be read is being reported as something other than closed"
+    );
+    assert_eq!(
+        report.link.nothing(),
+        Some(Nothing::Unknown),
+        "🔴 g25: the state for an unreadable record stopped wearing unknown"
+    );
+    // The plant: the two neighbours it must not collapse into. `never` would be a claim about a
+    // history this process can no longer read, and `zero` would be the count it is not entitled to.
+    for wrong in [Link::Never.mark(), Link::Off.mark(), Nothing::Zero.mark()] {
+        assert_ne!(
+            report.link.mark(),
+            wrong,
+            "🔴 g25: the unreadable record is drawn as {wrong}, which is a different sentence"
+        );
+    }
+}
+
+/// 🔴 **g26 — the note is paid for out of spare rows, and the one shape where it vanishes is held
+/// where it is.**
+///
+/// The ruling lived only in a comment: the list's legend is paid for out of rows the records did not
+/// take, never out of a record, because the first build of it turned a list of three into a list of
+/// two at 46x12 to print a legend with no room for a key. `renderer::note_rows` is that sentence as
+/// a function and this is the sentence as a gate, fired over every shape of list and body.
+///
+/// 🔴 It also **bounds a defect this round decided not to close** (`req/964` §16). Where the records
+/// fill the body exactly there is no spare row, so the note is not drawn and nothing says so. The
+/// two ways out are a reversal of the ruling above — which reinstates the exact screen the ruling
+/// was measured from — and telling `layout::resolve` how many rows the region actually drew, which
+/// is the order inversion §16 named. Neither was taken, so the set of shapes where the legend
+/// disappears is pinned to exactly the diagonal: it cannot grow, and a reversal fires this gate
+/// instead of passing quietly.
+#[test]
+fn g26_the_note_is_paid_from_spare_rows_and_its_silent_drop_is_exactly_the_diagonal() {
+    let mut silent: Vec<(usize, usize)> = Vec::new();
+    for body in 0usize..=24 {
+        for occupied in 0usize..=24 {
+            let rows = renderer::note_rows(occupied, body);
+            assert!(
+                rows <= body,
+                "🔴 g26: {rows} rows of note budgeted into a body of {body}"
+            );
+            assert!(rows <= 2, "🔴 g26: a legend of {rows} rows is furniture");
+            if occupied <= body {
+                assert!(
+                    rows <= body - occupied,
+                    "🔴 g26: the note took a row from a record: {occupied} rows of content in a \
+                     body of {body} and {rows} rows of legend"
+                );
+            } else {
+                assert_eq!(
+                    rows,
+                    usize::from(body > 0),
+                    "🔴 g26: a list that is already being cut pays for the note out of the row the \
+                     count was on, and only when there is a row at all"
+                );
+            }
+            if rows == 0 && body > 0 && occupied > 0 {
+                silent.push((occupied, body));
+            }
+        }
+    }
+    println!("G26_SILENT={silent:?}");
+    let diagonal: Vec<(usize, usize)> = (1..=24).map(|n| (n, n)).collect();
+    assert_eq!(
+        silent, diagonal,
+        "🔴 g26: the shapes where the legend disappears with nothing saying so are no longer \
+         exactly the ones where the records fill the body"
+    );
+
+    // The plant is the reversal: let the note take a record's row when the body is full, and the
+    // ruling assertion above is what refuses it. Fired here so this gate is known to say no.
+    let reversed = |occupied: usize, body: usize| {
+        if occupied >= body {
+            1
+        } else {
+            (body - occupied).min(2)
+        }
+    };
+    assert!(
+        reversed(3, 3) > 3usize.saturating_sub(3),
+        "🔴 g26: the plant for this gate no longer breaks the rule the gate enforces"
+    );
+    assert_ne!(
+        reversed(3, 3),
+        renderer::note_rows(3, 3),
+        "🔴 g26: the shipped budget and the reversal of it agree, so this gate is a tautology"
+    );
+}
+
+/// 🔴 **g27 — the declared acts are closed, and no two of them answer the same key.**
+///
+/// `acts` argues that a `match` on a key code in the drawing loop is wiring no gate can read, and
+/// replaces it with a declaration. The declaration has two holes of its own and neither was held by
+/// anything: `ACTS` is an array beside the enum, so a ninth `Act` compiles without ever reaching
+/// `apply` or `for_key`; and `for_key` resolves a key by scanning `ACTS` in order, so a key declared
+/// twice is answered by whichever act is written first — one table with two rows for the same key,
+/// which is the defect the module exists to prevent, one level down.
+///
+/// The slot table below is the closure: a ninth variant has to be given an arm, the arm has to name
+/// an index, and the index has to be one `ACTS` actually holds.
+#[test]
+fn g27_the_declared_acts_are_closed_and_no_key_answers_twice() {
+    let slot = |act: Act| match act {
+        Act::Prev => 0usize,
+        Act::Next => 1,
+        Act::First => 2,
+        Act::Last => 3,
+        Act::Open => 4,
+        Act::Close => 5,
+        Act::Read => 6,
+        Act::Leave => 7,
+    };
+    for act in acts::ACTS {
+        assert_eq!(
+            acts::ACTS.get(slot(act)),
+            Some(&act),
+            "🔴 g27: {} is declared and the table does not hold it at its own slot",
+            act.name()
+        );
+    }
+    assert_eq!(
+        acts::ACTS.len(),
+        8,
+        "🔴 g27: the table grew or shrank without the slots being redrawn"
+    );
+    // 🔴 The loop above walks the **table**, so on its own it cannot see an act that was left out of
+    // it — the first version of this gate could not, and the plant that dropped `act.prev` was
+    // caught by the key check below instead, which is luck rather than coverage. The slots the table
+    // fills are what close it: eight entries occupying eight distinct slots is the same statement as
+    // "every act the enum declares is in here exactly once", and it fails on a table that repeats
+    // one act to make room for the one it dropped.
+    let filled: BTreeSet<usize> = acts::ACTS.into_iter().map(slot).collect();
+    assert_eq!(
+        filled,
+        (0..8).collect::<BTreeSet<usize>>(),
+        "🔴 g27: the table does not hold every declared act exactly once — slots filled: {filled:?}"
+    );
+
+    let mut seen: Vec<&str> = Vec::new();
+    for act in acts::ACTS {
+        assert!(
+            !act.keys().is_empty(),
+            "🔴 g27: {} declares no key, so nothing can produce it and `spelled` would panic on it",
+            act.name()
+        );
+        for key in act.keys() {
+            assert!(
+                !seen.contains(key),
+                "🔴 g27: {key} is declared by two acts, and `for_key` answers with whichever is \
+                 written first"
+            );
+            seen.push(key);
+            assert_eq!(
+                acts::for_key(key),
+                Some(act),
+                "🔴 g27: {key} is declared by {} and the one road from a key to an act does not \
+                 take it there",
+                act.name()
+            );
+        }
+    }
+    println!("G27_KEYS={seen:?}");
+
+    // The plant: the same lookup over a table with a key on two acts. The shipped table must not
+    // look like this one, and the check above is what tells them apart.
+    let doubled = [(Act::Open, "l"), (Act::Close, "l")];
+    let first = doubled
+        .iter()
+        .find(|(_, key)| *key == "l")
+        .map(|(act, _)| *act);
+    assert_eq!(
+        first,
+        Some(Act::Open),
+        "🔴 g27: the plant does not demonstrate the silent first-wins the gate refuses"
+    );
+    assert_ne!(
+        doubled[0].1, "",
+        "🔴 g27: the plant is empty and proves nothing"
+    );
+}

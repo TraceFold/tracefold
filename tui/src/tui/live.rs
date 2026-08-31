@@ -258,6 +258,34 @@ pub const fn reopenings(opens: u64) -> u64 {
     opens.saturating_sub(1)
 }
 
+/// What this face reports when it cannot read its own record of the connection.
+///
+/// 🔴 **Named rather than left inline, because naming it is the only way anything can fire it.** The
+/// lock behind [`Subscription`] is poisoned only by a panic inside a critical section, and every
+/// critical section in this module is one assignment or one addition: [`set`]'s closures,
+/// [`record`]'s tally, [`Subscription::due`], [`Subscription::report`] and the one line in
+/// [`Subscription::start`]. There is no `unwrap`, no index, no allocation and no user code under a
+/// guard, so **on this code the branch is unreachable** (`req/38` SS996, read rather than run).
+/// Unreachable is not absent: the branch exists, this is the report it produces, and gate `g25`
+/// requires it to go on existing and to go on saying `?`. An arm nothing can reach and nothing names
+/// is the shape a lie takes when someone later edits the critical sections.
+///
+/// `Closed` and not `Never`: what has happened is unknowable, which is what `?` means, and `never`
+/// would be a claim about a history this process can no longer read.
+///
+/// 🔴 **Named ceiling.** The counts come back nought, so [`LinkReport::long`] would spell `closed
+/// after 0 events, 0 reconnects` — a count offered for a record that could not be read, which is the
+/// `unknown`-into-`zero` collapse this module's own documentation refuses one paragraph up. Saying
+/// *unknown* about a `u64` needs a third value on this report, and a third value is a change to what
+/// the worker and the face agree on. Declared here rather than half-done, and out of reach in
+/// practice for the reason above.
+#[must_use]
+pub const fn unreadable_record() -> LinkReport {
+    let mut report = LinkReport::off();
+    report.link = Link::Closed;
+    report
+}
+
 /// What the subscription has measured about itself: the state, and the counts behind it.
 ///
 /// 🔴 Every member is a **renderer-local** fact in the sense of `req/942` §19-4 — the engine returns
@@ -610,28 +638,24 @@ impl Subscription {
 
     /// What the subscription has measured about itself.
     ///
-    /// A poisoned lock reports `closed` and **not** `never`: what has happened is unknowable, which
-    /// is what `?` means, and it is the second half of this state's widened definition — *either it
-    /// ended, or this face cannot read its own record of it*. `never` would be a claim about a
-    /// history this process can no longer read.
+    /// A poisoned lock reports [`unreadable_record`]: `closed` and **not** `never`, which is the
+    /// second half of this state's widened definition — *either it ended, or this face cannot read
+    /// its own record of it*. That arm is spelled once, out of line, so that `g25` can fire the
+    /// thing itself; unreachable on this code is not the same as absent.
     ///
     /// 🔴 `reconnects` is [`reopenings`] of the number of times the stream was up, computed here.
     /// There is no counter behind it that could disagree with the state beside it.
     #[must_use]
     pub fn report(&self) -> LinkReport {
-        self.shared.lock().map_or(
-            LinkReport {
-                link: Link::Closed,
-                ..LinkReport::off()
-            },
-            |state| LinkReport {
+        self.shared
+            .lock()
+            .map_or(unreadable_record(), |state| LinkReport {
                 link: state.link,
                 events: state.events,
                 unreadable: state.unreadable,
                 reconnects: reopenings(state.opens),
                 attempts: state.attempts,
-            },
-        )
+            })
     }
 
     /// Whether an event has arrived and the debounce window has passed since the last one.
