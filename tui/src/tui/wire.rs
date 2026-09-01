@@ -834,14 +834,52 @@ pub fn inverse_status(object: &serde_json::Value) -> InverseMark {
     }
 }
 
+/// The wire's key for why `status` is not `ok`, on `/v1/healthz` and on `server_health`
+/// (`GET /receipts/{tid}` -- 44 §2.2 `L-02`, the same two words either endpoint answers with).
+pub const STATUS_REASON_KEY: &str = "status_reason";
+
+/// Classify `status_reason`.
+///
+/// 🔴 **The second key on these routes where `null` is [`Nothing::Absent`], not
+/// [`Nothing::Unknown`]** (`req/924` §TUI-23, SS1051 -- the ruling -- and §TUI-39, SS1069 -- the
+/// repair). `crates/gx-api/src/handlers.rs`'s `healthz` and `server_health` write `null` for
+/// exactly one fact: the engine is `ok` and has no reason to give. That is *never-written*, the
+/// same shape [`inverse_status`] carves [`INVERSE_STATUS_KEY`] out of [`cell`]'s general rule for
+/// -- and this key is carved out the same way, for the same reason: [`cell`]'s rule is right for
+/// every route where `null` means *asked, and this process could not say* (`list.rs`, in
+/// `gx-api`), and wrong for the one route that writes `null` to mean *asked, and there is nothing
+/// to say*.
+///
+/// 🔴 **`tui/tests/r942_tui.rs`'s P9 found this and did not fix it.** It read this key through
+/// [`cell`] directly, printed `null_reads_as=Unknown` beside `req/924_§TUI-23_says=Absent`, and left
+/// the two sentences disagreeing on purpose — `req/38` SS856 is the reason given: repairing it
+/// **inside** `cell` would change what `null` means on every route through it, not mirror existing
+/// code. This function is that mirror: [`INVERSE_STATUS_KEY`] already proved the shape, so carrying
+/// it to a second key is the cheap repair SS856 asked for, not the expensive one it refused.
+///
+/// 🔴 **Declared and not distinguished**, for the reason [`inverse_status`] gives for its own key: a
+/// server built before `L-02`/R11 carries no `status_reason` member at all, and this face spells
+/// that the same way it spells `null`. Both read [`Nothing::Absent`].
+#[must_use]
+pub fn status_reason(object: &serde_json::Value) -> Cell {
+    let Some(value) = object.get(STATUS_REASON_KEY) else {
+        return Cell::Nothing(Nothing::Absent);
+    };
+    if value.is_null() {
+        return Cell::Nothing(Nothing::Absent);
+    }
+    cell(object, STATUS_REASON_KEY)
+}
+
 /// Classify one key of one JSON object.
 ///
 /// 🔴 The two lines this function exists to hold:
 /// * a key the object does not have is [`Nothing::Absent`]; a key it has with `null` is
 ///   [`Nothing::Unknown`]. On these routes `null` means "this process does not hold the body"
 ///   (`crates/gx-api/src/list.rs`), which is measured-and-unknowable and not never-written.
-///   🔴 The one exception is [`INVERSE_STATUS_KEY`], which has a classifier of its own and does not
-///   reach this arm — see [`inverse_status`] for the sentence in `list.rs` that makes it one.
+///   🔴 **Two exceptions**, each with a classifier of its own that does not reach this arm:
+///   [`INVERSE_STATUS_KEY`] (see [`inverse_status`]) and, since `req/924` §TUI-39,
+///   [`STATUS_REASON_KEY`] (see [`status_reason`]).
 /// * `false` is [`Nothing::False`] and never [`Nothing::Unknown`]. Collapsing a three-valued answer
 ///   into two is the first-principle breach this product exists to refuse.
 #[must_use]

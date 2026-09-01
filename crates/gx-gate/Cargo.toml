@@ -4,7 +4,7 @@
 [package]
 name = "gx-gate"
 description = "Cedar policy evaluation, invariant registry and verdict composition."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-gate-001) -- see the cedar-policy block below
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
@@ -55,8 +55,8 @@ default = []
 pg = []  # needs `policies/postgres/deny-system-catalogs.cedar`, not in this distribution
 
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }
-gx-witness = { path = "../gx-witness", version = "0.1.0" }
+gx-core = { path = "../gx-core", version = "0.1.2" }
+gx-witness = { path = "../gx-witness", version = "0.1.2" }
 
 # Earlier hands wrote here that gx-canon was NOT a dependency, on gx-witness's rule -- "a dependency
 # declared before its first use cannot be reviewed against a reason" -- and named the hand that
@@ -72,7 +72,7 @@ gx-witness = { path = "../gx-witness", version = "0.1.0" }
 # No package is added by it: gx-witness already depends on gx-canon, so the graph is unchanged
 # (223 before and after, measured directly). What changes is that this crate now says out loud
 # which digests it takes, rather than reaching them through a re-export.
-gx-canon = { path = "../gx-canon", version = "0.1.0" }
+gx-canon = { path = "../gx-canon", version = "0.1.2" }
 
 # The architecture spec's dependency line for this crate, and this workspace's DEFAULT license
 # ruling. Measured before it was

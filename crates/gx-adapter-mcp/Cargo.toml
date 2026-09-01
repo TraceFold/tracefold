@@ -11,7 +11,7 @@
 [package]
 name = "gx-adapter-mcp"
 description = "The MCP SubstrateAdapter: a tool call that cannot reach a server except through an admitted apply."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace only, per the adopted MSRV decision (sem: SEM-gx-adapter-mcp-027)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
@@ -35,9 +35,9 @@ publish = false                       # no crate in this workspace is a designat
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement, learned in an earlier build phase.
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }
-gx-canon = { path = "../gx-canon", version = "0.1.0" }
-gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
+gx-core = { path = "../gx-core", version = "0.1.2" }
+gx-canon = { path = "../gx-canon", version = "0.1.2" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.2" }
 
 serde = { version = "1", features = ["derive"] }  # the delta's field grammar
 
@@ -77,10 +77,10 @@ sha1 = "0.10"
 # shows none, and `probes/doubt/tests/workspace_doubt.rs` reads the shipping section. Moving either
 # line up into `[dependencies]` compiles and is caught by one text gate only. (sem: SEM-gx-adapter-mcp-037)
 [dev-dependencies]
-gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.0" }
-gx-gate = { path = "../gx-gate", version = "0.1.0" }
-gx-engine = { path = "../gx-engine", version = "0.1.0" }
-gx-witness = { path = "../gx-witness", version = "0.1.0" }
+gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.2" }
+gx-gate = { path = "../gx-gate", version = "0.1.2" }
+gx-engine = { path = "../gx-engine", version = "0.1.2" }
+gx-witness = { path = "../gx-witness", version = "0.1.2" }
 
 # 🔴 One performance requirement -- "the latency the proxy adds is p99 <= 30ms". (sem: SEM-gx-adapter-mcp-038)
 #

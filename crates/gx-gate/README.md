@@ -23,7 +23,11 @@ change before it lands.
 
 Above [`gx-core`](../gx-core), [`gx-canon`](../gx-canon) and [`gx-witness`](../gx-witness), and
 below [`gx-engine`](../gx-engine), which asks it for a verdict and then acts on one. The shipped
-rule sets it evaluates live in [`policies/`](../../policies).
+rule sets it evaluates live in [`policies/`](../../policies). 🔴 req/1032 §3 (2026-09-01): the
+files this crate's build actually embeds are the byte-identical mirror at
+[`policies/`](policies) inside this directory, not the repository-root copy this link names --
+`cargo package` cannot reach outside the crate root, so the mirror exists to keep the crate
+self-contained, and `tests/pack_embedding.rs` keeps the two copies equal.
 
 ## Learn more
 

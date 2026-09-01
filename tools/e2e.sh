@@ -1821,7 +1821,8 @@ receipt_payload_json_round_trip dr892_read_set_attestation dr891_http_undo_branc
 r868_name_durability r868_payload_version_attest r922_gx_object_file
 m5_11_postcondition_mismatch r919_index_branch_cache r919_engine_version_attest r919_engine_version_seat
 r942_tui r942_tui_binding r939_kind_binding attach_externalized attach_interface h9_operational_disclosure_doubt inference_closed_doubt
-r973_undo_attestation r973_undo_witness_stdout r973_undo_attestation_forgery boundary_gate_reach'
+r973_undo_attestation r973_undo_witness_stdout r973_undo_attestation_forgery boundary_gate_reach
+wm5a_promised_target wm5a_prediction_on_real_data'
 # [bookkeeping-repair] (req/38 SS978/SS1000): the six suite files above landed over several lanes
 # (tui942 merge 787ec6bf, kind-binding batch1, X-band attach externalization, h9/inference-closed
 # doubt probes) without a matching EXPECTED_SUITES entry -- f2 caught the gap census-side, all six
@@ -1831,6 +1832,24 @@ r973_undo_attestation r973_undo_witness_stdout r973_undo_attestation_forgery bou
 # 2684/474 -> 2806/483 -- and the three names on the end of the list are this lane's two suites plus
 # `boundary_gate_reach` (req/38 SS991's move out of `boundary_attest.rs`, likewise unnamed).
 # README/banner (f6/f8) remain deferred and are named as a number in the ratchet block above.
+# [wm5a-names-only] (req/1033, 2026-09-01, `req/1028` §8 item [floor-doubt-repair]): the two names
+# above register WM-5a's three new suite files -- `crates/gx-adapter-fs/tests/wm5a_promised_target.
+# rs`, `crates/gx-adapter-git/tests/wm5a_promised_target.rs` (same name, two crates, one entry
+# covers both the way this list's set-membership check already treats every other shared name) and
+# `crates/gx-engine/tests/wm5a_prediction_on_real_data.rs`. Names only, same restraint as
+# [bookkeeping-repair] above and for the same reason `req/1028` §8 gives explicitly: MIN_PROBES/
+# MIN_SUITES is a floor_doubt f1 ratchet across the **whole** repository, not this lane's three
+# files, and req/1028 named that as a batch to raise "一括で" once, not per lane -- raising it here
+# would either lowball it (leaving other lanes' suites still unaccounted for below the new number)
+# or require this lane to audit files it never touched. `floor_doubt` f1 and f2 were run before this
+# edit landed (`req/942_artifacts/r2_status_reason_2026-09-01/`): f1 was RED at 2822/490 declared
+# against 2923/501 reconstructed (gap 101/11, unrelated to WM-5a) and f2's `MISSING` carried eleven
+# entries -- these two names plus nine still open (`inverse_status_on_the_row_face`,
+# `req981_stale_plan_road`, `r1003_seventh_cause_e2e`, `r1017_escrowed_inverse_shadow`,
+# `wm2a_prediction_outcome_e2e`, `verdict_split_view`, `r964_c25_canon`,
+# `read_surface_census_doubt`, and the second `wm5a_promised_target` file collapsing into the one
+# name added here). f2 stays RED after this edit for those nine; f1 stays RED for the unrelated
+# floor gap. Both are named rather than silently left for the next lane to rediscover.
 EXPECTED_SUITES=$(printf '%s' "$EXPECTED_SUITES" | tr '
 ' ' ')  # V§17: line-boundary tokens failed the space-delimited case match
 

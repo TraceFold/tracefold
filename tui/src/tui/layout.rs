@@ -178,7 +178,17 @@ pub const REGIONS: [Region; 4] = [
         // Three is safe because the head is now wrapped rather than clipped and a head that still
         // does not fit is cut **with a mark** (`super::renderer::apparatus`). Before that, cutting
         // the apparatus was silent, so the fourth row was buying silence rather than safety.
-        min_rows: 3,
+        //
+        // 🔴 **One, and it was three** (`req/924` §TUI-22, `req/38` SS1049, Owner `#266-T`). The
+        // region is now the ledger's **top rail** and it draws one row. The two rows it gave up were
+        // carrying, between them, a duplicate and a defect: the breadcrumb row spelled
+        // `GET /v1/transformations` a second time when the rail's own title is that address, and
+        // `status_reason` was drawn on every frame as `?` on a bed whose `status` is `ok` — which is
+        // the face repeating an engine-side collapse of the seven words for nothing (§TUI-22's own
+        // new finding: `ok` has no reason, so the truth is `--`). The reason is drawn now exactly
+        // when the engine is not `ok`, which is the state it was reserved for, and it is disclosed
+        // among the fields not drawn when it is not.
+        min_rows: 1,
     },
     Region {
         intent: Intent::RecordsTheEngineProduced,
@@ -194,7 +204,12 @@ pub const REGIONS: [Region; 4] = [
         // that grows its own chrome out of its content is the defect `super::renderer::note_rows`
         // was written against. What the row buys is the answer to *what am I looking at*, which
         // this face could not give at any shape narrower than eighty cells.
-        min_rows: 5,
+        //
+        // 🔴 **Four, and it was five** (`req/924` §TUI-22). The row is given back, and the question
+        // it bought is still answered: [`heading`] is drawn on the **top rail**, in the apparatus
+        // region's one row, beside the address it is the last segment of. Nothing is lost and one
+        // record is gained, which is the trade this whole lane is.
+        min_rows: 4,
     },
     Region {
         intent: Intent::WhereTheNumbersCameFrom,
@@ -301,6 +316,13 @@ pub const WIDE_ADDRESS: &str = "gx tui --wide";
 /// zero (`req/942` §2: the range this face does not cover is part of what it must say).
 pub const READ_NOT_DRAWN: [&str; 2] = ["GET /v1/candidates", "GET /v1/escalations"];
 
+/// The cells the ledger's enclosure takes out of a rail's row: a corner and a space at each end.
+///
+/// 🔴 Declared once because two places need the same number — the disclosure is **composed**
+/// against `width - FRAME_MARGIN` and `super::renderer` **draws** the corners into those cells. A
+/// second spelling is how a line comes to be composed against one width and drawn at another.
+pub const FRAME_MARGIN: u16 = 4;
+
 /// The phrase that must appear when the provenance is folded into the disclosure.
 ///
 /// 🔴 `req/942` §19-5-2. Without it the four measured facts would sit in the disclosure line
@@ -329,21 +351,57 @@ pub struct Measured {
     pub statuses: String,
     /// The subscription's state and its counts (`super::live`).
     pub link: super::live::LinkReport,
+    /// The engine's own line about itself, key by key, for the top rail.
+    ///
+    /// 🔴 **Here since `req/924` §TUI-22, and here rather than in the region that draws it.** The
+    /// apparatus is one row now, so the rail has to choose between the page's address and the
+    /// engine's caveats when a terminal is narrow — and *whoever makes that choice has to be the
+    /// one that composes the disclosure*, because the clause naming what the rail let go of is
+    /// composed in [`resolve_attended`]. Leaving the choice in the region would have put the two
+    /// on opposite sides of the seam: the region cutting text off the right edge with a `~` and the
+    /// disclosure, one row down, saying nothing at all. That is the defect this whole module is
+    /// ordered to prevent, and it is the defect the first cut of this lane actually shipped —
+    /// measured on a real terminal at 80, 66, 46 and 40 cells, where `ledger_agrees yes` left the
+    /// screen behind a `~` and no line said so.
+    ///
+    /// Pairs, not one string, so [`heading`] can drop them one at a time from the end.
+    pub engine: Vec<(String, String)>,
 }
 
 impl Measured {
     /// The long form, for a screen wide enough to carry it.
+    ///
+    /// 🔴 **The date is gone and the words `read` and `at` with it** (`req/924` §TUI-21, `req/38`
+    /// SS1048, Owner `#265-T`). `2026-09-01T04:28:41Z` spends eleven cells telling a reader which
+    /// day it is on a line whose whole point is *how fresh is this*, and the four measured facts —
+    /// how many routes, when, how slow, what they answered — are unchanged. The clock is kept, so
+    /// nothing that could go stale went; what went is the part that cannot.
+    ///
+    /// **Named ceiling**: a session left open across midnight now reads a clock with no day behind
+    /// it. The full stamp is still in [`Measured::read_at`] and the help face draws this line, so
+    /// closing it properly means a rung that spells the date only when the day has turned — which
+    /// needs a clock this face does not keep between frames.
     #[must_use]
     pub fn long(&self) -> String {
         format!(
-            "{} read {} routes at {} | worst {}ms | {} | {}",
+            "{} {} routes {} | worst {}ms | {} | {}",
             self.link.link.mark(),
             self.routes,
-            self.read_at,
+            self.clock(),
             self.worst_ms,
             self.statuses,
+            // 🔴 The long form of the link, and it is **kept** although shortening it is the last
+            // easy cell on this row. `LIVE_BADGE` is Owner #227's ruling — a face that says `LIVE`
+            // must say *whose* events it counts — and this lane has no ruling that reverses it.
+            // The residual ink on this row is a caveat and a badge, which `INHERITED_PRINCIPLES`
+            // §削る前に3分類 puts outside the word count.
             self.link.long()
         )
+    }
+
+    /// The reading's time of day: what the shorter rungs already spell, named once.
+    fn clock(&self) -> &str {
+        self.read_at.split('T').next_back().unwrap_or(&self.read_at)
     }
 
     /// The short form. Still carries all four facts; only the spelling is smaller.
@@ -414,8 +472,20 @@ pub struct Plan {
     pub dropped_fields: Vec<&'static str>,
     /// How many wire keys the route offers in total.
     pub total_fields: usize,
-    /// The heading strip's cells, top row of the subject region. See [`heading`].
+    /// The top rail's cells: the page's address, and which of the three screens this is.
+    ///
+    /// 🔴 Drawn by the **apparatus** region since `req/924` §TUI-22, in the one row that region
+    /// now has, rather than by the subject region in a row taken off the ledger. See [`heading`].
     pub heading: Vec<HeadingCell>,
+    /// Whether the ledger's enclosure is drawn: a corner at each end of each rail.
+    ///
+    /// 🔴 Decided **here** rather than by either region that draws a corner, for the reason every
+    /// other member of this struct is: two regions draw the enclosure and one line discloses its
+    /// absence, so a screen where the three disagreed would be a screen whose own account of
+    /// itself is false. The disclosure is composed against [`FRAME_MARGIN`] fewer cells when this
+    /// is true, which is what makes the corners free rather than something that pushes a clause
+    /// off the row.
+    pub framed: bool,
     /// The provenance region's text, when it has a region.
     pub provenance: String,
     /// The provenance in full, at every width, whether or not the region drew it.
@@ -570,39 +640,106 @@ pub fn page_name() -> &'static str {
 ///
 /// A ladder rather than a width test, like every other line in this face: the long form is offered
 /// first and taken only if it fits whole.
+/// 🔴 **The tab strip is gone and the address is here instead** (`req/924` §TUI-22, `req/38`
+/// SS1049, Owner `#266-T`). `transformations │ list record help` named all three screens on every
+/// frame, and two of the three names were **destinations the key legend already spells** — `ret
+/// open` goes to the record and `?` goes to help. The screen was saying where a reader can go in
+/// two places. What is not a duplicate is *which of the three the reader is on*, so that one name
+/// stays and wears [`super::tokens::Role::Attend`], which is a swap of fore and ground and
+/// therefore survives `mono`.
+///
+/// The cells the two deleted names paid for are spent on `LEDGER_ADDRESS` in full. This is the
+/// **one** row that spells it: the note used to spell it, the disclosure used to spell it, and the
+/// apparatus used to spell it on a breadcrumb row of its own, so `GET` was on the screen five
+/// times over. A title says where everything under it came from, once.
+/// 🔴 **A ladder, and it is one because the rail is one row and a terminal cuts from the right.**
+/// The rungs are, longest first:
+///
+/// 1. the address, the boundary, the screen's name, and every key of the engine's own line;
+/// 2. the same with the engine's line one key shorter, and so on down to none;
+/// 3. the page's **name** in place of the address, with the engine's line back at full length,
+///    and the same walk down again;
+/// 4. the screen's name alone.
+///
+/// The order is the ruling and not a preference. The address gives way **after** the engine's
+/// caveats because the disclosure can spell an address and cannot re-measure a caveat: `status`
+/// and `ledger_agrees` are what `req/924` §TUI-22 classified as the things that may be folded and
+/// may not be discarded, and `LEDGER_ADDRESS` is a road the row below can carry. What the rail
+/// drops is counted by [`heading_engine_dropped`] and named in the disclosure, so no key leaves
+/// this row in silence — which is what the first cut of this lane did, behind a `~`, at four of
+/// the seven shapes.
 #[must_use]
-pub fn heading(subject: Subject, width: u16) -> Vec<HeadingCell> {
-    let tabs: Vec<HeadingCell> = SUBJECTS
-        .into_iter()
-        .map(|shape| HeadingCell {
-            text: shape.name().to_string(),
-            role: if shape == subject {
-                super::tokens::Role::Attend
-            } else {
-                super::tokens::Role::Quiet
-            },
-        })
-        .collect();
-    let mut named = vec![
+pub fn heading(subject: Subject, width: u16, engine: &[(String, String)]) -> Vec<HeadingCell> {
+    let here = HeadingCell {
+        text: subject.name().to_string(),
+        role: super::tokens::Role::Attend,
+    };
+    let strip = |kept: usize| -> Vec<HeadingCell> {
+        engine
+            .iter()
+            .take(kept)
+            .map(|(key, value)| HeadingCell {
+                text: format!("{key} {value}"),
+                role: super::tokens::Role::Head,
+            })
+            .collect()
+    };
+    // 🔴 The glyph, and the whole of what it buys: without it the page's address and the screen's
+    // name are two phrases in a row and a reader has to be told which is which. With it they are
+    // two parts of one row. The words it replaces are the labels — `page:`, `view:` — that a face
+    // without a boundary mark has to spell.
+    let bar = HeadingCell {
+        text: super::tokens::RULE.to_string(),
+        role: super::tokens::Role::Quiet,
+    };
+    let titles = [
+        HeadingCell {
+            text: LEDGER_ADDRESS.to_string(),
+            role: super::tokens::Role::Head,
+        },
         HeadingCell {
             text: page_name().to_string(),
             role: super::tokens::Role::Head,
         },
-        // 🔴 The glyph, and the whole of what it buys: without it the page's name and the first
-        // screen's name are two words in a row and a reader has to be told which is which. With it
-        // they are two parts of one screen. The words it replaces are the labels — `page:`,
-        // `view:` — that a face without a boundary mark has to spell.
-        HeadingCell {
-            text: super::tokens::RULE.to_string(),
-            role: super::tokens::Role::Quiet,
-        },
     ];
-    named.extend(tabs.iter().cloned());
-    if heading_width(&named) <= width as usize {
-        named
-    } else {
-        tabs
+    for title in titles {
+        for kept in (0..=engine.len()).rev() {
+            let mut cells = vec![title.clone(), bar.clone(), here.clone()];
+            cells.extend(strip(kept));
+            if heading_width(&cells) <= width as usize {
+                return cells;
+            }
+        }
     }
+    vec![here]
+}
+
+/// How many of the engine's own keys the rail could not carry.
+///
+/// 🔴 Read from the cells the rail is going to draw rather than recomputed from a width, for the
+/// reason [`heading_carries_address`] is: the row that drops them and the row that names the drop
+/// have to be reading one decision.
+#[must_use]
+pub fn heading_engine_dropped(cells: &[HeadingCell], engine: &[(String, String)]) -> usize {
+    engine
+        .iter()
+        .filter(|(key, value)| {
+            let spelled = format!("{key} {value}");
+            !cells.iter().any(|cell| cell.text == spelled)
+        })
+        .count()
+}
+
+/// Whether a heading strip of these cells spells [`LEDGER_ADDRESS`] in full.
+///
+/// 🔴 **Read from the cells rather than from a width test.** Whether the top rail carried the
+/// address decides whether the disclosure has to, and a second width comparison here would be a
+/// second decision for the two rows to disagree about — the defect `Subject` was factored out to
+/// close. Gate g40's property (*the page's address is on some row at every shape*) is what this
+/// keeps true now that the apparatus is one row rather than three.
+#[must_use]
+pub fn heading_carries_address(cells: &[HeadingCell]) -> bool {
+    cells.iter().any(|cell| cell.text == LEDGER_ADDRESS)
 }
 
 /// How many cells a heading needs: the words, and one space between each pair.
@@ -974,6 +1111,31 @@ struct Shape<'a> {
     /// the keys it folded when it *is* drawn, and this is what discloses **all** of them when it is
     /// not (`req/988` §3-2).
     keys_not_drawn: usize,
+    /// Whether the top rail spelled [`LEDGER_ADDRESS`] in full on this screen.
+    ///
+    /// 🔴 **The address is spelled once and this is how the second spelling is refused**
+    /// (`req/924` §TUI-22: `GET` was on the screen five times). The rule is the one already
+    /// written into `super::renderer::Rung::keeps` — *what a line gives up may be given up only if
+    /// the same screen spells it somewhere else* — read from the other end: this clause is
+    /// **added** only when nothing above it carried the address. At the shapes where the apparatus
+    /// is let go of by its declared priority, or where the rail was too narrow to hold the address,
+    /// that is exactly what happens, so gate g40's property still holds.
+    address_above: bool,
+    /// Whether the ledger's enclosure is drawn at this shape.
+    ///
+    /// 🔴 A renderer cannot `invert`, so what it owes is to name what it let go of, and the
+    /// enclosure carries meaning: it is what says where the ledger begins and ends now that no row
+    /// spells `screen: apparatus subject provenance disclosure`. Dropping it at a width that cannot
+    /// hold it is right; dropping it **silently** is the one drop this face is not allowed to make.
+    framed: bool,
+    /// How many of the engine's own keys the top rail had no cells for.
+    ///
+    /// 🔴 **The caveat clause, and it exists because the first cut of this lane lost one.**
+    /// `req/924` §TUI-22 classified `status ok` and `ledger_agrees yes` as things that may be
+    /// folded and may **not** be discarded; the rail is one row and at four of the seven measured
+    /// shapes `ledger_agrees yes` went off the right edge behind a `~` with no line saying so.
+    /// A marked cut is better than a silent one and it is still not disclosure.
+    engine_dropped: usize,
 }
 
 /// The disclosure line, in whichever of its two forms fits.
@@ -1001,7 +1163,17 @@ fn compose_disclosure(
         keys_address,
         wide_address,
         keys_not_drawn,
+        address_above,
+        framed,
+        engine_dropped,
     } = shape;
+    // 🔴 One spelling of the page's address on the whole screen (`req/924` §TUI-22). Empty when the
+    // top rail is carrying it, which is every shape wide enough to hold it with the apparatus drawn.
+    let road = if address_above {
+        String::new()
+    } else {
+        format!(" | {LEDGER_ADDRESS}")
+    };
     let mut long: Vec<String> = Vec::new();
     // 🔴 The field count belongs to the **grid**. While a record is open there is no grid, every
     // member the wire carried is a row of its own, and the record's own line is what says how many
@@ -1011,18 +1183,18 @@ fn compose_disclosure(
         Subject::Grid => {
             if !dropped_fields.is_empty() {
                 long.push(format!(
-                    "{} of {total_fields} fields not drawn | {LEDGER_ADDRESS}",
+                    "{} of {total_fields} fields not drawn{road}",
                     dropped_fields.len()
                 ));
             }
         }
         Subject::Record => long.push(format!(
-            "a record is open: its own line counts what it drew | {LEDGER_ADDRESS}"
+            "a record is open: its own line counts what it drew{road}"
         )),
         // The help face draws the declaration, not the wire, so a count of wire fields would be
         // describing a screen nobody is looking at -- the error the record arm exists to avoid.
         Subject::Help => long.push(format!(
-            "what this face can do is on the screen; the records are not | {LEDGER_ADDRESS}"
+            "what this face can do is on the screen; the records are not{road}"
         )),
     }
     // 🔴 **The folded provenance is spelled second, before every other clause.** It carries
@@ -1083,14 +1255,6 @@ fn compose_disclosure(
     // this line runs and the disclosure's height is one of the inputs to settling them. On a screen
     // too small for even the floor a region can therefore be named here and given nought rows
     // below; that screen sets `truncated`, so it is a marked cut rather than a silent one.
-    let kept: Vec<&str> = REGIONS
-        .iter()
-        .filter(|region| {
-            !dropped_regions.contains(&region.role)
-                && !(region.role == RegionRole::Provenance && fold.is_some())
-        })
-        .map(|region| region.role.short())
-        .collect();
     if !dropped_regions.is_empty() {
         let names: Vec<&str> = dropped_regions.iter().map(|r| r.short()).collect();
         let addresses: Vec<&str> = dropped_regions
@@ -1112,32 +1276,52 @@ fn compose_disclosure(
             addresses.join(", ")
         ));
     }
+    // 🔴 **The count stays on the screen and the two names move behind `?`** (`req/924` §TUI-21:
+    // *the numbers stay, the names may go to the escape hatch — but do not call it moved until a
+    // gate has confirmed the hatch actually lists them*). `GET /v1/candidates,
+    // GET /v1/escalations` is forty cells of a line whose job is a count, and both names are
+    // drawn in full by `super::renderer::help_lines`, which gate `g61` measures. A hatch that is
+    // empty is not a hatch, and this clause would then be a deletion wearing a signpost's face.
     long.push(format!(
-        "{} routes read and not drawn: {}",
-        READ_NOT_DRAWN.len(),
-        READ_NOT_DRAWN.join(", ")
+        "{} routes read and not drawn -> {keys_address}",
+        READ_NOT_DRAWN.len()
     ));
-    // 🔴 **The rail is offered last and only if it is free.** Two candidate long forms are built,
-    // the one with the rail is preferred, and it is taken **only when it fits in the same rows the
-    // form without it would have taken**. So the clause this lane adds can never displace a clause
-    // that was already there.
+    // 🔴 The engine's own keys the rail had no room for. The route is the region's declared
+    // `Recoverable::Route`, so this names the road as well as the count — these are caveats, and a
+    // caveat with no way back is a fact the screen destroyed.
+    if engine_dropped > 0 {
+        let route = match region(RegionRole::Apparatus).recoverable {
+            Recoverable::Route(route) => route,
+            _ => LEDGER_ADDRESS,
+        };
+        long.push(format!("{engine_dropped} engine keys not drawn | {route}"));
+    }
+    // 🔴 The enclosure, when it is not on the screen. It is a mark that carries meaning, so its
+    // absence is a fact about what this frame let go of and not a matter of taste.
+    if !framed {
+        long.push("frame not drawn at this width".to_string());
+    }
+    // 🔴 **The region rail is deleted, and it is deleted *because* the enclosure is drawn**
+    // (`req/924` §TUI-22, `req/38` SS1049, Owner `#266-T`). It read
+    // `screen: apparatus subject provenance disclosure` — the face spelling the names of its own
+    // internal parts, on a row, in words a reader cannot act on. §TUI-21 classified it as
+    // persuasion and §TUI-22 made the deletion conditional on the thing that replaces it: a
+    // boundary a reader can *see* says where one part ends and the next begins, which is the whole
+    // of what those four words were for.
     //
-    // Measured, not assumed. The first build of this put the rail in unconditionally: at
-    // forty-six cells the longer line stopped fitting the cap, the whole disclosure fell to its
-    // short form, and `LEDGER_ADDRESS` — which only the long form spells — left the screen
-    // entirely. A rail that says which parts the screen is made of, bought by deleting the address
-    // of the page, is a bad trade at any width. Gate g35 counts the widths where the address is on
-    // no row at all, which is how this was caught.
-    let mut with_rail = long.clone();
-    with_rail.push(format!("screen: {}", kept.join(" ")));
-    let with_rail = with_rail.join(" | ");
+    // 🔴 The two move **together**, and that is the admission test for the glyphs
+    // (`INHERITED_PRINCIPLES` §3c-③''): a mark earns its cells by carrying meaning and thereby
+    // deleting words. Adding the corners and keeping this clause would have been a mark beside a
+    // word that stays, which is weight. Gate `g60` is that pairing fired as an assertion, so the
+    // clause cannot come back while the corners are drawn and the corners cannot be drawn beside
+    // it.
+    //
+    // What the deleted rail *did* carry that nothing else did is which regions are **present**; the
+    // clause below still names the ones that are **absent**, which is the half a reader can act on.
     let long = long.join(" | ");
 
     let cap = disclosure_cap(fold.is_some());
-    if wide || rows_needed(&with_rail, width) <= cap {
-        return with_rail;
-    }
-    if rows_needed(&long, width) <= cap {
+    if wide || rows_needed(&long, width) <= cap {
         return long;
     }
     // 🔴 The short form still **names** the regions it let go of. A count on its own would satisfy
@@ -1165,11 +1349,13 @@ fn compose_disclosure(
     // it took the only spelling of `GET /v1/transformations` on the screen with it. Gate g40
     // measured exactly that and named the shape. A count of fields nobody can go and read is a
     // number without a road, so the road is spelled here and the row it costs is paid.
+    //
+    // 🔴 And it is **conditional** since `req/924` §TUI-22, for the reason `road` carries: at the
+    // shapes where the top rail holds the address, spelling it again here is the second of the
+    // five spellings that lane was opened to delete. `address_above` is read from the rail's own
+    // cells, so the two rows cannot disagree about whether the road is on the screen.
     let head = match subject {
-        Subject::Grid => format!(
-            "{}/{total_fields} fields | {LEDGER_ADDRESS}",
-            dropped_fields.len()
-        ),
+        Subject::Grid => format!("{}/{total_fields} fields{road}", dropped_fields.len()),
         Subject::Record => "record open".to_string(),
         Subject::Help => "help open".to_string(),
     };
@@ -1197,8 +1383,19 @@ fn compose_disclosure(
     // the routes, then the road to the long form. It was written the other way round and at forty
     // by eight the cut landed inside `1 regions not drawn: apparatus` — the screen dropped a
     // region and the sentence saying which was itself the thing that did not fit, which P4 caught.
+    // The enclosure is named in the short form too: it is dropped most often at exactly the widths
+    // this form is chosen at, and a mark that carries meaning cannot go quietly at the shapes where
+    // it always goes.
+    let frame = if framed { "" } else { " | no frame" };
+    // The caveats are in the short form too, and for the reason they are in the long one: they
+    // cannot be re-measured from anything else on the screen.
+    let engine = if engine_dropped > 0 {
+        format!(" | {engine_dropped} engine keys")
+    } else {
+        String::new()
+    };
     format!(
-        "{folded}{} regions not drawn{named} | {head}{keys}{counts} | {} routes | {wide_address}",
+        "{folded}{} regions not drawn{named} | {head}{keys}{counts}{engine}{frame} | {} routes | {wide_address}",
         dropped_regions.len(),
         READ_NOT_DRAWN.len()
     )
@@ -1290,6 +1487,22 @@ pub fn resolve_attended(
     let wide_address = WIDE_ADDRESS.to_string();
     let subject_floor = region(RegionRole::Subject).min_rows;
     let apparatus_rows = region(RegionRole::Apparatus).min_rows;
+    // 🔴 The top rail, resolved once and read three times: it is what the apparatus draws, it is
+    // what decides whether the disclosure has to spell the address, and its width is what decides
+    // whether the enclosure's corners fit. Three readings of one decision, which is this module's
+    // rule — the alternative is three width tests that disagree.
+    //
+    // 🔴 The rungs are chosen against `width - FRAME_MARGIN` and **not** against `width`, which is
+    // what breaks the circle: whether the enclosure is drawn depends on whether the rail fits with
+    // its corners, and which rung the rail takes would otherwise depend on whether the enclosure is
+    // drawn. Reserving the corners' cells up front means the chosen rung fits either way, and the
+    // enclosure is refused only when even the floor of the ladder overflowed.
+    let head_cells = heading(shape, width.saturating_sub(FRAME_MARGIN), &measured.engine);
+    let address_above = heading_carries_address(&head_cells);
+    let engine_dropped = heading_engine_dropped(&head_cells, &measured.engine);
+    // The enclosure is never offered where the apparatus has been let go of: there is no top rail
+    // to open it with, and a screen closed at the bottom and open at the top is not an enclosure.
+    let frame_room = heading_width(&head_cells) + FRAME_MARGIN as usize <= width as usize;
 
     // The declaration's order, read once. Three passes at most walk it, and it is four elements.
     let order = letting_go_order();
@@ -1300,8 +1513,18 @@ pub fn resolve_attended(
     let mut disclosure_rows;
     let mut truncated = false;
     let mut rung;
+    let mut framed;
     loop {
         let fold = folded.then(|| measured.clone());
+        // Decided at the top of the pass beside the provenance's rung, because the clause that
+        // discloses its absence is composed in the same call and the row budget below depends on
+        // how many rows that composition takes.
+        framed = frame_room && !dropped.contains(&RegionRole::Apparatus);
+        let inner = if framed {
+            width.saturating_sub(FRAME_MARGIN)
+        } else {
+            width
+        };
         // 🔴 A ladder rather than one threshold, for the reason `compose_disclosure` and
         // `super::renderer::fold_note` are ladders: this region gets exactly one row and a terminal
         // cuts what does not fit **without saying so**. Adding the subscription to the line made
@@ -1320,7 +1543,7 @@ pub fn resolve_attended(
             total_fields,
             &dropped,
             fold.as_ref(),
-            width,
+            inner,
             wide,
             Shape {
                 subject,
@@ -1335,9 +1558,12 @@ pub fn resolve_attended(
                 // settles the shape of the screen without this clause, and the clause is added
                 // afterwards against the rows the loop actually produced.
                 keys_not_drawn: 0,
+                address_above,
+                framed,
+                engine_dropped,
             },
         );
-        disclosure_rows = rows_needed(&disclosure, width).min(disclosure_cap(folded));
+        disclosure_rows = rows_needed(&disclosure, inner).min(disclosure_cap(folded));
         let apparatus = if dropped.contains(&RegionRole::Apparatus) {
             0
         } else {
@@ -1391,8 +1617,14 @@ pub fn resolve_attended(
         truncated = true;
     }
     // 🔴 The disclosure being cut is the worst cut available, because the disclosure is the line
-    // that says what was cut. If the cap bit, the screen has to admit it.
-    if rows_needed(&disclosure, width) > disclosure_rows {
+    // that says what was cut. If the cap bit, the screen has to admit it. Measured against the
+    // width the line was **composed** at, which is four cells narrower once the enclosure is drawn.
+    let inner = if framed {
+        width.saturating_sub(FRAME_MARGIN)
+    } else {
+        width
+    };
+    if rows_needed(&disclosure, inner) > disclosure_rows {
         truncated = true;
     }
     if apparatus > 0 {
@@ -1432,7 +1664,10 @@ pub fn resolve_attended(
     // 🔴 Two rows, and it was one: the heading and the grid's column header both stand above the
     // records now. The note is paid for out of what is left after both, which is the same ruling
     // one row further down — a region does not fund its own chrome out of its content.
-    let body_rows = subject_rows.saturating_sub(2);
+    // 🔴 **One again, and the row is a record** (`req/924` §TUI-22). The heading moved to the top
+    // rail, which the apparatus region draws in the row it already had, so this region stands over
+    // the grid's column header alone. The row is not saved, it is spent — on the ledger.
+    let body_rows = subject_rows.saturating_sub(1);
     let note_rows = match shape {
         Subject::Grid => super::renderer::note_rows(attention.items.max(1), body_rows),
         Subject::Record | Subject::Help => 0,
@@ -1474,7 +1709,7 @@ pub fn resolve_attended(
                 total_fields,
                 &dropped,
                 folded.then(|| measured.clone()).as_ref(),
-                width,
+                inner,
                 wide,
                 Shape {
                     subject: shape,
@@ -1482,9 +1717,12 @@ pub fn resolve_attended(
                     keys_address: &keys_address,
                     wide_address: &wide_address,
                     keys_not_drawn,
+                    address_above,
+                    framed,
+                    engine_dropped,
                 },
             );
-            if rows_needed(&disclosure, width) > disclosure_rows {
+            if rows_needed(&disclosure, inner) > disclosure_rows {
                 truncated = true;
             }
         }
@@ -1497,7 +1735,8 @@ pub fn resolve_attended(
         columns,
         dropped_fields,
         total_fields,
-        heading: heading(shape, width),
+        heading: head_cells,
+        framed,
         // The rung was decided at the top of the last pass, beside the disclosure that describes
         // it. Spelling it here would be a second decision, and the two could differ.
         provenance: match rung {

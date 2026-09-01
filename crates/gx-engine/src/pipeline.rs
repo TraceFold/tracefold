@@ -3088,9 +3088,15 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
     /// measured, where this process is the one that took the comparison.
     ///
     /// `None` is the **third value** and not a missing answer: the transformation made no
-    /// prediction (no adapter of this workspace fills `promised_target` today, so this is the
-    /// common case), or it is a row read back off the journal after a restart — the outcome is not
-    /// a component of Σ (see [`PredictionOutcome`]). A prediction that was *wrong* is `Some` whose
+    /// prediction, or it is a row read back off the journal after a restart — the outcome is not
+    /// a component of Σ (see [`PredictionOutcome`]).
+    ///
+    /// 🔴 **"no adapter of this workspace fills `promised_target` today, so this is the common
+    /// case" — struck** (WM-5a Phase 1, `req/1011` §6, ruled by `req/1016`, 2026-09-01). It was
+    /// true on the day `req/1010` wrote it and false one lane later: `gx-adapter-fs` and
+    /// `gx-adapter-git` fill the seat in production, so `Some` is now the common case on those two
+    /// substrates and `None` is what `gx-adapter-mcp` and the SQL adapters' partial `UPDATE`
+    /// answer. A prediction that was *wrong* is `Some` whose
     /// [`PredictionOutcome::matched`] is `false`, which is a different fact and is spelled
     /// differently on purpose.
     #[must_use]
@@ -3109,9 +3115,51 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
     }
 
     /// The CID of the inverse T-10b escrowed, if one could be constructed.
+    /// 🔴 **T6 condition ① (Σ-shadow)** — the escrow index first, then the journal's own fold.
+    ///
+    /// The fall-through is what turns a restarted process from "this transformation does not exist"
+    /// into "this transformation is here and I hold no body for it" (`req/182` H-02, `req/38` §148).
+    ///
+    /// # 🔴 **R1017 / `req/987` §13-3** — the asymmetry this closes
+    ///
+    /// Until this ruling the accessor read `self.table` alone while [`Engine::inverse_status`]
+    /// already fell through, so a restarted process answered `Available` and `None` about one
+    /// escrow in the same breath: "the inverse is here" beside "I hold no name for it". A consumer
+    /// gated on the status then asked for the name and got nothing.
+    ///
+    /// The rule the fall-through follows is *fall through exactly where the value is a component
+    /// of Σ*. [`crate::replay::EscrowRow::inverse_cid`] **is** one — E-M5-2 reads Σ as the state
+    /// table, the ledger root and the escrow index — and [`crate::replay::SigmaShadow::escrow_of`]
+    /// was already handing the whole row to `inverse_status`, which read its `status` and dropped
+    /// its `inverse_cid`. The opposite arm of the same rule is
+    /// [`Engine::rollback_not_attempted_because`], which stays table-only and says so: its cause is
+    /// not a component of Σ, so `None` there is an honest answer.
+    ///
+    /// # 🔴 Why the pair, and not `self.table` with a shadow arm bolted on
+    ///
+    /// The defect was two accessors disagreeing about one escrow, so the repair reads **the same
+    /// two sources `inverse_status` reads, in the same order** — which makes the agreement
+    /// structural rather than a thing two call sites have to keep remembering. Reading
+    /// `self.table` first would have left one road open: `Engine::plan`'s idempotent rebuild puts a
+    /// row back into the table with `inverse_cid: None` (the escrow index is not one of the members
+    /// it restores), and a table consulted first would then shadow the escrow that Σ still holds.
+    /// The live map and the table are written in lockstep at all three escrow sites, so no
+    /// same-process answer moves.
+    ///
+    /// `None` still means what it always meant — **no CID was escrowed** (42 §3.12's `Unavailable`,
+    /// and every id no record has named). It does not mean "this process lost the name", which is
+    /// why no seventh `InverseStatus` word was minted for it: a word about the process would be
+    /// false the moment it was written, because the name is in Σ and the shadow is holding it.
+    ///
+    /// What this does **not** promise is the body. The CID is a name, and
+    /// [`Engine::inverse_status`] is still the accessor that reads the blob store before it says
+    /// `Available` (R8/R9). A caller wanting the delta itself goes on through `self.blobs()`.
     #[must_use]
     pub fn escrowed_inverse(&self, id: &TransformationId) -> Option<Cid> {
-        self.table.get(id).and_then(|e| e.inverse_cid)
+        self.escrow
+            .get(id)
+            .or_else(|| self.shadow.escrow_of(id))
+            .and_then(|row| row.inverse_cid)
     }
 
     /// 🔴 A read-only probe of the world an undo of `id` would run against (`req/38` §98 ruling 2 (sem: SEM-gx-engine-164) —
@@ -5854,11 +5902,80 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             .rebuilt_subject(&sigma, id)
             .ok_or_else(|| missing("the subject snapshot in the provenance record"))?;
 
+        // 🔴 **WM-5a Phase 1 repair** (`req/1011` §6c, `req/1020` §5): the adapter and the fresh
+        // snapshot are read **here**, before the rebuild, because 41 §3's `target` is inside the
+        // identity view and this function was the workspace's **second** construction site of a
+        // `Transformation` — the one [`Engine::plan_shape`]'s own doc says does not exist ("Why
+        // this is not a second definition of identity: it is the same code"). It did exist, and it
+        // dropped `target` on the floor.
+        //
+        // The drop was invisible while every shipped adapter promised nothing: `plan_shape` filled
+        // `None` and this line wrote `None`, so the two agreed by accident. The moment
+        // `gx-adapter-fs` and `gx-adapter-git` began promising a post-state, the accident ended and
+        // `gx undo <TID>` from a cold process refused every fs and git transformation with "the
+        // rebuilt transformation names another id" — the verb this whole function exists to make
+        // reachable (M6H4-4).
+        //
+        // `target` comes from the same place `plan_shape` gets it and from nowhere else: the
+        // adapter's own plan of the caller's intent. That is what the field's doc in
+        // `gx-substrate`'s `delta.rs` already prescribed for this road — a delta read back out of
+        // the blob store carries `None` here by construction (`BlobStore::put` stores
+        // `identity_view()` bytes, and 42 §1.3 excludes the prophecy from that view), so the
+        // promise cannot be recovered from the body and **must** be re-derived. The same doc names
+        // the consequence when the re-derivation disagrees: "a promise that did not survive that
+        // road would change the `TransformationId`, which is the check rather than the loss".
+        //
+        // 🔴 The `pre` this plans against is the **fresh** snapshot, not the historical one (ASM-9
+        // does not store content, which the section above already says of `pre` itself). For an
+        // adapter whose plan is a function of the goal alone — fs and git, by E-M4-29 and by L1
+        // respectively — the promise is stable across that difference. For an adapter whose plan
+        // reads the pre-state, a moved world re-derives a different promise and the rebuild
+        // correctly fails to re-identify. That is the check doing its job, not this line failing.
+        //
+        // The cost is one extra `plan` on the rebuild road, which is the road [`Engine::plan_shape`]
+        // already prices at "the adapter's read-only three run twice".
+        let adapter = self
+            .adapters
+            .get(delta.substrate())
+            .ok_or_else(|| Error::NotFound {
+                what: "adapter",
+                id: format!("{:?}", delta.substrate()),
+            })?
+            .adapter
+            .clone();
+        let pre = adapter.snapshot(&locator).map_err(|e| Error::Adapter {
+            action: "snapshot",
+            detail: e.to_string(),
+        })?;
+        // 🔴 **And not every committed row was planned.** [`Engine::undo`] builds `T_u` from an
+        // *escrowed inverse* rather than from a plan, and fixes its `target` at `None` — an
+        // inverse is not a prophecy and the undo road never asked the adapter for one. Re-deriving
+        // a promise here would invent a prophecy the original never made, and the rebuild would
+        // fail to re-identify every undo in the journal (which is how this was found: repairing
+        // only the planned road left `gx redo` refusing, `crates/gx-cli/tests/dr891_undo_branches.rs`).
+        //
+        // `parents` is the mark, and it is already in hand from the `Planned` record: 43 T-12's
+        // guard is "`T_u.parents` includes `T_o.id`", so a non-empty parents list on a row read out
+        // of Σ **is** the undo road, and `Engine::plan_shape` writes `Vec::new()` on the planned
+        // one. The discriminator is therefore the journal's own data — no new field, no journal
+        // schema change, and it moves in lockstep with the site it mirrors.
+        let target = if parents.is_empty() {
+            adapter
+                .plan(intent, &pre)
+                .map_err(|e| Error::Adapter {
+                    action: "plan",
+                    detail: e.to_string(),
+                })?
+                .promised_target()
+        } else {
+            None
+        };
+
         let mut transformation = Transformation::new(
             TransformationId(Cid([0u8; 32])),
             0,
             Subject::Object(subject),
-            None,
+            target,
             parents,
             CompositionMetadata {
                 intent_id,
@@ -5879,20 +5996,14 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         }
         transformation.id = *id;
 
-        let adapter = self
-            .adapters
-            .get(delta.substrate())
-            .ok_or_else(|| Error::NotFound {
-                what: "adapter",
-                id: format!("{:?}", delta.substrate()),
-            })?
-            .adapter
-            .clone();
-        let pre = adapter.snapshot(&locator).map_err(|e| Error::Adapter {
-            action: "snapshot",
-            detail: e.to_string(),
-        })?;
-
+        // The adapter lookup and the fresh snapshot used to stand here, after the re-identification.
+        // They were **moved** above rather than duplicated (the block that reads them is the one
+        // carrying the WM-5a comment): the prophecy has to exist before the CID is computed, and two
+        // snapshots of one locator on one road would be two answers to "the object as it is now".
+        // Moving them earlier keeps every refusal this function already made, in the same order
+        // relative to each other, and adds none — an unreadable world still answers
+        // `Error::Adapter{action: "snapshot"}`, now before the rebuild instead of after it, which is
+        // the order `crates/gx-cli/tests/dr4646_world_unreadable.rs` asserts the boundary at.
         self.seat(
             *id,
             Entry {
@@ -7417,9 +7528,14 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         // that there was no prediction to check.
         //
         // **The guard is the `Option`, and it is the whole compatibility story.** `target` is
-        // `None` for every adapter that fills no `promised_target`, which is all six shipped ones,
-        // so the `let Some` below does not open and this block costs one `Option` discriminant
-        // read on the road every existing commit takes.
+        // `None` for every adapter that fills no `promised_target`, so the `let Some` below does
+        // not open and this block costs one `Option` discriminant read on that road.
+        //
+        // 🔴 **"which is all six shipped ones" — struck** (WM-5a Phase 1, `req/1011` §6, ruled by
+        // `req/1016`, 2026-09-01). Two of the six now promise (`gx-adapter-fs`, `gx-adapter-git`),
+        // so the `let Some` opens on the ordinary fs and git road and this comparison runs for
+        // real rather than only under a fixture. The compatibility argument is unchanged for the
+        // adapters that still answer `None`; what changed is how many of them there are.
         //
         // **Why here.** It is as early as the comparison can be — a post-state digest exists only
         // after `apply` — and as late as it must be to leave the undo material intact: the

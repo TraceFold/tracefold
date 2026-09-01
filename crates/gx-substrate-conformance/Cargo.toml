@@ -12,7 +12,7 @@
 [package]
 name = "gx-substrate-conformance"
 description = "The adapter contract harness: seven contracts and the laws the rulings added."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the
                                        # workspace, per the adopted MSRV decision (sem: SEM-gx-substrate-conformance-003)
@@ -34,8 +34,8 @@ publish = false
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement, learned in an earlier build phase.
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }
-gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
+gx-core = { path = "../gx-core", version = "0.1.2" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.2" }
 
 [dev-dependencies]
-gx-canon = { path = "../gx-canon", version = "0.1.0" }
+gx-canon = { path = "../gx-canon", version = "0.1.2" }

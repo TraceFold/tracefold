@@ -14,7 +14,7 @@
 [package]
 name = "gx-engine"
 description = "The Transformation lifecycle: engine journal, escrow store, deterministic replay."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-engine-003)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
@@ -55,12 +55,12 @@ repository.workspace = true           # `dist generate` reads this
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement, learned in an earlier build phase.
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }        # every id, `Timestamp`, `AbortReason`, `VerdictKind`, and its two-axis verdict shape
-gx-canon = { path = "../gx-canon", version = "0.1.0" }      # the architecture spec: "every canonical encode goes through gx-canon only, no detour" (quoted in SEM-gx-engine-009)
-gx-substrate = { path = "../gx-substrate", version = "0.1.0" } # `PlannedDelta`, the body an escrowed inverse holds
-gx-log = { path = "../gx-log", version = "0.1.0" }          # `Recovery`: one spelling of "what opening an append-only file found" (sem: SEM-gx-engine-009)
-gx-gate = { path = "../gx-gate", version = "0.1.0" }        # `Gate::verify`, returning a `Result<Verdict>`
-gx-witness = { path = "../gx-witness", version = "0.1.0" }  # `Evidence`: what an `EvidenceSource` returns
+gx-core = { path = "../gx-core", version = "0.1.2" }        # every id, `Timestamp`, `AbortReason`, `VerdictKind`, and its two-axis verdict shape
+gx-canon = { path = "../gx-canon", version = "0.1.2" }      # the architecture spec: "every canonical encode goes through gx-canon only, no detour" (quoted in SEM-gx-engine-009)
+gx-substrate = { path = "../gx-substrate", version = "0.1.2" } # `PlannedDelta`, the body an escrowed inverse holds
+gx-log = { path = "../gx-log", version = "0.1.2" }          # `Recovery`: one spelling of "what opening an append-only file found" (sem: SEM-gx-engine-009)
+gx-gate = { path = "../gx-gate", version = "0.1.2" }        # `Gate::verify`, returning a `Result<Verdict>`
+gx-witness = { path = "../gx-witness", version = "0.1.2" }  # `Evidence`: what an `EvidenceSource` returns
 
 serde = { version = "1", features = ["derive"] }  # the journal's canonical form
 thiserror = "2"                       # the architecture spec, "errors are typed with thiserror" (sem: SEM-gx-engine-010)
@@ -141,7 +141,7 @@ gx-engine = { path = ".", features = ["probe-bin"] }  # turns the probe binary o
 # would keep printing 0
 # while the dependency was there. Changing the spelling to keep a number is the failure a standing
 # ledger warns about; the number moves and the report says why.
-gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
+gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.2" }
 
 # Three acceptance criteria's instrument, named ("gx-engine's integration bench" / "bench (load test)" /
 # "bench (recovery benchmark)", quoted in SEM-gx-engine-018), which files all three under this crate by name.

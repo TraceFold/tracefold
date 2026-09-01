@@ -4,7 +4,7 @@
 [package]
 name = "gx-witness"
 description = "Provenance, evidence and DSSE-signed receipts."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the
                                        # workspace, per the adopted MSRV decision (sem: SEM-gx-witness-001)
@@ -19,7 +19,7 @@ publish = false                       # no crate in this workspace is a designat
 #
 # `version` beside `path`: see gx-canon's manifest for why (`cargo deny check bans`).
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-core = { path = "../gx-core", version = "0.1.2" }
 
 # A later hand. The field-table spec gives `Evidence` an IdentityView row (all fields, no exclusions) (sem:
 # SEM-gx-witness-002), so the type needs a
@@ -29,7 +29,7 @@ gx-core = { path = "../gx-core", version = "0.1.0" }
 # `evidence.rs` implement the trait for a local type without gx-witness ever naming BLAKE3 or a CBOR
 # codec -- `tests/evidence_cid.rs` reads the source and fails if it does. No cycle: gx-canon names
 # gx-core and nothing else in this workspace.
-gx-canon = { path = "../gx-canon", version = "0.1.0" }
+gx-canon = { path = "../gx-canon", version = "0.1.2" }
 
 # A later hand. One acceptance criterion verifies a `CommitReceipt`'s inclusion proof offline and a
 # ruling attaches a signature over `gx_log::proof::
@@ -39,7 +39,7 @@ gx-canon = { path = "../gx-canon", version = "0.1.0" }
 # graph and cargo, not a convention, is what says so. `tests/ac_018.rs` reads gx-log's manifest and
 # fails if that ever changes. The architecture spec's informal dep line for gx-witness names neither
 # this nor gx-canon.
-gx-log = { path = "../gx-log", version = "0.1.0" }
+gx-log = { path = "../gx-log", version = "0.1.2" }
 
 # Named on this crate's dependency line in the architecture spec and approved in a research note.
 # Versions are the max_stable_version read off the crates.io API on 2026-08-07; every license was

@@ -745,11 +745,65 @@ fn p9_a_refused_route_draws_unknown_and_not_zero() {
     );
     // 🔴 The other half, so this probe cannot be satisfied by removing `zero` from the vocabulary:
     // a genuine zero, on the route that did answer, still reads `0`.
-    assert!(
-        flat(&text).contains("journal_rows 0"),
-        "🔴 P9: `/v1/healthz` answered 200 with `journal_rows: 0`, and a real zero has to survive \
-         this repair:\n{text}"
+    //
+    // 🔴 **Read through the face's own wire reader rather than off the frame, and the loss is
+    // recorded rather than hidden** (`req/924` §TUI-22, `req/38` SS1049, Owner `#266-T`,
+    // 2026-09-01: *`journal_rows 31`=`25 of 31` と重複* — persuasion, deleted). The carrier left
+    // the screen with the ruling, so the discrimination is asked of `wire::cell`, which is the one
+    // function the rail and the grid read **every** value through: a zero that collapsed into
+    // unknown would change this text, so this cannot be satisfied by dropping `zero` from the
+    // vocabulary either.
+    //
+    // 🔴 **Named ceiling, and it is a real one.** With `journal_rows` off the rail there is no
+    // wire-sourced zero drawn on the grid at any ruled shape, so the **frame** no longer carries a
+    // positive control of its own. That is printed and left open rather than asserted away: the
+    // ruling deleted a duplicate and took this probe's on-screen half with it.
+    let body = screen
+        .healthz
+        .body
+        .clone()
+        .unwrap_or(serde_json::Value::Null);
+    let zero = wire::cell(&body, "journal_rows").text();
+    let absent = wire::cell(&body, "status_reason").text();
+    println!(
+        "P9_WIRE journal_rows={zero:?} status_reason={absent:?} on_frame={}",
+        flat(&text).contains("journal_rows")
     );
+    assert_eq!(
+        zero,
+        Nothing::Zero.mark(),
+        "🔴 P9: `/v1/healthz` answered 200 with `journal_rows: 0`, and a real zero has to survive \
+         this repair. The face reads it as {zero:?}"
+    );
+    assert_ne!(
+        zero, absent,
+        "🔴 P9: a measured nought and a key with nothing behind it read the same, which is the \
+         collapse this probe exists to refuse"
+    );
+    // 🔴 **A divergence found by writing this, printed and not asserted.** `req/924` §TUI-23
+    // (2026-09-01, SS1051) rules the wire spelling for `status_reason` and states, as its ground,
+    // that *面の写像は既に `null` → `--`(Absent) で定義済*. It is not: `wire::cell` reads a JSON
+    // `null` as **Unknown**, which is this suite's own fixture comment two hundred lines up
+    // (*`verdict` is `null` on the second row (measured, not knowable)*) and is what several gates
+    // in this file already require. So the ruling and the implementation disagree about which of
+    // the seven words a `null` is, and the disagreement is older and wider than this lane.
+    //
+    // It is left as a finding rather than repaired here for the reason `req/38` SS856 separates:
+    // this is not a repair that mirrors existing code, it is a change to what one of the seven
+    // words **means** across every route, and a face that quietly re-spelled it would be the
+    // collapse this probe exists to refuse, committed by the probe.
+    println!(
+        "P9_DIVERGENCE null_reads_as={absent:?} req/924_§TUI-23_says={:?}",
+        Nothing::Absent.mark()
+    );
+    // 🔴 **Addendum, no-delete (`req/924` §TUI-39, SS1069; `req/1033`).** The divergence above is
+    // still true of `wire::cell` -- `cell` was deliberately left alone, for the exact SS856 reason
+    // the paragraph above gives. What changed is that `status_reason` is no longer read through
+    // `cell` by any caller that matters: `wire::status_reason` (a carve-out, mirroring
+    // `wire::inverse_status`'s existing shape for `INVERSE_STATUS_KEY`) now answers `Absent` for
+    // this one key, and `super::renderer::engine_line` reads the key through it. `g62`
+    // (`fn g62_status_reason_null_is_absent_not_unknown_through_the_classifier`, this file) is the
+    // assertion this comment could not make in 2026-09-01's first pass.
     // And the provenance still carries the codes one by one rather than `all 200`.
     let measured = renderer::measured(&screen);
     assert!(
@@ -1145,10 +1199,38 @@ fn g9_the_disclosure_spells_an_address_that_answers_with_what_was_dropped() {
         !plan.dropped_fields.is_empty(),
         "eighty columns cannot hold ten of them; a plan that drops no field is not measuring"
     );
-    assert!(
+    // 🔴 **Exactly one of the two rows spells it, and this read `the disclosure spells it`**
+    // (`req/924` §TUI-22, `req/38` SS1049, Owner `#266-T`, 2026-09-01: *`GET /v1/transformations`
+    // の2〜5回目*=persuasion, deleted; §TUI-21, SS1048, Owner `#265-T` deleted the second and the
+    // third). The address did not leave the screen — it moved to the **top rail**, which is now
+    // the one row that spells it. Requiring `contains` here would be requiring the duplicate the
+    // ruling deleted, so the assertion is the ruling itself, and it is strictly stronger than what
+    // it replaces: it also refuses the two spellings standing at once.
+    let on_rail = layout::heading_carries_address(&plan.heading);
+    assert_eq!(
         plan.disclosure.contains(LEDGER_ADDRESS),
-        "the disclosure does not spell its address: {}",
+        !on_rail,
+        "🔴 g9: the rail carries the address = {on_rail}, and the disclosure spells it = {}. One \
+         row, once. Rail {:?}, disclosure {:?}",
+        plan.disclosure.contains(LEDGER_ADDRESS),
+        plan.heading
+            .iter()
+            .map(|cell| cell.text.as_str())
+            .collect::<Vec<_>>(),
         plan.disclosure
+    );
+    // And it is on the **frame**, not only in the plan -- the half that separates a declaration
+    // from a screen, and the property `g40` holds over every ruled shape.
+    let frame = renderer::buffer_text(&renderer::render_to_buffer(
+        &screen,
+        80,
+        24,
+        Tier::Mono,
+        false,
+    ));
+    assert!(
+        address_row(&frame).is_some(),
+        "🔴 g9: the page's address is on no row of the frame:\n{frame}"
     );
     // 🔴 `req/942` §19-3: only eight of the wire's fields come back from an id, so the id spelling
     // would be a lie for the rest. The route is the address, and this is the assertion that stops
@@ -2411,21 +2493,46 @@ fn g18_the_note_fits_its_rows_and_names_the_keys_it_folded() {
 /// A face whose stated debt is disclosure cannot pay it and silently drop text off an edge, and a
 /// region that hoards rows is hoarding them from the region that goes looking for rows when the
 /// screen runs out — which is why the declaration went from four rows to three in the same change.
+///
+/// 🔴 **The region is one row now and cannot wrap, so this probe measures the property rather
+/// than the mechanism** (`req/924` §TUI-22, `req/38` SS1049, Owner `#266-T`, 2026-09-01). Three
+/// things in that ruling reach this probe and each is named where it lands:
+///
+/// 1. `REGIONS[Apparatus].min_rows` is **one**. One row cannot wrap, so *the head is wrapped* is
+///    no longer a form this face can take. What was load-bearing was never the wrap — it was
+///    **never silently clipped** — and that is what is asserted below, at the seven ruled shapes.
+/// 2. `journal_rows` is deleted (§TUI-22 ①説得: *`journal_rows 31`=`25 of 31` と重複*), so the
+///    four pairs this probe was written against are three. They are read off
+///    [`renderer::measured`] rather than written out here, because a probe carrying its own copy
+///    of the keys measures the copy.
+/// 3. `status ok` and `ledger_agrees yes` are §TUI-22 ②但し書き — *畳んで良いが捨てるな*. The rail
+///    folds them from the end at narrow widths, so what is asked here is the folding's other half:
+///    the count is on the same screen. The **names** half is `g61`, which was **red at four of the
+///    six ruled shapes where the face makes the claim** when this was rewritten (the names were
+///    absent at five of the seven ruled shapes; the seventh, 40x10, makes no claim). That is the
+///    implementation defect this lane repaired rather than wrote around.
 #[test]
 fn p15_the_apparatus_head_is_wrapped_and_never_silently_clipped() {
     let fixture = Fixture::start();
     let screen = fixture.read();
-    let pairs = [
-        "engine_version gx-engine 0.1.0",
-        "status ok",
-        "ledger_agrees yes",
-        "journal_rows 0",
-    ];
-    // The probe is only worth running where the head cannot fit on one row. Measured, not assumed.
-    let head_width = pairs.join("  ").chars().count();
-    println!("P15_HEAD_WIDTH={head_width}");
+    let measured = renderer::measured(&screen);
+    println!("P15_ENGINE={:?}", measured.engine);
+    // The discriminator, measured rather than assumed: the rail at full length is wider than the
+    // widest ruled shape, so the folds below are real rather than an artefact of a short line.
+    let full = layout::heading_width(&layout::heading(
+        layout::Subject::Grid,
+        u16::MAX,
+        &measured.engine,
+    ));
+    println!("P15_RAIL_AT_FULL_LENGTH={full}");
 
-    for (width, height) in [(46u16, 24u16), (60, 24), (80, 24), (100, 24), (120, 24)] {
+    let mut silent: Vec<String> = Vec::new();
+    let mut overflowed: Vec<String> = Vec::new();
+    let mut fired = 0usize;
+    let mut untestable: Vec<String> = Vec::new();
+
+    for (width, height) in RULED_SHAPES {
+        let plan = layout::resolve(width, height, &measured, false, layout::Subject::Grid);
         let text = renderer::buffer_text(&renderer::render_to_buffer(
             &screen,
             width,
@@ -2434,45 +2541,78 @@ fn p15_the_apparatus_head_is_wrapped_and_never_silently_clipped() {
             false,
         ));
         let one = flat(&text);
-        let missing: Vec<&&str> = pairs.iter().filter(|pair| !one.contains(**pair)).collect();
-        let vacuous = head_width <= width as usize;
-        println!("P15 {width}x{height} missing={missing:?} one_row_would_fit={vacuous}");
-        assert!(
-            missing.is_empty(),
-            "🔴 P15: at {width} cells the apparatus lost {missing:?} with no mark. The engine's \
-             account of itself is not a place to drop text quietly:\n{text}"
+        let dropped = layout::heading_engine_dropped(&plan.heading, &measured.engine);
+        // Half one: nothing is handed to the right edge. The rail chooses its rung against
+        // `width - FRAME_MARGIN` when the enclosure is drawn, so a rung wider than the row is text
+        // the terminal cuts -- the silent drop this probe was opened for, one region up.
+        let room = if plan.framed {
+            width.saturating_sub(layout::FRAME_MARGIN)
+        } else {
+            width
+        } as usize;
+        let rail = layout::heading_width(&plan.heading);
+        if rail > room {
+            overflowed.push(format!(
+                "{width}x{height}: rail {rail} cells, row holds {room}"
+            ));
+        }
+        println!(
+            "P15 {width}x{height} framed={} rail={rail} room={room} engine_dropped={dropped}",
+            plan.framed
         );
+        // Half two: what the rail could not carry is **counted**, on the same screen.
+        if dropped == 0 {
+            untestable.push(format!("{width}x{height}: the rail carried the whole line"));
+            continue;
+        }
+        fired += 1;
+        if !one.contains(&format!("{dropped} engine keys")) {
+            silent.push(format!(
+                "{width}x{height}: {dropped} dropped, disclosure {:?}",
+                plan.disclosure
+            ));
+        }
     }
-    // And the discriminator: at the narrow end the head genuinely does not fit on one row, so the
-    // frames above are passing because of the wrap and not because there was nothing to wrap.
+
+    println!("P15_FIRED={fired} P15_UNTESTABLE={untestable:?}");
+    // The discriminator, and it is the sweep straddling the boundary rather than a width
+    // comparison: some ruled shape folded a key and some ruled shape carried the whole line. One
+    // without the other would mean this probe measured a face that always folds or never does.
     assert!(
-        head_width > 46,
-        "🔴 P15 is vacuous: the head is {head_width} cells and fits a 46-cell row without wrapping"
+        !untestable.is_empty(),
+        "🔴 P15 is vacuous in the other direction: every ruled shape folded a key, so nothing \
+         here distinguishes a rail that folds by width from one that folds always"
+    );
+    assert!(
+        overflowed.is_empty(),
+        "🔴 P15: the top rail is wider than the row it is drawn in, so the terminal cuts it and \
+         no line says so: {overflowed:?}"
+    );
+    assert!(
+        fired > 0,
+        "🔴 P15: no ruled shape folded a key off the rail, so this probe measured nothing"
+    );
+    assert!(
+        silent.is_empty(),
+        "🔴 P15: the rail let go of the engine's own keys and the disclosure did not count them. \
+         The engine's account of itself is not a place to drop text quietly: {silent:?}"
     );
 
-    // The other half — a cut that cannot be avoided is **marked**, with the same trailing mark a
-    // table cell is cut with, rather than performed silently.
-    let narrow = renderer::buffer_text(&renderer::render_to_buffer(
+    // The named ceilings, printed rather than asserted, because both are rulings rather than
+    // defects: `journal_rows` was deleted as a duplicate of `N of M`, and `status_reason` is drawn
+    // only when the engine is not `ok` (`g59`).
+    let wide = flat(&renderer::buffer_text(&renderer::render_to_buffer(
         &screen,
-        24,
-        24,
+        200,
+        32,
         Tier::Mono,
         false,
-    ));
-    println!("--- 24x24 ---\n{narrow}");
-    let apparatus_rows: Vec<&str> = narrow
-        .lines()
-        .take_while(|line| !line.trim_start().starts_with("transformation"))
-        .collect();
-    let head_lost = pairs.iter().any(|pair| !flat(&narrow).contains(*pair));
-    println!("P15_NARROW_HEAD_LOST={head_lost} ROWS={apparatus_rows:?}");
-    if head_lost {
-        assert!(
-            apparatus_rows.iter().any(|line| line.contains('~')),
-            "🔴 P15: the apparatus dropped part of its head at 24 cells and drew no cut mark:\n\
-             {narrow}"
-        );
-    }
+    )));
+    println!(
+        "P15_CEILING journal_rows_on_screen={} status_reason_on_screen={} (both by ruling, `req/924` §TUI-22 and §TUI-23)",
+        wide.contains("journal_rows"),
+        wide.contains("status_reason")
+    );
 }
 
 // =============================================================================================
@@ -4262,7 +4402,11 @@ fn g29_the_position_is_drawn_wherever_the_list_is_longer_than_the_window() {
                 continue;
             }
             fired += 1;
-            let position = format!("record {} of {items}", selected + 1);
+            // 🔴 `N of M` and not `record N of M` (`req/924` §TUI-21 目標の形, `req/38` SS1048,
+            // Owner `#265-T`, 2026-09-01: the target form spells `25 of 31`). The property this
+            // gate holds is untouched — what changed is the spelling the face draws it in, and a
+            // locator that keeps the deleted word measures the word rather than the position.
+            let position = format!("{} of {items}", selected + 1);
             let carries = flat(&text).contains(&position);
             println!("G29 {width}x{height} selected={selected} drawn={drawn} carries={carries}");
             if !carries {
@@ -4903,7 +5047,9 @@ fn g34_every_declared_key_is_either_spelled_or_disclosed() {
 #[test]
 fn g35_the_screen_names_its_own_parts_and_says_where_the_address_went() {
     let screen = ledger(28);
-    let all: BTreeSet<&str> = REGIONS.iter().map(|r| r.role.short()).collect();
+    // The four declared roles were this gate's partition target while the rail was drawn.
+    // `req/924` §TUI-22 deleted the rail, so what is asserted now is its absence and the
+    // totality of the half that remains -- the regions the screen let **go** of.
     let mut rail_missing: Vec<String> = Vec::new();
     let mut with_breadcrumb: Vec<u16> = Vec::new();
     let mut without_breadcrumb: Vec<u16> = Vec::new();
@@ -4916,38 +5062,29 @@ fn g35_the_screen_names_its_own_parts_and_says_where_the_address_went() {
             let (plan, text) = shape_at(&screen, width, height, 28);
             let flat_text = flat(&text);
 
-            // 🔴 The rail is offered only when it costs no row (`compose_disclosure`), so its
-            // absence is a decision rather than a defect and the widths where it is absent are
-            // counted rather than asserted against. What **is** asserted is that wherever it is
-            // drawn it is a true partition of the four declared roles.
+            // 🔴 **The rail is deleted and this half is its negation** (`req/924` §TUI-22,
+            // `req/38` SS1049, Owner `#266-T`, 2026-09-01: *枠を足して `screen: …` を残したら不可。
+            // 対で動かせ*). The clause named the face's own internal regions in words a reader
+            // cannot act on; §TUI-21 classified it as persuasion and §TUI-22 made deleting it the
+            // condition the enclosure was admitted under. What used to be asserted **about** the
+            // rail's partition is therefore asserted about its absence, and the pairing itself is
+            // `g60`'s subject.
             if plan.disclosure.contains("screen: ") {
-                // The rail is a property of the composed line, so it is read there: the buffer can
-                // cut it, and a cut is `truncated`'s business rather than this half's.
-                let kept: BTreeSet<&str> = plan
-                    .disclosure
-                    .split("screen: ")
-                    .nth(1)
-                    .unwrap_or("")
-                    .split(" | ")
-                    .next()
-                    .unwrap_or("")
-                    .split_whitespace()
-                    .collect();
-                let dropped: BTreeSet<&str> = plan.dropped.iter().map(|r| r.short()).collect();
-                let folded: BTreeSet<&str> = if plan.provenance_folded {
-                    [RegionRole::Provenance.short()].into_iter().collect()
-                } else {
-                    BTreeSet::new()
-                };
-                let named: BTreeSet<&str> = kept.union(&dropped).copied().collect();
-                let named: BTreeSet<&str> = named.union(&folded).copied().collect();
-                if named != all || !kept.is_disjoint(&dropped) {
-                    rail_missing.push(format!(
-                        "{width}x{height}: kept {kept:?} dropped {dropped:?} folded {folded:?}"
-                    ));
-                }
+                rail_missing.push(format!("{width}x{height}: {:?}", plan.disclosure));
             } else {
                 no_rail.push((width, height));
+            }
+            // What the deleted rail carried that nothing else did is which regions are **present**.
+            // The half a reader can act on -- which are **absent** -- is still total, and that is
+            // asserted here rather than counted.
+            for role in &plan.dropped {
+                assert!(
+                    plan.disclosure.contains(role.short()),
+                    "🔴 g35: {width}x{height} let go of {:?} and the disclosure does not name it: \
+                     {:?}",
+                    role.short(),
+                    plan.disclosure
+                );
             }
 
             // The breadcrumb half. The apparatus is drawn first, so its rows are the first rows of
@@ -5008,19 +5145,22 @@ fn g35_the_screen_names_its_own_parts_and_says_where_the_address_went() {
         address_nowhere,
         no_rail
     );
-    // 🔴 The rail has to actually be drawn somewhere, or "it is offered only when free" is just a
-    // description of never offering it.
-    assert!(
-        no_rail.len() < SWEEP_WIDTHS.len() * SWEEP_HEIGHTS.len(),
-        "🔴 g35: the rail was free at no shape in the sweep, so the clause is declared and never \
-         drawn"
+    // 🔴 **And this read `the rail has to actually be drawn somewhere`** -- the sentence that
+    // stood here while the clause existed. It is now the other way round: the rail is drawn at
+    // **no** shape, which is what makes the enclosure's four cells free rather than an addition.
+    assert_eq!(
+        no_rail.len(),
+        SWEEP_WIDTHS.len() * SWEEP_HEIGHTS.len(),
+        "🔴 g35: the internal region rail is still drawn at {} shapes. `req/924` §TUI-22 admitted \
+         the enclosure on the condition that the two move together",
+        SWEEP_WIDTHS.len() * SWEEP_HEIGHTS.len() - no_rail.len()
     );
 
     let shown: Vec<&String> = rail_missing.iter().take(8).collect();
     assert!(
         rail_missing.is_empty(),
-        "🔴 g35 (`req/988` §3-1): the rail and the dropped clause are not a partition of the four \
-         declared roles in {} shapes. The first eight are {shown:#?}",
+        "🔴 g35 (`req/924` §TUI-22): the face still names its own internal regions at {} shapes. \
+         The first eight are {shown:#?}",
         rail_missing.len()
     );
     assert!(
@@ -5443,7 +5583,12 @@ fn read_note(screen: &Screen, width: u16, height: u16, records: usize) -> Option
     .lines()
     .filter(|line| line.contains("gx1:"))
     .count();
-    let position = format!("record 1 of {records}");
+    // 🔴 `N of M` (`req/924` §TUI-21 目標の形, `req/38` SS1048, Owner `#265-T`, 2026-09-01).
+    // This helper rebuilds the head the face composes so the ladder it walks is the face's own; a
+    // stale spelling here does not fail a gate, it makes every shape `UNTESTABLE` -- which is how
+    // `g38` and `g39` came to report, in green prose on a red run, that they had measured nothing
+    // at any of the seventy-eight shapes swept.
+    let position = format!("1 of {records}");
     let acts = renderer::offered(records);
     let ladder = renderer::note_ladder(
         &position,
@@ -5514,10 +5659,30 @@ fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
     let mut no_clause: Vec<String> = Vec::new();
     let mut checked = 0usize;
     let mut bought = 0usize;
+    // The ruled shapes where there is no note at all, each with its reason asserted below.
+    let mut ruled_untestable: Vec<String> = Vec::new();
 
     for (width, height) in shapes {
         let Some(note) = read_note(&screen, width, height, records) else {
             untestable.push(format!("{width}x{height}"));
+            // 🔴 **The third value carries its reason at the ruled shapes** (`[T-r42]`,
+            // 2026-09-01; `INHERITED_PRINCIPLES` 検査不能を不合格に畳み込むな). `req/924` §TUI-22
+            // gave the ledger back a row, so at 120x32 a ledger of twenty-eight now fills the
+            // region exactly: nothing is cut, `renderer::note_rows` budgets nought rows and there
+            // is no note on the screen to measure. That is a shape where the ruling has nothing to
+            // say, not a shape where it was broken — and the difference is asserted rather than
+            // assumed, because an unexplained UNTESTABLE is an exemption nobody can see.
+            if RULED_SHAPES.contains(&(width, height)) {
+                let (plan, _) = shape_at(&screen, width, height, records);
+                assert_eq!(
+                    plan.note_rows, 0,
+                    "🔴 g38: {width}x{height} is a ruled shape, the region budgeted \
+                     {} note rows and no note was found on the frame. The instrument and the face \
+                     disagree, which is not a third value",
+                    plan.note_rows
+                );
+                ruled_untestable.push(format!("{width}x{height}"));
+            }
             continue;
         };
         checked += 1;
@@ -5620,12 +5785,22 @@ fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
          G38_UNTESTABLE_NOTE_NOT_DRAWN={untestable:?} \
          G38_NO_CLAUSE_AT_CEILING={no_clause:?}"
     );
+    println!("G38_RULED_UNTESTABLE={ruled_untestable:?}");
+    // 🔴 **Measured plus explained equals the seven, and it read `measured equals the seven`.**
+    // The guard is the same one: nothing leaves this sweep unaccounted for. What changed is that
+    // a shape with no note on it is now required to say **why** rather than being counted as a
+    // failure of the ruling -- `req/924` §TUI-22 handed the ledger a row and at one ruled shape
+    // the list stopped being cut, which is the lane's stated goal arriving as a gate's third value.
     assert_eq!(
-        table.len(),
+        table.len() + ruled_untestable.len(),
         RULED_SHAPES.len(),
-        "🔴 g38: {} of the seven ruled shapes could not be measured, so the ruling is unchecked \
-         rather than kept",
-        RULED_SHAPES.len() - table.len()
+        "🔴 g38: {} of the seven ruled shapes were neither measured nor explained, so the ruling \
+         is unchecked rather than kept",
+        RULED_SHAPES.len() - table.len() - ruled_untestable.len()
+    );
+    assert!(
+        !table.is_empty(),
+        "🔴 g38: no ruled shape carried a note, so the ruling was not measured at all"
     );
     assert!(
         bought > 0,
@@ -5645,7 +5820,11 @@ fn g38_the_help_key_is_bought_only_with_a_line_the_screen_still_spells() {
 fn g39_the_position_and_the_drop_count_are_never_given_up_for_a_legend() {
     let records = 28;
     let screen = ledger(records);
-    let position = format!("record 1 of {records}");
+    // 🔴 The same spelling and the same ruling. `+K more rows` went with it (`req/924` §TUI-21
+    // ①: *`+11 more rows`(`25 of 31` と重複)*), so the second half of the protected set no longer
+    // fires on this face. It is kept rather than deleted because it is the guard that refuses a
+    // priced rung carrying the drop count if one is ever added back.
+    let position = format!("1 of {records}");
     let mut kept = 0usize;
     let mut untestable: Vec<String> = Vec::new();
 
@@ -5850,15 +6029,20 @@ fn g41_the_heading_names_which_screen_this_is_at_every_shape() {
                 "🔴 g41: {width}x{height} {subject:?}: the heading is empty, so the screen does \
                  not say which screen it is"
             );
+            // 🔴 **The tab strip is deleted and this asks the question it was admitted for**
+            // (`req/924` §TUI-22, `req/38` SS1049, Owner `#266-T`, 2026-09-01:
+            // *`transformations │ list record help`=breadcrumb はキー凡例と重複・行き先を2箇所で
+            // 言っている*). Owner #227 admitted the heading to answer *which screen is this*;
+            // naming the two screens the reader is **not** on was answering *where can I go*,
+            // which `ret open` and `?` already answer on the note line of every shape. So what is
+            // asserted is the half that was never a duplicate: the screen being drawn is named,
+            // and it is the only cell that wears the attention.
             let names: Vec<&str> = plan.heading.iter().map(|cell| cell.text.as_str()).collect();
-            for shape in layout::SUBJECTS {
-                assert!(
-                    names.contains(&shape.name()),
-                    "🔴 g41: {width}x{height} {subject:?}: the heading does not name {:?}. A tab \
-                     strip that hides the tabs you are not on answers nothing",
-                    shape.name()
-                );
-            }
+            assert!(
+                names.contains(&subject.name()),
+                "🔴 g41: {width}x{height} {subject:?}: the heading does not name the screen being \
+                 drawn. It reads {names:?}"
+            );
             let attended: Vec<&str> = plan
                 .heading
                 .iter()
@@ -5894,18 +6078,16 @@ fn g41_the_heading_names_which_screen_this_is_at_every_shape() {
                 false,
                 &view,
             ));
+            // The rail is the row that carries the boundary glyph, so keying on it is what
+            // keeps this from finding the word `record` inside a sentence somewhere else.
             let heading_row = frame
                 .lines()
-                .find(|line| {
-                    layout::SUBJECTS
-                        .iter()
-                        .all(|shape| line.contains(shape.name()))
-                })
+                .find(|line| line.contains(subject.name()) && line.contains(tokens::RULE))
                 .map(str::to_string);
             assert!(
                 heading_row.is_some(),
-                "🔴 g41: {width}x{height} {subject:?}: no row of the frame carries all three \
-                 names. The plan has them and the screen does not, which is a declaration nothing \
+                "🔴 g41: {width}x{height} {subject:?}: no rail of the frame names the screen being \
+                 drawn. The plan has it and the screen does not, which is a declaration nothing \
                  reads.\n{frame}"
             );
             if width == 40 && height == 10 {
@@ -6951,5 +7133,886 @@ fn g53_an_absent_escrow_row_is_not_an_unavailable_inverse() {
          shape/tier(s):\n{}",
         wrong.len(),
         wrong.join("\n")
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// G55..G58 — the paint axis's top rung, the emphasis that reaches a record row, and the ruling
+// that a hoisted claim is measured over the ledger rather than over the viewport
+// (`req/924` §TUI-19 #1/#4 and §TUI-20, `req/38` SS1046/SS1047, Owner #264-T).
+// ---------------------------------------------------------------------------------------------
+
+/// The live bed, in miniature: `count` records that agree on everything, and one near the end that
+/// does not.
+///
+/// 🔴 The odd record is what makes this fixture able to tell the two hoists apart. Measured against
+/// the engine on 2026-09-01, `GET /v1/transformations` answered with thirty-one records of which
+/// **one** carried `verdict ?` and `state Candidate`; a viewport that never reached that record
+/// hoisted `verdict Admit` and stated it flatly, and the same screen with the attention at the end
+/// drew a verdict column. A fixture that agrees on every row cannot see the difference, which is
+/// why `uniform_ledger` above is not reused here.
+///
+/// The id keeps `record_id`'s shape so [`drawn_records`] can still say which row is which.
+fn ledger_with_one_odd(count: usize) -> Screen {
+    let odd = count.saturating_sub(2);
+    let items: Vec<serde_json::Value> = (0..count)
+        .map(|n| {
+            if n == odd {
+                serde_json::json!({
+                    "transformation": record_id(n),
+                    "state": "Candidate",
+                    "verdict": serde_json::Value::Null,
+                    "enforced": true,
+                    "created_at": "2026-08-31T21:52:09Z",
+                    "actor": "agent-a",
+                    "scope": format!("src/row{n}.rs"),
+                    "inverse_status": serde_json::Value::Null,
+                    "rollback": serde_json::Value::Null,
+                    "superseded_by": serde_json::Value::Null,
+                })
+            } else {
+                serde_json::json!({
+                    "transformation": record_id(n),
+                    "state": "Committed",
+                    "verdict": "Admit",
+                    "enforced": true,
+                    "created_at": "2026-08-30T09:00:00Z",
+                    "actor": "agent-a",
+                    "scope": format!("src/row{n}.rs"),
+                    "inverse_status": "Available",
+                    "rollback": serde_json::Value::Null,
+                    "superseded_by": serde_json::Value::Null,
+                })
+            }
+        })
+        .collect();
+    Screen {
+        healthz: answered(
+            "/v1/healthz",
+            serde_json::json!({
+                "status": "ok",
+                "engine_version": "gx-engine 0.1.0",
+                "ledger_agrees": true,
+                "journal_rows": count,
+                "status_reason": serde_json::Value::Null,
+            }),
+        ),
+        transformations: answered(
+            "/v1/transformations",
+            serde_json::json!({ "items": items, "next_cursor": serde_json::Value::Null }),
+        ),
+        candidates: answered(
+            "/v1/candidates",
+            serde_json::json!({ "items": [], "next_cursor": serde_json::Value::Null }),
+        ),
+        escalations: answered(
+            "/v1/escalations",
+            serde_json::json!({ "items": [], "next_cursor": serde_json::Value::Null }),
+        ),
+    }
+}
+
+/// The seven shapes `req/942_artifacts/tui_r37_2026-09-01` captures on a real terminal, so a gate
+/// and a photograph are asking about the same screens.
+const R37_SHAPES: [(u16, u16); 7] = [
+    (120, 32),
+    (100, 30),
+    (80, 24),
+    (66, 20),
+    (60, 20),
+    (46, 12),
+    (40, 10),
+];
+
+/// Whether one cell carries any emphasis at all: a hue, a ground, or a modifier.
+fn cell_is_emphasised(cell: &ratatui::buffer::Cell) -> bool {
+    cell.fg != ratatui::style::Color::Reset
+        || cell.bg != ratatui::style::Color::Reset
+        || !cell.modifier.is_empty()
+}
+
+/// Whether any cell in this row carries emphasis.
+fn row_is_emphasised(buffer: &ratatui::buffer::Buffer, y: u16) -> bool {
+    (buffer.area.x..buffer.area.x + buffer.area.width).any(|x| cell_is_emphasised(&buffer[(x, y)]))
+}
+
+/// The declared paint intents: what this face is saying, and the [`tokens::Role`] it says it in.
+///
+/// 🔴 **The map `req/924` §TUI-15 recorded as UNTESTABLE, given a domain.** The census looked for an
+/// `Intent` type in `tui/src/tui/tokens.rs`, found none, and was right that a map with no domain
+/// cannot be checked. The ruling this lane made (and wrote into that module's own documentation) is
+/// that the rung is not missing: it is `wire`, where the product's words arrive, and the three
+/// `role()` methods there **are** this map. Eleven of the fifteen entries below are therefore *read
+/// out of the wire's vocabularies* rather than typed, so a word added to `Nothing` or a fourth
+/// verdict grows this gate instead of leaving it measuring the old count.
+///
+/// The remaining four are the face's own chrome — what it says about itself rather than about the
+/// engine — and they are spelled here because there is nowhere outside the face to read them from.
+/// That they are hand-written is the honest weak point of this gate and is not hidden.
+fn declared_paint_intents() -> Vec<(String, tokens::Role)> {
+    let mut out: Vec<(String, tokens::Role)> = Vec::new();
+    for nothing in Nothing::ALL {
+        out.push((
+            format!("the wire carried nothing, of the kind `{}`", nothing.word()),
+            nothing.role(),
+        ));
+    }
+    for kind in wire::VERDICT_KINDS {
+        out.push((
+            format!("the engine's decision was `{kind}`"),
+            wire::VerdictMark::Kind(kind).role(),
+        ));
+    }
+    out.push((
+        "the wire carried no decision for this record".to_string(),
+        wire::VerdictMark::None(Nothing::Unknown).role(),
+    ));
+    out.push((
+        "which screen this is, and what its columns are called".to_string(),
+        tokens::Role::Head,
+    ));
+    out.push((
+        "the face's own account of itself, and of what it let go of".to_string(),
+        tokens::Role::Quiet,
+    ));
+    out.push(("a value the wire carried".to_string(), tokens::Role::Body));
+    out.push((
+        "the thing the reader is standing on".to_string(),
+        tokens::Role::Attend,
+    ));
+    out
+}
+
+/// 🔴 **g55 — `intent -> role` on the paint axis is total, injective, and covers `ROLES` exactly.**
+///
+/// Total: every declared intent resolves to a role. Injective: no two intents resolve to the same
+/// one — *different things this face is saying must never collapse into one appearance*. Covering:
+/// no role exists that nothing names, because a value nobody means is a value nobody maintains.
+///
+/// 🔴 **This gate is green on the source it was written against, and that is stated rather than
+/// dressed up.** It is a tripwire, not a finding. What it would have caught, on the run rather than
+/// in a reading, is `req/38` SS974: a value with nothing in it and a count of nought were painted
+/// in one role until the seventh word was added, which is exactly two intents collapsed into one
+/// appearance. The planted control below fires it in the red direction so it is not a gate that has
+/// never refused anything.
+#[test]
+fn g55_a_paint_intent_resolves_to_exactly_one_role_and_no_role_is_unclaimed() {
+    let declared = declared_paint_intents();
+    println!(
+        "G55_INTENTS={} G55_ROLES={}",
+        declared.len(),
+        tokens::ROLES.len()
+    );
+
+    let mut collapsed: Vec<String> = Vec::new();
+    for (i, (sentence_a, role_a)) in declared.iter().enumerate() {
+        for (sentence_b, role_b) in declared.iter().skip(i + 1) {
+            if role_a == role_b {
+                collapsed.push(format!(
+                    "{:?}: {sentence_a:?} and {sentence_b:?}",
+                    role_a.name()
+                ));
+            }
+        }
+    }
+    assert!(
+        collapsed.is_empty(),
+        "🔴 g55: {} pair(s) of distinct paint intents resolve to one role, so the face draws two \
+         different things it is saying with one appearance:\n{}",
+        collapsed.len(),
+        collapsed.join("\n")
+    );
+
+    let named: BTreeSet<&str> = declared.iter().map(|(_, role)| role.name()).collect();
+    let all: BTreeSet<&str> = tokens::ROLES.iter().map(|role| role.name()).collect();
+    let unclaimed: Vec<&&str> = all.difference(&named).collect();
+    assert!(
+        unclaimed.is_empty(),
+        "🔴 g55: {} role(s) are declared in `ROLES` and no intent names them, so nothing on this \
+         screen means them: {unclaimed:?}",
+        unclaimed.len()
+    );
+    let unknown: Vec<&&str> = named.difference(&all).collect();
+    assert!(
+        unknown.is_empty(),
+        "🔴 g55: {} intent(s) resolve to a role that is not in `ROLES`: {unknown:?}",
+        unknown.len()
+    );
+
+    // The positive control: the SS974 collapse, planted. Two intents, one role.
+    let planted = [
+        ("a count of nought".to_string(), tokens::Role::MarkZero),
+        (
+            "a value with nothing in it".to_string(),
+            tokens::Role::MarkZero,
+        ),
+    ];
+    let caught = planted[0].1 == planted[1].1;
+    assert!(
+        caught,
+        "🔴 g55 control: the planted collapse was not detected, so this gate's own test for \
+         injectivity does not work"
+    );
+    println!("G55_CONTROL=caught the planted `zero`/`empty` collapse");
+}
+
+/// 🔴 **g56 — emphasis reaches the rows the reader is reading.**
+///
+/// Measured on a real terminal at 120x29 on 2026-09-01 (`req/924` §TUI-19 #1), the face drew
+/// **nineteen record rows carrying no SGR at all**: every column that could have said something
+/// about a record had been hoisted into one line above them, and what was left was the id, painted
+/// `paint.body`, which spells no hue and no modifier by decision. Emphasis was not weak on that
+/// screen; it was absent from the part of the screen the reader was looking at.
+///
+/// The predicate is a property and not a magic number: **no drawn record row may be entirely
+/// unemphasised**, and the count of emphasised rows is printed at every shape so the number is in
+/// the record rather than in a lane report. One row is not a screen with emphasis on it, so the
+/// count is also required to exceed one wherever more than one record is drawn.
+#[test]
+fn g56_no_record_row_is_drawn_without_any_emphasis_on_it() {
+    let screen = ledger_with_one_odd(31);
+    let mut naked: Vec<String> = Vec::new();
+    let mut untestable = 0usize;
+    for (width, height) in R37_SHAPES {
+        let buffer = renderer::render_view_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Truecolor,
+            false,
+            &View::default(),
+        );
+        let text = renderer::buffer_text(&buffer);
+        let records = drawn_records(&text);
+        if records.is_empty() {
+            // The third value: a shape with no room for a record says nothing about emphasis on
+            // record rows. Counted and printed, never folded into the failing side.
+            println!("G56 UNTESTABLE {width}x{height}: no record row drawn");
+            untestable += 1;
+            continue;
+        }
+        let rows: Vec<u16> = (buffer.area.y..buffer.area.y + buffer.area.height)
+            .filter(|y| row_is_emphasised(&buffer, *y))
+            .collect();
+        let bare: Vec<usize> = records
+            .iter()
+            .map(|(row, _)| *row)
+            .filter(|row| !row_is_emphasised(&buffer, *row as u16))
+            .collect();
+        println!(
+            "G56 {width}x{height} records={} emphasised_rows={} of {height} bare_record_rows={}",
+            records.len(),
+            rows.len(),
+            bare.len()
+        );
+        if !bare.is_empty() {
+            naked.push(format!(
+                "{width}x{height}: {} of {} record row(s) carry no hue, no ground and no \
+                 modifier -- rows {bare:?}",
+                bare.len(),
+                records.len()
+            ));
+        }
+        if records.len() > 1 {
+            assert!(
+                rows.len() > 1,
+                "🔴 g56 at {width}x{height}: {} record(s) are drawn and only {} row(s) on the \
+                 whole screen carry any emphasis",
+                records.len(),
+                rows.len()
+            );
+        }
+    }
+    println!("G56_UNTESTABLE={untestable}");
+    assert!(
+        naked.is_empty(),
+        "🔴 g56: a record row with no emphasis anywhere on it is a row the reader has no handle \
+         on, at {} shape(s):\n{}",
+        naked.len(),
+        naked.join("\n")
+    );
+}
+
+/// 🔴 **g57 — the seven words for nothing stay seven after the paint is applied.**
+///
+/// `P2` already measures that the marks are told apart by their symbol on `mono`. This asks the
+/// next question, which is the one emphasis makes it possible to get wrong: once a hue, a ground
+/// and a modifier are added, do two of the seven become the *same drawn thing*? A pair that shares
+/// a spelling **and** an appearance is a pair a reader cannot separate at any tier.
+#[test]
+fn g57_the_seven_kinds_of_nothing_are_still_seven_once_they_are_painted() {
+    let mut collisions: Vec<String> = Vec::new();
+    for tier in tokens::Tier::ALL {
+        let drawn: Vec<(String, &'static str, tokens::Ink)> = Nothing::ALL
+            .into_iter()
+            .map(|nothing| {
+                (
+                    nothing.mark().to_string(),
+                    nothing.word(),
+                    tokens::ink(nothing.role(), tier),
+                )
+            })
+            .collect();
+        for (i, (mark_a, word_a, ink_a)) in drawn.iter().enumerate() {
+            for (mark_b, word_b, ink_b) in drawn.iter().skip(i + 1) {
+                if mark_a == mark_b && ink_a == ink_b {
+                    collisions.push(format!(
+                        "{}: `{word_a}` and `{word_b}` are both {mark_a:?} in {ink_a:?}",
+                        tier.name()
+                    ));
+                }
+            }
+        }
+        println!(
+            "G57 {} distinct_marks={} of {}",
+            tier.name(),
+            drawn
+                .iter()
+                .map(|(mark, _, _)| mark.clone())
+                .collect::<BTreeSet<String>>()
+                .len(),
+            Nothing::ALL.len()
+        );
+    }
+    assert!(
+        collisions.is_empty(),
+        "🔴 g57: {} pair(s) of the seven words are drawn as the same symbol in the same ink, so \
+         emphasis has closed a distinction the vocabulary exists to keep open:\n{}",
+        collisions.len(),
+        collisions.join("\n")
+    );
+}
+
+/// 🔴 **g58 — which columns the grid draws does not depend on where the attention is standing.**
+///
+/// Owner reported it from a live terminal on 2026-09-01 (#264-T): *"the list's records 1-29 show
+/// nothing but the verdict when selected"*. Reproduced on a real PTY at 120x29 against
+/// thirty-one records — with the attention on record 1 the grid drew **one** column, and with the
+/// attention on record 31 it drew **six**. `hoist` was asking its question of the records in the
+/// window, so the answer moved when the window did.
+///
+/// Two halves, for the reason g28 has two: the decision, fired at [`renderer::hoist`] over every
+/// place the attention can stand, and then the picture, so a gate is not measuring an arithmetic
+/// nobody draws with. The claim itself is checked too — a column called constant must actually be
+/// constant over every record the read carried, not over the drawn slice.
+#[test]
+fn g58_the_column_set_does_not_move_when_the_attention_does() {
+    let screen = ledger_with_one_odd(31);
+    let items = screen.transformations.items();
+    assert_eq!(items.len(), 31, "g58 bed: thirty-one records, as measured");
+
+    let mut moved: Vec<String> = Vec::new();
+    let mut false_claims: Vec<String> = Vec::new();
+    for width in HOIST_WIDTHS {
+        let (columns, _) = layout::columns_for(width);
+        for capacity in [2usize, 5, 12, 19, 23, 40] {
+            let mut seen: BTreeSet<Vec<&'static str>> = BTreeSet::new();
+            for selected in 0..items.len() {
+                let window = layout::window(selected, items.len(), capacity);
+                let (kept, shared, _) =
+                    renderer::hoist(&items, &columns, window, capacity, selected);
+                seen.insert(kept.iter().map(|column| column.key).collect());
+                // A hoisted column claims that every record agrees. Asked of the ledger, not of
+                // the window.
+                for (key, mark) in &shared {
+                    let all_agree = items
+                        .iter()
+                        .all(|item| &renderer::cell_mark(item, key).0 == mark);
+                    if !all_agree {
+                        false_claims.push(format!(
+                            "{width} capacity={capacity} selected={selected}: `{key} {mark}` is \
+                             stated as constant and at least one of the {} records disagrees",
+                            items.len()
+                        ));
+                    }
+                }
+            }
+            if seen.len() > 1 {
+                let shapes: Vec<Vec<&str>> = seen.iter().cloned().collect();
+                moved.push(format!(
+                    "{width} capacity={capacity}: the grid took {} different column sets \
+                     depending only on where the attention stood: {shapes:?}",
+                    seen.len()
+                ));
+            }
+        }
+    }
+    println!("G58_DECISION_SHAPES_CHECKED={}", HOIST_WIDTHS.len() * 6);
+    assert!(
+        false_claims.is_empty(),
+        "🔴 g58: {} hoisted line(s) state something the ledger does not support -- a claim \
+         measured over the viewport and drawn as a claim about the list:\n{}",
+        false_claims.len(),
+        false_claims
+            .iter()
+            .take(6)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    assert!(
+        moved.is_empty(),
+        "🔴 g58: the column set is a function of the attention's position at {} \
+         width/capacity pair(s):\n{}",
+        moved.len(),
+        moved.iter().take(6).cloned().collect::<Vec<_>>().join("\n")
+    );
+
+    // The picture. The same three places on a real shape, read off the header row.
+    let header_at = |selected: usize| -> Vec<String> {
+        let view = View {
+            selected,
+            ..View::default()
+        };
+        let text = renderer::buffer_text(&renderer::render_view_to_buffer(
+            &screen,
+            120,
+            29,
+            Tier::Truecolor,
+            false,
+            &view,
+        ));
+        text.lines()
+            .find(|line| line.split_whitespace().next() == Some(LEDGER_COLUMNS[0].key))
+            .map(|line| line.split_whitespace().map(str::to_string).collect())
+            .unwrap_or_default()
+    };
+    let first = header_at(0);
+    let middle = header_at(15);
+    let last = header_at(items.len() - 1);
+    println!("G58 header first={first:?}");
+    println!("G58 header middle={middle:?}");
+    println!("G58 header last={last:?}");
+    assert!(
+        !first.is_empty(),
+        "🔴 g58: no header row was found at 120x29, so the picture half measured nothing"
+    );
+    assert!(
+        first == middle && middle == last,
+        "🔴 g58 at 120x29: the header names {:?} with the attention at the top, {:?} in the \
+         middle and {:?} at the bottom",
+        first,
+        middle,
+        last
+    );
+}
+
+// =============================================================================================
+// `req/924` §TUI-22 / §TUI-21 / §TUI-23 — the three gates the enclosure's own doc comments name.
+//
+// 🔴 **`tui/src` referred to `g59`, `g60` and `g61` and no suite in this repository contained any
+// of them** (`req/38` SS1057: the enclosure landed UNVERIFIED with nought new gates). A doc
+// comment naming a gate nobody wrote is the same failure as a gate checking a declaration nothing
+// reads, pointed the other way: the source asserts a machine is watching and none is. Minted after
+// a fresh grep of every `*.rs` in the repository, where the highest number in use was `g58`.
+// =============================================================================================
+
+/// 🔴 **g59 — the reason is on the rail exactly when the engine is not the healthy word.**
+///
+/// `req/924` §TUI-22 (`req/38` SS1049, Owner `#266-T`) raised this as a **new** finding: the bed
+/// answers `status: ok` with `status_reason: null` and the face drew `status_reason ?` on every
+/// frame — *measured, and not knowable*, asserted about a key that has no reason to give. §TUI-23
+/// then ruled the wire's half (`null`, and the field is always sent, because not sending it is a
+/// different claim and would collapse Absent into Unknown). The face's half is this: draw the
+/// reason when there is one, draw nothing when there is not, and name the condition in the hatch.
+///
+/// The discrimination is the whole gate. A face that never drew the reason would satisfy one half
+/// and a face that always drew it would satisfy the other, so both directions are measured on two
+/// screens that differ in exactly one wire value.
+#[test]
+fn g59_the_reason_is_on_the_rail_exactly_when_the_engine_is_not_ok() {
+    let well = ledger(28);
+    let mut unwell = ledger(28);
+    unwell.healthz = answered(
+        "/v1/healthz",
+        serde_json::json!({
+            "status": "degraded",
+            "engine_version": "gx-engine 0.1.0",
+            "ledger_agrees": false,
+            "journal_rows": 28,
+            "status_reason": "the ledger disagrees with the journal",
+        }),
+    );
+
+    let keys = |screen: &Screen| -> Vec<String> {
+        renderer::measured(screen)
+            .engine
+            .into_iter()
+            .map(|(key, _)| key)
+            .collect()
+    };
+    let well_keys = keys(&well);
+    let unwell_keys = keys(&unwell);
+    println!("G59_WELL={well_keys:?} G59_UNWELL={unwell_keys:?}");
+    assert!(
+        !well_keys.iter().any(|key| key == "status_reason"),
+        "🔴 g59: the engine is `ok` and the rail carries a reason. An engine that is ok has no \
+         reason, so drawing one asserts `measured and not knowable` about a fact that is Absent"
+    );
+    assert!(
+        unwell_keys.first().map(String::as_str) == Some("status_reason"),
+        "🔴 g59: the engine is not `ok` and the reason is not the rail's first key. It leads \
+         because it is the one fact that explains the rest, and the rail gives its keys up from \
+         the end: {unwell_keys:?}"
+    );
+
+    // And it reaches the frame, at a width wide enough to hold the whole line.
+    let drawn = flat(&renderer::buffer_text(&renderer::render_to_buffer(
+        &unwell,
+        200,
+        32,
+        Tier::Mono,
+        false,
+    )));
+    assert!(
+        drawn.contains("the ledger disagrees with the journal"),
+        "🔴 g59: the engine gave a reason and no row of the frame carries it:\n{drawn}"
+    );
+    let healthy = flat(&renderer::buffer_text(&renderer::render_to_buffer(
+        &well,
+        200,
+        32,
+        Tier::Mono,
+        false,
+    )));
+    assert!(
+        !healthy.contains("status_reason ?"),
+        "🔴 g59: the engine is `ok` and the rail spells a reason anyway:\n{healthy}"
+    );
+
+    // The hatch names the key and the condition, because a key drawn conditionally and explained
+    // nowhere is the one field on the screen that leaves without a word.
+    let hatch = flat(&renderer::buffer_text(&renderer::render_view_to_buffer(
+        &well,
+        200,
+        32,
+        Tier::Mono,
+        false,
+        &View {
+            help: true,
+            ..View::default()
+        },
+    )));
+    assert!(
+        hatch.contains("status_reason is on the rail only when status is not ok"),
+        "🔴 g59: the condition is drawn nowhere a reader can reach:\n{hatch}"
+    );
+}
+
+/// 🔴 **g60 — the enclosure and the words it replaced move together.**
+///
+/// `req/924` §TUI-22 (`req/38` SS1049, Owner `#266-T`, 2026-09-01) admitted the corners under the
+/// test `INHERITED_PRINCIPLES` §3c-③'' states — *記号が意味を担い、その結果 語が消えるなら可。語を
+/// 残したまま記号を足すなら不可* — and made the admission **conditional**: 🔴 *ただし枠を足して
+/// `screen: …` を残したら不可。対で動かせ。*
+///
+/// So the pairing is the gate. Three directions, over the whole sweep and the seven ruled shapes:
+/// the clause is on no screen; a screen that says it is enclosed draws the corners; a screen that
+/// is not enclosed says so. The third is the renderer's standing debt — it cannot `invert`, so
+/// what it owes is to name what it let go of, and the enclosure carries meaning.
+///
+/// 🔴 **This is a tripwire and not a discovery.** It was green on `main` the hour it was written,
+/// because the clause was deleted by the same commit that drew the corners. The negative control
+/// below is what keeps that from being a gate which would also pass with no predicate at all.
+#[test]
+fn g60_the_enclosure_and_the_region_rail_move_together() {
+    let screen = ledger(28);
+    let measured = renderer::measured(&screen);
+    let mut named: Vec<String> = Vec::new();
+    let mut open: Vec<String> = Vec::new();
+    let mut unsaid: Vec<String> = Vec::new();
+    let mut cut: Vec<String> = Vec::new();
+    let mut framed_shapes = 0usize;
+    let mut bare_shapes = 0usize;
+
+    let mut shapes: Vec<(u16, u16)> = RULED_SHAPES.to_vec();
+    for width in SWEEP_WIDTHS {
+        for height in SWEEP_HEIGHTS {
+            if !shapes.contains(&(width, height)) {
+                shapes.push((width, height));
+            }
+        }
+    }
+
+    for (width, height) in shapes {
+        let plan = layout::resolve(width, height, &measured, false, layout::Subject::Grid);
+        let text = renderer::buffer_text(&renderer::render_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+        ));
+        // One: the words are gone, at every shape, in the line the face composed.
+        if plan.disclosure.contains("screen: ") {
+            named.push(format!("{width}x{height}: {:?}", plan.disclosure));
+        }
+        if plan.framed {
+            framed_shapes += 1;
+            // Two: the mark that replaced them is drawn. The bottom right corner is the last cell
+            // of the last wrapped row of the disclosure, so a disclosure the cap cut takes it with
+            // it -- which is `truncated`'s business and is counted here rather than failed.
+            let missing: Vec<&str> = tokens::CORNERS
+                .into_iter()
+                .filter(|corner| !text.contains(*corner))
+                .collect();
+            if !missing.is_empty() {
+                if plan.truncated {
+                    cut.push(format!("{width}x{height}: {missing:?} (disclosure cut)"));
+                } else {
+                    open.push(format!("{width}x{height}: {missing:?}"));
+                }
+            }
+        } else {
+            bare_shapes += 1;
+            // Three: a screen without the enclosure says so, because the mark carries meaning and
+            // its absence is a fact about what this frame let go of.
+            if !plan.disclosure.contains("frame") && !plan.truncated {
+                unsaid.push(format!("{width}x{height}: {:?}", plan.disclosure));
+            }
+        }
+    }
+
+    println!(
+        "G60_FRAMED={framed_shapes} G60_BARE={bare_shapes} G60_CORNERS_CUT_WITH_DISCLOSURE={cut:?}"
+    );
+    // The negative control: the predicate refuses the clause it is written against, so a green run
+    // is a measurement rather than a search for a string nothing could produce.
+    let planted = format!(
+        "3 of 11 fields not drawn | screen: {}",
+        REGIONS
+            .iter()
+            .map(|region| region.role.short())
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    assert!(
+        planted.contains("screen: "),
+        "🔴 g60: the control did not carry the clause, so the predicate is untested"
+    );
+    assert!(
+        named.is_empty(),
+        "🔴 g60 (`req/924` §TUI-22): the corners are drawn and the face still names its own \
+         internal regions. The two were admitted as one decision: {named:?}"
+    );
+    assert!(
+        open.is_empty(),
+        "🔴 g60: the plan says the ledger is enclosed and the frame does not draw every corner: \
+         {open:?}"
+    );
+    assert!(
+        unsaid.is_empty(),
+        "🔴 g60: the enclosure was let go of and the disclosure does not say so. A renderer \
+         cannot invert; naming what it dropped is the whole of what it owes: {unsaid:?}"
+    );
+    assert!(
+        framed_shapes > 0 && bare_shapes > 0,
+        "🔴 g60: {framed_shapes} enclosed and {bare_shapes} bare shapes -- one side of the \
+         pairing was never exercised, so this gate measured one thing and reported two"
+    );
+}
+
+/// 🔴 **g61 — the hatch lists what the disclosure sends a reader to it for.**
+///
+/// `req/924` §TUI-21 (`req/38` SS1048, Owner `#265-T`, 2026-09-01), on the caveats it classified
+/// as ②但し書き and therefore outside the word count: 🔴 *数だけ残して名前を `?` へ逃がすのは可。
+/// ただし逃がし先が実際に列挙している事を gate で確かめるまで「逃がした」と言うな* — and that
+/// section's own gate clause: 🔴 *`?` を押した画面に `3 fields` の名前3つと `2 routes` の名前2つが
+/// 実在する事を assert。無ければ赤——逃がし先が空なら、それは逃がしたのでなく消したのと同じ。*
+///
+/// The claim is read off the face rather than assumed: the long form of the disclosure is the one
+/// that spells `routes read and not drawn -> <address>`, and only there has the face said the
+/// names moved. Where it has not said so — the short form, at forty by ten — nothing is asserted,
+/// because a face that makes no claim cannot break one. That is the third value and it is printed.
+///
+/// 🔴 **Red on `main` at four of the six ruled shapes that make the claim** when it was written
+/// — 80x24, 66x20, 60x20 and 46x12, with 120x32 and 100x30 clean and 40x10 making no claim. The
+/// three entries carrying the names were pushed **last** into the help face's list, so at every
+/// shape below a hundred cells the list was cut before reaching them while the grid went on
+/// spelling `-> help:?`. Counted the other way, without the claim filter, the names were absent at
+/// five of the seven ruled shapes.
+#[test]
+fn g61_the_escape_hatch_lists_the_names_the_disclosure_sent_there() {
+    let screen = ledger(28);
+    let measured = renderer::measured(&screen);
+    let mut empty: Vec<String> = Vec::new();
+    let mut no_claim: Vec<String> = Vec::new();
+    let mut fired = 0usize;
+
+    for (width, height) in RULED_SHAPES {
+        let plan = layout::resolve(width, height, &measured, false, layout::Subject::Grid);
+        // The face's own words. `keys_address` is `help:?` or `gx tui --help` depending on the
+        // shape, so the marker is the clause rather than either spelling of the road.
+        if !plan.disclosure.contains("routes read and not drawn ->") {
+            no_claim.push(format!("{width}x{height}: {:?}", plan.disclosure));
+            continue;
+        }
+        fired += 1;
+        let hatch = flat(&renderer::buffer_text(&renderer::render_view_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &View {
+                help: true,
+                ..View::default()
+            },
+        )));
+        let (_, unseen) = layout::columns_for(width);
+        let mut wanted: Vec<&str> = layout::READ_NOT_DRAWN.to_vec();
+        wanted.extend(unseen);
+        wanted.extend(LEDGER_PAGE_KEYS);
+        let missing: Vec<&&str> = wanted
+            .iter()
+            .filter(|name| !hatch.contains(**name))
+            .collect();
+        println!(
+            "G61 {width}x{height} wanted={} missing={missing:?}",
+            wanted.len()
+        );
+        if !missing.is_empty() {
+            empty.push(format!("{width}x{height}: {missing:?}\n{hatch}"));
+        }
+    }
+
+    println!("G61_FIRED={fired} G61_NO_CLAIM={no_claim:?}");
+    assert!(
+        fired > 0,
+        "🔴 g61: no ruled shape made the claim, so this gate measured nothing"
+    );
+    assert!(
+        empty.is_empty(),
+        "🔴 g61 (`req/924` §TUI-21): the disclosure says the names are behind `?` and the hatch \
+         does not carry them. A hatch that lists nothing turns a disclosure into a deletion: \
+         {empty:#?}"
+    );
+}
+
+// =============================================================================================
+// g62 — `req/924` §TUI-23 (SS1051, the ruling) and §TUI-39 (SS1069, the repair): `status_reason`'s
+// `null` is `Absent`, not `Unknown`, and the fix is a carved-out classifier, not a change to
+// `cell`'s general rule. `req/1033` is the lane that lands this gate; P9 (this file, above)
+// printed the divergence in the first pass and named the reason it was not repaired there.
+// =============================================================================================
+
+/// 🔴 **g62a — `status_reason: null` reads `Absent` through the classifier meant for it.**
+///
+/// The positive half of the repair: `/v1/healthz`'s and `server_health`'s `null` (44 §2.2 `L-02`,
+/// §2.5) means *the engine is `ok` and has no reason to give* — never-written, not
+/// measured-and-unknowable — so `wire::status_reason` must answer [`Nothing::Absent`], the mark
+/// `req/924` §TUI-23 named and `wire::cell` alone could not produce (P9, above).
+#[test]
+fn g62a_status_reason_null_on_ok_reads_absent_through_the_classifier() {
+    let body: serde_json::Value = serde_json::from_str(
+        r#"{"status":"ok","engine_version":"gx-engine 0.1.0","ledger_agrees":true,
+            "journal_rows":0,"status_reason":null}"#,
+    )
+    .expect("fixture parses");
+    assert_eq!(
+        wire::status_reason(&body),
+        wire::Cell::Nothing(Nothing::Absent),
+        "🔴 g62a: an `ok` engine's `status_reason: null` is never-written, not \
+         measured-and-unknowable — `req/924` §TUI-23"
+    );
+    assert_eq!(
+        wire::status_reason(&body).text(),
+        Nothing::Absent.mark(),
+        "🔴 g62a: the mark on screen has to be `--`, not `?`"
+    );
+}
+
+/// 🔴 **g62b — negative control: a real reason still reads as the reason, word for word.**
+///
+/// The carve-out must not swallow the case it was not built for. `status: "degraded"` /
+/// `"unhealthy"` / `"unknown"` all carry a non-null sentence (`crates/gx-api/src/handlers.rs`'s
+/// `degraded_reason` and the two `format!` arms in `server_health`/`healthz`), and a repair that
+/// answered `Absent` for those too would trade one collapse for another.
+#[test]
+fn g62b_status_reason_a_real_sentence_is_not_swallowed_into_absent() {
+    let body: serde_json::Value = serde_json::from_str(
+        r#"{"status":"unhealthy","engine_version":"gx-engine 0.1.0","ledger_agrees":false,
+            "journal_rows":3,"status_reason":"the ledger disagrees with the journal"}"#,
+    )
+    .expect("fixture parses");
+    assert_eq!(
+        wire::status_reason(&body),
+        wire::Cell::Value("the ledger disagrees with the journal".to_string()),
+        "🔴 g62b: a real sentence was read as a kind of nothing"
+    );
+}
+
+/// 🔴 **g62c — negative control: a server that predates the key reads the same as `null`.**
+///
+/// `L-02`/R11 added `status_reason`; a server built before either never carries the key at all.
+/// `wire::inverse_status` draws that the same way it draws a present `null` (declared and not
+/// distinguished, `req/924` §TUI-13 追記), and `status_reason` is carved out of `cell` the same
+/// way, so it keeps the same answer for the same reason.
+#[test]
+fn g62c_status_reason_a_missing_key_reads_absent_the_same_as_null() {
+    let body: serde_json::Value =
+        serde_json::from_str(r#"{"status":"ok","engine_version":"gx-engine 0.1.0"}"#)
+            .expect("fixture parses");
+    assert_eq!(
+        wire::status_reason(&body),
+        wire::Cell::Nothing(Nothing::Absent),
+        "🔴 g62c: a server old enough to carry no `status_reason` member has to read the same as \
+         one that carries it as `null`"
+    );
+}
+
+/// 🔴 **g62d — negative control: `cell`'s general rule for this key is unmoved.**
+///
+/// `req/38` SS856's caution, kept literal: repairing `status_reason` **inside** `cell` would
+/// change what a `null` means on every route that function classifies, which is the expensive
+/// repair this lane refused. `wire::cell(&body, "status_reason")` still answers `Unknown` on the
+/// same fixture `g62a` reads as `Absent` — the carve-out is additive, not a change to the rule it
+/// is carved out of.
+#[test]
+fn g62d_cells_general_rule_for_status_reason_is_unchanged() {
+    let body: serde_json::Value = serde_json::from_str(
+        r#"{"status":"ok","engine_version":"gx-engine 0.1.0","ledger_agrees":true,
+            "journal_rows":0,"status_reason":null}"#,
+    )
+    .expect("fixture parses");
+    assert_eq!(
+        wire::cell(&body, wire::STATUS_REASON_KEY),
+        wire::Cell::Nothing(Nothing::Unknown),
+        "🔴 g62d: `cell`'s general rule moved. It was meant to stay put — the fix is the carve-out \
+         (`wire::status_reason`), not a change to the rule underneath it"
+    );
+}
+
+/// 🔴 **g62e — the repair reaches the rail's `not ok` road, and `g59`'s `ok` road is unmoved.**
+///
+/// `super::renderer::engine_line` now reads `status_reason` through the classifier rather than
+/// through `cell` directly. This does not touch `g59` (`req/924` §TUI-22): the row this function
+/// draws when the engine is `ok` is still nothing at all, by that separate, still-standing
+/// decision — this gate measures only that the *not ok* road, which draws the value, still draws
+/// it correctly once it is reached through the new call.
+#[test]
+fn g62e_the_rails_not_ok_road_still_draws_the_real_reason() {
+    let mut unwell = ledger(6);
+    unwell.healthz = answered(
+        "/v1/healthz",
+        serde_json::json!({
+            "status": "degraded",
+            "engine_version": "gx-engine 0.1.0",
+            "ledger_agrees": true,
+            "journal_rows": 6,
+            "status_reason": "`.gx/VERSION` is not there, so this server refuses every write",
+        }),
+    );
+    let measured = renderer::measured(&unwell);
+    let reason = measured
+        .engine
+        .iter()
+        .find(|(key, _)| key == "status_reason")
+        .map(|(_, value)| value.clone());
+    assert_eq!(
+        reason.as_deref(),
+        Some("`.gx/VERSION` is not there, so this server refuses every write"),
+        "🔴 g62e: the rail's engine line, read through `renderer::measured`, is {:?}",
+        measured.engine
     );
 }

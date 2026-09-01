@@ -177,11 +177,31 @@ pub const FS_PACK_PATH: &str = "policies/fs/deny-etc.cedar";
 /// is what keeps it the only one -- a `const` beside this one, or an `include_str!` in some other
 /// crate, is a second copy that is free to be edited alone.
 ///
-/// It reaches outside this crate's directory, which is the cost of M3-16's ruling that the pack
-/// belongs at the repository root: `cargo package` does not follow such a path, so the day this
-/// crate is published the road has to be reconsidered. Measured rather than assumed, and raised in
-/// `req/65` §4 rather than pre-solved here.
-pub const FS_PACK_SOURCE: &str = include_str!("../../../policies/fs/deny-etc.cedar");
+/// 🔴 **req/1032 §3 (2026-09-01), resolved**: this road used to reach outside the crate directory
+/// (`../../../policies/...`), which is the cost of M3-16's ruling that the pack belongs at the
+/// repository root -- `cargo package` does not follow such a path, and the empirical
+/// `cargo package -p gx-gate --list` in req/1032 §3 measured **zero** `policies/` files in the
+/// tarball, confirming the failure `req/65` §4 G-1 predicted rather than pre-solved. **Fix, chosen
+/// over the two alternatives req/65 §4 G-1 and req/1032 §5 named**: `build.rs` copying at build time
+/// was rejected first, in `req/65` §3.5, for making the "one road" claim ungameable-in-appearance
+/// only (a copy-then-`include!` road is a second embedding *mechanism* the `pack_embedding.rs` scan
+/// -- which greps for the `include_str!`/`include_bytes!` macro names -- would not see). Moving
+/// `policies/` itself into the crate (and reversing every one of the 94 other repository files a
+/// `policies/(fs|git|mcp|postgres)/` grep hits, measured 2026-09-01 -- `tools/pub_sync_dryrun.sh`'s
+/// sync-set list, `req/spec/`, `docs/TUTORIAL.md`, `req/semantics.json` among them) was rejected as
+/// disproportionate to this blocker: it would need an M3-16 erratum and would touch files this fix
+/// does not need to touch.
+/// **What this crate does instead**: `crates/gx-gate/policies/{fs,git,mcp,postgres}/*.cedar` are
+/// byte-identical mirrors of the root files, placed inside the crate directory so `cargo package`
+/// picks them up automatically (no `include`/`exclude` entry needed -- files under the crate root
+/// ship by default). [`FS_PACK_PATH`] is deliberately left naming the **root** copy (AC-025's
+/// verbatim path is about that file, not about where the build reaches for bytes), so every existing
+/// reader of the root path is unaffected. The road (`include_str!` below) now reads the crate-local
+/// mirror, and divergence between the two copies is not a new risk left unguarded: it is exactly
+/// what `crates/gx-gate/tests/pack_embedding.rs::the_embedded_bytes_are_the_files_the_criteria_name`
+/// already asserted (`pack.source == pack_text(pack.path)`, i.e. embedded bytes == root-file bytes)
+/// before this change, unmodified -- the existing audited test becomes the sync gate for free.
+pub const FS_PACK_SOURCE: &str = include_str!("../policies/fs/deny-etc.cedar");
 
 /// The ids the shipped fs pack answers under, sorted (**ASM-62-1**).
 ///
@@ -223,7 +243,13 @@ pub const GIT_PACK_PATH: &str = "policies/git/deny-nonbranch-refs.cedar";
 /// FR-028's "exactly one road" is a claim per pack rather than per repository (sem: SEM-gx-gate-093): one embedding of *this*
 /// file, so that the bytes in the build and the bytes on disk cannot diverge. `SHIPPED_PACKS` is what
 /// makes the claim countable for a set of packs, and `crates/gx-gate/tests/pack_embedding.rs` counts.
-pub const GIT_PACK_SOURCE: &str = include_str!("../../../policies/git/deny-nonbranch-refs.cedar");
+///
+/// 🔴 **req/1032 §3 (2026-09-01)**: reads the crate-local mirror `crates/gx-gate/policies/git/
+/// deny-nonbranch-refs.cedar`, not the root file, for the same reason [`FS_PACK_SOURCE`]'s doc
+/// comment gives in full -- `cargo package` cannot follow a path outside the crate directory.
+/// [`GIT_PACK_PATH`] still names the root copy on purpose; the two are kept equal by
+/// `pack_embedding.rs`'s existing, unmodified test.
+pub const GIT_PACK_SOURCE: &str = include_str!("../policies/git/deny-nonbranch-refs.cedar");
 
 /// The ids the shipped git pack answers under, sorted (**ASM-62-1**).
 pub const GIT_PACK_POLICY_IDS: [&str; 2] = ["git-deny-nonbranch-refs", "git-permit-default"];
@@ -248,7 +274,10 @@ pub fn git_pack() -> Result<PolicyEngine> {
 pub const MCP_PACK_PATH: &str = "policies/mcp/deny-etc-resources.cedar";
 
 /// The shipped mcp pack, as the build embeds it -- **the third road, for the third pack**.
-pub const MCP_PACK_SOURCE: &str = include_str!("../../../policies/mcp/deny-etc-resources.cedar");
+///
+/// 🔴 **req/1032 §3 (2026-09-01)**: reads the crate-local mirror `crates/gx-gate/policies/mcp/
+/// deny-etc-resources.cedar`; see [`FS_PACK_SOURCE`]'s doc comment for the full reasoning.
+pub const MCP_PACK_SOURCE: &str = include_str!("../policies/mcp/deny-etc-resources.cedar");
 
 /// The ids the shipped mcp pack answers under, sorted (**ASM-62-1**).
 pub const MCP_PACK_POLICY_IDS: [&str; 2] = ["mcp-deny-etc-resources", "mcp-permit-default"];
@@ -283,9 +312,15 @@ pub const POSTGRES_PACK_PATH: &str = "policies/postgres/deny-system-catalogs.ced
 /// *dependent* crate -- so `gx-cli`'s `pg` feature could never have reached it (`req/817` §2.5),
 /// and the published tree failed here with `couldn't read .../policies/postgres/...` for every
 /// cargo build. The gate is on the embedding itself, which is the only place it can be.
+///
+/// 🔴 **req/1032 §3 (2026-09-01)**: reads the crate-local mirror `crates/gx-gate/policies/postgres/
+/// deny-system-catalogs.cedar`; see [`FS_PACK_SOURCE`]'s doc comment for the full reasoning. `pg`
+/// defaults on in the private manifest (`crates/gx-gate/Cargo.toml`), so a default-features
+/// `cargo package -p gx-gate` compiles this road too -- the mirror has to exist for the same
+/// dry-run req/1032 measured failing, not only for the three unconditional packs.
 #[cfg(feature = "pg")]
 pub const POSTGRES_PACK_SOURCE: &str =
-    include_str!("../../../policies/postgres/deny-system-catalogs.cedar");
+    include_str!("../policies/postgres/deny-system-catalogs.cedar");
 
 /// The ids the shipped postgres pack answers under, sorted (**ASM-62-1**).
 ///

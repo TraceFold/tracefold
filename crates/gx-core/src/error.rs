@@ -301,7 +301,14 @@ pub enum AbortReason {
     ///
     /// 41 §3's `target` is an `Option`, and it is `None` for every adapter that does not fill
     /// `PlannedDelta::promised_target`. No prediction, no comparison, no road to this word — which
-    /// is why adding it moves nothing for the six shipped adapters. The engine-side refusal §37
+    /// is why adding it moved nothing for the six adapters shipped at the time.
+    ///
+    /// 🔴 **Two of those six now take the road** (WM-5a Phase 1, `req/1011` §4, ruled by
+    /// `req/1016`, 2026-09-01): `gx-adapter-fs` and `gx-adapter-git` fill the seat from the goal
+    /// bytes, so this word is reachable from an ordinary commit and not only from a fixture. The
+    /// sentence above is corrected rather than deleted because the reasoning it carries is still
+    /// the reasoning — what changed is how many adapters make a prediction, not what happens when
+    /// one does. The engine-side refusal §37
     /// asked for is written where the two values meet, and L5 (`gx-substrate-conformance`) keeps
     /// answering the same question one layer down, for a harness rather than a commit.
     ///

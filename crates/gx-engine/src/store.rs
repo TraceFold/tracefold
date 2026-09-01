@@ -491,10 +491,18 @@ impl Rollback {
 /// # What `None` from [`Engine::prediction_outcome`] means — and what it does not
 ///
 /// It is the **third value**, not a failure: no prediction was made (the adapter filled no
-/// `promised_target`, which is what every shipped adapter does), or this process is not the one
+/// `promised_target`), or this process is not the one
 /// that ran the commit. "The prediction was wrong" is `Some` with `matched() == false`, and
 /// collapsing the two would be this workspace's own first principle broken in its own instrument
 /// — the residue `docs/LIMITS.md` names for `NotAttemptedBecause` reads the same way here.
+///
+/// 🔴 **"which is what every shipped adapter does" was struck from the clause above** (WM-5a
+/// Phase 1, `req/1011` §4, ruled by `req/1016`, 2026-09-01). It described the world on the day
+/// `req/1010` landed and stopped being true one lane later: `gx-adapter-fs` and `gx-adapter-git`
+/// now fill `promised_target` in production, so this accessor answers `Some` on the ordinary
+/// road rather than only under a fixture. The clause is corrected in place because a doc comment
+/// that has drifted from the implementation is not documentation, it is a claim — and this one
+/// would have told a reader that `None` is the normal answer when it has become the exception.
 ///
 /// # Deliberately not a component of Σ
 ///

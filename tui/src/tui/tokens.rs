@@ -6,11 +6,46 @@
 //! intent  ->  role  ->  token  ->  value
 //! ```
 //!
-//! `super::layout` holds the ladder for **placement**. This module holds the one for **paint**, and
-//! the two are the same shape on purpose: a caller names a [`Role`] — what a thing is, in the
-//! reader's words — and never a hue. A role resolves to a [`Token`], a token to an [`Ink`], and the
-//! ink is turned into the medium's own type in exactly one place (`super::renderer`), which is the
-//! seam gate g5 already measures.
+//! `super::layout` holds the ladder for **placement**. This module holds the one for **paint**: a
+//! caller names a [`Role`] — what a thing is, in the reader's words — and never a hue. A role
+//! resolves to a [`Token`], a token to an [`Ink`], and the ink is turned into the medium's own type
+//! in exactly one place (`super::renderer`), which is the seam gate g5 already measures.
+//!
+//! # Where the paint axis's `intent` rung is, and why it is not a type in this file
+//!
+//! 🔴 **The ruling asked for by `req/924` §TUI-15 and `req/942_artifacts/tui_r37_2026-09-01`.**
+//! That census read this file, found no `Intent`, and recorded the paint axis's `intent -> role`
+//! map as UNTESTABLE — correctly, because a map with no domain has nothing to check. The remedy it
+//! offered was to stand a type up here. **This face does not, and the reason is mechanical rather
+//! than economical.**
+//!
+//! The rung is not missing. It is `super::wire`, and it is written there on purpose: an intent is
+//! *what a thing is in the product's words*, and the product's words arrive on the wire.
+//! [`super::wire::Nothing::role`], [`super::wire::VerdictMark::role`] and
+//! [`super::wire::InverseMark::role`] are exactly the map the doctrine asks for — each takes a word
+//! the engine spells and answers with the [`Role`] it is painted in — and they are the join that
+//! makes this face gateable by the engine's own vocabulary rather than by its own opinion of
+//! itself. An `Intent` enum here would be a **second** name for that one join, and this face has
+//! now closed the same defect three times (`super::acts::grounded`, [`super::renderer::note_rows`],
+//! `super::layout::subject_shape` are all "one classifier, read twice" rulings): two names for one
+//! join disagree the day one of them is edited.
+//!
+//! What was actually missing was not a type but the **gate**, and gate g55 is it: every declared
+//! paint intent resolves to a role, no two resolve to the same one, and the intent set covers
+//! [`ROLES`] exactly. It would have caught `req/38` SS974 — where an empty string and a count of
+//! nought were painted in one role — on the run rather than in a reading.
+//!
+//! **The case against this ruling, since it is not free.** Three costs, none hidden:
+//!
+//! 1. The two ladders are no longer the same shape. `super::layout` has four named rungs and this
+//!    axis has three, with `Role` carrying the top two. The sentence that used to stand here — "the
+//!    two are the same shape on purpose" — is now false and has been struck rather than left to rot.
+//! 2. By the same argument, `super::layout::Intent` is *also* in bijection with
+//!    `super::layout::RegionRole`, so that type is an alias table by this file's own standard. It is
+//!    not deleted: it is out of the path of the defect this ruling was made against, and deleting a
+//!    declaration to make an argument tidy is how a face loses the words it cannot get back.
+//! 3. g55 is **green on the source it was written against**. It is a tripwire for the next edit and
+//!    not a finding, and saying so is the whole difference between a gate and a decoration.
 //!
 //! # Why this file exists at all, said plainly
 //!
@@ -265,18 +300,69 @@ pub struct Glyph {
 
 /// Every glyph outside the ASCII budget this face may draw. Gate `P6` reads this array.
 ///
-/// One entry, and the count is the point: the ruling opened a door, not a room.
-pub const GLYPHS: [Glyph; 1] = [Glyph {
-    text: "\u{2502}",
-    means: "a boundary between two parts of one screen",
-    instead_of: "the labels that would otherwise have to name each part in words",
-}];
+/// 🔴 **Five entries, and the four that were added are one decision** (`req/924` §TUI-22,
+/// `req/38` SS1049, Owner `#266-T`). They are the corners of the enclosure the ledger is drawn
+/// inside, and they are admitted under the same test every glyph here is admitted under: the mark
+/// carries a meaning and **thereby deletes words**. The words it deletes are named in
+/// `instead_of` and they are not hypothetical — before this the screen spelled
+/// `screen: apparatus subject provenance disclosure`, an eight-word rail naming its own internal
+/// regions, and it spelled `GET /v1/transformations` on four separate rows so that each part
+/// could say for itself where it came from. A boundary a reader can see says both of those
+/// things without a word.
+///
+/// The corners are four glyphs and not one because a rectangle has four corners and each names a
+/// different one of them; they are **not** four decisions, and `instead_of` says so by naming the
+/// same deleted words for all four. There is no horizontal or vertical rule between them, and that
+/// is measured rather than aesthetic: a run of `─` is ink, a hundred and twenty cells of it is more
+/// ink than the four rows the enclosure was brought in to delete, and this lane's whole purpose is
+/// the ratio of ink spent on the machine to ink spent on the ledger.
+pub const GLYPHS: [Glyph; 5] = [
+    Glyph {
+        text: "\u{2502}",
+        means: "a boundary between two parts of one screen",
+        instead_of: "the labels that would otherwise have to name each part in words",
+    },
+    Glyph {
+        text: "\u{250c}",
+        means: "the ledger's enclosure opens here, at the top left",
+        instead_of: "`screen: apparatus subject provenance disclosure`, and the repeated \
+                     `GET /v1/transformations` each part used to spell for itself",
+    },
+    Glyph {
+        text: "\u{2510}",
+        means: "the ledger's enclosure opens here, at the top right",
+        instead_of: "`screen: apparatus subject provenance disclosure`, and the repeated \
+                     `GET /v1/transformations` each part used to spell for itself",
+    },
+    Glyph {
+        text: "\u{2514}",
+        means: "the ledger's enclosure closes here, at the bottom left",
+        instead_of: "`screen: apparatus subject provenance disclosure`, and the repeated \
+                     `GET /v1/transformations` each part used to spell for itself",
+    },
+    Glyph {
+        text: "\u{2518}",
+        means: "the ledger's enclosure closes here, at the bottom right",
+        instead_of: "`screen: apparatus subject provenance disclosure`, and the repeated \
+                     `GET /v1/transformations` each part used to spell for itself",
+    },
+];
 
 /// The boundary between two parts of one screen.
 ///
 /// 🔴 Read out of [`GLYPHS`] rather than typed a second time: a second spelling is a glyph the
 /// gate's allow-list does not cover, which is the failure the array exists to make impossible.
 pub const RULE: &str = GLYPHS[0].text;
+
+/// The four corners of the ledger's enclosure, read out of [`GLYPHS`] for the reason [`RULE`] is.
+///
+/// Order: top-left, top-right, bottom-left, bottom-right.
+pub const CORNERS: [&str; 4] = [
+    GLYPHS[1].text,
+    GLYPHS[2].text,
+    GLYPHS[3].text,
+    GLYPHS[4].text,
+];
 
 /// One resolved value: a colour in the spelling this tier can carry, and the emphasis.
 ///

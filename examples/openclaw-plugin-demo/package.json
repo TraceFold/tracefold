@@ -1,0 +1,20 @@
+{
+  "name": "gx-openclaw-plugin-demo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A before_tool_call plugin that puts an agent's filesystem writes through the gx membrane, so that a write can be refused before it lands and taken back after it does.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "demo": "node src/demo.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "//": "The demo runs the .ts sources directly on Node's own type stripping: no build, no node_modules. `typecheck` is the optional stricter pass and is the only script that needs typescript and @types/node installed.",
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^6.0.3"
+  }
+}

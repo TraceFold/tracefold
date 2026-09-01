@@ -17,7 +17,7 @@
 [package]
 name = "gx-tui"
 description = "The `gx tui` terminal face: four GET routes, a buffer, and no engine."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice

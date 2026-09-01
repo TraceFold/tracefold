@@ -18,7 +18,7 @@
 [package]
 name = "gx-cli"
 description = "The `gx` command line: `.gx/` layout, draft store, id-resolution cache."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-cli-383)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
@@ -105,7 +105,7 @@ pg = []  # needs `gx-adapter-postgres`, not in this distribution
 tui = ["dep:gx-tui"]
 
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }  # ids, `Cid::from_text`, `Intent`, `b64`
+gx-core = { path = "../gx-core", version = "0.1.2" }  # ids, `Cid::from_text`, `Intent`, `b64`
 
 # 🔴 A later hand, under the same rule an earlier hand applied to `gx-gate`/`gx-engine`:
 # "a shipping dependency is declared by the hand where the call exists" (sem: SEM-gx-cli-390). All
@@ -126,9 +126,9 @@ gx-core = { path = "../gx-core", version = "0.1.0" }  # ids, `Cid::from_text`, `
 # 🔴 `gx-canon` is still absent and still may not be added (the architecture spec, house rule (i); sem: SEM-gx-cli-394). It arrives here
 # transitively through all three, which is exactly the point: this crate consumes values the canon
 # layer produced and computes none.
-gx-witness = { path = "../gx-witness", version = "0.1.0" }
-gx-log = { path = "../gx-log", version = "0.1.0" }
-gx-engine = { path = "../gx-engine", version = "0.1.0" }
+gx-witness = { path = "../gx-witness", version = "0.1.2" }
+gx-log = { path = "../gx-log", version = "0.1.2" }
+gx-engine = { path = "../gx-engine", version = "0.1.2" }
 
 # 🔴 A later hand, under the same rule ("a shipping dependency is declared by the hand where the call exists"; sem: SEM-gx-cli-395). Both are **path**
 # dependencies and both were already in this binary's transitive graph through `gx-engine`, so the
@@ -147,8 +147,8 @@ gx-engine = { path = "../gx-engine", version = "0.1.0" }
 #   no-substrate-adapter breach: "what that invariant
 #   protects is the engine's neutrality, not the CLI's neutrality" (sem: SEM-gx-cli-397). `gx-engine`'s own manifest still declares no
 #   adapter, and `ENGINE_SHIPPED_ADAPTERS=0` is unmoved.
-gx-gate = { path = "../gx-gate", version = "0.1.0" }
-gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
+gx-gate = { path = "../gx-gate", version = "0.1.2" }
+gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.2" }
 
 # 🔴 **A later hand** — the default registry half of a paired ruling: "the
 # default policy set and the default registry are decided **as a pair** (adding a pack without
@@ -183,8 +183,8 @@ gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
 #      **without any network backend** (no `curl`, no `reqwest`, no `blocking-http-transport`), so
 #      what the binary gained is the git wire *format*, not a client. A ledger records it as a
 #      touched declaration rather than leaving it inside a comment.
-gx-adapter-git = { path = "../gx-adapter-git", version = "0.1.0" }
-gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
+gx-adapter-git = { path = "../gx-adapter-git", version = "0.1.2" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.2" }
 
 # 🔴 **A later phase** — the third adapter and the wire that made registering it
 # true rather than decorative.
@@ -201,7 +201,7 @@ gx-substrate = { path = "../gx-substrate", version = "0.1.0" }
 # Neither crate adds an external package: `gx-mcp-wire` declares `serde`/`serde_json`, which this
 # binary already carries, and refuses a linked MCP client library for the no-bypass acceptance
 # criterion's reason.
-gx-adapter-mcp = { path = "../gx-adapter-mcp", version = "0.1.0" }
+gx-adapter-mcp = { path = "../gx-adapter-mcp", version = "0.1.2" }
 # 🔴 **optional, behind the `mcp` feature**: `gx-mcp-wire` is one of the four crates
 # held private, so it is absent from the public distribution. The dependency is
 # `optional` and the source that names it is `cfg(feature = "mcp")`, which is what lets one source
@@ -297,7 +297,7 @@ clap = { version = "4", features = ["derive"] }
 # (`ratatui`) is not declared here any more -- it moved to `tui/Cargo.toml` with the package split,
 # same version, same `default-features = false, features = ["crossterm"]`, off the
 # termion/termwiz/termina/`palette` backends the default set would otherwise pull in.
-gx-tui = { path = "../../tui", version = "0.1.0", optional = true }
+gx-tui = { path = "../../tui", version = "0.1.2", optional = true }
 
 # 🔴 **A later hand** — `gx serve` calls into it, so it moves from `[dev-dependencies]` to here under the
 # rule this manifest has now applied five times: "a shipping dependency
@@ -311,7 +311,7 @@ gx-tui = { path = "../../tui", version = "0.1.0", optional = true }
 # and `tests/ac_057.rs` asserts they arrive through this edge and no other — a networking crate
 # declared anywhere else in this workspace's shipping graph is a red probe, which is what keeps
 # "the verifier links no network stack" (sem: SEM-gx-cli-409) a measurement rather than a memory.
-gx-api = { path = "../gx-api", version = "0.1.0" }
+gx-api = { path = "../gx-api", version = "0.1.2" }
 
 # The output format the API spec fixes ("a command that returns a single object puts a single
 # newline-terminated JSON on stdout"; sem: SEM-gx-cli-410)
@@ -340,8 +340,8 @@ thiserror = "2"                       # the architecture spec, "errors are typed
 # (`tools/m6h5_dep_probe.sh`): **+0 packages** each, licences inside `deny.toml`'s allow list,
 # subtree `rust-version` max 1.71, no duplicate roots.
 [dev-dependencies]
-gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.0" }
-gx-gate = { path = "../gx-gate", version = "0.1.0" }
+gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.2" }
+gx-gate = { path = "../gx-gate", version = "0.1.2" }
 # 🔴 **A later hand**, and it is the battery's doing rather than the plan's. `crates/gx-cli/tests/
 # defaults.rs` measured `default_policies` and `register_default_adapters` and **not the branch that
 # calls them**, so mutation (e) of `tools/verify_m7h4.sh` (put `open_engine`'s `None` arm back to
@@ -350,7 +350,7 @@ gx-gate = { path = "../gx-gate", version = "0.1.0" }
 # Same package, same version and same features as `gx-adapter-git`'s own dev entry, so nothing is
 # added to any graph.
 gix = { version = "0.86", default-features = false, features = ["sha1"] }
-gx-engine = { path = "../gx-engine", version = "0.1.0" }
+gx-engine = { path = "../gx-engine", version = "0.1.2" }
 tokio = { version = "1", features = ["rt", "macros"] }
 tower = { version = "0.5", features = ["util"] }
 axum = "0.8"

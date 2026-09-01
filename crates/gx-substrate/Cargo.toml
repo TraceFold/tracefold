@@ -9,7 +9,7 @@
 [package]
 name = "gx-substrate"
 description = "The SubstrateAdapter boundary and its delta types."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the
                                        # workspace, per the adopted MSRV decision (sem: SEM-gx-substrate-002)
@@ -34,8 +34,8 @@ publish = false                       # no crate in this workspace is a designat
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement, learned in an earlier build phase.
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.0" }
-gx-canon = { path = "../gx-canon", version = "0.1.0" }
+gx-core = { path = "../gx-core", version = "0.1.2" }
+gx-canon = { path = "../gx-canon", version = "0.1.2" }
 
 serde = { version = "1", features = ["derive"] }  # the IdentityView projections
 thiserror = "2"                       # the architecture spec, "errors are typed with thiserror" (sem:

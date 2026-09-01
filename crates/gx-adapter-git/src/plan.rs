@@ -30,6 +30,7 @@
 //! quantifies determinism over "the same snapshot"; an adapter whose payload is a target state does not (sem: SEM-gx-adapter-git-085)
 //! need it, and L1 holds a fortiori for one that ignores it.
 
+use gx_canon::cid::{self, Domain};
 use gx_core::{Intent, ObjectSnapshot, SubstrateKind};
 use gx_substrate::{Error, PlannedDelta, Result};
 
@@ -80,5 +81,31 @@ pub fn plan(intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
             ),
         });
     }
-    PlannedDelta::new(SubstrateKind::Git, payload)
+    // 🔴 **WM-5a Phase 1** (`req/1011` §4, ruled by `req/1016`): the prophecy seat, filled.
+    //
+    // What `apply` observes at this position is `crate::repo::content_digest` of the entry's bytes
+    // -- not the commit id and not the tree hash -- and the payload above says the entry becomes
+    // the goal. So the post-state digest is a function of the goal alone, and this line is that
+    // function. `req/1016` §1 classified this adapter `digest-sufficient` for exactly that reason,
+    // and recorded the scope the classification does **not** cover in the same row: this promises
+    // the entry's content digest, and says nothing about which commit carries it or what the tree
+    // hash becomes.
+    //
+    // 🔴 **Why the mint is spelled out here instead of calling the repository module.** This
+    // module is scanned by `tests/git_plan_purity.rs`, whose ban list holds `repo::` -- the whole
+    // repository boundary -- so naming that module would turn a gate red that is measuring
+    // something true. The gate is right and this line is not an exception to it: what is called is
+    // `gx-canon`'s mint, the one place 41 §6 admits bytes becoming a digest, which is also what
+    // `repo::content_digest` is. Two call sites of one function rather than two functions, and
+    // `tests/wm5a_promised_target.rs` pins them equal so the pair cannot drift in silence.
+    //
+    // What it does not guarantee: that the promise is kept. Someone else pushing between `plan`
+    // and `apply` moves the tip, and the CAS is what refuses there; a promise that survives the
+    // CAS and still misses is `AbortReason::PostconditionMismatch`.
+    //
+    // 🔴 As on the fs side, this moves `Transformation.target` from `None` to `Some`, and `target`
+    // is inside the identity view -- the `TransformationId` of a git plan is not the one this
+    // adapter minted before this lane. Declared rather than discovered.
+    Ok(PlannedDelta::new(SubstrateKind::Git, payload)?
+        .with_promised_target(cid::mint(Domain::Leaf, &[intent.goal().0.as_slice()])))
 }

@@ -27,6 +27,7 @@
 use gx_core::{Intent, ObjectSnapshot, SubstrateKind};
 use gx_substrate::{Error, PlannedDelta, Result};
 
+use crate::adapter::content_digest;
 use crate::delta::{FsDelta, FsOp, MAX_FORWARD_PAYLOAD_BYTES};
 use crate::locator;
 
@@ -81,5 +82,32 @@ pub fn plan(intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
             ),
         });
     }
-    PlannedDelta::new(SubstrateKind::Fs, payload)
+    // 🔴 **WM-5a Phase 1** (`req/1011` §4, ruled by `req/1016`): the prophecy seat, filled.
+    //
+    // The module header has quoted the reason since **E-M4-29** was written -- "for a single
+    // whole-file replacement, the target digest is derivable from the goal bytes" -- and until now
+    // that sentence was an argument nobody cashed: `promised_target` stayed `None` in production
+    // and only the conformance fixture computed the value, for L5's benefit. `req/1016` measured
+    // the claim (`AGREE=true`, one digest reached by two roads) and this line is what it bought.
+    //
+    // What it guarantees: the post-state digest a commit of this delta will observe, computed from
+    // the goal and from nothing else -- no snapshot is consulted, no position is read, and the zero
+    // I/O `tests/plan_purity.rs` fixes as a machine check is untouched, because
+    // [`crate::adapter::content_digest`] is `gx-canon`'s mint and not a filesystem call. It is the
+    // **same function** `apply`'s observation goes through (41 §6 admits one), so promise and
+    // measurement cannot disagree by digesting differently -- only by the world not becoming what
+    // was asked, which is precisely what the comparison exists to catch.
+    //
+    // What it does not guarantee: that the promise is kept. A separate writer between `plan` and
+    // `apply`, a partial write, a rename into the wrong position -- each makes this prediction
+    // wrong, and being wrong is the point (`AbortReason::PostconditionMismatch`, and the record
+    // `Engine::prediction_outcome` keeps of both outcomes).
+    //
+    // 🔴 This moves `Transformation.target` from `None` to `Some` for every fs transformation, and
+    // `target` is inside the identity view -- so the `TransformationId` of an fs plan is not the
+    // one this adapter minted before. Declared here rather than discovered: the ids were never
+    // frozen anywhere (they are derived on every road), but a reader comparing an id written down
+    // before this lane will find it moved.
+    Ok(PlannedDelta::new(SubstrateKind::Fs, payload)?
+        .with_promised_target(content_digest(&intent.goal().0)))
 }

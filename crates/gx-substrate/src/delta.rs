@@ -222,10 +222,20 @@ impl PlannedDelta {
 
     /// What the plan promises the post-state digest will be, where the adapter worked one out.
     ///
-    /// `None` is "this adapter makes no prediction" and is not a failure — it is what every
-    /// adapter in this workspace answers today, and it is the value that keeps `Engine::plan`'s
-    /// `target` at the `None` 41 §3 has always allowed. L5 (`gx-substrate-conformance`) is the
-    /// harness-side reading of the same question and answers `NotSupplied` for the same case.
+    /// `None` is "this adapter makes no prediction" and is not a failure — it is the value that
+    /// keeps `Engine::plan`'s `target` at the `None` 41 §3 has always allowed. L5
+    /// (`gx-substrate-conformance`) is the harness-side reading of the same question and answers
+    /// `NotSupplied` for the same case.
+    ///
+    /// 🔴 **"what every adapter in this workspace answers today" — no longer true, and the date is
+    /// why the clause is corrected rather than left standing** (WM-5a Phase 1, `req/1011` §4,
+    /// ruled by `req/1016`, 2026-09-01). `gx-adapter-fs` and `gx-adapter-git` fill this seat in
+    /// production: for a whole-object replacement the post-state digest is a function of the goal
+    /// bytes, so the prediction costs no I/O. The adapters that still answer `None` are
+    /// `gx-adapter-mcp` (a tool call describes what is invoked, not what it writes) and
+    /// `gx-adapter-postgres`/`gx-adapter-mysql` for a partial-column `UPDATE` (the post-state row
+    /// digest covers columns the plan is forbidden to read) — `req/1016` §1 carries the row-by-row
+    /// classification and the reasons.
     #[must_use]
     pub fn promised_target(&self) -> Option<Cid> {
         self.promised_target

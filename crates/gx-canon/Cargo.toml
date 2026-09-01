@@ -3,7 +3,7 @@
 [package]
 name = "gx-canon"
 description = "Canonical DAG-CBOR form, CID, and the JCS compatibility layer."
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-canon-001)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
@@ -26,7 +26,7 @@ repository.workspace = true           # `dist generate` reads this
 # `cargo deny check bans` on its first real run (`deny.toml`, `wildcards = "deny"`); inside the
 # workspace the path still wins and nothing about resolution changes. Same in gx-log and
 # gx-witness.
-gx-core = { path = "../gx-core", version = "0.1.0" }
+gx-core = { path = "../gx-core", version = "0.1.2" }
 
 # Named on this crate's dependency line in the architecture spec.
 blake3 = "1.8"                        # Cid = BLAKE3-256 (this workspace's default hash choice)
