@@ -137,8 +137,8 @@ pub use replay::{
 };
 pub use store::{
     BlobStore, EngineJournal, EngineJournalRecord, EscrowedInverse, InverseStatus, NameDurability,
-    NotAttemptedBecause, ObservationStore, PutOutcome, Rollback, SupersedeIndex, MAX_BLOB_BYTES,
-    MAX_OBSERVATION_BYTES, MAX_RECORD_BYTES, NAME_DURABILITY,
+    NotAttemptedBecause, ObservationStore, PredictionOutcome, PutOutcome, Rollback, SupersedeIndex,
+    MAX_BLOB_BYTES, MAX_OBSERVATION_BYTES, MAX_RECORD_BYTES, NAME_DURABILITY,
 };
 
 /// 🔴 **M6H5-12, adopted (a)** — this crate's version, as a value the HTTP surface can ask for.

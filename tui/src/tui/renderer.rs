@@ -262,6 +262,100 @@ fn apparatus(frame: &mut Frame, area: Rect, reading: &Reading, tier: Tier) {
     frame.render_widget(Paragraph::new(lines), area);
 }
 
+/// The text and paint role one cell carries, before it is padded to its column's width.
+///
+/// 🔴 Factored out of the row loop rather than duplicated: this is the exact classification that
+/// loop used to inline, unchanged, so pulling it out changes nothing about what a row draws and is
+/// what lets [`hoist`] ask the same question of a column without a second copy of the verdict's
+/// special case drifting from the first.
+/// 🔴 Takes `&str` rather than `&'static str` since `req/924` §TUI-13 追記, so that the opened
+/// record — which walks the keys the wire actually sent, and owns them — asks this same question
+/// instead of reaching past it into [`wire::cell`]. Two classifiers for one column is how the grid
+/// and the record came to disagree about `inverse_status`.
+fn cell_mark(item: &serde_json::Value, key: &str) -> (String, Role) {
+    if key == wire::VERDICT_KEY {
+        let verdict = wire::verdict(item);
+        (verdict.mark(), verdict.role())
+    } else if key == wire::INVERSE_STATUS_KEY {
+        let inverse = wire::inverse_status(item);
+        (inverse.mark(), inverse.role())
+    } else {
+        match wire::cell(item, key) {
+            wire::Cell::Nothing(nothing) => (nothing.mark().to_string(), nothing.role()),
+            wire::Cell::Value(text) => (text, Role::Body),
+        }
+    }
+}
+
+/// Which of `columns` the rows on screen agree on, and the window left once a shared row is paid
+/// for out of it.
+///
+/// 🔴 **Crosses the line `req/942` §11 draws between layout and wire.** [`layout::resolve_shared`]
+/// only ever sees text; this is the one place that turns a record into the text a cell would show
+/// before asking it the question, which is why it lives here and not in `super::layout` —
+/// [`layout::Plan`] is built from a width and an item **count** alone and never reaches into a
+/// record, so it cannot know two rows agree on a field (`req/984` §10-33).
+///
+/// A shared row is only ever bought with a row [`layout::window`] would otherwise have spent on a
+/// record, and only when a second record is still left to justify calling anything constant — a
+/// window of one row proves nothing repeats. When the window has no spare capacity to give up for
+/// free, this recomputes it one row smaller and asks the question again on the rows that actually
+/// survive the smaller window, because a column that agreed across six rows is not guaranteed to
+/// still agree across whichever five [`layout::window`] keeps once `selected` moves the slice.
+///
+/// 🔴 **`capacity` is the row budget, and `window.rows` is not a substitute for it** (independent
+/// audit, 2026-09-01: the first cut of this function compared `items.len()` against
+/// `window.rows`, which [`layout::window`]'s own body caps at `items.min(capacity)` -- so
+/// `window.rows <= items.len()` always, the comparison could never find spare capacity, and every
+/// hoist paid for its shared row by dropping a real record even when the region had blank rows
+/// going unused below the list). `capacity` is [`layout::Plan::grid_capacity`], the number
+/// [`layout::window`] was asked for before the item count capped it, which is the only place that
+/// fact still exists.
+#[must_use]
+pub fn hoist(
+    items: &[&serde_json::Value],
+    columns: &[layout::Column],
+    window: layout::Window,
+    capacity: usize,
+    selected: usize,
+) -> (
+    Vec<layout::Column>,
+    Vec<(&'static str, String)>,
+    layout::Window,
+) {
+    let marks = |window: layout::Window| -> Vec<Vec<String>> {
+        items[window.first..window.first + window.rows]
+            .iter()
+            .map(|item| {
+                columns
+                    .iter()
+                    .map(|column| cell_mark(item, column.key).0)
+                    .collect()
+            })
+            .collect()
+    };
+    let (kept, shared) = layout::resolve_shared(columns, &marks(window));
+    if shared.is_empty() {
+        return (columns.to_vec(), Vec::new(), window);
+    }
+    if items.len() < capacity {
+        // Spare capacity: the region was never going to fill every row it was budgeted, so the
+        // shared row spends a row nothing else wanted.
+        return (kept, shared, window);
+    }
+    let shrunk = layout::window(selected, items.len(), capacity.saturating_sub(1));
+    if shrunk.rows < 2 {
+        // No shape claims a constant from fewer than two rows.
+        return (columns.to_vec(), Vec::new(), window);
+    }
+    let (kept2, shared2) = layout::resolve_shared(columns, &marks(shrunk));
+    if shared2.is_empty() {
+        (columns.to_vec(), Vec::new(), window)
+    } else {
+        (kept2, shared2, shrunk)
+    }
+}
+
 /// `GET /v1/transformations`, in the columns that fit.
 ///
 /// 🔴 A row is a list of **spans** rather than one string since `req/38` SS965 convert row (b). The
@@ -300,6 +394,23 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
     // not an opened record is a table" -- true while there were two shapes and false the moment
     // there were three.
     let grid = shape == layout::Subject::Grid;
+    // 🔴 **The columns and window this grid actually draws, not necessarily the plan's**
+    // (`req/984` §10-33). `hoist` asks whether the rows on screen already agree on a column and,
+    // if they do, spends one row of the window saying it once instead of on every row —
+    // 43 percent of the ink at 120x32 was five columns repeating the same five words down every
+    // one of twenty-three rows. Asked only where there is a record to ask the question of: an
+    // empty grid has no cell to compare, and an opened record is not this branch at all.
+    let (columns, shared, window) = if grid && !items.is_empty() {
+        hoist(
+            &items,
+            &plan.columns,
+            plan.window,
+            plan.grid_capacity,
+            view.selected,
+        )
+    } else {
+        (plan.columns.clone(), Vec::new(), plan.window)
+    };
     // The note is composed and budgeted **before** the rows it sits under, for the same reason the
     // opened record's note is: it is the line that says where the reader is and what the screen let
     // go of, and a line written after the thing it describes is a line that gets clipped.
@@ -308,11 +419,25 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         // `sum(width) + (n - 1)`, and a trailing separator would put the row one cell over the
         // screen the plan was asked about.
         lines.push(Line::from(spans(
-            plan.columns
+            columns
                 .iter()
                 .map(|column| (pad(column.key, column.width), Role::Head)),
             tier,
         )));
+        if !shared.is_empty() {
+            // 🔴 One row, standing for every column every row on screen already agreed on
+            // (`req/38` SS1019). `hoist` already paid for it out of `window` when there was no
+            // spare capacity to take it from instead, so this never costs a row nothing else
+            // budgeted. The role beside each mark is read from the first drawn row — every row in
+            // `window` agrees by construction, so any one of them names the same appearance.
+            let sample = items[window.first];
+            let fields = shared.iter().enumerate().map(|(index, (key, mark))| {
+                let (_, role) = cell_mark(sample, key);
+                let sep = if index + 1 < shared.len() { " |" } else { "" };
+                (format!("{key} {mark}{sep}"), role)
+            });
+            lines.push(Line::from(spans(fields, tier)));
+        }
     }
 
     // One row for the heading, which every shape draws, and one more for the grid's own header.
@@ -363,11 +488,16 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         // from, so while a record is open the disclosure says so instead of quoting a field count
         // that belongs to a grid nobody is looking at.
         let index = view.selected.min(items.len() - 1);
+        // 🔴 [`cell_mark`], not [`wire::cell`] (`req/924` §TUI-13 追記). The record is the road the
+        // disclosure names for every column the grid let go of, so a member drawn here by a
+        // different classifier than the grid's is a road that arrives somewhere else: at forty
+        // cells the grid has no `inverse_status` column at all, and this line was the only place a
+        // reader could see it — spelled as the serialisation of an object rather than as a value.
         let members: Vec<(String, String)> = items[index]
             .as_object()
             .map(|map| {
                 map.keys()
-                    .map(|key| (key.clone(), wire::cell(items[index], key).text()))
+                    .map(|key| (key.clone(), cell_mark(items[index], key).0))
                     .collect()
             })
             .unwrap_or_default();
@@ -410,16 +540,15 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         // legend went is composed in `layout::resolve_attended`, so the count it is composed from
         // has to be the count this region spends.
         let note_rows = plan.note_rows;
-        // 🔴 **The window is the plan's, not this region's** (`req/38` SS999, T-r4-B). This was
+        // 🔴 **The window is `hoist`'s, not necessarily the plan's** (`req/38` SS999, T-r4-B; and
+        // `req/984` §10-33 for the row a shared line above may have already spent). This was
         // `take(shown)` from the first record, so an attention moved past the bottom edge was drawn
         // nowhere while the note went on reporting where it was — measured at 80x24 against a
         // twenty-eight row ledger, where `G` produced a frame identical to the entry frame.
         // `layout::window` is where the decision lives now, which is what lets a gate read it
-        // instead of inferring it from a picture.
-        //
-        // The count is unchanged: the window holds as many records as the rows the note left over,
-        // exactly as `shown` did. What moved is **where it starts**.
-        let window = plan.window;
+        // instead of inferring it from a picture; `hoist` only ever shrinks it by the one row its
+        // own shared line spent, and never below two, so a smaller window here is always paid for
+        // by a line already standing above these rows.
         let shown = window.rows;
         for (index, item) in items
             .iter()
@@ -427,18 +556,9 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
             .skip(window.first)
             .take(window.rows)
         {
-            let cells = plan.columns.iter().map(|column| {
-                if column.key == wire::VERDICT_KEY {
-                    let verdict = wire::verdict(item);
-                    (pad(&verdict.mark(), column.width), verdict.role())
-                } else {
-                    match wire::cell(item, column.key) {
-                        wire::Cell::Nothing(nothing) => {
-                            (pad(nothing.mark(), column.width), nothing.role())
-                        }
-                        wire::Cell::Value(text) => (pad(&text, column.width), Role::Body),
-                    }
-                }
+            let cells = columns.iter().map(|column| {
+                let (text, role) = cell_mark(item, column.key);
+                (pad(&text, column.width), role)
             });
             let line = Line::from(spans(cells, tier));
             // The attention mark is the row itself rather than a gutter column: a gutter would take

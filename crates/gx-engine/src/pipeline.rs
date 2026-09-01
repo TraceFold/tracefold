@@ -115,7 +115,7 @@ use gx_witness::{
 use crate::replay::{reconstruct, CommittedRow, DraftRow, EscrowRow, Sigma, SigmaShadow, StateRow};
 use crate::store::{
     BlobStore, EngineJournal, EngineJournalRecord, FingerprintRecord, InverseStatus,
-    NotAttemptedBecause, ObservationStore, Rollback, SupersedeIndex,
+    NotAttemptedBecause, ObservationStore, PredictionOutcome, Rollback, SupersedeIndex,
 };
 use crate::{Error, Result};
 
@@ -1610,6 +1610,13 @@ pub struct Engine<E: EvidenceSource, C: Canonicalizer = CanonEncoder> {
     /// Deliberately **not** a component of Σ and deliberately not on [`Entry`]: see
     /// [`NotAttemptedBecause`] for the argument. Nothing reads this to decide anything.
     not_attempted_because: BTreeMap<TransformationId, NotAttemptedBecause>,
+    /// 🔴 **WM-2a (`req/1007` §4 item 2, `req/1010`)** — the plan's prediction and the apply's
+    /// measurement, for every commit of this process that made one.
+    ///
+    /// Deliberately **not** a component of Σ and deliberately not on [`Entry`], on
+    /// `not_attempted_because`'s own argument: see [`PredictionOutcome`]. Nothing reads this to
+    /// decide anything — it is the record of a comparison, not an input to one.
+    prediction_outcome: BTreeMap<TransformationId, PredictionOutcome>,
     /// 🔴 **M6-02 adopted (a)** (sem: SEM-gx-engine-139): 44 §0's id-resolution, inverted. See [`Engine::resolved`].
     ///
     /// Derived from the journal's `Planned` records and from nothing else, which is why it is a
@@ -2463,6 +2470,7 @@ impl<E: EvidenceSource> Engine<E, CanonEncoder> {
             resolved,
             table: BTreeMap::new(),
             not_attempted_because: BTreeMap::new(),
+            prediction_outcome: BTreeMap::new(),
             by_subject: BTreeMap::new(),
             escrow: BTreeMap::new(),
             supersedes: SupersedeIndex::new(),
@@ -2529,6 +2537,7 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
             resolved: self.resolved,
             table: self.table,
             not_attempted_because: self.not_attempted_because,
+            prediction_outcome: self.prediction_outcome,
             by_subject: self.by_subject,
             escrow: self.escrow,
             supersedes: self.supersedes,
@@ -3073,6 +3082,20 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         id: &TransformationId,
     ) -> Option<NotAttemptedBecause> {
         self.not_attempted_because.get(id).copied()
+    }
+
+    /// 🔴 **WM-2a (`req/1007` §4 item 2, `req/1010`)** — what the plan predicted and what the apply
+    /// measured, where this process is the one that took the comparison.
+    ///
+    /// `None` is the **third value** and not a missing answer: the transformation made no
+    /// prediction (no adapter of this workspace fills `promised_target` today, so this is the
+    /// common case), or it is a row read back off the journal after a restart — the outcome is not
+    /// a component of Σ (see [`PredictionOutcome`]). A prediction that was *wrong* is `Some` whose
+    /// [`PredictionOutcome::matched`] is `false`, which is a different fact and is spelled
+    /// differently on purpose.
+    #[must_use]
+    pub fn prediction_outcome(&self, id: &TransformationId) -> Option<PredictionOutcome> {
+        self.prediction_outcome.get(id).copied()
     }
 
     /// The moment the **engine** says the apply happened (**E-M4-31**, **M5-18 adopted (a)**; sem: SEM-gx-engine-163).
@@ -6417,7 +6440,7 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         match existing_state {
             None => {}
             Some(Lifecycle::Candidate) if in_table => {
-                // 🔴 **DR-46-47 (open, `req/973` §8-6, filed 2026-08-31)** — this return is before
+                // 🔴 ~~**DR-46-47 (open, `req/973` §8-6, filed 2026-08-31)** — this return is before
                 // the `Planned` append, so a second `undo` of the same `T_o` does not re-journal
                 // its witness: the receipt names the **first** call's disposition, not the last.
                 // Both calls did run the CAS (the `match` on `witness` is above this line), so no
@@ -6426,7 +6449,45 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
                 // compared successfully, i.e. under-claim. Owner: the next cargo lane on gx-engine.
                 // Release condition: either the second call updates the seat, or `undo` refuses a
                 // re-plan whose witness differs from the journalled one, with a probe that drives
-                // both orders (Attested-then-Unobservable and its reverse) and asserts the receipt.
+                // both orders (Attested-then-Unobservable and its reverse) and asserts the
+                // receipt.~~
+                //
+                // 🔴 **DR-46-47, repaired (`req/973` §9-3)** — the struck paragraph is the true
+                // record of what this arm did and is kept for it. The release condition offered two
+                // roads and this is the **refusal** one, because the other ("the second call updates
+                // the seat") means appending a second `Planned` for an id that already has one,
+                // which is precisely what 43 T-2's idempotency column forbids on this road and what
+                // an HTTP retry storm would turn into unbounded journal growth.
+                //
+                // What is compared is the *disposition*, not the witness: `Missing` is a refusal and
+                // has already returned above, so the two roads that reach here are `Attested` and
+                // `Unobservable(_)`, which is exactly what `witness.disposition()` distinguishes and
+                // exactly what T-11 will sign.
+                //
+                // 🔴 The one shape deliberately **not** refused: `undo_witness` is `None` for every
+                // `plan()` and for any journal written before DR-46-45. `None` is "nobody recorded a
+                // comparison", which is not "a different comparison" — folding it in would refuse
+                // every pre-erratum project's re-plan on the strength of a field that did not exist
+                // when its journal was written. Unknown is not False, and that is this system's own
+                // first principle rather than a courtesy.
+                let journalled =
+                    self.journal
+                        .records()
+                        .iter()
+                        .rev()
+                        .find_map(|record| match record {
+                            EngineJournalRecord::Planned {
+                                transformation,
+                                undo_witness,
+                                ..
+                            } if *transformation == id => Some(undo_witness.clone()),
+                            _ => None,
+                        });
+                if let Some(Some(journalled)) = journalled {
+                    if witness.disposition().as_ref() != Some(&journalled) {
+                        return Err(UndoRefusal::WitnessDiffers.into_error(original));
+                    }
+                }
                 return Ok((intent_id, id));
             }
             Some(Lifecycle::Candidate) => {
@@ -6434,6 +6495,15 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
                 // re-seat — Σ already holds a `Planned` for this id, and a second one leaves Σ's
                 // last-write-wins reconstruction where it was (`replay.rs`), which is what makes
                 // this the one arm where a second record is harmless rather than a rewind.
+                //
+                // 🔴 **DR-46-47** — this arm and the one above answer a witness disagreement
+                // differently, and that is deliberate rather than an oversight. Here the second
+                // `Planned` **is** appended, so the witness this call offers is the one journalled
+                // and the one T-11 will sign: nothing is misattributed and there is nothing to
+                // refuse. Above, the early return means no record is written at all, so answering
+                // would publish the *earlier* call's comparison. The rule is the same in both
+                // places — a receipt names the comparison the call that produced it made — and it
+                // is the roads that differ.
             }
             Some(Lifecycle::Aborted(_)) => {
                 // 🔴 The one **verdicted-or-later** state a second undo may re-plan over, and it is
@@ -7377,6 +7447,27 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
         // escrow completed first, fail-closed on a distrusted model — is unchanged.
         if let Some(promised) = self.table[id].transformation.target {
             let observed = *applied.resulting_digest();
+            // 🔴 **WM-2a (`req/1007` §4 item 2, `req/1010`)** — the comparison is recorded because
+            // it was **taken**, not because of how it came out. Until this line the kept promise
+            // was silent and only the broken one produced a value (R-1001-1's seventh cause), so
+            // the engine's model of a post-state could be faulted and never credited.
+            //
+            // **One site for both outcomes, on purpose.** `matched()` is derived from the two
+            // digests written here, so there is no second write that could disagree with this one
+            // about which way the comparison went — the shape `req/1010` §2 argues for.
+            //
+            // Placed **before** the `!=` branch so that the mispredicted road, which `return`s,
+            // carries the record too. The record costs one map insert on the far side of a
+            // prediction; the `let Some` above is still the whole compatibility story, and every
+            // adapter this workspace ships takes the road where it does not open.
+            self.prediction_outcome.insert(
+                *id,
+                PredictionOutcome {
+                    predicted: promised,
+                    observed,
+                    observed_at: at,
+                },
+            );
             if promised != observed {
                 self.not_attempted_because
                     .insert(*id, NotAttemptedBecause::PromisedPostStateWasWrong);
@@ -9440,6 +9531,24 @@ impl WitnessMissing {
 /// after R3 (`grep -rn "Unobservable::NoReceipt"` is the check), and the two live variants are
 /// `NoPostcondition` (a receipt that honestly attests nothing was observed -- `req/38` §123 ruling
 /// 1's tools-only face) and `LaunchAlreadyDecided`.
+///
+/// # 🔴 **DR-46-46 (`req/973` §9-3)** — the sentence above says "two", and it is now **three**
+///
+/// The count is kept rather than rewritten because it was true when it was written, and a reader who
+/// meets it in `req/973` has to be able to tell which era they are in. What changed: `gx-cli`'s
+/// settle pre-flight had two sites where **the world** could not be read, and both answered with
+/// [`Unobservable::NoPostcondition`] — a sentence about the *receipt*, which in those two cases was
+/// present, signed, and carrying a postcondition. Harmless while nothing published the word; a lie
+/// inside the signature once DR-46-45 put the disposition into the signed payload. So the third live
+/// variant is [`Unobservable::WorldUnreadable`], and the rule it satisfies is `req/38` §231 ruling
+/// 5's: **one arm per cause**, not one word doing duty for two.
+///
+/// Adding a variant here is additive at every surface it reaches, and that is DR-46-45's design
+/// rather than luck: `gx_witness::receipt::UndoDisposition::Unobservable` carries
+/// [`Unobservable::reason`]'s sentence as **opaque text**, not as a second copy of this enum, so a
+/// new variant is a new *value* in a field that already exists. No wire key, no `gx_code`, no exit
+/// number and no journal shape moves — which is why this repair needs no erratum on 44 §2.2's
+/// composite (`gx_api`'s `undo_witness` doc names the same reason for the same design).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unobservable {
     /// No commit receipt is archived for `T_o` -- the pair gotcha95 asks operators to keep was not
@@ -9464,6 +9573,19 @@ pub enum Unobservable {
     /// that costs a deployment that genuinely keeps none is written down where the cost lands --
     /// `gx_api::NoArchive` and 43 §5.2's note -- rather than paid silently at every undo.
     NoArchive,
+    /// 🔴 **DR-46-46** -- the *world* would not read when the undo probed it, and this is the third
+    /// live variant.
+    ///
+    /// The evidence is intact: a receipt is archived, it verifies, it is about this transformation
+    /// and it carries a postcondition. What could not be produced is the other half of the
+    /// comparison -- `Engine::live_digest` asked the adapter for the position and the adapter
+    /// refused. That is a property of the **substrate**, which is exactly the line
+    /// [`UndoWitness::Missing`]'s doc draws: a substrate that cannot be observed is *declared*
+    /// (DR-46-7, `req/38` §123 ruling 1), while absent or untrustworthy evidence is *refused*.
+    ///
+    /// Before this variant both sites returned [`Unobservable::NoPostcondition`], which named the
+    /// receipt -- the one object in the scene that was in perfect order.
+    WorldUnreadable,
 }
 
 impl Unobservable {
@@ -9476,6 +9598,7 @@ impl Unobservable {
             Unobservable::ReceiptUnreadable => "the archived commit receipt would not decode",
             Unobservable::LaunchAlreadyDecided => "the launch is already answered by another row",
             Unobservable::NoArchive => "this deployment keeps no receipt archive",
+            Unobservable::WorldUnreadable => "the world could not be read when the undo probed it",
         }
     }
 }
@@ -9595,6 +9718,19 @@ pub enum UndoRefusal {
         /// Which trust is missing.
         missing: WitnessMissing,
     },
+    /// 🔴 **DR-46-47 (`req/973` §9-3)** — a re-plan of a `T_u` still seated as a `Candidate` offered
+    /// a witness that disagrees with the one the journalled plan attests.
+    ///
+    /// H-05's guard answers a repeat `undo(T_o)` with the id it already minted and **no second
+    /// record** (43 T-2's idempotency column). That is right for a repeat *request* and wrong for a
+    /// second *observation*: since DR-46-45 the journalled witness is what T-11 signs, so answering
+    /// the second call with the first call's disposition publishes a comparison that this caller did
+    /// not make. Refusing hands the disagreement back rather than letting the engine pick which of
+    /// two observations to sign.
+    ///
+    /// An **agreeing** re-plan is not this row: it is still answered, with the same id and no second
+    /// record, because there the journalled disposition already names what this call compared.
+    WitnessDiffers,
 }
 
 impl UndoRefusal {
@@ -9613,6 +9749,7 @@ impl UndoRefusal {
             UndoRefusal::WorldMoved { .. } => "world-moved",
             UndoRefusal::AlreadyPlanned { .. } => "already-planned",
             UndoRefusal::WitnessMissing { .. } => "witness-missing",
+            UndoRefusal::WitnessDiffers => "witness-differs",
         }
     }
 
@@ -9685,6 +9822,19 @@ impl UndoRefusal {
                 reason: missing.reason(),
                 remedy: missing.remedy(),
             },
+            // 🔴 **DR-46-47** — an existing carrier, an existing `gx_code`, an existing exit number.
+            // `req/38` §132 ruling 2 mints no new number, and this row does not need one: the state
+            // the caller is refused on is the seat H-05's guard already answers about, so the word is
+            // 44 §2.3's `INVALID_STATE` (exit 2, HTTP 409) exactly as `already-planned`'s is.
+            UndoRefusal::WitnessDiffers => Error::InvalidState {
+                id,
+                state: "Candidate",
+                attempted: "undo (this T_u is already planned and the journalled plan attests a \
+                            different comparison than this call offers; answering with the first \
+                            call's disposition would sign an observation this caller did not make, \
+                            so the disagreement is refused rather than folded — DR-46-47. An \
+                            agreeing re-plan is still answered, 43 T-2)",
+            },
         }
     }
 }
@@ -9718,6 +9868,12 @@ pub struct UndoRefusalRow {
 /// 🔴 **43 §5.2's table** -- thirteen rows: eleven this engine judges and two it declares it does
 /// not (twelve/ten before **R3**, which added `witness-missing`).
 ///
+/// 🔴 **DR-46-47 (`req/973` §9-3)** -- **fourteen** rows now: twelve judged and the same two
+/// declared, the new one being `witness-differs`. The count above is kept for the reason the whole
+/// of this module keeps superseded counts: a reader holding `req/216`/`req/222`/`req/973` needs to
+/// know which era a number came from. The row mints no `gx_code`, no exit status and no HTTP status
+/// -- it takes `already-planned`'s, which is the seat it refuses on.
+///
 /// The two unjudged rows are the honest half. `req/207` §3-4 asked for "our side of aider's seven,
 /// with the rows that do not fill marked rather than dropped", and these are they.
 ///
@@ -9726,7 +9882,7 @@ pub struct UndoRefusalRow {
 /// declares (`gx_api::gx_code::GX_CODES` or `RULED_ADDITIONS`), and that each row's status pair
 /// agrees with that declaration. gx-engine cannot make that comparison itself -- it sits below both
 /// gx-cli and gx-api -- which is why the table is `pub` and the probe is one crate up.
-pub const UNDO_REFUSALS: [UndoRefusalRow; 13] = [
+pub const UNDO_REFUSALS: [UndoRefusalRow; 14] = [
     UndoRefusalRow {
         reason: "not-ours",
         material: "the state table and the shadow both answer `None` for the named id",
@@ -9842,6 +9998,25 @@ pub const UNDO_REFUSALS: [UndoRefusalRow; 13] = [
                 separate artefact whose absence could silently disable the check. That absence is \
                 exactly what `req/222` H-01 measured here",
         test: "serve_runtime_r3::a_deleted_commit_receipt_refuses_the_undo_instead_of_firing_it",
+        judged: true,
+    },
+    // 🔴 **DR-46-47** — the twelfth judged row. Before it, a second `undo` of the same `T_o` while
+    // `T_u` was still a `Candidate` was answered with the id it already had and the **first** call's
+    // journalled disposition, so the receipt T-11 would sign named a comparison a different call had
+    // made. The direction was fail-closed (both calls run the CAS, so the drift is an under-claim),
+    // and an under-claim in signed bytes is still a claim nobody checked.
+    UndoRefusalRow {
+        reason: "witness-differs",
+        material: "the `undo_witness` on the journalled `Planned` record for this `T_u`, against \
+                   the witness this call offers. A journal written before DR-46-45 carries `None` \
+                   here, which is \"nobody recorded a comparison\" and not \"a different one\", so \
+                   it is not this row",
+        gx_code: "INVALID_STATE",
+        cli_exit: 2,
+        http_status: 409,
+        aider: "no counterpart -- aider re-derives its undo from git on every call and keeps no \
+                record of what a previous call compared",
+        test: "dr4647_replan_witness::a_replan_that_offers_unobservable_over_a_journalled_attestation_is_refused",
         judged: true,
     },
     UndoRefusalRow {

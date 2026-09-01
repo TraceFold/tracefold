@@ -122,9 +122,17 @@ TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws
 | Dimension | Measured Value | Conditions & Scope |
 | :--- | --: | :--- |
 | **Test Floor** | **2,602** probes | 454 suites + SDK 36 passed &middot; fresh clone &middot; 25 Aug 2026 |
-| **Lean Formal Proofs** | **154** theorems | Lean 4, 14 files: **154 theorems, 14 of them counterexamples, 1 axiom, sorry 0** |
-| **Open High Holes** | **0** | After 44 adversarial audit rounds |
+| **Lean Formal Proofs** | **154** theorems | Lean 4, 14 files: **154 theorems, 14 of them counterexamples, 1 axiom, sorry 0**, recounted 1 Sep 2026 with the attribute-aware predicate (SS1001-consistent; see docs/LIMITS.md item 8) |
+| **Open High Holes** | **0** | Out of 44 adversarial audit rounds, same 25 Aug 2026 table/commit as above (not independently re-dated by this pass) |
 | **Unmeasured Platforms** | 3 environments | Windows native, OneDrive, SMB |
+
+**Deliberately absent:** no CI/build badge on this page, and the honest reason is worse than not
+having one. GitHub Actions has run zero jobs on any push since the account went billing-blocked at
+2026-08-15T17:25:29Z (`req/908`) — not because of a code defect, but a green tick here would not
+mean what a green tick usually means while that stays true. The last time CI ran (commit
+`f65aac2f`), it covered 16 of this project's 17 workspace crates automatically; the TypeScript
+SDK's tests have never run under CI at all. See [docs/LIMITS.md](docs/LIMITS.md) item 8 for the
+full, dated detail (checked current as of 2026-09-01).
 
 ### Scope Exclusions (Limits by Design)
 | Out of Scope | Why it cannot be closed from inside |

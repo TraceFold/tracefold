@@ -6255,3 +6255,701 @@ fn g46_a_resize_is_an_event_this_face_answers() {
         arms[0]
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// G47..G50 — a column every drawn row agrees on is said once, not on every row (T-r30-hoist).
+//
+// 🔴 `req/38` SS1019: 667 of the 1,540 non-blank cells at 120x32 were exactly this repetition --
+// five columns spelling the same five words down every one of twenty-three rows. `req/984`
+// §10-33 names the design these gates hold to: a layer-independent uniform predicate
+// ([`layout::resolve_shared`]) that never has to know what a wire key or a terminal width is, and
+// a renderer-side [`renderer::hoist`] that crosses into wire values only after the plan's window
+// already exists -- so [`layout::Plan::columns`] and [`layout::columns_for`] answer exactly what
+// they answered before this existed, and every call site that already reads either one is unhurt.
+// ---------------------------------------------------------------------------------------------
+
+const HOIST_WIDTHS: [u16; 7] = [120, 100, 80, 66, 60, 46, 40];
+
+#[test]
+fn g47_a_column_every_drawn_row_agrees_on_is_moved_to_shared_at_every_ruled_shape() {
+    for width in HOIST_WIDTHS {
+        let (columns, _) = layout::columns_for(width);
+        if columns.is_empty() {
+            println!("G47_UNTESTABLE width={width}: columns_for drew no column at all");
+            continue;
+        }
+        let target = columns[0];
+        let rows: Vec<Vec<String>> = (0..4).map(|_| vec!["Admit".to_string()]).collect();
+        let (kept, shared) = layout::resolve_shared(&[target], &rows);
+        assert!(
+            kept.is_empty(),
+            "🔴 G47 at {width}: a column all {} drawn rows spell \"Admit\" must not stay in the \
+             per-row set -- got kept={kept:?}",
+            rows.len()
+        );
+        assert_eq!(
+            shared,
+            vec![(target.key, "Admit".to_string())],
+            "🔴 G47 at {width}: the constant must be hoisted with its own key and its own mark, \
+             not dropped or renamed"
+        );
+    }
+}
+
+#[test]
+fn g48_the_shared_mark_keeps_unknown_and_absent_apart() {
+    let target = layout::Column {
+        key: "created_at",
+        width: 20,
+        priority: Priority::Two,
+    };
+    let (_, unknown) =
+        layout::resolve_shared(&[target], &[vec!["?".to_string()], vec!["?".to_string()]]);
+    let (_, absent) =
+        layout::resolve_shared(&[target], &[vec!["--".to_string()], vec!["--".to_string()]]);
+    assert_eq!(
+        unknown,
+        vec![(target.key, "?".to_string())],
+        "🔴 G48: every drawn row measured and got no answer -- the shared mark must stay \"?\""
+    );
+    assert_eq!(
+        absent,
+        vec![(target.key, "--".to_string())],
+        "🔴 G48: every drawn row never carried the key at all -- the shared mark must stay \"--\", \
+         never rounded into unknown's mark"
+    );
+    assert_ne!(
+        unknown, absent,
+        "🔴 G48: the seven-word vocabulary for nothing is not simplification's to spend -- two \
+         different kinds of nothing must never hoist to the same shared field"
+    );
+}
+
+#[test]
+fn g49_no_shared_field_is_claimed_from_fewer_than_two_rows() {
+    let target = layout::Column {
+        key: "verdict",
+        width: 9,
+        priority: Priority::One,
+    };
+    let (kept0, shared0) = layout::resolve_shared(&[target], &[]);
+    assert!(
+        shared0.is_empty() && kept0.len() == 1,
+        "🔴 G49: zero drawn rows is not evidence of a constant -- the column stays kept, not \
+         shared: kept={kept0:?} shared={shared0:?}"
+    );
+    let (kept1, shared1) = layout::resolve_shared(&[target], &[vec!["Admit".to_string()]]);
+    assert!(
+        shared1.is_empty() && kept1.len() == 1,
+        "🔴 G49: one drawn row proves nothing repeats -- the column stays kept, not shared: \
+         kept={kept1:?} shared={shared1:?}"
+    );
+}
+
+/// A ledger of `rows` records, every one of them agreeing on `verdict`, `state`, `created_at`
+/// (`null` on the wire, so drawn as `?`) and `scope` (`null` too), and disagreeing on
+/// `transformation`, which is what a reader tells one record from another by.
+fn uniform_ledger(rows: usize) -> Vec<serde_json::Value> {
+    (0..rows)
+        .map(|i| {
+            serde_json::json!({
+                "transformation": format!("gx1:t{i:016x}"),
+                "verdict": "Admit",
+                "state": "Committed",
+                "created_at": serde_json::Value::Null,
+                "scope": serde_json::Value::Null,
+                "enforced": true,
+            })
+        })
+        .collect()
+}
+
+#[test]
+fn g50_a_shared_row_never_leaves_fewer_than_two_records_drawn_to_justify_it() {
+    let rows = uniform_ledger(6);
+    let items: Vec<&serde_json::Value> = rows.iter().collect();
+    let mut saw_a_hoist = false;
+    for width in HOIST_WIDTHS {
+        let (columns, _) = layout::columns_for(width);
+        if columns.len() < 2 {
+            println!("G50_UNTESTABLE width={width}: fewer than two columns fit, nothing to hoist out of the row");
+            continue;
+        }
+        for capacity in 1..=items.len() {
+            let window = layout::window(0, items.len(), capacity);
+            let (kept, shared, drawn) = renderer::hoist(&items, &columns, window, capacity, 0);
+            if shared.is_empty() {
+                continue;
+            }
+            saw_a_hoist = true;
+            assert!(
+                drawn.rows >= 2,
+                "🔴 G50 at {width}, capacity {capacity}: a shared row was drawn over a window of \
+                 {} record(s) -- no shape claims a constant from fewer than two",
+                drawn.rows
+            );
+            assert!(
+                kept.len() < columns.len(),
+                "🔴 G50 at {width}, capacity {capacity}: {} column(s) said the same thing on \
+                 every one of {} drawn rows and none of them moved to shared",
+                columns.len() - kept.len(),
+                drawn.rows
+            );
+        }
+    }
+    assert!(
+        saw_a_hoist,
+        "🔴 G50: this ledger was built to agree on four columns at every width in \
+         HOIST_WIDTHS -- if no width and no capacity ever produced a shared field, the test is \
+         not exercising hoist() at all"
+    );
+}
+
+/// 🔴 Independent audit, 2026-09-01: the first cut of `hoist` compared `items.len()` against
+/// `window.rows` to decide whether the region had spare capacity, and [`layout::window`]'s own
+/// body caps `rows` at `items.min(capacity)` -- so `window.rows <= items.len()` by construction,
+/// the comparison could never be true, and every hoist paid for its shared row by dropping a real
+/// record even when the region had blank rows going unused below the list. This is that exact
+/// shape, planted directly: three records, and a region asked for ten.
+#[test]
+fn g51_a_shared_row_costs_nothing_when_the_region_has_spare_capacity() {
+    let rows = uniform_ledger(3);
+    let items: Vec<&serde_json::Value> = rows.iter().collect();
+    let (columns, _) = layout::columns_for(120);
+    let capacity = 10; // strictly more than items.len() (3): the region has room to spare.
+    let window = layout::window(0, items.len(), capacity);
+    assert_eq!(
+        window.rows,
+        items.len(),
+        "🔴 G51 setup: a window built from more capacity than there are items must draw every \
+         item -- got {} of {}",
+        window.rows,
+        items.len()
+    );
+    let (kept, shared, drawn) = renderer::hoist(&items, &columns, window, capacity, 0);
+    assert!(
+        !shared.is_empty(),
+        "🔴 G51 setup: this ledger agrees on verdict/state/created_at/scope at every row -- \
+         hoist() found nothing to share, so this test is not exercising the fix at all"
+    );
+    assert!(
+        kept.len() < columns.len(),
+        "🔴 G51: {} column(s) agreed on every one of {} rows and none moved to shared",
+        columns.len() - kept.len(),
+        items.len()
+    );
+    assert_eq!(
+        drawn.rows,
+        items.len(),
+        "🔴 G51: the region asked for {capacity} rows and only {} items exist, so a shared row \
+         must cost nothing -- got a window of {} record(s), which means a real record was \
+         dropped to pay for a row the region never needed to fill",
+        items.len(),
+        drawn.rows
+    );
+}
+
+// =============================================================================================
+// `req/924` §TUI-13 追記 -- the ten states of the inverse column, and the two collapses that were
+// in this face until g51..g53 were written.
+//
+// The ruling counts ten: two that belong to the *reading* (not measured yet, measured and not
+// knowable) and eight that belong to the *wire* (`null`, and the seven `InverseStatus` variants of
+// `crates/gx-engine/src/store.rs`, of which `Consumed` alone carries a member). The two collapses:
+//
+// 1. `null` was drawn `?`, the same mark a failed read draws. "This transformation never escrowed
+//    anything" and "this face could not read the list" were one picture.
+// 2. `{"Consumed":{"by":...}}` was drawn as the JSON text of itself and cut at fourteen cells to
+//    `{"Consumed":{~` -- the whole column spent on punctuation, and the one fact the object carried
+//    thrown away.
+//
+// 🔴 These three gates are written against the **frame**, not against the classifier, so that they
+// compile and run on the commit before the repair. A gate that only compiles once the repair exists
+// cannot be fired in the red direction, and a compile error is not a red gate.
+// =============================================================================================
+
+/// The transformation the Consumed fixture names.
+///
+/// Nineteen characters against a fourteen-cell column on purpose: `g52` is about a cut being a cut,
+/// and a `by` short enough to fit would measure nothing.
+const INVERSE_CONSUMED_BY: &str = "gx1:t3sto0000000042";
+
+/// The six words the engine spells as bare strings.
+///
+/// 🔴 **Transcribed from `crates/gx-engine/src/store.rs`, not read from it.** #188/#189 ruled that
+/// this package's suite does not open another crate's source -- a suite that fails when a crate it
+/// does not depend on drifts is a coupling `cargo tree` cannot show. The cost of that ruling is
+/// paid here and is named rather than hidden: nothing in this file goes red the day `InverseStatus`
+/// grows an eighth variant. The freshness gate for the count is the engine's own
+/// (`crates/gx-engine/tests/lifecycle_transitions.rs` asserts the arms and their writers).
+const INVERSE_WORDS: [&str; 6] = [
+    "Available",
+    "Expired",
+    "Unavailable",
+    "Pending",
+    "BodyMissing",
+    "Undetermined",
+];
+
+/// The eight shapes `inverse_status` can arrive in, each under the name this file calls it by.
+fn inverse_wire_shapes() -> Vec<(&'static str, serde_json::Value)> {
+    let mut shapes: Vec<(&'static str, serde_json::Value)> =
+        vec![("null", serde_json::Value::Null)];
+    for word in INVERSE_WORDS {
+        shapes.push((word, serde_json::Value::String(word.to_string())));
+    }
+    shapes.push((
+        "Consumed",
+        serde_json::json!({ "Consumed": { "by": INVERSE_CONSUMED_BY } }),
+    ));
+    shapes
+}
+
+/// The width the declaration gives the column, read from the declaration.
+fn inverse_column_width() -> usize {
+    LEDGER_COLUMNS
+        .iter()
+        .find(|column| column.key == INVERSE_KEY)
+        .unwrap_or_else(|| panic!("🔴 no column is declared for {INVERSE_KEY}"))
+        .width as usize
+}
+
+/// The wire's key, spelled once. Checked against the declaration by [`inverse_column_width`], which
+/// panics rather than silently measuring nothing if the key is ever renamed.
+const INVERSE_KEY: &str = "inverse_status";
+
+/// A ledger carrying one `inverse_status` shape per row.
+///
+/// 🔴 Every other column differs across the rows **on purpose**. `renderer::hoist` moves a column
+/// that every drawn row agrees on out of the header and into a shared line; these gates find their
+/// column by reading the header the frame actually drew, so a ledger that let any column agree
+/// would move the thing being measured rather than measure it.
+fn inverse_ledger() -> Screen {
+    let items: Vec<serde_json::Value> = inverse_wire_shapes()
+        .into_iter()
+        .enumerate()
+        .map(|(n, (_, status))| {
+            let verdict = wire::VERDICT_KINDS[n % wire::VERDICT_KINDS.len()];
+            serde_json::json!({
+                "transformation": record_id(n),
+                "state": format!("State{n}"),
+                "verdict": verdict,
+                "enforced": n % 2 == 0,
+                "created_at": format!("2026-08-0{}T09:00:00Z", n + 1),
+                "actor": format!("agent-{n}"),
+                "scope": format!("src/row{n}.rs"),
+                "inverse_status": status,
+                "rollback": format!("kind-{n}"),
+                "superseded_by": record_id(n + 100),
+            })
+        })
+        .collect();
+    let rows = items.len();
+    Screen {
+        healthz: answered(
+            "/v1/healthz",
+            serde_json::json!({
+                "status": "ok",
+                "engine_version": "gx-engine 0.1.0",
+                "ledger_agrees": true,
+                "journal_rows": rows,
+                "status_reason": serde_json::Value::Null,
+            }),
+        ),
+        transformations: answered(
+            "/v1/transformations",
+            serde_json::json!({ "items": items, "next_cursor": serde_json::Value::Null }),
+        ),
+        candidates: answered(
+            "/v1/candidates",
+            serde_json::json!({ "items": [], "next_cursor": serde_json::Value::Null }),
+        ),
+        escalations: answered(
+            "/v1/escalations",
+            serde_json::json!({ "items": [], "next_cursor": serde_json::Value::Null }),
+        ),
+    }
+}
+
+/// A reading that was refused: an answer, with a body, and no `items` in it.
+fn inverse_refused(route: &str) -> wire::Reading {
+    wire::Reading {
+        route: format!("GET {route}"),
+        status: Some(401),
+        read_at: "2026-09-01T00:00:00.000000000Z".to_string(),
+        elapsed_ms: 1,
+        body: Some(serde_json::json!({"title":"unauthorized","gx_code":"UNAUTHORIZED"})),
+        error: None,
+    }
+}
+
+/// The same ledger with its subject route replaced, for the two states that belong to the reading
+/// rather than to any row.
+fn inverse_screen_with(reading: wire::Reading) -> Screen {
+    let mut screen = inverse_ledger();
+    screen.transformations = reading;
+    screen
+}
+
+/// The frame this face draws at one shape, one tier, and one place for the attention.
+fn inverse_frame(
+    screen: &Screen,
+    width: u16,
+    height: u16,
+    tier: Tier,
+    selected: usize,
+    open: bool,
+) -> String {
+    renderer::buffer_text(&renderer::render_view_to_buffer(
+        screen,
+        width,
+        height,
+        tier,
+        false,
+        &View {
+            selected,
+            open,
+            ..View::default()
+        },
+    ))
+}
+
+/// Where the `inverse_status` column starts in the frame, read from the header the frame drew.
+///
+/// [`None`] when the frame has no such column -- because the plan dropped it, or because `hoist`
+/// moved it. Both are answers about the frame, which is why this reads the header rather than
+/// summing widths out of the declaration.
+fn inverse_column_start(text: &str) -> Option<usize> {
+    text.lines()
+        .find(|line| line.contains("transformation") && line.contains(INVERSE_KEY))
+        .and_then(|line| line.find(INVERSE_KEY))
+}
+
+/// The `inverse_status` cell of each drawn record, keyed by which record it is.
+fn inverse_grid_cells(text: &str) -> Vec<(usize, String)> {
+    let Some(start) = inverse_column_start(text) else {
+        return Vec::new();
+    };
+    let width = inverse_column_width();
+    let lines: Vec<&str> = text.lines().collect();
+    drawn_records(text)
+        .into_iter()
+        .filter_map(|(row, n)| {
+            lines.get(row).map(|line| {
+                (
+                    n,
+                    line.chars()
+                        .skip(start)
+                        .take(width)
+                        .collect::<String>()
+                        .trim_end()
+                        .to_string(),
+                )
+            })
+        })
+        .collect()
+}
+
+/// The `inverse_status` member of an opened record, as the frame spelled it.
+///
+/// The record draws one member per line as `key value`, so the member is recovered by the key it
+/// begins with. [`None`] when no line does -- the region ran out of rows, which is a third value and
+/// not a failure.
+fn inverse_opened_member(text: &str) -> Option<String> {
+    text.lines()
+        .find_map(|line| line.trim_end().strip_prefix(&format!("{INVERSE_KEY} ")))
+        .map(|rest| rest.trim().to_string())
+}
+
+/// 🔴 **g51 -- the ten states of the inverse column are ten spellings, on `mono` as well.**
+///
+/// `req/924` §TUI-13 追記. Two of the ten come from [`wire::Nothing`]'s own declaration, and the
+/// gate requires them to be on the screen as well as declared; the other eight are read out of the
+/// frame at every ruled shape and every tier.
+///
+/// A shape where a state cannot be read is counted `UNTESTABLE` and named, never folded into the
+/// failing side (`req/942` §14-3, and the ruling that a measurement which did not happen is not a
+/// measurement that failed). The gate refuses only two things: two states sharing a spelling, and
+/// no shape having measured all ten.
+#[test]
+fn g54_the_ten_inverse_states_are_ten_spellings() {
+    let ledger = inverse_ledger();
+    let pending = inverse_screen_with(wire::Reading::pending("/v1/transformations"));
+    let refused = inverse_screen_with(inverse_refused("/v1/transformations"));
+    let loading = Nothing::Loading.mark().to_string();
+    let unknown = Nothing::Unknown.mark().to_string();
+    let shapes = inverse_wire_shapes();
+
+    let mut fully_measured: Vec<(u16, u16, &'static str)> = Vec::new();
+    let mut untestable: Vec<String> = Vec::new();
+    let mut grid_measured: Vec<(u16, u16, &'static str)> = Vec::new();
+    let mut collisions: Vec<String> = Vec::new();
+
+    for (width, height) in RULED_SHAPES {
+        for tier in Tier::ALL {
+            // The two states that belong to the reading. Declared by `wire`, and required to reach
+            // the screen: a mark nothing draws is a mark that is not part of the face.
+            let pending_frame = inverse_frame(&pending, width, height, tier, 0, false);
+            let refused_frame = inverse_frame(&refused, width, height, tier, 0, false);
+            assert!(
+                pending_frame.contains(&loading),
+                "🔴 G54 at {width}x{height} {}: a reading that has not happened draws no \
+                 {loading:?}:\n{pending_frame}",
+                tier.name()
+            );
+            assert!(
+                refused_frame.contains(&unknown),
+                "🔴 G54 at {width}x{height} {}: a refused reading draws no {unknown:?}:\n\
+                 {refused_frame}",
+                tier.name()
+            );
+
+            let mut spelled: Vec<(&'static str, String)> = vec![
+                ("<loading>", loading.clone()),
+                ("<unknown>", unknown.clone()),
+            ];
+            let grid = inverse_frame(&ledger, width, height, tier, 0, false);
+            let cells = inverse_grid_cells(&grid);
+            if cells.len() == shapes.len() {
+                grid_measured.push((width, height, tier.name()));
+            }
+            for (n, (name, _)) in shapes.iter().enumerate() {
+                // The record is the road the disclosure names for a column the grid let go of, so
+                // it is where the state is read when the column is not drawn -- and it is read the
+                // same way when it is, because one road that always answers is better than two that
+                // sometimes do.
+                let opened = inverse_frame(&ledger, width, height, tier, n, true);
+                match inverse_opened_member(&opened) {
+                    Some(text) => spelled.push((name, text)),
+                    None => untestable.push(format!(
+                        "{width}x{height} {} {name}: the opened record drew no {INVERSE_KEY} line",
+                        tier.name()
+                    )),
+                }
+            }
+
+            if spelled.len() == shapes.len() + 2 {
+                fully_measured.push((width, height, tier.name()));
+            }
+            for i in 0..spelled.len() {
+                for j in (i + 1)..spelled.len() {
+                    if spelled[i].1 == spelled[j].1 {
+                        collisions.push(format!(
+                            "{width}x{height} {}: {} and {} are both spelled {:?}",
+                            tier.name(),
+                            spelled[i].0,
+                            spelled[j].0,
+                            spelled[i].1
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    println!(
+        "G51_STATES={} G51_SHAPES_FULLY_MEASURED={} G51_SHAPES_MEASURED_IN_THE_GRID={} \
+         G51_UNTESTABLE={} G51_COLLISIONS={}",
+        shapes.len() + 2,
+        fully_measured.len(),
+        grid_measured.len(),
+        untestable.len(),
+        collisions.len()
+    );
+    for line in &untestable {
+        println!("G51_UNTESTABLE {line}");
+    }
+    for line in &collisions {
+        println!("G51_COLLISION {line}");
+    }
+    assert!(
+        collisions.is_empty(),
+        "🔴 G54: {} of the ten states share a spelling with another. The ruling is that all ten \
+         are told apart on `mono`, where there is no hue to tell them apart with:\n{}",
+        collisions.len(),
+        collisions.join("\n")
+    );
+    assert!(
+        !fully_measured.is_empty(),
+        "🔴 G54: no shape and tier measured all ten states, so the gate above refused nothing. \
+         UNTESTABLE:\n{}",
+        untestable.join("\n")
+    );
+    assert!(
+        !grid_measured.is_empty(),
+        "🔴 G54: the eight wire states were never read out of a grid -- only out of opened \
+         records. The column is declared at {} cells and something is dropping it at every ruled \
+         shape.",
+        inverse_column_width()
+    );
+}
+
+/// 🔴 **g52 -- `Consumed` keeps the transformation it names.**
+///
+/// The variant carries a member, and the member is the answer to *what used the inverse up*. Three
+/// refusals:
+///
+/// * no frame spells the object's **serialisation**. `{"Consumed"` on a screen is this face
+///   drawing a value layer it is not allowed to name (`SKILL.md`, "直列化を第一級objectと取り違え
+///   るな"), and at fourteen cells it is also all the reader gets.
+/// * every spelling of the state is a prefix of `Consumed <by>`, cut at the cut mark this face
+///   already uses on the id column -- a cut is allowed, an invention is not.
+/// * at least one shape carries the whole of `by`. A `by` that is cut at every shape this face
+///   draws is a `by` that was dropped with extra steps.
+#[test]
+fn g52_consumed_keeps_the_transformation_that_used_it() {
+    let ledger = inverse_ledger();
+    let whole = format!("Consumed {INVERSE_CONSUMED_BY}");
+    let index = inverse_wire_shapes()
+        .iter()
+        .position(|(name, _)| *name == "Consumed")
+        .expect("the fixture carries a Consumed row");
+
+    let mut serialised: Vec<String> = Vec::new();
+    let mut invented: Vec<String> = Vec::new();
+    let mut whole_at: Vec<(u16, u16, &'static str)> = Vec::new();
+    let mut read: usize = 0;
+
+    for (width, height) in RULED_SHAPES {
+        for tier in Tier::ALL {
+            let grid = inverse_frame(&ledger, width, height, tier, index, false);
+            let opened = inverse_frame(&ledger, width, height, tier, index, true);
+            for (what, frame) in [("grid", &grid), ("record", &opened)] {
+                if frame.contains("{\"Consumed\"") {
+                    serialised.push(format!("{width}x{height} {} {what}", tier.name()));
+                }
+            }
+            let mut spellings: Vec<(&str, String)> = Vec::new();
+            if let Some((_, cell)) = inverse_grid_cells(&grid)
+                .into_iter()
+                .find(|(n, _)| *n == index)
+            {
+                spellings.push(("grid", cell));
+            }
+            if let Some(member) = inverse_opened_member(&opened) {
+                spellings.push(("record", member));
+            }
+            for (what, spelling) in spellings {
+                read += 1;
+                let cut = spelling.trim_end_matches('~');
+                if !whole.starts_with(cut) {
+                    invented.push(format!(
+                        "{width}x{height} {} {what}: {spelling:?} is not a cut of {whole:?}",
+                        tier.name()
+                    ));
+                }
+                if spelling == whole {
+                    whole_at.push((width, height, tier.name()));
+                }
+            }
+        }
+    }
+
+    println!(
+        "G52_SPELLINGS_READ={read} G52_SERIALISED={} G52_INVENTED={} G52_SHAPES_CARRYING_THE_WHOLE_BY={}",
+        serialised.len(),
+        invented.len(),
+        whole_at.len()
+    );
+    assert!(
+        serialised.is_empty(),
+        "🔴 g52: the object's serialisation reached the screen at {} shape/tier/region(s). A cell \
+         fourteen cells wide cuts it to `{{\"Consumed\":{{~` and the reader is left with \
+         punctuation:\n{}",
+        serialised.len(),
+        serialised.join("\n")
+    );
+    assert!(
+        invented.is_empty(),
+        "🔴 g52: {} spelling(s) of Consumed are not a cut of {whole:?}:\n{}",
+        invented.len(),
+        invented.join("\n")
+    );
+    assert!(
+        !whole_at.is_empty(),
+        "🔴 g52: no shape this face is ruled at carried the whole of `by`. `Consumed` without the \
+         transformation that consumed it is the word without the fact."
+    );
+}
+
+/// 🔴 **g53 -- `null` and `Unavailable` are never the same spelling, and `null` is `absent`.**
+///
+/// The pair the ruling names by name (`req/924` §TUI-13 追記): `crates/gx-api/src/list.rs` writes
+/// `null` for **no escrow row at all** and `InverseStatus::Unavailable` for *`invert()` answered
+/// `None`*. Asked-and-there-is-none is a property of the change; there-is-nobody-to-ask is a
+/// property of the ledger. This gate refuses both directions of collapsing them:
+///
+/// * `null` drawn as anything but [`Nothing::Absent`]'s mark -- which is what it was, drawn `?`,
+///   the mark of a read that failed;
+/// * `null` and `Unavailable` drawn alike -- which is what over-correcting the first would produce.
+#[test]
+fn g53_an_absent_escrow_row_is_not_an_unavailable_inverse() {
+    let ledger = inverse_ledger();
+    let absent = Nothing::Absent.mark().to_string();
+    let shapes = inverse_wire_shapes();
+    let at = |name: &str| {
+        shapes
+            .iter()
+            .position(|(n, _)| *n == name)
+            .unwrap_or_else(|| panic!("🔴 the fixture carries no {name} row"))
+    };
+    let (null_at, unavailable_at) = (at("null"), at("Unavailable"));
+
+    let mut wrong: Vec<String> = Vec::new();
+    let mut collapsed: Vec<String> = Vec::new();
+    let mut compared = 0usize;
+
+    for (width, height) in RULED_SHAPES {
+        for tier in Tier::ALL {
+            let null_frame = inverse_frame(&ledger, width, height, tier, null_at, true);
+            let unavailable_frame =
+                inverse_frame(&ledger, width, height, tier, unavailable_at, true);
+            let (Some(null_spelling), Some(unavailable_spelling)) = (
+                inverse_opened_member(&null_frame),
+                inverse_opened_member(&unavailable_frame),
+            ) else {
+                // The region drew no member line at this shape. Not measured, and not a failure.
+                continue;
+            };
+            compared += 1;
+            if null_spelling != absent {
+                wrong.push(format!(
+                    "{width}x{height} {}: null is spelled {null_spelling:?}, and the ruling spells \
+                     it {absent:?}",
+                    tier.name()
+                ));
+            }
+            if null_spelling == unavailable_spelling {
+                collapsed.push(format!(
+                    "{width}x{height} {}: both are spelled {null_spelling:?}",
+                    tier.name()
+                ));
+            }
+        }
+    }
+
+    println!(
+        "G53_COMPARED={compared} G53_NULL_MISSPELLED={} G53_COLLAPSED={}",
+        wrong.len(),
+        collapsed.len()
+    );
+    assert!(
+        compared > 0,
+        "🔴 g53: no shape produced both spellings to compare"
+    );
+    assert!(
+        collapsed.is_empty(),
+        "🔴 g53: an absent escrow row and an inverse the adapter could not build are drawn alike \
+         at {} shape/tier(s):\n{}",
+        collapsed.len(),
+        collapsed.join("\n")
+    );
+    assert!(
+        wrong.is_empty(),
+        "🔴 g53: `null` on this key means **there is no escrow row** -- `list.rs` says so in the \
+         comment beside the line that writes it -- and this face draws it as something else at {} \
+         shape/tier(s):\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
+}

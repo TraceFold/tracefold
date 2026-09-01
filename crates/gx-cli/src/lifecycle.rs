@@ -392,18 +392,29 @@ fn settle_preflight(
         }
         Ok(_) => {}
         Err(e) => {
-            crate::note!(
-                "gx undo settle: polls=1 elapsed_ms=0 result=abandoned (the probe could not read                  the world: {e}); firing as before"
-            );
-            // 🔴 **DR-46-46 (open, `req/973` §8-6, filed 2026-08-31)** — the reason is wrong, and
+            // 🔴 ~~**DR-46-46 (open, `req/973` §8-6, filed 2026-08-31)** — the reason is wrong, and
             // since DR-46-45 it is wrong **inside the signature**. What happened here is "the probe
             // could not read the world"; what the receipt will now say is "the commit receipt
             // carries no postcondition". Harmless while nothing published the word; a lie once the
             // word is attested, which is what DR-46-45 changed. Two sites: this one and the twin
             // after the wait, below. Owner: the next cargo lane on this crate. Release condition:
             // `Unobservable` gains a `WorldUnreadable` variant (one arm per cause, `req/38` §231
-            // ruling 5's gate) and both sites name it, with a probe that fires each.
-            return Ok(UndoWitness::Unobservable(Unobservable::NoPostcondition));
+            // ruling 5's gate) and both sites name it, with a probe that fires each.~~
+            //
+            // 🔴 **DR-46-46, repaired (`req/973` §9-3)** — the struck paragraph is the true record
+            // of what this site returned and is kept for it. The witness now names the cause this
+            // arm actually has, and the note prints the word rather than only the English, so that
+            // what the caller says out loud and what a receipt would carry are one string minted in
+            // one place (`UndoWitness::word`, DR-46-45) instead of two sentences that agree by
+            // inspection. The receipt is intact here — archived, verified, about this
+            // transformation, carrying a postcondition — which is why naming it was wrong.
+            let witness = UndoWitness::Unobservable(Unobservable::WorldUnreadable);
+            crate::note!(
+                "gx undo settle: polls=1 elapsed_ms=0 result=abandoned (the probe could not read \
+                 the world: {e}); firing as before, declared as {}",
+                witness.word()
+            );
+            return Ok(witness);
         }
     }
     // The world does not match. Everything from here is waiting, and none of it holds `.gx/LOCK`.
@@ -435,11 +446,21 @@ fn settle_preflight(
             "gx undo settle: {outcome} — the world does not match what T_o attested, so DR-43-1's              CAS is what answers now"
         ),
         Err(e) => {
-            crate::note!("gx undo settle: {outcome} — the world would not read afterwards ({e})");
-            // 🔴 **DR-46-46 (open)** — the twin of the site above, same defect, same release
-            // condition. Named here too because a repair that fixed one and not the other would
-            // leave the same false sentence reachable by the slower road.
-            return Ok(UndoWitness::Unobservable(Unobservable::NoPostcondition));
+            // 🔴 **DR-46-46, repaired** — the twin of the site above, same defect, same repair.
+            // ~~Named here too because a repair that fixed one and not the other would leave the
+            // same false sentence reachable by the slower road.~~ That sentence was the reason to
+            // name it, and it is now the reason both sites carry the same witness: this is the arm
+            // `crates/gx-cli/tests/dr4646_world_unreadable.rs` drives end to end, because it is the
+            // one a third party can reach from outside the process (the first probe's arm needs the
+            // world to stop reading *between* `Session::rehydrate_committed`'s snapshot and this
+            // function — see that file's denominator arm).
+            let witness = UndoWitness::Unobservable(Unobservable::WorldUnreadable);
+            crate::note!(
+                "gx undo settle: {outcome} — the world would not read afterwards ({e}), declared \
+                 as {}",
+                witness.word()
+            );
+            return Ok(witness);
         }
     }
     Ok(UndoWitness::Attested(expected))
@@ -479,7 +500,8 @@ fn settle_poll(
             Ok(_) => {}
             Err(e) => {
                 return format!(
-                    "polls={polls} elapsed_ms={} result=abandoned (the probe could not read the                      world: {e})",
+                    "polls={polls} elapsed_ms={} result=abandoned (the probe could not read the \
+                     world: {e})",
                     started.elapsed().as_millis()
                 )
             }
@@ -553,6 +575,22 @@ fn settle_evidence(
         }
         Err(e) => {
             crate::note!("gx undo refused: the receipt store would not answer: {e}");
+            // 🔴 **DR-46-50 (open, `req/973` §9-5, filed 2026-09-01)** — DR-46-46's shape, one type
+            // over, found by generalising its predicate rather than by a new report: this arm names
+            // a cause it does not have. What happened is that the receipt **store** would not
+            // answer; `WitnessMissing::Unreadable.reason()` says "the archived commit receipt would
+            // not decode", which is a claim about a document this arm never got to read. The two
+            // are different repairs for an operator — a store that will not open is a permissions
+            // or a filesystem problem, a payload that will not decode is a corrupt file.
+            //
+            // Lighter than DR-46-46 and recorded rather than fixed here for that reason: `Missing`
+            // is a **refusal**, so it mints no `TransformationId` and issues no receipt
+            // (`UndoWitness::disposition()` answers `None`), and the wrong sentence therefore
+            // reaches stderr and the refusal's `reason` but never the signed bytes. Owner: the next
+            // cargo lane on this crate. Release condition: `WitnessMissing` gains a variant for a
+            // store that would not answer, this arm names it, and a probe fires this arm. No
+            // `UNDO_REFUSALS` row is added — `witness-missing` is one row that branches on
+            // `missing`.
             return Err(UndoWitness::Missing(WitnessMissing::Unreadable));
         }
     };

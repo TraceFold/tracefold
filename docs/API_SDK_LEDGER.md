@@ -37,8 +37,8 @@ give three different totals:
 
 | Source | Count | Method |
 |---|---|---|
-| `crates/gx-api/src/lib.rs::router` (the actual server) | **25** method-paths | Counted every `.route(...)` call in the function body (lines 551-608), 2026-08-31. |
-| `glovrex_app/membrane/route-table.json` | **24** routes | Counted `routes[]` array entries. |
+| `crates/gx-api/src/lib.rs::router` (the actual server) | **25** method-paths | Counted every `.route(...)` call in the function body (lines 551-608, denominator = every `.route(...)` call in that span), 2026-08-31 commit. |
+| `glovrex_app/membrane/route-table.json` | **24** routes | Counted `routes[]` array entries, denominator = the full `routes[]` array, 2026-08-31 commit. |
 | `req/spec/40-architecture/44-api-spec.md` §2.1 table | **17** rows visible to the automated parser; **21** rows in the file | The parser (`specifiedEndpointsFromSpec()`) matches lines starting `` | ` `` -- the four rows the file's own 2026-08-30 "M-13" correction added for the attach-source registry are written as `` | 🔴 `POST /attach-sources` ``, so the leading emoji moves the match point past the parser's prefix and those four rows are invisible to the count the SDK gate checks. The gate still passes today (17 == 17) only because `SPECIFIED_METHODS` was never asked to include them either -- they are covered by `EXTENSION_METHODS` instead (§3). |
 
 **The gap is one route**: `POST /attach-sources/{id}/observations`

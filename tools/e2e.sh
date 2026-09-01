@@ -1666,8 +1666,29 @@ set -u
 # ones r973 already folded in. The gap `f1` already reported before this merge (README/banner still
 # 2664/470, `boundary_gate_reach` etc.) is unchanged by this merge and is not this lane's to repair
 # -- named here, not repaired here, same as every block above it.
-MIN_PROBES=2812
-MIN_SUITES=487
+# 🔴 DR-46-46 / DR-46-47 repair lane (`req/38` §SS1037, `req/973` §9-5): +7 probes / +3 suites,
+# raised in the same edit that names them in EXPECTED_SUITES (req/29 §4). The three are
+# `dr4646_world_unreadable` (2: the twin arm end to end, plus the denominator arm that records why
+# the first of DR-46-46's two sites is not drivable from a cold start), `dr4646_world_unreadable_
+# witness` (2: the new absence reaches the signed receipt, and is distinguishable there from the
+# sentence it used to be spelled as) and `dr4647_replan_witness` (3: both orders of the witness
+# disagreement, plus the control that an agreeing re-plan is still idempotent).
+#
+# The gap `f1`/`f2` already reported before this lane is unchanged by it and is not this lane's to
+# repair: seven suites tracked at HEAD are absent from EXPECTED_SUITES
+# (`inverse_status_on_the_row_face`, `req981_stale_plan_road`, `r1003_seventh_cause_e2e`,
+# `wm2a_prediction_outcome_e2e`, `verdict_split_view`, `r964_c25_canon`,
+# `read_surface_census_doubt`). `f1` reconstructs 2896/497 against this tree (2885 `#[test]` + 11
+# doc-tests; 454 integration + 19 libs + 5 bins), measured after this lane's +7/+3, so the standing
+# gap is 77 probes / 7 suites and every one of them predates this lane. `f6`/`f8`/`f10` are the same
+# staleness on the README and banner (they quoted 2803 against a floor of 2812 before this edit, so
+# they were red on their own arithmetic already).
+#
+# Named here, not repaired here, same as every block above it -- raising the floor to 2896 would also
+# adopt those seven lanes' arithmetic, and the gate compares the floor against *passes*, which in an
+# environment without MySQL/Postgres up is lower still.
+MIN_PROBES=2822
+MIN_SUITES=490
 # KNOWN_IGNORED: exactly one probe is unconditionally #[ignore]d (gx-engine two_phase_escrow.rs,
 # B2 / req/871 F1, frozen pending an Owner ruling on the third-value vocabulary). MIN_PROBES counts
 # #[test] functions (the basis floor_doubt f1/f2 reconstruct), while the gate below counts passes,
@@ -1740,6 +1761,7 @@ defaults delta_semantics
 delta_skeleton demo_e2e deny_order do_result dr2 dr4625_read_set_cost_probe dr44_9_views dr4626_invert_seam
 dr4631_escalated_reissue dr4633_input_generation dr4634_read_set_absence dr4639_catalogue_hash_attest
 dr4640_standing_windows
+dr4646_world_unreadable dr4646_world_unreadable_witness dr4647_replan_witness
 dr892_read_set_attestation dr892_mcp_still_per_read dr891_undo_branches r895_help_has_no_private_vocabulary attach_sources observations observation_canonical observation_class g8_observation_atomicity g9_name_durability
 dr46_16_cas_read_by_tool dr46_21_digest_reverify dr46_28_boundary_declaration dr529_missing_field
 dr529_residual_cells dr529_cli_order_swap dr_v4b_2_const_json dr_v4b_3_strip dr_v4b_3_wrap_strip draft_index

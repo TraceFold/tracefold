@@ -3070,7 +3070,7 @@ one of the two members would leave a decode-refusal probe green, because `serde`
 member per refusal.
 
 `gx receipt verify` answers exit **7** for this document, which is the word for *refuted*, about a
-file nobody has touched. That sentence is driven where the binary is:
+file nobody has touched — the same 18 August 2026 frozen document named above. That sentence is driven where the binary is:
 `crates/gx-cli/tests/r39_frozen_receipt_verdict.rs` has **five** probes, which hand the frozen
 artefacts to the shipped binary the way a third party would and assert the 7. A control changes one
 byte of the specimen and asserts the answer about it changes — the exit stays 7, and what moves is
@@ -3290,7 +3290,7 @@ and `GET /ledger/checkpoint` all answer **500 `LEDGER_DISAGREES`**, because no s
 *which* tree this is can be honest while the journal and the ledger describe two.
 
 **What is served anyway.** `GET /receipts/{tid}` answers **200** in the same second, with the same
-bytes it answered before the cut, and `GET /candidates/{id}` answers 200 as well. Nothing in either
+bytes it answered before the cut, and `GET /candidates/{id}` answers 200 as well — same 2026-08-22 R40 commit and single-run cut described in the section heading above. Nothing in either
 response says the project it came from is refusing every other question about itself.
 
 **This is deliberate, and it is the promise made elsewhere on this page.** A receipt is a signed

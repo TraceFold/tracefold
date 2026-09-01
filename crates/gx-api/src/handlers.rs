@@ -734,6 +734,11 @@ pub async fn get_candidate(State(state): State<AppState>, Segment(id): Segment<S
 
 /// `GET /transformations/{id}` → `{ transformation, state, receipt, superseded_by }` (44 §2.2).
 ///
+/// 🔴 The sentence above is 44 §2.2 L614's four members and is left standing; the wire carries
+/// **six**. `rollback` was added by R29 (`req/361` §3-1) and `inverse_status` by the ruling below,
+/// both under 44 §2.6's "a backward-compatible addition (a new optional field) is allowed within
+/// `/v1`". See the two members at the end of the body for what each one costs and does not answer.
+///
 /// # Errors
 /// `404 NOT_FOUND`.
 pub async fn get_transformation(
@@ -741,7 +746,7 @@ pub async fn get_transformation(
     Segment(id): Segment<String>,
 ) -> Answer {
     let id = transformation_id(&id)?;
-    let (transformation, lifecycle, superseded_by, rollback) = {
+    let (transformation, lifecycle, superseded_by, rollback, inverse_status) = {
         // 🔴 **DR-43-6 / `req/215` H-05** — read to the end of the log first, without the lock.
         let engine = state.engine_refreshed()?;
         (
@@ -750,6 +755,12 @@ pub async fn get_transformation(
             engine.superseded_by(&id).map(|t| t.0.to_text()),
             // 🔴 **R29 / `req/361` §3-1** — see the `rollback` member below.
             engine.rollback(&id).map(|r| r.kind()),
+            // 🔴 **Owner #260 / `req/987`** — see the `inverse_status` member below. Serialised
+            // here, inside the read, so the value and its spelling come from one borrow.
+            engine
+                .inverse_status(&id)
+                .and_then(|status| serde_json::to_value(status).ok())
+                .unwrap_or(serde_json::Value::Null),
         )
     };
     if lifecycle.is_none() && transformation.is_null() {
@@ -779,6 +790,48 @@ pub async fn get_transformation(
             // field) is allowed within `/v1`"), and DR-44-9's "no additions" predates the member's
             // existence and is silent about it. `null` where no roll-back was in question.
             "rollback": rollback,
+            // 🔴 **Owner #260 (relay ①, ruled with the TUI seat) / `req/987` §3-4 + §4-1** — 42
+            // §3.12's status of this row's escrowed inverse, on the **read face for one row** and
+            // not only on the list.
+            //
+            // `req/987` §3-4 measured the asymmetry in the source: `list.rs` has carried this key
+            // since M6H6-15 and this handler has never carried it, so *is this one still
+            // undoable* was answerable about a **page** and not about the **row**, and a client
+            // that already held an id had to fetch a list to learn a fact about a transformation
+            // it could name. A consent screen is exactly that client.
+            //
+            // 🔴 **What the comment on `list.rs`'s copy does and does not say.** It reads "Why on
+            // the **list** and not only on `GET /transformations/{id}`", which `req/987` §4-1 (b)
+            // read as *the absence here was intended*. It does not say that: it argues that the
+            // set-shaped question needs the list **as well**, and it presupposes the row face
+            // rather than excluding it. The absence was an omission wearing a justification, which
+            // is the same shape as R29's `rollback` — the ruling that put a member on two faces
+            // and left the third.
+            //
+            // 44 §2.6 permits the addition in the same words it permitted `rollback`'s, and it is
+            // the same value the list already publishes: the spelling here is `list.rs`'s
+            // (`serde_json::to_value`), deliberately, because `req/496` L-02 is this endpoint's
+            // own record of what it costs when one row read through two mouths of one surface
+            // answers two shapes. **`Consumed` therefore arrives as `{"Consumed":{"by":…}}` on
+            // both faces**, and not as the bare word `undo`'s refusal `detail` prints from
+            // `InverseStatus::kind()` — that is a sentence for a human, not a wire contract.
+            //
+            // 🔴 **What this member does not answer, stated rather than implied.** It says *whether*
+            // an inverse can still be run and never *what would come back* — no locator, no
+            // substrate, no digest of the escrowed bytes. `req/987` §4-2 designed that descriptor
+            // (`inverse: {substrate, locator, goal_cid}`) and it is **not** in this change: the
+            // three members it names are reachable only from the escrow row and the state table,
+            // which is a second read this handler does not take, and one of the three (`locator`)
+            // is `null` after a restart on the very rows whose status the Σ-shadow can still
+            // answer (`req/987` §3-8's asymmetry). A face that needs "what will be restored"
+            // before it asks for consent needs that descriptor and is not served by this member;
+            // that is a further ruling, and `req/987` is its reqdef.
+            //
+            // `null` for a transformation with **no escrow row at all** — `list.rs`'s own care,
+            // repeated here for its own reason: `Unavailable` means "`invert()` answered `None`"
+            // (42 §3.12), so writing it for a candidate that never reached T-10b would answer a
+            // question nobody asked. `null` here is `req/987` §4-3's E1 and nothing else.
+            "inverse_status": inverse_status,
         }),
     )
 }

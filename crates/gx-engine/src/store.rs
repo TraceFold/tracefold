@@ -466,6 +466,73 @@ impl Rollback {
     }
 }
 
+/// 🔴 **WM-2a (`req/1007` §4 item 2, `req/1010`)** — what the plan predicted the post-state would
+/// be, what the apply measured it to be, and the moment the two were compared.
+///
+/// # Why the kept promise needs a value at all
+///
+/// [`NotAttemptedBecause::PromisedPostStateWasWrong`] gave the **broken** promise a word
+/// (**R-1001-1**), and that left the arithmetic lopsided: a prediction that failed produced an
+/// abort, a rollback account and a cause, while a prediction that **held** produced nothing at
+/// all. A model whose hits are silent and whose misses are loud cannot be scored — every
+/// commit that kept its promise was indistinguishable, from outside the engine, from a commit
+/// that never made one. This value is the other half: the comparison is recorded whenever it is
+/// **taken**, and which way it came out is a property of the record rather than the reason it
+/// exists.
+///
+/// # `matched` is derived and not stored
+///
+/// [`PredictionOutcome::matched`] recomputes `predicted == observed` from the two digests the
+/// record already carries. A stored flag would be a third place the same fact lives, free to
+/// disagree with the two digests beside it; a derived one cannot go stale. The engine writes one
+/// record at one site for both outcomes, so there is also no second write site for the two to
+/// drift between.
+///
+/// # What `None` from [`Engine::prediction_outcome`] means — and what it does not
+///
+/// It is the **third value**, not a failure: no prediction was made (the adapter filled no
+/// `promised_target`, which is what every shipped adapter does), or this process is not the one
+/// that ran the commit. "The prediction was wrong" is `Some` with `matched() == false`, and
+/// collapsing the two would be this workspace's own first principle broken in its own instrument
+/// — the residue `docs/LIMITS.md` names for `NotAttemptedBecause` reads the same way here.
+///
+/// # Deliberately not a component of Σ
+///
+/// The same standing [`NotAttemptedBecause`] argues for itself, and for the same reason: no
+/// journal record carries this, nothing reads it to decide anything, and adding it costs an
+/// upgrader nothing. Making it a journal record would be a **journal-schema** change — 42 §3.13's
+/// enum, `JOURNAL_RECORD_KINDS`, `tests/journal_vocabulary.rs`'s fifteen and 47 §4's upgrade
+/// precondition — which is a ruling of its own and is raised in `req/1010` §8 item 1 rather than
+/// made here.
+///
+/// # The residue, declared rather than argued away
+///
+/// The map holding these grows with the transformations *this process* commits and is never
+/// evicted — exactly the lifetime `not_attempted_because` already has, mirrored rather than
+/// re-decided. A long-lived engine pays two digests and a timestamp per predicting commit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PredictionOutcome {
+    /// `Transformation.target` (41 §3), as `plan` fixed it — the prophecy.
+    pub predicted: Cid,
+    /// `AppliedDelta::resulting_digest`, as `apply` reported it — the measurement.
+    pub observed: Cid,
+    /// When the comparison was taken. The engine's `at`, not a clock read (the engine reads
+    /// neither clock nor entropy; `tests/engine_shape.rs` holds it to that).
+    pub observed_at: Timestamp,
+}
+
+impl PredictionOutcome {
+    /// Whether the world arrived where the plan said it would.
+    ///
+    /// `false` is the road [`NotAttemptedBecause::PromisedPostStateWasWrong`] describes from the
+    /// rollback's side; this says the same event from the model's side, and the two are written at
+    /// one site so they cannot disagree about which happened.
+    #[must_use]
+    pub fn matched(&self) -> bool {
+        self.predicted == self.observed
+    }
+}
+
 /// One line of the engine's write-ahead log (42 §3.13, 43 §3).
 ///
 /// **Fifteen variants**: 42 §3.13's eleven, plus the engine-internal records that write no

@@ -3,7 +3,7 @@
 
 # docs/
 
-Seven documents and three articles. Read them in the order below if you are new; jump straight to
+Eight documents and three articles. Read them in the order below if you are new; jump straight to
 [`LIMITS.md`](LIMITS.md) if what you want to know is what this project cannot do.
 
 ---
@@ -16,6 +16,7 @@ Seven documents and three articles. Read them in the order below if you are new;
 | [`RECOVERABILITY.md`](RECOVERABILITY.md) | What "reversible" is defined to mean, state by state — including the states from which a change cannot be put back. |
 | [`TRACEFOLD_TR.md`](TRACEFOLD_TR.md) | The technical report: the calculus, the encoding rules, and the receipt format in full. |
 | [`DEVELOPMENT_TREE_TESTS.md`](DEVELOPMENT_TREE_TESTS.md) | The taxonomy of the test probes, and what each family is actually measuring. |
+| [`API_SDK_LEDGER.md`](API_SDK_LEDGER.md) | What the public HTTP surface and the TypeScript SDK actually cover — a registry, not a pitch: one row per asset, where its number came from, and whether anything turns red if it drifts. |
 | `README.md` | This page. |
 
 ## Articles

@@ -156,6 +156,28 @@
 //! silent about it — the addition is ruled, not slipped past. `null` where no roll-back was in
 //! question, which is what keeps the refusal face's five-key census exact everywhere else.
 //!
+//! # 🔴 Owner #260 — `inverse_status` reaches the row face (`req/987`, ruled with the TUI seat)
+//!
+//! | shape | what this adds | why |
+//! |---|---|---|
+//! | `GET /transformations/{id}` | `inverse_status` (5 keys → 6) | the key has been on the **list** since M6H6-15 and never here, so *is this one still undoable* was answerable about a page and not about the row a client can already name |
+//!
+//! The same sentence of 44 §2.6, and the same shape of omission R29 repaired: a ruling taken on
+//! the set-shaped face, with the row-shaped face left behind. `list.rs`'s comment — "Why on the
+//! **list** and not only on `GET /transformations/{id}`" — argues for the list *as well as* the
+//! row and was mistaken for a decision to keep the row bare (`req/987` §4-1 (b) read it that way).
+//!
+//! **One face, not three, and the denominator says so.** The list already carries it and the
+//! stream has no arm that could: `inverse_status` is a fold over the escrow table plus a blob
+//! read, not a field of any journal record, so there is no value "already in the assembling
+//! function's hand" to stop dropping. The third face is *absent by construction* rather than
+//! *left behind*, which is the distinction R29's own lane says must be made out loud.
+//!
+//! **What it still does not answer**: *what* comes back. The descriptor `req/987` §4-2 specifies
+//! (`inverse: {substrate, locator, goal_cid}`) needs a second read this handler does not take and
+//! is not in this window; a consent face that must show the loss before it asks is not served by
+//! a status word alone.
+//!
 //! Two of these are deliberate refusals rather than additions, and both are censused as absences:
 //! **no `alg`** on `receipt_view` (33 NFR-011's closing note, `req/38` §109/§113 — the algorithm is
 //! the key's property and nothing alg-like may ride beside a signature) and **no verdict** of any
@@ -358,7 +380,20 @@ async fn the_admit_pipeline_answers_exactly_the_specified_key_sets() {
         // 🔴 **R29 / `req/361` §3-1** — `rollback` joins the four. 44 §2.6 allows a
         // backward-compatible addition inside `/v1`, and DR-44-9's "no additions" predates the
         // member and is silent about it.
+        //
+        // 🔴 **Owner #260 / `req/987`** — `inverse_status` joins the five, under the same sentence
+        // of 44 §2.6 and for the reason `req/987` §3-4 measured: the key has been on the **list**
+        // since M6H6-15 and was absent here, so a client holding one id had to read a page to
+        // learn whether that one row was still undoable. This census turning RED is the mechanism
+        // that made the addition visible rather than silent, exactly as the module header says.
+        //
+        // The expectation is **widened, not rewritten**: the five words above are unmoved and no
+        // arm that asserted them has been weakened. `req/38`-style note for a future reader — the
+        // rule that governs edits here is "a test may change only when a named, dated ruling has
+        // judged the behaviour it asserts to be a defect"; the previous expectation asserted no
+        // defect, it asserted a smaller wire, and this is the ruling that made the wire larger.
         &[
+            "inverse_status",
             "receipt",
             "rollback",
             "state",

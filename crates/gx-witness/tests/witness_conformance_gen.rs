@@ -99,6 +99,21 @@ fn conformance_gen_receipt_verify() {
     );
     let count = vectors_per_kind();
     let mut lines = Vec::with_capacity(count);
+    // Corpus-coverage flags, same idiom as `crates/gx-canon/tests/conformance_gen.rs`
+    // (`order_gap_covered` etc.) and `crates/gx-gate/tests/gate_conformance_gen.rs`
+    // (`law_true`/`law_false`): the receipt under test (`r_v` below) is drawn from
+    // `verdict_kind()`'s three-way `VerdictKind` space (Admit/Deny/Escalate -- `Escalate` is this
+    // project's "nobody here can say" / three-valued-Unknown branch, `crates/gx-core/src/
+    // verdict.rs` L52), but `is_admit` only records the Admit-vs-not-Admit boolean, so nothing
+    // upstream previously guaranteed the corpus actually contains a receipt drawn from each of the
+    // three branches (a run that happened to never draw `Escalate` for `r_v` would still pass
+    // silently). Likewise `proof_sound` is only genuinely exercised on both truth values if
+    // `inject_bogus` actually produces an unsound claim at least once. Tracked and asserted below.
+    let mut admit_covered = false;
+    let mut deny_covered = false;
+    let mut escalate_covered = false;
+    let mut proof_sound_true_covered = false;
+    let mut proof_sound_false_covered = false;
     for i in 0..count {
         let (
             mut entries,
@@ -142,6 +157,17 @@ fn conformance_gen_receipt_verify() {
         debug_assert_eq!(proof_sound, proof_sound_expected);
         let conclusion_should_hold = !(is_admit && proof_sound) || receipt_contains;
 
+        match r_v {
+            VerdictKind::Admit => admit_covered = true,
+            VerdictKind::Deny => deny_covered = true,
+            VerdictKind::Escalate => escalate_covered = true,
+        }
+        if proof_sound {
+            proof_sound_true_covered = true;
+        } else {
+            proof_sound_false_covered = true;
+        }
+
         let t1_contains = contains(&entries, t1, v1);
         let t2_contains = contains(&entries, t2, v2);
 
@@ -173,6 +199,46 @@ fn conformance_gen_receipt_verify() {
         });
         lines.push(vector);
     }
+    // Corpus-coverage gates (same idiom as `crates/gx-canon/tests/conformance_gen.rs`'s
+    // `order_gap_covered` and `crates/gx-gate/tests/gate_conformance_gen.rs`'s `law_true`/
+    // `law_false`, deterministic under the fixed seed): the receipt-under-test's `VerdictKind`
+    // must exercise all three branches, including `Escalate` (this project's three-valued
+    // "Unknown" branch), or a real class of receipts is silently absent from the differential
+    // corpus regardless of `is_admit`'s two-valued projection of it.
+    assert!(
+        admit_covered,
+        "no generated vector drew an Admit receipt -- the receipt_verify corpus does not \
+         exercise the Admit branch of VerdictKind"
+    );
+    assert!(
+        deny_covered,
+        "no generated vector drew a Deny receipt -- the receipt_verify corpus does not \
+         exercise the Deny branch of VerdictKind"
+    );
+    assert!(
+        escalate_covered,
+        "no generated vector drew an Escalate receipt -- the receipt_verify corpus does not \
+         exercise the Escalate (three-valued \"Unknown\"/undecided) branch of VerdictKind"
+    );
+    // proof_sound is T4's genuinely falsifiable half (module doc: "isolating the kind's
+    // differential-testable content to `ProofSound ∧ ... → contains`"); without both branches
+    // actually occurring, that half degenerates to always-true and stops testing anything.
+    assert!(
+        proof_sound_true_covered,
+        "no generated vector had proof_sound=true -- the receipt_verify corpus does not \
+         exercise the sound-claim branch"
+    );
+    assert!(
+        proof_sound_false_covered,
+        "no generated vector had proof_sound=false -- inject_bogus never produced a real \
+         unsound claim, so the receipt_verify corpus does not exercise T4's falsifiable half"
+    );
     write_jsonl(&conformance_dir(), "receipt_verify.jsonl", &lines);
-    println!("CONFORMANCE_GEN receipt_verify={}", lines.len());
+    println!(
+        "CONFORMANCE_GEN receipt_verify={} admit_covered={admit_covered} \
+         deny_covered={deny_covered} escalate_covered={escalate_covered} \
+         proof_sound_true_covered={proof_sound_true_covered} \
+         proof_sound_false_covered={proof_sound_false_covered}",
+        lines.len()
+    );
 }

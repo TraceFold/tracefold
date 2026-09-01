@@ -414,8 +414,9 @@ export interface CandidateView {
  */
 export type Rollback = "NotAttempted" | "Succeeded" | "Failed" | "Diverged";
 
-/** `GET /transformations/{id}` -> `{ transformation, state, receipt, superseded_by, rollback }`
- * (44 §2.2; `rollback` added by R29 under 44 §2.6's backward-compatible addition). */
+/** `GET /transformations/{id}` -> `{ transformation, state, receipt, superseded_by, rollback,
+ * inverse_status }` (44 §2.2; `rollback` added by R29 and `inverse_status` by Owner #260, both
+ * under 44 §2.6's backward-compatible addition). */
 export interface TransformationView {
   transformation: Record<string, unknown>;
   state: Lifecycle | null;
@@ -423,6 +424,14 @@ export interface TransformationView {
   superseded_by: TransformationId | null;
   /** 🔴 **R29 / `req/361` §3-1** -- `null` where no roll-back was in question. */
   rollback: Rollback | null;
+  /** 🔴 **Owner #260 / `req/987`** -- 42 §3.12's status of this row's escrowed inverse, the same
+   * value and the same spelling `TransformationRow` carries on the list. `null` for a
+   * transformation with no escrow row at all, which is the *only* thing `null` means here.
+   *
+   * It says **whether** an inverse can still be run and never **what would come back**: no
+   * locator, no substrate, no digest of the escrowed bytes. A consent screen that must show the
+   * loss before it asks needs the descriptor `req/987` §4-2 specifies, which is not on this face. */
+  inverse_status: InverseStatus | null;
 }
 
 /** `POST /candidates/{id}/verify` -> `200` (handler's actual body, wider than 44 §2.2's summary). */

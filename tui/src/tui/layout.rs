@@ -455,6 +455,17 @@ pub struct Plan {
     ///
     /// Nought for an opened record, which carries its own closing line and no legend.
     pub note_rows: usize,
+    /// The row budget [`window`] was actually asked for, before the item count capped it.
+    ///
+    /// 🔴 **Not recoverable from `window` alone** (`req/984` §10-33, independent audit
+    /// 2026-09-01): [`window`]'s own body is `items.min(capacity)`, so `window.rows <=
+    /// items.len()` always holds and a reader who compares `items.len()` against `window.rows`
+    /// to ask "was there spare room?" gets the same answer -- no -- every time, whether or not
+    /// there actually was. A caller that needs to know whether the region had rows to spare (for
+    /// example, whether a summary line can be added for free) has to be handed the number that
+    /// was capped, not the number that survived the cap. Nought for an opened record, the same as
+    /// [`note_rows`](Self::note_rows).
+    pub grid_capacity: usize,
 }
 
 impl Plan {
@@ -759,6 +770,57 @@ pub fn columns_for(width: u16) -> (Vec<Column>, Vec<&'static str>) {
     }
     dropped.extend(LEDGER_PAGE_KEYS);
     (drawn, dropped)
+}
+
+/// Whether every one of these already-resolved marks agrees, and what they agree on.
+///
+/// 🔴 **Layer-independent** (`req/984` §10-33): this has no idea which wire key, column width or
+/// terminal shape produced the strings, and it would answer the same question about a column of
+/// usernames or a column of exit codes. Fewer than two marks proves nothing repeats, so it answers
+/// [`None`] there even when the lone mark is not empty — the same ruling [`resolve_shared`] is
+/// built on, stated once rather than at each of its call sites.
+fn uniform(marks: &[String]) -> Option<&str> {
+    let (first, rest) = marks.split_first()?;
+    if rest.is_empty() || !rest.iter().all(|mark| mark == first) {
+        return None;
+    }
+    Some(first.as_str())
+}
+
+/// Split the columns [`columns_for`] already chose into the ones that vary across the rows a
+/// screen is about to draw and the ones every one of those rows already says the same thing —
+/// so the constant ones can be said once instead of on every row.
+///
+/// 🔴 **Hoists the draw, never the meaning** (`req/38` SS1019: 667 of 1,540 cells at 120x32 were
+/// exactly this repetition). `rows[r][c]` is already the exact text a cell would put on screen —
+/// `?` for an unknown, `--` for an absent one — so a hoisted column keeps whichever of the seven
+/// marks for nothing it was without this function ever having to know the seven exist; the
+/// distinction survives for free because two different marks are, by definition, not the one
+/// value [`uniform`] found agreement on.
+///
+/// A column of fewer than two rows, or whose marks disagree, is left in the first half of the
+/// return value untouched — so a caller that had no reason to hoist anything sees exactly the
+/// columns [`columns_for`] gave it, byte for byte, which is what keeps the twenty-five call sites
+/// that already read [`columns_for`] or [`Plan::columns`] unhurt by this function's existence
+/// (`req/984` §10-33: "resolve_shared() 新設で既存25 call site 無傷").
+///
+/// `rows` is addressed `rows[row][column_index]`, `column_index` matching `columns`'s order — the
+/// same order a caller already builds when it resolves one cell per column per row.
+#[must_use]
+pub fn resolve_shared(
+    columns: &[Column],
+    rows: &[Vec<String>],
+) -> (Vec<Column>, Vec<(&'static str, String)>) {
+    let mut kept = Vec::new();
+    let mut shared = Vec::new();
+    for (index, column) in columns.iter().enumerate() {
+        let marks: Vec<String> = rows.iter().map(|row| row[index].clone()).collect();
+        match uniform(&marks) {
+            Some(mark) => shared.push((column.key, mark.to_string())),
+            None => kept.push(*column),
+        }
+    }
+    (kept, shared)
 }
 
 /// How many rows a line of text needs at this width, word-wrapped.
@@ -1375,13 +1437,17 @@ pub fn resolve_attended(
         Subject::Grid => super::renderer::note_rows(attention.items.max(1), body_rows),
         Subject::Record | Subject::Help => 0,
     };
+    // 🔴 Held rather than only fed to `window` below: the cap `window` applies is exactly the
+    // fact a caller needs and cannot get back out of `Window` once applied (see
+    // `Plan::grid_capacity`'s own doc). Nought for the two shapes with no window, matching
+    // `Window::default()` below rather than leaking a number nothing was capped against.
+    let grid_capacity = match shape {
+        Subject::Record | Subject::Help => 0,
+        Subject::Grid => body_rows.saturating_sub(note_rows),
+    };
     let window = match shape {
         Subject::Record | Subject::Help => Window::default(),
-        Subject::Grid => window(
-            attention.selected,
-            attention.items,
-            body_rows.saturating_sub(note_rows),
-        ),
+        Subject::Grid => window(attention.selected, attention.items, grid_capacity),
     };
 
     // 🔴 **The second composition, and the only one there is.** The loop above settled how tall this
@@ -1445,6 +1511,7 @@ pub fn resolve_attended(
         truncated,
         window,
         note_rows,
+        grid_capacity,
     }
 }
 

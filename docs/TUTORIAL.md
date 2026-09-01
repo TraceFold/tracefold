@@ -134,7 +134,7 @@ gx --project . verify "$TID"
 {"kind":"Admit","transformation":"gx1:y7g4jmyxwobkywvgcdduu44qkvh7utjdft3akrtnjketrwxhdrsa","state":"Admitted","proof":{"policy_decisions":[{"policy_id":"fs-permit-default","decision":"Allow","diagnostics_digest":null}],"invariant_results":[],"evidence_digests":[],"composed_from":[],"proof_ref":null},"reasons":null,"enforced":true,"fail_posture_engaged":false,"ticket":null,"held_by":null,"record_only":false,"reverified":true,"receipt_stored_at":"./.gx/receipts/gx1_y7g4jmyxwobkywvgcdduu44qkvh7utjdft3akrtnjketrwxhdrsa.verdict.json"}
 ```
 
-`Admit` is one of three answers, and the shipped `fs` policy pack is what produced it:
+Confirmed by code reading, not a fresh CLI run, 2026-09-01 commit: `Admit` is one of three answers, and the shipped `fs` policy pack is what produced it:
 `fs-permit-default` allows, and `policies/fs/deny-etc.cedar` forbids anything under `/etc`. The
 other two are exit **2** (`Deny` — try the same walk with `--locator /etc/hostname`) and exit
 **4** (`Escalate`, which raises a ticket a person has to rule on with `gx escalation
@@ -232,7 +232,7 @@ gx --project . commit "$TID2" > /dev/null
 cat notes.md
 ```
 
-Every one of those four verbs exits **0**, and the last line prints:
+Confirmed by code reading, not a fresh CLI run, 2026-09-01 commit: every one of those four verbs exits **0**, and the last line prints:
 
 ```
 {"tool":"notes.write","arguments":{"contents":"hello"}}

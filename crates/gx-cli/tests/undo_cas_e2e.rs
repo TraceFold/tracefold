@@ -343,6 +343,12 @@ fn every_refusal_variant_owns_one_row_and_its_code_is_one_44_declares() {
         gx_engine::UndoRefusal::WitnessMissing {
             missing: gx_engine::WitnessMissing::NoReceipt,
         },
+        // 🔴 **DR-46-47 (`req/973` §9-3)** — the twelfth judged row. A re-plan of a `T_u` still
+        // seated as a `Candidate` used to be answered with the **first** call's journalled
+        // disposition, which since DR-46-45 is what T-11 signs. It mints no code and no number: the
+        // row takes `already-planned`'s, and that is what this test's second and third properties
+        // check rather than take on trust.
+        gx_engine::UndoRefusal::WitnessDiffers,
     ];
     let named: Vec<&str> = variants
         .iter()
@@ -417,11 +423,20 @@ fn the_table_declares_the_two_rows_it_does_not_judge() {
             row.reason
         );
     }
+    // 🔴 ~~13 — **eleven** judged plus two declared, since R3 added `witness-missing`
+    // (`req/38` §160 ruling 2).~~ The number is the ratchet and it worked exactly as written: this
+    // assertion is what stopped **DR-46-47** from adding a row without a decision about which kind
+    // it is. The ruling that moves it is `req/973` §9-3's DR-46-47 (filed 2026-08-31, repaired
+    // 2026-09-01), which mints `witness-differs` as a **judged** row taking `already-planned`'s
+    // `gx_code`, exit status and HTTP status — so the count moves and the *shape* of the table does
+    // not. The struck number is kept because it is the true record of the era `req/216`/`req/222`
+    // describe.
     assert_eq!(
         UNDO_REFUSALS.len(),
-        13,
-        "🔴 **eleven** judged plus two declared, since R3 added `witness-missing` (`req/38` §160 \
-         ruling 2). A row added without a decision about which it is would change this number"
+        14,
+        "🔴 **twelve** judged plus two declared, since DR-46-47 (`req/973` §9-3) added \
+         `witness-differs`. A row added without a decision about which it is would change this \
+         number"
     );
 }
 

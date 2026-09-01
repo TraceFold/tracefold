@@ -686,12 +686,162 @@ pub fn verdict(object: &serde_json::Value) -> VerdictMark {
     }
 }
 
+/// The wire's key for what became of the escrowed inverse.
+pub const INVERSE_STATUS_KEY: &str = "inverse_status";
+
+/// The six words the engine spells as bare strings, in the order `crates/gx-engine/src/store.rs`
+/// declares them, minus the one that is not a bare string.
+///
+/// 🔴 Read out of `InverseStatus` and repeated here as **strings**, for the reason
+/// [`VERDICT_KINDS`] is: naming the engine's enum in this directory would put its crates back
+/// inside the membrane for the sake of six words. `Consumed` is deliberately absent from this
+/// array — it is the one variant carrying a member, so it arrives as an object and never as one of
+/// these ([`InverseMark::Consumed`]).
+///
+/// 🔴 `Expired` is in the array and **has no writer**: `store.rs` says so in its own words
+/// ("DR-9 puts enforcement of the deadline in the commercial tier"), and `lifecycle_transitions.rs`
+/// asserts the absence. A word this face can draw and this engine does not yet send is not the same
+/// fact as a word that will never come, so it stays in the vocabulary and the disclosure carries
+/// the difference rather than the array dropping it.
+pub const INVERSE_KINDS: [&str; 6] = [
+    "Available",
+    "Expired",
+    "Unavailable",
+    "Pending",
+    "BodyMissing",
+    "Undetermined",
+];
+
+/// The tag the one variant with a member arrives under.
+pub const CONSUMED_KIND: &str = "Consumed";
+/// The member it carries: which transformation used the inverse up.
+pub const CONSUMED_BY_KEY: &str = "by";
+
+/// What the `inverse_status` column draws: one of the six words, the seventh with its member, or
+/// one of the three kinds of nothing that can stand in for all of them.
+///
+/// 🔴 **Ten states, and the reason they are ten** (`req/924` §TUI-13 追記). Two of them belong to
+/// the reading rather than to the row — not measured yet, and measured and not knowable — and eight
+/// are shapes the wire can carry: `null` and the seven variants. Collapsing any pair of the ten is
+/// the same breach in the small that this product refuses in the large, and one pair in particular
+/// was collapsed here until this type existed (see [`inverse_status`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InverseMark {
+    /// No word arrived, in the kind of nothing that was there instead.
+    Nothing(Nothing),
+    /// One of [`INVERSE_KINDS`], spelled the engine's way.
+    Kind(&'static str),
+    /// The inverse was used up, and by which transformation.
+    Consumed {
+        /// The `by` member, whole. The reason this variant exists rather than falling through to
+        /// [`InverseMark::Other`]: an object drawn by [`cell`] becomes the JSON text of itself, and
+        /// a cell fourteen wide cuts that to `{"Consumed":{~` — which spends the whole column on
+        /// punctuation and loses the only fact the object was carrying.
+        by: String,
+    },
+    /// A word this face's vocabulary does not hold. Drawn as it arrived, for the reason
+    /// [`VerdictMark::Other`] is: an engine that grows an eighth word should make this face look
+    /// out of date, not make it lie.
+    Other(String),
+}
+
+impl InverseMark {
+    /// What is drawn in the cell.
+    ///
+    /// 🔴 `Consumed` is spelled as **two words** rather than as its serialisation. A cell narrower
+    /// than the whole of it is cut by the same rule and marked with the same character as the id
+    /// column, which is already cut at every width this face draws; what a reader must never see is
+    /// a column that says `Consumed` and hides that a transformation is named behind it.
+    #[must_use]
+    pub fn mark(&self) -> String {
+        match self {
+            InverseMark::Nothing(nothing) => nothing.mark().to_string(),
+            InverseMark::Kind(kind) => (*kind).to_string(),
+            InverseMark::Consumed { by } => format!("{CONSUMED_KIND} {by}"),
+            InverseMark::Other(text) => text.clone(),
+        }
+    }
+
+    /// The paint role it is drawn in.
+    ///
+    /// 🔴 The seven words for a value all resolve to [`super::tokens::Role::Body`], and that is a
+    /// decision rather than an omission: `Unavailable`, `BodyMissing` and `Undetermined` read as
+    /// bad news and a hue would say so, but the ten states are told apart by their spelling on
+    /// `mono`, where there is no hue at all. A meaning carried by colour is a meaning one tier
+    /// loses.
+    #[must_use]
+    pub fn role(&self) -> super::tokens::Role {
+        match self {
+            InverseMark::Nothing(nothing) => nothing.role(),
+            InverseMark::Kind(_) | InverseMark::Consumed { .. } | InverseMark::Other(_) => {
+                super::tokens::Role::Body
+            }
+        }
+    }
+}
+
+/// Classify one row's `inverse_status`.
+///
+/// 🔴 **The one key on these four routes where `null` is not [`Nothing::Unknown`].** [`cell`]'s
+/// general rule is right for every other key it is asked about and wrong for this one, and the
+/// engine says so in its own source: `crates/gx-api/src/list.rs` writes `null` here for "a
+/// transformation with **no escrow row at all**", and names the confusion it is avoiding —
+/// `InverseStatus::Unavailable` already means "`invert()` answered `None`". So the wire carries
+/// three different facts that a careless face draws as one:
+///
+/// * `null` — **there is no escrow row**. Nobody to ask. [`Nothing::Absent`], whose mark is
+///   documented as "a line where nothing was ever written".
+/// * `"Unavailable"` — asked, and the adapter built no inverse. A **value**, spelled as the word.
+/// * a reading that failed — [`Nothing::Unknown`], and it is [`Reading::nothing`] that produces it,
+///   one layer above this function.
+///
+/// Before this function, the first of those three was drawn `?` — the same mark as the third. A
+/// reader could not tell "this transformation never escrowed anything" from "this face could not
+/// read the list", which is the collapse the seven words exist to refuse, committed on the one
+/// column whose subject is whether an undo is still possible.
+///
+/// 🔴 **Declared and not distinguished**: a key the object does not carry at all also draws
+/// [`Nothing::Absent`] here. A server older than `M6H6-15` sends no `inverse_status` member, and
+/// this face spells that the same way it spells `null`. The two are different facts — *this server
+/// does not have the field* and *this row has no escrow* — and nothing on this screen tells them
+/// apart. It is written down rather than hidden, and the road to telling them apart is
+/// `GET /v1/healthz`'s `engine_version`, which this face already draws.
+#[must_use]
+pub fn inverse_status(object: &serde_json::Value) -> InverseMark {
+    let Some(value) = object.get(INVERSE_STATUS_KEY) else {
+        return InverseMark::Nothing(Nothing::Absent);
+    };
+    if value.is_null() {
+        return InverseMark::Nothing(Nothing::Absent);
+    }
+    if let serde_json::Value::Object(map) = value {
+        if let Some(consumed) = map.get(CONSUMED_KIND) {
+            return match consumed.get(CONSUMED_BY_KEY).and_then(|by| by.as_str()) {
+                Some(by) if !by.is_empty() => InverseMark::Consumed { by: by.to_string() },
+                // The tag arrived and the member did not. Drawn as it arrived rather than as a bare
+                // `Consumed`: a face that quietly spells the tag alone would be reporting the shape
+                // it expected instead of the shape it was sent.
+                _ => InverseMark::Other(value.to_string()),
+            };
+        }
+    }
+    match cell(object, INVERSE_STATUS_KEY) {
+        Cell::Nothing(nothing) => InverseMark::Nothing(nothing),
+        Cell::Value(text) => INVERSE_KINDS
+            .into_iter()
+            .find(|kind| *kind == text)
+            .map_or(InverseMark::Other(text), InverseMark::Kind),
+    }
+}
+
 /// Classify one key of one JSON object.
 ///
 /// 🔴 The two lines this function exists to hold:
 /// * a key the object does not have is [`Nothing::Absent`]; a key it has with `null` is
 ///   [`Nothing::Unknown`]. On these routes `null` means "this process does not hold the body"
 ///   (`crates/gx-api/src/list.rs`), which is measured-and-unknowable and not never-written.
+///   🔴 The one exception is [`INVERSE_STATUS_KEY`], which has a classifier of its own and does not
+///   reach this arm — see [`inverse_status`] for the sentence in `list.rs` that makes it one.
 /// * `false` is [`Nothing::False`] and never [`Nothing::Unknown`]. Collapsing a three-valued answer
 ///   into two is the first-principle breach this product exists to refuse.
 #[must_use]
