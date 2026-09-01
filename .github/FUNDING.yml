@@ -1,4 +1,5 @@
-# Funding channel for TraceFold (pay-what-you-want via Polar).
-# The `polar:` platform field is deliberately NOT used: it renders the org slug,
-# which is a retired handle. The opaque checkout URL below carries no handle.
-custom: ["https://buy.polar.sh/polar_cl_yO81NsWT1zDnCzfulaArcrpnS5GuPW5ac3gxf29LgLa"]
+# Funding channel for TraceFold (pay-what-you-want via Stripe).
+# Switched from Polar to Stripe on 1 Sep 2026 (Polar checkout account's
+# onboarding was not finishing). Stripe has no dedicated FUNDING.yml
+# platform key, so this stays under `custom:` same as the prior Polar link.
+custom: ["https://buy.stripe.com/8x214mbkU2pu5yneyk97G00"]
