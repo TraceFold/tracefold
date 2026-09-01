@@ -18,7 +18,7 @@ See the Scope Exclusions table below and [docs/LIMITS.md](docs/LIMITS.md) for wh
 <a href="lean/"><img src="https://img.shields.io/badge/Lean%204-154%20Theorems-00dfd8?style=for-the-badge&logoColor=090a0f" alt="Lean 4 Proofs"></a>
 <a href="mailto:mahirohirakawa@glovrex.com"><img src="https://img.shields.io/badge/Contact-mahirohirakawa%40glovrex.com-26231f?style=for-the-badge&logo=minutemailer&logoColor=ffffff" alt="Email"></a>
 <a href="https://discord.gg/rtvXqYEQzr"><img src="https://img.shields.io/badge/Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=ffffff" alt="Discord"></a>
-<a href="https://buy.polar.sh/polar_cl_yO81NsWT1zDnCzfulaArcrpnS5GuPW5ac3gxf29LgLa"><img src="https://img.shields.io/badge/Support-Pay%20what%20you%20want-ff4f00?style=for-the-badge&logo=polar&logoColor=ffffff" alt="Support Tracefold"></a>
+<a href="https://buy.stripe.com/8x214mbkU2pu5yneyk97G00"><img src="https://img.shields.io/badge/Support-Pay%20what%20you%20want-635bff?style=for-the-badge&logo=stripe&logoColor=ffffff" alt="Support Tracefold"></a>
 </p>
 
 </div>
@@ -149,6 +149,7 @@ full, dated detail (checked current as of 2026-09-01).
 - **Foundational Paper**: [*A Mechanical World Model for Agents* (DOI: 10.5281/zenodo.22168558)](https://doi.org/10.5281/zenodo.22168558).
 - **Formal Verification Spec**: Machine-checked Lean 4 theorem suite: [lean/README.md](lean/README.md).
 - **Exclusion Taxonomy**: Test-enforced scope boundaries and limits: [docs/LIMITS.md](docs/LIMITS.md).
+- **Adapter Guide**: What it takes to connect a new substrate to the escrow gate, measured cost, and what conformance requires: [docs/ADAPTER_GUIDE.md](docs/ADAPTER_GUIDE.md).
 - **Error Classification**: Error taxonomy and exit code specifications: [docs/ERROR_TAXONOMY.md](docs/ERROR_TAXONOMY.md).
 - **Recoverability Mechanics**: Reversible execution state definitions: [docs/RECOVERABILITY.md](docs/RECOVERABILITY.md).
 - **Development Tree Tests**: Full-spectrum test probe taxonomy: [docs/DEVELOPMENT_TREE_TESTS.md](docs/DEVELOPMENT_TREE_TESTS.md).
@@ -170,9 +171,9 @@ Everything shipped here is free — verification, receipts, self-hosting — and
 
 If you want to fund the work anyway, there is exactly one channel:
 
-**[Support TraceFold — pay what you want, via Polar](https://buy.polar.sh/polar_cl_yO81NsWT1zDnCzfulaArcrpnS5GuPW5ac3gxf29LgLa)**
+**[Support TraceFold — pay what you want, via Stripe](https://buy.stripe.com/8x214mbkU2pu5yneyk97G00)**
 
-Disclosure (1 Sep 2026): the payment account's onboarding is not yet finished, so a checkout may fail to complete. Nothing is promised in return either way. This section will be updated when that changes.
+Changed from Polar to Stripe on 1 Sep 2026 (the Polar checkout account's onboarding was not finishing). Nothing is promised in return either way.
 
 ---
 
