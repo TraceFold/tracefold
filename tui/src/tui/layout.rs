@@ -227,6 +227,38 @@ pub const REGIONS: [Region; 4] = [
     },
 ];
 
+/// The regions that do **not** scroll: the standing chrome, declared in one place so a gate reads
+/// the declaration rather than a row number.
+///
+/// 🔴 **One, and it was five rows across three regions** (`req/924` §TUI-57, `req/38` SS1088, Owner
+/// `#282-T`). The Owner's reference faces — `Claude Code`, `OpenClaw CLI` — keep **no fixed header
+/// at all**: the body scrolls whole and one row at the bottom stands. The top rail is gone, and the
+/// grid's column header and its `these N` clause are content rows at the head of the scrolling
+/// stream rather than pinned chrome.
+///
+/// The predicate is *which region draws the row*, not *which row index it is*, because a row number
+/// is a fact about one terminal size and this has to hold at all of them.
+pub const FIXED_REGIONS: [RegionRole; 1] = [RegionRole::Disclosure];
+
+/// The regions that stand down **by ruling** rather than by running out of rows.
+///
+/// 🔴 The distinction is [`Shape::provenance_stood_down`]'s, one region wider (`req/924` §TUI-29):
+/// *cut for room* and *has nothing left to say* are different facts and get different clauses.
+/// These two are a third thing again — *ruled off the standing frame* — and what each of them was
+/// carrying has a declared destination:
+///
+/// * `apparatus`: the page's address and the engine's own line. The address goes behind `?`
+///   (§TUI-57: a signpost is enough once and the complete address is a detail); `status ok` and
+///   `ledger_agrees yes` were furniture on every healthy frame by §TUI-29's own test, and they are
+///   spelled in full in the hatch by `super::renderer::help_lines`.
+/// * `provenance`: the four measured facts and the connection. The connection becomes the dot on
+///   the standing row ([`super::live::LinkReport::dot`]); the four facts and the counts are the
+///   hatch's [`Plan::provenance_full`], and the disclosure spells the road to them.
+///
+/// 🔴 Being ruled off is **not** being deleted. `§TUI-21` is the rule that a road has to arrive, and
+/// gate `g76` is what confirms it does rather than this comment being believed.
+pub const STOOD_DOWN_REGIONS: [RegionRole; 2] = [RegionRole::Apparatus, RegionRole::Provenance];
+
 /// One column of the subject table.
 #[derive(Clone, Copy, Debug)]
 pub struct Column {
@@ -382,6 +414,15 @@ pub struct Measured {
     /// drives — whether the provenance region has anything left to say — must not move when it is.
     /// Two readings of one measurement, and only one of them is a string.
     pub all_200: bool,
+    /// Whether both of the engine's claims about itself hold: `status ok` and `ledger_agrees yes`.
+    ///
+    /// 🔴 A bool beside [`Measured::engine`] for the reason [`Measured::all_200`] is one beside
+    /// `statuses`. `req/924` §TUI-29's test — *does this row change the reader's next act when
+    /// everything is normal?* — is now the thing that decides whether the one standing row spends
+    /// cells on the engine at all, and a decision that important may not be a `len() == 1` on a
+    /// vector composed for a reader. `super::renderer::engine_line` is where it is measured, which
+    /// is the one place that reads the two words the fold turns on.
+    pub healthy: bool,
     /// The columns whose every value in this reading is a mark for nothing.
     ///
     /// 🔴 **`req/924` §TUI-45 (`req/38` SS1076, Owner `#275-T`): a column that says nothing on every
@@ -420,12 +461,17 @@ impl Measured {
     #[must_use]
     pub fn long(&self) -> String {
         format!(
-            "{} {} routes {} | worst {}ms | {} | {}",
+            "{} {} routes {} | worst {}ms | {} | {} | {}",
             self.link.link.mark(),
             self.routes,
             self.clock(),
             self.worst_ms,
             self.statuses,
+            // 🔴 **When something last arrived** (`req/38` SS1085, `req/924` §TUI-57). The dot on
+            // the standing row says *live* or *quiet*; the sentence that says **how** quiet is
+            // spelled here, which is the one screen a reader reaches it on. `§TUI-21` is why gate
+            // `g76` confirms this line is actually on the hatch rather than trusting this comment.
+            self.link.silence(),
             // 🔴 The long form of the link, and it is **kept** although shortening it is the last
             // easy cell on this row. `LIVE_BADGE` is Owner #227's ruling — a face that says `LIVE`
             // must say *whose* events it counts — and this lane has no ruling that reverses it.
@@ -585,6 +631,37 @@ pub struct Plan {
     /// vacancy is a property of the reading rather than of the shape being drawn, and a reader who
     /// pressed `?` is asking about the grid they came from.
     pub vacant_fields: Vec<(&'static str, String)>,
+    /// The one standing row, cell by cell: where the reader is, the keys, the connection's dot, and
+    /// what is not on the screen.
+    ///
+    /// 🔴 **Four lines became one** (`req/924` §TUI-57). They are cells rather than one string
+    /// because the dot carries a paint role of its own — six of them
+    /// ([`super::live::LinkReport::dot`]) — and a role cannot travel inside a `String`. The same
+    /// reason [`Plan::heading`] is a `Vec<HeadingCell>`.
+    pub status: Vec<HeadingCell>,
+    /// The note the standing row carries: where the reader is, the keys, and the count of keys it
+    /// folded away.
+    ///
+    /// 🔴 Held beside [`Plan::status`] rather than dug back out of it, for the reason
+    /// [`Plan::disclosure`] is held beside it: the two are what the row is **composed from**, and a
+    /// caller that had to find the note by index would be re-deriving a decision this module made.
+    /// `status` is the same three strings with their paint roles attached and is what the region
+    /// draws; a gate that wants the words asks for them here.
+    pub note: String,
+    /// How many rows the grid puts above its records in the scrolling stream: the column header,
+    /// and the `all N` clause when there is one.
+    ///
+    /// 🔴 **They are content, not chrome** (`req/924` §TUI-57). Both are derived from the records —
+    /// the header names the columns *this reading* has, the clause states what *these records*
+    /// agree on — so pinning them would be a region growing its own chrome out of its content, the
+    /// defect `super::renderer::note_rows` was written against. They sit at the head of the stream
+    /// and scroll away like any other row.
+    pub preamble: usize,
+    /// How many of those rows are still on the screen at this scroll position.
+    ///
+    /// Nought once the reader has moved far enough down the ledger, which is what makes them
+    /// scrolling content rather than a fixed header, and what gate `g73` measures.
+    pub preamble_shown: usize,
 }
 
 impl Plan {
@@ -595,6 +672,20 @@ impl Plan {
             .iter()
             .find(|(r, _)| *r == role)
             .map_or(0, |(_, n)| *n)
+    }
+
+    /// How many rows of this frame do not scroll.
+    ///
+    /// 🔴 Read from [`FIXED_REGIONS`] rather than restated, so the number and the declaration cannot
+    /// drift. Gate `g73` asserts this is at most one at every ruled shape; the declaration is what
+    /// it reads, and the behaviour it reads beside it is [`Plan::preamble_shown`] falling to nought.
+    #[must_use]
+    pub fn fixed_rows(&self) -> u16 {
+        self.rows
+            .iter()
+            .filter(|(role, _)| FIXED_REGIONS.contains(role))
+            .map(|(_, n)| *n)
+            .sum()
     }
 }
 
@@ -840,6 +931,13 @@ pub struct Attention {
     pub selected: usize,
     /// How many records the read carried.
     pub items: usize,
+    /// How far the reader has moved the face, as against the attention
+    /// ([`super::acts::View::glide`], `req/924` §TUI-62 裁定3).
+    ///
+    /// A third member rather than a fourth argument, for the reason the two above it travel
+    /// together: a plan is resolved for a reading, for a reader, and now for where that reader has
+    /// pushed the stream.
+    pub glide: isize,
 }
 
 /// Which records fit, and which one the window starts at.
@@ -874,6 +972,88 @@ pub fn window(selected: usize, items: usize, capacity: usize) -> Window {
     };
     Window { first, rows }
 }
+
+/// The same question over a stream that has `preamble` content rows in front of the records.
+///
+/// 🔴 **`req/924` §TUI-57's third ruling, and the whole of it.** The Owner withdrew the seat's
+/// refusal of a wholly scrolling body: the reference faces keep no fixed header, so the grid's
+/// column row and its `all N` clause stop being pinned and become the first rows of one stream.
+/// From here on there is a single content list — `preamble` rows, then the records — and one
+/// viewport over it.
+///
+/// Returns how many of the preamble rows are still visible and which records are drawn. The two
+/// answers come from one arithmetic, which is why they are one function: computing them separately
+/// is how a screen comes to draw a header it did not budget a row for.
+///
+/// 🔴 It stays a **function of the state** rather than a remembered scroll offset, exactly as
+/// [`window`] is: the top is derived from where the attention is standing, so no act had to learn
+/// about it and there is nothing to fall out of step with.
+/// 🔴 `glide` is the reader's own offset (`req/924` §TUI-62 裁定3): **positive moves the content
+/// up**, which is what scrolling down does in the face the ruling names. It is added to the answer
+/// the attention would have produced and then clamped here — the only place that knows both how
+/// tall the stream is and how tall the region is.
+#[must_use]
+pub fn scrolled(
+    selected: usize,
+    items: usize,
+    preamble: usize,
+    height: usize,
+    glide: isize,
+) -> (usize, Window) {
+    if height == 0 {
+        return (0, Window { first: 0, rows: 0 });
+    }
+    let total = preamble + items;
+    if items == 0 {
+        return (preamble.min(height), Window { first: 0, rows: 0 });
+    }
+    // Where the attended record sits in the stream, counting the preamble.
+    let attended = preamble + selected.min(items - 1);
+    // The least the stream has to move for the attention to be on the screen. `+1` because the
+    // attended row is inside the window, not the row after it.
+    let top = if attended < height {
+        0
+    } else {
+        attended + 1 - height
+    };
+    // 🔴 And never past the end: at the bottom of a short ledger the stream stops rather than
+    // scrolling blank rows up under the reader. `saturating_sub` answers nought when the whole
+    // stream fits, which is the case where the header is on the screen at every position.
+    let ceiling = total.saturating_sub(height);
+    let top = top.min(ceiling);
+    // The reader's own push, on top of that, clamped to the stream. With `glide` at nought this is
+    // the identity and the window is exactly the function of the state it has always been.
+    let top = (top as isize)
+        .saturating_add(glide)
+        .clamp(0, ceiling as isize) as usize;
+    let shown = preamble.saturating_sub(top);
+    let first = top.saturating_sub(preamble);
+    let rows = (items - first).min(height - shown);
+    (shown, Window { first, rows })
+}
+
+/// The cells between one column and the next, and before the first.
+///
+/// 🔴 **`req/924` §TUI-62 裁定3, 余裕** (`req/38` SS1093, Owner `#284-T`): *a terminal has no line
+/// height, so the room is made in the column gap and the left margin.* Two constants and not a
+/// number typed into four places — `columns_for_less` prices a column against the gap,
+/// `super::renderer::spans` draws it, `header_width` measures it and the margin is charged to the
+/// width the plan is resolved against. A second spelling is how a row comes to be composed at one
+/// width and drawn at another, which [`FRAME_MARGIN`] is declared once to prevent.
+pub const COLUMN_GAP: u16 = 2;
+
+/// The cells before the first column of every row of the ledger.
+pub const LEFT_MARGIN: u16 = 1;
+
+/// How many records share one group before the next rule.
+///
+/// 🔴 **`req/924` §TUI-62 裁定3, 区切り**: *a rule every N rows, or a blank line between groups.*
+/// Neither is free — a blank row costs a record and a rule row costs a record — so this face draws
+/// the rule **as an underline on the last row of each group**, which is the one form of a horizontal
+/// line a terminal can draw without spending a row on it. Ink added: **nought**; rows given up:
+/// **nought**. The chrome budget is reported either way, because the ruling asked for the
+/// measurement rather than for the answer.
+pub const GROUP_ROWS: usize = 5;
 
 /// Which rung of the provenance ladder the width bought.
 ///
@@ -969,10 +1149,14 @@ pub fn columns_for_less(width: u16, vacant: &[&'static str]) -> (Vec<Column>, Ve
             dropped.push(column.key);
             continue;
         }
+        // 🔴 The gap is [`COLUMN_GAP`] and the row starts [`LEFT_MARGIN`] cells in
+        // (`req/924` §TUI-62 (`req/38` SS1093, Owner `#284-T`, 2026-09-01)). It was one cell, hard-typed here and in
+        // `super::renderer::spans`; the ruling asks for room and the room has to be priced where
+        // the columns are chosen or the row is composed at one width and drawn at another.
         let cost = if drawn.is_empty() {
-            column.width
+            column.width + LEFT_MARGIN
         } else {
-            column.width + 1
+            column.width + COLUMN_GAP
         };
         if overflowed || used + cost > width {
             overflowed = true;
@@ -1188,40 +1372,34 @@ struct Shape<'a> {
     /// the keys it folded when it *is* drawn, and this is what discloses **all** of them when it is
     /// not (`req/988` §3-2).
     keys_not_drawn: usize,
-    /// Whether the top rail spelled [`LEDGER_ADDRESS`] in full on this screen.
+    /// The engine's own line, spelled in full, exactly when one of its two claims has stopped
+    /// holding.
     ///
-    /// 🔴 **The address is spelled once and this is how the second spelling is refused**
-    /// (`req/924` §TUI-22: `GET` was on the screen five times). The rule is the one already
-    /// written into `super::renderer::Rung::keeps` — *what a line gives up may be given up only if
-    /// the same screen spells it somewhere else* — read from the other end: this clause is
-    /// **added** only when nothing above it carried the address. At the shapes where the apparatus
-    /// is let go of by its declared priority, or where the rail was too narrow to hold the address,
-    /// that is exactly what happens, so gate g40's property still holds.
-    address_above: bool,
-    /// Whether the ledger's enclosure is drawn at this shape.
-    ///
-    /// 🔴 A renderer cannot `invert`, so what it owes is to name what it let go of, and the
-    /// enclosure carries meaning: it is what says where the ledger begins and ends now that no row
-    /// spells `screen: apparatus subject provenance disclosure`. Dropping it at a width that cannot
-    /// hold it is right; dropping it **silently** is the one drop this face is not allowed to make.
-    framed: bool,
-    /// How many of the engine's own keys the top rail had no cells for.
-    ///
-    /// 🔴 **The caveat clause, and it exists because the first cut of this lane lost one.**
-    /// `req/924` §TUI-22 classified `status ok` and `ledger_agrees yes` as things that may be
-    /// folded and may **not** be discarded; the rail is one row and at four of the seven measured
-    /// shapes `ledger_agrees yes` went off the right edge behind a `~` with no line saying so.
-    /// A marked cut is better than a silent one and it is still not disclosure.
-    engine_dropped: usize,
-    /// Whether the provenance region stood down because every route answered `200`.
-    ///
-    /// 🔴 Not the same fact as being in `dropped_regions` (`req/924` §TUI-29). That list is for a
-    /// region the ladder gave up because the screen ran out of rows; this is a region that left
-    /// because it had nothing left to report. *Cut for room* and *nothing to say* are different
-    /// facts — the distinction the seven words for nothing exist to keep — so they get different
-    /// clauses, and this one carries the road to the line in full.
-    provenance_stood_down: bool,
+    /// 🔴 **The other half of `req/924` §TUI-29, and this lane shipped the first half without it.**
+    /// The ruling is *fold to one word while everything is normal, and expand the moment either
+    /// claim stops holding, with `status_reason` in front*. The fold moved to the dot and the
+    /// expansion had nowhere to go, so an engine answering `ledger disagrees` drew no reason on any
+    /// row — caught by gate `g59`, which had been written for exactly this and was measuring the
+    /// rail. Empty while the engine is well, which is what keeps it out of the standing row's cells
+    /// on every normal frame.
+    engine_caveat: &'a str,
 }
+
+// 🔴 **Three members left this description with `req/924` §TUI-57, and where each one went is
+// recorded here rather than deleted** (`INHERITED_PRINCIPLES` no-delete, and SS842: a reduction
+// pass takes the caveats out with the padding unless the caveat is *moved*):
+//
+// * `address_above` — whether the top rail spelled [`LEDGER_ADDRESS`]. There is no top rail. The
+//   complete address is a detail and lives behind `?` (§TUI-57), so the clause below carries a
+//   road (`keys_address`) instead of a second spelling of the address. Gate `g75` is what refuses
+//   a second spelling now, and `g76` is what confirms the hatch really carries the first.
+// * `framed` — whether the ledger's enclosure was drawn. An enclosure needs two rails and there is
+//   one row; the corners went with the rail. Nothing the corners deleted has come back, so their
+//   absence destroys no fact — which is the test §TUI-22 admitted them under, read backwards.
+// * `provenance_stood_down` — the provenance region stands down **by ruling** now
+//   ([`STOOD_DOWN_REGIONS`]) rather than per frame, and §TUI-29's own test is why that clause is
+//   not on the standing row: a sentence true on every frame forever changes no reader's next act.
+//   `super::renderer::help_lines` spells the region, its intent and its line in full.
 
 /// The disclosure line, in whichever of its two forms fits.
 ///
@@ -1248,19 +1426,24 @@ fn compose_disclosure(
         keys_address,
         wide_address,
         keys_not_drawn,
-        address_above,
-        framed,
-        engine_dropped,
-        provenance_stood_down,
+        engine_caveat,
     } = shape;
-    // 🔴 One spelling of the page's address on the whole screen (`req/924` §TUI-22). Empty when the
-    // top rail is carrying it, which is every shape wide enough to hold it with the apparatus drawn.
-    let road = if address_above {
-        String::new()
-    } else {
-        format!(" | {LEDGER_ADDRESS}")
-    };
+    // 🔴 **No road on this clause, and the address is not here either** (`req/924` §TUI-57,
+    // `req/38` SS1088, Owner `#282-T`). `GET /v1/transformations` was on this screen once and the
+    // ruling moves it behind `?`: *a signpost is enough once, and the complete address is a
+    // detail*. The road is spelled once on this line — the routes clause below ends `-> {keys}` —
+    // and §TUI-21's own words are why it is not spelled twice: **a signpost printed twice is not
+    // two signposts**, and on a row this face now has exactly one of, ten cells is the difference
+    // between the key legend spelling four acts and spelling two.
+    let road = String::new();
     let mut long: Vec<String> = Vec::new();
+    // 🔴 **First, because it is the one clause that changes what the reader does next**
+    // (`req/924` §TUI-29). While the engine is well this is empty and costs nothing; the moment a
+    // claim stops holding it leads the row, with `status_reason` at the front of it — which is the
+    // order `super::renderer::engine_line` puts the keys in, read rather than restated here.
+    if !engine_caveat.is_empty() {
+        long.push(engine_caveat.to_string());
+    }
     // 🔴 The field count belongs to the **grid**. While a record is open there is no grid, every
     // member the wire carried is a row of its own, and the record's own line is what says how many
     // of them the height allowed. Saying `4 of 11 fields not drawn` over a record that is drawing
@@ -1375,28 +1558,20 @@ fn compose_disclosure(
     // 🔴 The engine's own keys the rail had no room for. The route is the region's declared
     // `Recoverable::Route`, so this names the road as well as the count — these are caveats, and a
     // caveat with no way back is a fact the screen destroyed.
-    if engine_dropped > 0 {
-        let route = match region(RegionRole::Apparatus).recoverable {
-            Recoverable::Route(route) => route,
-            _ => LEDGER_ADDRESS,
-        };
-        long.push(format!("{engine_dropped} engine keys not drawn | {route}"));
-    }
-    // 🔴 **The provenance stood down, and the road to it** (`req/924` §TUI-29, `req/38` SS1058,
-    // Owner `#268-T`; repeated as §TUI-45 row 5). Four routes that all answered `200` is the state
-    // `engine ok` on the rail already asserts, so a row saying it a second time is furniture — but
-    // the four measured facts do leave the screen, and a screen that lets something go without
-    // saying so is the one cut this face is not allowed to make. The line in full is
-    // [`Plan::provenance_full`], which `super::renderer::help_lines` draws on every frame, and this
-    // clause is the road there.
-    if provenance_stood_down {
-        long.push(format!("provenance -> {keys_address}"));
-    }
-    // 🔴 The enclosure, when it is not on the screen. It is a mark that carries meaning, so its
-    // absence is a fact about what this frame let go of and not a matter of taste.
-    if !framed {
-        long.push("frame not drawn at this width".to_string());
-    }
+    // 🔴 **Nought by construction since `req/924` §TUI-57**: there is no rail to run out of cells,
+    // and `super::renderer::help_lines` spells every one of the engine's keys, in full, at every
+    // shape. The clause is kept as a comment rather than deleted because the *obligation* it served
+    // did not go anywhere — §TUI-22 classified those two claims as things that may be folded and
+    // may not be discarded — and the hatch is now where it is discharged.
+    //
+    // 🔴 **`provenance -> ?` and `frame not drawn at this width` left with it, and for one reason**
+    // (`req/924` §TUI-57). Both were true on **every** frame once the rail went, and §TUI-29's own
+    // test — *does this row change the reader's next act when everything is normal?* — is what puts
+    // a permanently true sentence off the standing row. Neither fact is discarded: the provenance
+    // region, its intent and its line in full are in the hatch ([`Plan::provenance_full`],
+    // `super::renderer::help_lines`), and the enclosure's corners deleted nothing that has come
+    // back, so their absence destroys no fact. Gate `g76` is what checks the first of those rather
+    // than this paragraph being believed.
     // 🔴 **The region rail is deleted, and it is deleted *because* the enclosure is drawn**
     // (`req/924` §TUI-22, `req/38` SS1049, Owner `#266-T`). It read
     // `screen: apparatus subject provenance disclosure` — the face spelling the names of its own
@@ -1420,20 +1595,6 @@ fn compose_disclosure(
     if wide || rows_needed(&long, width) <= cap {
         return long;
     }
-    // 🔴 The short form still **names** the regions it let go of. A count on its own would satisfy
-    // "say how many" and fail the thing the disclosure is for, which is saying *which*.
-    let named = if dropped_regions.is_empty() {
-        String::new()
-    } else {
-        format!(
-            ": {}",
-            dropped_regions
-                .iter()
-                .map(|role| role.short())
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    };
     // The short form spends its words on the same facts, including the two above: an open record
     // says so instead of quoting a field count that belongs to a grid nobody is looking at, and a
     // dropped set of counts is named rather than being the one thing only the long form admits.
@@ -1455,6 +1616,12 @@ fn compose_disclosure(
         Subject::Record => "record open".to_string(),
         Subject::Help => "help open".to_string(),
     };
+    // 🔴 **The count of regions no longer leads this line** (`req/924` §TUI-57). Nothing is dropped
+    // by the ladder any more — the apparatus and the provenance are off the standing frame by
+    // ruling and the two that remain cannot be given up — so `0 regions not drawn` would have been
+    // a number that is nought on every frame forever, printed first, on the one row this face has.
+    // The declaration that says which regions are not drawn, and where what they carried went, is
+    // [`STOOD_DOWN_REGIONS`], and the hatch is where a reader reads it.
     let counts = if counts_dropped {
         format!(" | counts cut, {NO_ADDRESS_PHRASE}")
     } else {
@@ -1482,36 +1649,69 @@ fn compose_disclosure(
     // The enclosure is named in the short form too: it is dropped most often at exactly the widths
     // this form is chosen at, and a mark that carries meaning cannot go quietly at the shapes where
     // it always goes.
-    let frame = if framed { "" } else { " | no frame" };
-    // The same clause in the short form, for the reason the keys' clause is in both: a region that
-    // is not on the screen is a loss the reader can act on, and the act is the road.
-    let stood_down = if provenance_stood_down {
-        format!(" | provenance -> {keys_address}")
-    } else {
+    // 🔴 `no frame`, `provenance -> ?` and `N engine keys` are gone from this form for the reason
+    // the long form's copies are: each was true on every frame once the rail went, and a caveat
+    // that never changes is furniture by `req/924` §TUI-29's own test. The facts are in the hatch,
+    // which is what `g76` measures.
+    // 🔴 **`gx tui --wide` is off this form and `?` is on it** (`req/924` §TUI-57). The short form
+    // used to end with the address of the *long form*, which is a command that requires leaving the
+    // process; `?` opens the hatch in place and the hatch spells every field name, every route name
+    // and the whole of the provenance — strictly more than `--wide` answers for. This is the same
+    // argument `Shape::keys_address` was introduced with, applied to the one clause that had not
+    // taken it. `w` is still a declared act and the hatch still names it.
+    let _ = wide_address;
+    // The caveat leads this form too, and for the reason it leads the long one: a terminal cuts
+    // from the end, and this is the clause a reader has to act on.
+    let engine = if engine_caveat.is_empty() {
         String::new()
-    };
-    // The caveats are in the short form too, and for the reason they are in the long one: they
-    // cannot be re-measured from anything else on the screen.
-    let engine = if engine_dropped > 0 {
-        format!(" | {engine_dropped} engine keys")
     } else {
-        String::new()
+        format!("{engine_caveat} | ")
     };
     format!(
-        "{folded}{} regions not drawn{named} | {head}{keys}{counts}{engine}{frame}{stood_down} | {} routes | {wide_address}",
-        dropped_regions.len(),
+        "{engine}{folded}{head}{keys}{counts} | {} routes -> {keys_address}",
         READ_NOT_DRAWN.len()
     )
 }
 
 /// The disclosure may take three rows, or four once the provenance has folded into it — the row the
 /// provenance gave up is the row the fold is allowed to spend.
-const fn disclosure_cap(folded: bool) -> u16 {
-    if folded {
-        4
-    } else {
-        3
+/// Cut a line to `room` cells and **mark** the cut, which is what `super::renderer::pad` does for a
+/// table cell and what this row had no equivalent of.
+///
+/// 🔴 A terminal clips from the right without saying so, and the clause this row clips is the one
+/// that says what is missing. The mark is inside the budget, so a reader sees *which* clause ran
+/// out rather than a sentence that stops mid-word.
+/// 🔴 **And it refuses to cut below [`CLIP_FLOOR`].** A clause cut to two cells is not a shorter
+/// clause, it is a `~` where a sentence was — measured at twenty-four cells, where the clause
+/// naming the connection's counts as unrecoverable came back as the single character `~`. Below the
+/// floor the text is left whole and the row's own `!` is what says it was cut; a mark that says
+/// *this was cut* is worth more than a mark that says *something was here*.
+#[must_use]
+fn clip(text: &str, room: usize) -> String {
+    if text.chars().count() <= room {
+        return text.to_string();
     }
+    if room < CLIP_FLOOR {
+        return text.to_string();
+    }
+    let head: String = text.chars().take(room.saturating_sub(1)).collect();
+    format!("{head}~")
+}
+
+/// The fewest cells a cut clause may be left with before cutting stops being a shortening.
+///
+/// Sixteen: enough for `N/M fields` and a mark. Declared rather than typed into [`clip`] because it
+/// is a judgement about legibility and the day it is wrong there is one line to change.
+const CLIP_FLOOR: usize = 16;
+
+const fn disclosure_cap(_folded: bool) -> u16 {
+    // 🔴 **One, and it was three or four** (`req/924` §TUI-57, `req/38` SS1088, Owner `#282-T`).
+    // The standing chrome of this face is one row, so the line that says what is not on the screen
+    // gets one row and the ladder above chooses the form that fits it. The parameter is kept
+    // because the question it asked — *did the provenance fold into this line, and may it therefore
+    // spend the row the region gave up?* — is still a real question the day this cap moves again;
+    // it is answered `one` for both values now and that is a decision, not an oversight.
+    1
 }
 
 /// Resolve the grid, for a reading with no records in it.
@@ -1593,277 +1793,282 @@ pub fn resolve_attended(
     // the cheapest road. The help face names `w` in full, and the note spells it wherever it fits.
     let wide_address = WIDE_ADDRESS.to_string();
     let subject_floor = region(RegionRole::Subject).min_rows;
-    let apparatus_rows = region(RegionRole::Apparatus).min_rows;
-    // 🔴 The top rail, resolved once and read three times: it is what the apparatus draws, it is
-    // what decides whether the disclosure has to spell the address, and its width is what decides
-    // whether the enclosure's corners fit. Three readings of one decision, which is this module's
-    // rule — the alternative is three width tests that disagree.
+    // 🔴 **The top rail is gone, and with it four readings of one row** (`req/924` §TUI-57,
+    // `req/38` SS1088, Owner `#282-T`). The heading ladder chose between the page's address, the
+    // screen's name and the engine's keys; it opened the enclosure; it decided whether the
+    // disclosure had to spell the address; and it decided whether the provenance region could
+    // stand down. There is no such row now, so [`Plan::heading`] is empty at every shape and the
+    // apparatus is never given rows. [`STOOD_DOWN_REGIONS`] is the declaration that says so and
+    // where what it carried went; gate `g73` is what holds the standing chrome to one row.
     //
-    // 🔴 The rungs are chosen against `width - FRAME_MARGIN` and **not** against `width`, which is
-    // what breaks the circle: whether the enclosure is drawn depends on whether the rail fits with
-    // its corners, and which rung the rail takes would otherwise depend on whether the enclosure is
-    // drawn. Reserving the corners' cells up front means the chosen rung fits either way, and the
-    // enclosure is refused only when even the floor of the ladder overflowed.
-    let head_cells = heading(shape, width.saturating_sub(FRAME_MARGIN), &measured.engine);
-    let address_above = heading_carries_address(&head_cells);
-    let engine_dropped = heading_engine_dropped(&head_cells, &measured.engine);
-    // The enclosure is never offered where the apparatus has been let go of: there is no top rail
-    // to open it with, and a screen closed at the bottom and open at the top is not an enclosure.
-    let frame_room = heading_width(&head_cells) + FRAME_MARGIN as usize <= width as usize;
-    // 🔴 **The caveat takes a row when it is a caveat** (`req/924` §TUI-29, `req/38` SS1058, Owner
-    // `#268-T`; repeated as §TUI-45 row 5). `4 routes 09:52:28Z | worst 5ms | all 200` is a sentence
-    // a reader cannot act on while every route is answering `200`, and `engine ok` on the rail is
-    // the whole of what it was saying. So the region stands down — **folded, not deleted**: the line
-    // in full is [`Plan::provenance_full`], the help face draws it on every frame, and
-    // `compose_disclosure` spells the road.
+    // 🔴 **Named ceiling.** [`heading`], [`heading_carries_address`] and [`heading_engine_dropped`]
+    // are still declared and are now called by nothing that draws. They are kept rather than
+    // deleted because `no-delete` is the rule and because the ladder they encode is the answer the
+    // day a rail comes back; they are named here so that "declared and read by nothing" is a fact
+    // this module states about itself rather than one an audit has to find.
+    let head_cells: Vec<HeadingCell> = Vec::new();
+    let framed = false;
+    // Nothing is given up by the ladder any more: the two regions that could be are off the frame
+    // by ruling, and the two that remain are what the screen is *for* and the line that says what
+    // is missing. The vector is kept because `compose_disclosure` still names whatever is in it,
+    // so a region that grows a step later arrives there rather than in a new branch.
+    let dropped: Vec<RegionRole> = Vec::new();
+    // 🔴 **§TUI-29's test, applied in both directions.** A caveat takes a row when it is a caveat:
+    // while every route answers `200` **and** both of the engine's claims hold, the dot is the
+    // whole of what the old rail was saying and the four measured facts are in the hatch. The
+    // moment either stops holding, the facts fold **into** the standing row — which is
+    // [`Measured::folded`], the shape that already existed for exactly this, and it leads with the
+    // clause no second read can recover.
     //
-    // 🔴 **The whole region is [`Recoverable::Nowhere`], and the first cut of this comment narrowed
-    // that to the connection alone** (independent audit, finding 6). [`REGIONS`] declares `Nowhere`
-    // for the region, and [`Recoverable`]'s own doc says *nothing in it can be fetched again; a
-    // second read makes a new measurement* — which is true of the reading clock and of `worst Nms`
-    // as much as of the subscription. So standing the region down **does** put four unrecoverable
-    // facts behind `?`, and the honesty of that turns entirely on the road arriving: the disclosure
-    // spells `provenance -> ?` and `super::renderer::help_lines` moves the line to the front of the
-    // hatch exactly when it does (gate `g67`). What is special about the connection is only that it
-    // is the one fact the **rail** can carry, which is why the badge is what this condition reads.
-    let badge_on_rail = head_cells
-        .iter()
-        .any(|cell| cell.text.contains(super::live::LIVE_BADGE));
-    // 🔴 **And the sentence that is supposed to replace the region has to be *on* the rail**
-    // (independent audit, finding 2). The first cut asked only whether the badge fitted, so at
-    // sixty-six and sixty cells the rail read `list ENGINE LIVE, 151 events` — `engine ok` dropped
-    // off the end, `1 engine keys not drawn` in the disclosure — and the region stood down anyway.
-    // The justification for standing it down is *`engine ok` is the whole of what it was saying*,
-    // and at those two shapes that sentence was not on the screen. A premise that is false on the
-    // drawn frame is not a premise. `heading_engine_dropped` is read rather than a width compared,
-    // which is this module's rule everywhere else.
-    let claim_on_rail = badge_on_rail && engine_dropped == 0;
-    let provenance_wanted = !measured.all_200 || !claim_on_rail;
-
-    // The declaration's order, read once. Three passes at most walk it, and it is four elements.
-    let order = letting_go_order();
-
-    let mut dropped: Vec<RegionRole> = Vec::new();
-    let mut folded = false;
-    let mut disclosure;
-    let mut disclosure_rows;
-    let mut truncated = false;
-    let mut rung;
-    let mut framed;
-    loop {
-        let fold = folded.then(|| measured.clone());
-        // Decided at the top of the pass beside the provenance's rung, because the clause that
-        // discloses its absence is composed in the same call and the row budget below depends on
-        // how many rows that composition takes.
-        framed = frame_room && !dropped.contains(&RegionRole::Apparatus);
-        let inner = if framed {
-            width.saturating_sub(FRAME_MARGIN)
-        } else {
-            width
-        };
-        // 🔴 A ladder rather than one threshold, for the reason `compose_disclosure` and
-        // `super::renderer::fold_note` are ladders: this region gets exactly one row and a terminal
-        // cuts what does not fit **without saying so**. Adding the subscription to the line made
-        // the long form longer than sixty cells in some states, so the rung is chosen by measuring
-        // it instead of by a width the line used to fit at. It is chosen **here**, at the top of
-        // the pass, so the disclosure below can name what the rung gave up.
-        rung = if width >= 60 && rows_needed(&measured.long(), width) <= 1 {
-            Rung::Long
-        } else if rows_needed(&measured.short(), width) <= 1 {
-            Rung::Short
-        } else {
-            Rung::Bare
-        };
-        disclosure = compose_disclosure(
-            &dropped_fields,
-            total_fields,
-            &dropped,
-            fold.as_ref(),
-            inner,
-            wide,
-            Shape {
-                subject,
-                // A folded provenance carries its counts into the disclosure; only the bottom rung
-                // of a provenance that still has a region of its own gives them up.
-                counts_dropped: provenance_wanted && !folded && !rung.carries_counts(),
-                keys_address: &keys_address,
-                wide_address: &wide_address,
-                // 🔴 Nought **inside the loop**, and the real count once below it. How many rows the
-                // note gets depends on how many rows the subject region gets, which depends on how
-                // tall this disclosure is — the order inversion `req/964` §16 named. So the loop
-                // settles the shape of the screen without this clause, and the clause is added
-                // afterwards against the rows the loop actually produced.
-                keys_not_drawn: 0,
-                address_above,
-                framed,
-                engine_dropped,
-                provenance_stood_down: !provenance_wanted,
-            },
-        );
-        disclosure_rows = rows_needed(&disclosure, inner).min(disclosure_cap(folded));
-        let apparatus = if dropped.contains(&RegionRole::Apparatus) {
-            0
-        } else {
-            apparatus_rows
-        };
-        let provenance = u16::from(provenance_wanted && !folded);
-        let need = subject_floor + apparatus + provenance + disclosure_rows;
-        if need <= height {
-            break;
-        }
-        // 🔴 Which region goes next is [`letting_go_order`]'s answer and not this loop's. The two
-        // steps were spelled here in that order by hand and they were right; what was missing was
-        // anything that made them *have* to be. A role with no step is stepped over rather than
-        // stopping the walk: "cannot be let go of" and "has already been let go of" are different
-        // facts, and treating the first as the second would end the loop at the subject every time.
-        let mut stepped = false;
-        for &role in &order {
-            let took = match role {
-                RegionRole::Apparatus if !dropped.contains(&RegionRole::Apparatus) => {
-                    dropped.push(RegionRole::Apparatus);
-                    true
-                }
-                RegionRole::Provenance if provenance_wanted && !folded => {
-                    folded = true;
-                    true
-                }
-                _ => false,
-            };
-            if took {
-                stepped = true;
-                break;
-            }
-        }
-        if stepped {
-            continue;
-        }
-        truncated = true;
-        break;
-    }
-
-    let mut rows: Vec<(RegionRole, u16)> = Vec::new();
-    let apparatus = if dropped.contains(&RegionRole::Apparatus) {
-        0
+    // 🔴 [`Measured::healthy`] and not a re-derivation from [`Measured::engine`]: the decision is
+    // measured where the fold is made (`super::renderer::engine_line`), so the two cannot disagree.
+    let folded = !(measured.all_200 && measured.healthy);
+    // The rung is still chosen by measuring the line rather than against a width the line used to
+    // fit at, and it still decides what [`Plan::provenance`] carries for the hatch.
+    let rung = if width >= 60 && rows_needed(&measured.long(), width) <= 1 {
+        Rung::Long
+    } else if rows_needed(&measured.short(), width) <= 1 {
+        Rung::Short
     } else {
-        apparatus_rows
+        Rung::Bare
     };
-    let provenance = u16::from(provenance_wanted && !folded);
-    let spent = apparatus + provenance + disclosure_rows;
-    let subject = height.saturating_sub(spent);
-    if subject < subject_floor {
-        truncated = true;
-    }
-    // 🔴 The disclosure being cut is the worst cut available, because the disclosure is the line
-    // that says what was cut. If the cap bit, the screen has to admit it. Measured against the
-    // width the line was **composed** at, which is four cells narrower once the enclosure is drawn.
-    let inner = if framed {
-        width.saturating_sub(FRAME_MARGIN)
+
+    // 🔴 **The standing row, composed here** — where the disclosure has always been composed, and
+    // now the reader's position, the keys and the connection's dot with it. The three parts are
+    // budgeted in the order they may **not** be lost and drawn in the order Owner `#282-T`'s sketch
+    // has them.
+    //
+    // It is composed **before** the rows are settled, and that is the order `req/964` §16 argued
+    // for: the row this line lives on is one row by ruling, so its height is no longer a function
+    // of its own text and the inversion that forced two passes is gone.
+    let (dot_mark, dot_role) = measured.link.dot();
+    // One space either side of the dot: `super::renderer::spans` puts one between cells, and the
+    // row then reads as three parts rather than as one run.
+    let dot_cells = dot_mark.chars().count() as u16 + 2;
+    let room = width.saturating_sub(dot_cells);
+    let position = if attention.items == 0 {
+        String::new()
     } else {
+        format!(
+            "{} of {}",
+            attention.selected.min(attention.items - 1) + 1,
+            attention.items
+        )
+    };
+    // 🔴 **The floor is reserved before the caveat is composed.** The caveat may have the whole of
+    // the row **except** the note's floor, which is the one thing on this row that no other row can
+    // say. Without the reservation the caveat took every cell at forty and the row read
+    // `! 8 keys: help:? · 8/11 fields | 2 rout~` — with no position on it at all.
+    //
+    // 🔴 It is the note's **whole floor line** and not just the position: since `req/924` §TUI-57
+    // closed `super::renderer::fold_note`'s named ceiling, the shortest note this face draws is the
+    // position *and* the clause naming where the keys went. Reserving only the position was this
+    // lane's own defect, measured at eighty by twenty-four on a terminal wide enough to have
+    // carried both.
+    let floor = super::renderer::fold_note(std::slice::from_ref(&position), offered, 1, 1)
+        .chars()
+        .count() as u16;
+    // 🔴 The engine's own line, spelled exactly when a claim has stopped holding (`req/924`
+    // §TUI-29's other half). `measured.engine` is already the unfolded list in that state, because
+    // `super::renderer::engine_line` folds to one pair only while both claims hold — so this reads
+    // the fold's own decision rather than making a second one.
+    let engine_caveat = if measured.healthy {
+        String::new()
+    } else {
+        measured
+            .engine
+            .iter()
+            .map(|(key, value)| format!("{key} {value}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    // 🔴 **What the caveat may have.** On the standing frame: everything except the note's floor
+    // and the space beside it. Under `w` it may have the row, because `super::acts::Act::Wide` is
+    // *spell what was let go of in full, without restarting* and a face that answered it by cutting
+    // the line to one row would be answering it with a `~`.
+    let budget = if wide {
         width
+    } else {
+        room.saturating_sub(floor + 1)
     };
-    if rows_needed(&disclosure, inner) > disclosure_rows {
+    let disclosure = compose_disclosure(
+        &dropped_fields,
+        total_fields,
+        &dropped,
+        folded.then(|| measured.clone()).as_ref(),
+        budget,
+        wide,
+        Shape {
+            subject: shape,
+            counts_dropped: !folded && !rung.carries_counts(),
+            keys_address: &keys_address,
+            wide_address: &wide_address,
+            // 🔴 **Nought, and that is a repair rather than a regression** (`req/988` §3-2). That
+            // clause existed for the one case where the note was given nought rows and spelled no
+            // key at all; the note is on the standing row now and is drawn at every shape, so the
+            // case cannot arise. What discloses a folded legend is
+            // `super::renderer::note_line`'s own `N more keys` clause, which is the half of the
+            // partition gate `g34` measures that never went away. Composing both would put the
+            // same count on one row twice.
+            keys_not_drawn: 0,
+            engine_caveat: &engine_caveat,
+        },
+    );
+    // 🔴 **The reservation is enforced and not merely offered.** `compose_disclosure` has a long
+    // form and a short one and nothing below that, so at forty cells it answered thirty-one against
+    // a budget of thirteen and took the note's floor with it. Cutting the caveat back to its budget
+    // here is what makes the floor a floor; the cut is marked, and what it carries is on the hatch.
+    let mut truncated = false;
+    let disclosure = if !wide && disclosure.chars().count() > budget as usize {
+        truncated = true;
+        clip(&disclosure, budget as usize)
+    } else {
+        disclosure
+    };
+
+    // 🔴 **One row of standing chrome, and no loop.** The ladder that walked the regions existed to
+    // decide which of four to give up; with two of them ruled off and the row capped at one there
+    // is nothing left for it to decide. So the subject region's height is the screen's minus the
+    // standing row — the same ordering the loop was enforcing, arrived at by arithmetic.
+    //
+    // 🔴 More than one row only while the reader is holding `w`. The **standing** frame is one row
+    // (`req/924` §TUI-57) and gate `g73` measures the standing frame for that reason.
+    let disclosure_rows: u16 = if height == 0 {
+        0
+    } else if wide {
+        rows_needed(&disclosure, width)
+            .max(1)
+            .min(height.saturating_sub(subject_floor).max(1))
+    } else {
+        1
+    };
+    let subject_height = height.saturating_sub(disclosure_rows);
+    if subject_height < subject_floor {
         truncated = true;
     }
-    if apparatus > 0 {
-        rows.push((RegionRole::Apparatus, apparatus));
+
+    // 🔴 **The grid's column header is content and scrolls with the records** (`req/924` §TUI-57).
+    // `preamble` is how many rows the grid puts in front of them; `super::renderer::subject` adds
+    // one more when `hoist` produces a shared line and asks [`scrolled`] the same question with the
+    // larger number. Both answers come from one function, so the plan and the region cannot
+    // disagree about where the stream is standing.
+    let preamble = match shape {
+        Subject::Grid => 1usize,
+        Subject::Record | Subject::Help => 0,
+    };
+    let grid_capacity = match shape {
+        Subject::Record | Subject::Help => 0,
+        Subject::Grid => subject_height as usize,
+    };
+    let (preamble_shown, window) = match shape {
+        Subject::Record | Subject::Help => (0usize, Window::default()),
+        Subject::Grid => scrolled(
+            attention.selected,
+            attention.items,
+            preamble,
+            grid_capacity,
+            attention.glide,
+        ),
+    };
+    // 🔴 **Nought, and it is not a loss** (`req/924` §TUI-57). The note used to be the last line of
+    // the subject region, paid for out of the rows the records left over — and
+    // `super::renderer::note_rows`'s own documentation names the shapes where that spare was nought
+    // and the legend vanished with nothing saying so. It is on the standing row now, so it is drawn
+    // at **every** shape and that bounded defect is closed rather than bounded. The number stays in
+    // the plan because the region still reads it, and it is nought because the region no longer
+    // draws the note.
+    let note_rows = 0usize;
+
+    let ladder = super::renderer::note_ladder(
+        &position,
+        attention.items.checked_sub(window.rows).filter(|d| *d > 0),
+        offered,
+    );
+    // 🔴 **The floor is a floor even when the caveat could not be cut to fit beside it.** `clip`
+    // refuses to reduce a clause below [`CLIP_FLOOR`], so at thirty cells the caveat kept fifteen
+    // of the twenty-seven available and the note was handed eleven — below its own floor, and the
+    // row came back `8 keys: help:? · 9/11 fields` with **the reader's position gone**. `req/984`
+    // §10-8 is the ruling that the position is the ladder's floor and is never given up for a
+    // legend, and gates g38/g39 are what caught this lane breaking it.
+    //
+    // So the note is composed against at least its floor. The row then overflows, which is a cut —
+    // and a cut this face marks (`!`, and `~` wherever the cut could be placed inside the budget)
+    // rather than one a terminal makes in silence. What is cut is the caveat's tail, and every
+    // clause of it is on the hatch.
+    let note_room = room
+        .saturating_sub(disclosure.chars().count() as u16 + 1)
+        .max(floor)
+        .max(1);
+    let note = super::renderer::fold_note(
+        &super::renderer::afford(&ladder, offered, note_room, 1),
+        offered,
+        note_room,
+        1,
+    );
+    // 🔴 **A cut is marked twice: `!` in front of the row, and `~` where the cut fell.** A terminal
+    // clips from the right without saying so, and the clause it would clip is the one that says
+    // what is missing. Cutting it here means the mark is inside the budget and the reader can see
+    // *which* clause ran out rather than being handed a sentence that stops mid-word.
+    //
+    // The `!` and the space after it are two cells the row spends the moment it is cut, so the room
+    // a cut row has is two fewer than the room an uncut one has. Left out of this arithmetic the
+    // marks themselves went off the right edge, which is a cut nothing marked.
+    let spent = note.chars().count() + disclosure.chars().count() + dot_cells as usize;
+    let marked_room = width.saturating_sub(2) as usize;
+    let disclosure = if !wide && spent > width as usize {
+        truncated = true;
+        clip(
+            &disclosure,
+            disclosure
+                .chars()
+                .count()
+                .saturating_sub(spent.saturating_sub(marked_room)),
+        )
+    } else {
+        disclosure
+    };
+    // 🔴 **The dot survives every width, and it did not** (gate `g19b`, 2026-09-02). It is drawn
+    // after the note, so a note wider than the row took the dot off the screen with it — and at
+    // forty cells **all five states of the connection drew the same frame**, which is the collapse
+    // `req/38` SS1085 is named for, reintroduced by a repair to the note.
+    //
+    // `Measured::bare`'s ruling, one row down: *the mark is never given up, and it leads the line
+    // for that reason — a terminal cuts from the right, so what cannot be recovered goes at the
+    // front.* The Owner's sketch puts the dot in the middle, so instead of moving it the **note**
+    // is cut back to leave it room. The order of survival on this row is: the reader's position,
+    // then the connection's state, then the road, then the caveat's tail.
+    let note = {
+        let room = width.saturating_sub(dot_cells + u16::from(truncated) * 2) as usize;
+        if note.chars().count() > room {
+            truncated = true;
+            clip(&note, room)
+        } else {
+            note
+        }
+    };
+    let mut status: Vec<HeadingCell> = Vec::new();
+    if !note.is_empty() {
+        status.push(HeadingCell {
+            text: note.clone(),
+            role: super::tokens::Role::Quiet,
+        });
     }
-    if subject > 0 {
-        rows.push((RegionRole::Subject, subject));
+    status.push(HeadingCell {
+        text: dot_mark.to_string(),
+        role: dot_role,
+    });
+    if !disclosure.is_empty() {
+        status.push(HeadingCell {
+            text: disclosure.clone(),
+            role: super::tokens::Role::Quiet,
+        });
     }
-    if provenance > 0 {
-        rows.push((RegionRole::Provenance, provenance));
+    let mut rows: Vec<(RegionRole, u16)> = Vec::new();
+    if subject_height > 0 {
+        rows.push((RegionRole::Subject, subject_height));
     }
     if disclosure_rows > 0 {
         rows.push((RegionRole::Disclosure, disclosure_rows));
-    }
-
-    // 🔴 The window, decided beside everything else the screen is handed. The region's row count is
-    // read back out of the list that was just built, which is the same list `super::renderer::draw`
-    // splits the frame by — so the rows the window is computed against are the rows that exist.
-    //
-    // An opened record has no window: it is one record drawing every member it carries, the rows it
-    // gives up are given up by height rather than by count, and its own line is what says how many.
-    let subject_rows = rows
-        .iter()
-        .find(|(role, _)| *role == RegionRole::Subject)
-        .map_or(0, |(_, count)| *count) as usize;
-    // One row for the header, and the note is paid for out of what the records leave over.
-    // `super::renderer::note_rows` is that ruling as a function, and this **reads** it rather than
-    // restating it: a second copy of the budget here is a second answer, and the region and the plan
-    // would disagree the day one of them was edited.
-    //
-    // 🔴 `max(1)` is a repair the note's disclosure made necessary and worth naming. `occupied` is
-    // what the region draws *before* the note, and for a reading with no records in it that is the
-    // one kind-of-nothing row — which `super::renderer::subject` has always passed and this call
-    // site had not. The two were computing different budgets for the empty list; it was invisible
-    // because the only consumer was a window that is nought rows wide on an empty list either way.
-    // Disclosing the number makes it visible, so it is repaired rather than disclosed wrongly.
-    // 🔴 Two rows, and it was one: the heading and the grid's column header both stand above the
-    // records now. The note is paid for out of what is left after both, which is the same ruling
-    // one row further down — a region does not fund its own chrome out of its content.
-    // 🔴 **One again, and the row is a record** (`req/924` §TUI-22). The heading moved to the top
-    // rail, which the apparatus region draws in the row it already had, so this region stands over
-    // the grid's column header alone. The row is not saved, it is spent — on the ledger.
-    let body_rows = subject_rows.saturating_sub(1);
-    let note_rows = match shape {
-        Subject::Grid => super::renderer::note_rows(attention.items.max(1), body_rows),
-        Subject::Record | Subject::Help => 0,
-    };
-    // 🔴 Held rather than only fed to `window` below: the cap `window` applies is exactly the
-    // fact a caller needs and cannot get back out of `Window` once applied (see
-    // `Plan::grid_capacity`'s own doc). Nought for the two shapes with no window, matching
-    // `Window::default()` below rather than leaking a number nothing was capped against.
-    let grid_capacity = match shape {
-        Subject::Record | Subject::Help => 0,
-        Subject::Grid => body_rows.saturating_sub(note_rows),
-    };
-    let window = match shape {
-        Subject::Record | Subject::Help => Window::default(),
-        Subject::Grid => window(attention.selected, attention.items, grid_capacity),
-    };
-
-    // 🔴 **The second composition, and the only one there is.** The loop above settled how tall this
-    // region is without knowing whether the note would survive, because the note's budget is a
-    // function of the rows the loop was still deciding. Now the rows exist, so the count is known,
-    // and the one clause that depends on it is added against the screen that was actually produced.
-    //
-    // The height is **not** recomputed from the longer line: re-running the ladder here would let
-    // the disclosure grow itself a row and take it from the records, which is exactly the ruling
-    // `super::renderer::note_rows` was written from. The budget stands, and if the longer line no
-    // longer fits inside it the cut is marked — by the same check the first composition gets, fired
-    // again here, because a cut that happens after a check is a cut nothing checked.
-    if note_rows == 0 && matches!(shape, Subject::Grid) {
-        // 🔴 Minus the one the address spells, when the address is a key rather than a command —
-        // the same count `super::renderer::note_line` makes, for the same reason: `help:?` on the
-        // screen is a key the reader can see, and counting it among the ones they cannot would
-        // make `declared = spelled + disclosed` come to one more than there are (gate g34).
-        let keys_not_drawn = super::renderer::offered(attention.items)
-            .len()
-            .saturating_sub(usize::from(offered.contains(&super::acts::Act::Help)));
-        if keys_not_drawn > 0 {
-            disclosure = compose_disclosure(
-                &dropped_fields,
-                total_fields,
-                &dropped,
-                folded.then(|| measured.clone()).as_ref(),
-                inner,
-                wide,
-                Shape {
-                    subject: shape,
-                    counts_dropped: provenance_wanted && !folded && !rung.carries_counts(),
-                    keys_address: &keys_address,
-                    wide_address: &wide_address,
-                    keys_not_drawn,
-                    address_above,
-                    framed,
-                    engine_dropped,
-                    provenance_stood_down: !provenance_wanted,
-                },
-            );
-            if rows_needed(&disclosure, inner) > disclosure_rows {
-                truncated = true;
-            }
-        }
     }
 
     Plan {
@@ -1875,8 +2080,8 @@ pub fn resolve_attended(
         total_fields,
         heading: head_cells,
         framed,
-        // The rung was decided at the top of the last pass, beside the disclosure that describes
-        // it. Spelling it here would be a second decision, and the two could differ.
+        // The rung was decided above, beside the fold that describes it. Spelling it here would be
+        // a second decision, and the two could differ.
         provenance: match rung {
             Rung::Long => measured.long(),
             Rung::Short => measured.short(),
@@ -1891,6 +2096,10 @@ pub fn resolve_attended(
         grid_capacity,
         engine_full: measured.engine_full.clone(),
         vacant_fields: measured.vacant.clone(),
+        status,
+        note,
+        preamble,
+        preamble_shown,
     }
 }
 

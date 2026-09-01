@@ -12,11 +12,10 @@ Not an observability tool. It sits before the effect.
 See the Scope Exclusions table below and [docs/LIMITS.md](docs/LIMITS.md) for what this does not cover.
 
 <p>
-<a href="https://doi.org/10.5281/zenodo.22168558"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22168558-00dfd8?style=for-the-badge&logo=doi&logoColor=090a0f" alt="Zenodo DOI"></a>
 <a href="https://www.npmjs.com/package/@mahirhir/tracefold"><img src="https://img.shields.io/badge/npm-SDK%20v0.1-0070f3?style=for-the-badge&logo=npm&logoColor=ffffff" alt="npm SDK"></a>
-<a href="https://crates.io/crates/tracefold"><img src="https://img.shields.io/crates/v/tracefold.svg?style=for-the-badge&logo=rust&logoColor=ffffff&label=crates.io&color=dea584" alt="crates.io"></a>
+<a href="https://crates.io/crates/tracefold"><img src="https://img.shields.io/crates/v/tracefold.svg?style=for-the-badge&logo=rust&logoColor=ffffff&label=crates.io&color=7928ca" alt="crates.io"></a>
 <a href="rust-toolchain.toml"><img src="https://img.shields.io/badge/Rust-1.97.1-7928ca?style=for-the-badge&logo=rust&logoColor=ffffff" alt="Rust 1.97.1"></a>
-<a href="lean/"><img src="https://img.shields.io/badge/Lean%204-154%20Theorems-00dfd8?style=for-the-badge&logoColor=090a0f" alt="Lean 4 Proofs"></a>
+<a href="https://doi.org/10.5281/zenodo.22168558"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22168558-0070f3?style=for-the-badge&logo=doi&logoColor=ffffff" alt="Zenodo DOI"></a>
 <a href="mailto:mahirohirakawa@glovrex.com"><img src="https://img.shields.io/badge/Contact-mahirohirakawa%40glovrex.com-26231f?style=for-the-badge&logo=minutemailer&logoColor=ffffff" alt="Email"></a>
 <a href="https://discord.gg/rtvXqYEQzr"><img src="https://img.shields.io/badge/Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=ffffff" alt="Discord"></a>
 <a href="https://buy.stripe.com/8x214mbkU2pu5yneyk97G00"><img src="https://img.shields.io/badge/Support-Pay%20what%20you%20want-635bff?style=for-the-badge&logo=stripe&logoColor=ffffff" alt="Support Tracefold"></a>
@@ -123,7 +122,7 @@ TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws
 
 | Dimension | Measured Value | Conditions & Scope |
 | :--- | --: | :--- |
-| **Test Floor** | **2,602** probes | 454 suites + SDK 36 passed &middot; fresh clone &middot; 25 Aug 2026 |
+| **Test Floor** | **2,602** probes | 454 suites + SDK 36 passed &middot; fresh clone &middot; 25 Aug 2026 &middot; point-in-time — this number has moved on nearly every commit since; run `tools/e2e.sh` yourself for the count as of your clone, do not treat it as current |
 | **Lean Formal Proofs** | **154** theorems | Lean 4, 14 files: **154 theorems, 14 of them counterexamples, 1 axiom, sorry 0**, recounted 1 Sep 2026 with the attribute-aware predicate (SS1001-consistent; see docs/LIMITS.md item 8) |
 | **Open High Holes** | **0** | Out of 44 adversarial audit rounds, same 25 Aug 2026 table/commit as above (not independently re-dated by this pass) |
 | **Unmeasured Platforms** | 3 environments | Windows native, OneDrive, SMB |

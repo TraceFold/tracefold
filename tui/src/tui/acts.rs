@@ -246,6 +246,25 @@ pub struct View {
     /// instruction to the caller about *now*, and this is a state that persists across frames,
     /// reads and keypresses.
     pub wide: bool,
+    /// How far the reader has moved the **face**, as against the attention.
+    ///
+    /// 🔴 **`req/924` §TUI-62 裁定3** (`req/38` SS1093, Owner `#284-T`, 2026-09-01): *scroll down and
+    /// the content moves up — and "relative scroll" includes the face moving independently of the
+    /// selection*. Until this the window was a pure function of `selected`, so the only way to move
+    /// the screen was to move the attention, and a wheel had nothing to turn.
+    ///
+    /// A **signed offset added to the window's own answer**, not an absolute top. That is what keeps
+    /// the reducer allowed to hold it: a reducer knows how many records the list has and nothing
+    /// about how tall the terminal is, so it cannot compute a top — but it can say *this many rows
+    /// further down than wherever the face would otherwise be standing*, and
+    /// `super::layout::scrolled` clamps it against a height only it knows.
+    ///
+    /// 🔴 **The consequence is deliberate and is disclosed**: with this away from nought the attended
+    /// record can be off the screen. The standing row spells `N of M` at every shape (`req/924`
+    /// §TUI-57), so the reader is told where they are standing even when they cannot see it — which
+    /// is the property `req/38` SS999 T-r4-B was actually about. Gate `g28` measures the window's
+    /// invariant with this at nought and says so.
+    pub glide: isize,
 }
 
 /// What the caller has to do about an act, once the state has been moved.
@@ -302,7 +321,55 @@ pub fn grounded(view: &View, rows: usize) -> View {
     next.open &= rows > 0;
     next.help &= rows > 0;
     next.wide &= rows > 0;
+    // 🔴 The face's own offset is clamped by the same line, for the same reason the three above it
+    // are: a list with nothing in it has no stream to stand in, and a record or the hatch is not a
+    // stream at all. Left standing, the offset would survive a read that emptied the list and the
+    // next frame would open somewhere nobody scrolled to.
+    if rows == 0 || next.open || next.help {
+        next.glide = 0;
+    }
     next
+}
+
+/// The pointer's road: attend to the record under it.
+///
+/// 🔴 **A declared function and deliberately not an [`Act`]** (`req/924` §TUI-62 裁定2, `req/38`
+/// SS1093, Owner `#284-T`). [`ACTS`] is the **key** binding table — `act-table.json` and its gate
+/// read it as such — and a pointer is not a key: it carries a position, which no entry in that table
+/// can. Adding a keyed act for it would put a row in the ledger that no key answers.
+///
+/// What it does is exactly what `j` and `k` do, arrived at differently, and that is why it may be
+/// wired now: **clicking to select is a read**. `req/924` §TUI-50's order — *an act with an effect
+/// comes after the consent screen* — is untouched, because this has no effect. The seat's earlier
+/// ruling that the mouse waits for the input surface was withdrawn on exactly that ground.
+///
+/// Clamped here rather than by the caller, so a click below the last record attends to the last
+/// record instead of to a row that is not there.
+#[must_use]
+pub fn attend(view: &View, index: usize, rows: usize) -> View {
+    let mut next = *view;
+    next.selected = index.min(rows.saturating_sub(1));
+    // 🔴 Bringing the attention back into view is the point of clicking on it. A click that left
+    // the face standing somewhere else would answer the reader's *position* and ignore their
+    // *gesture*.
+    next.glide = 0;
+    grounded(&next, rows)
+}
+
+/// The wheel's road: move the face, and leave the attention where it is.
+///
+/// 🔴 **`req/924` §TUI-62 裁定3.** Scrolling down moves the content **up**, which is `delta`
+/// positive. Not an [`Act`] for the reason [`attend`] is not one, and additionally because it is a
+/// *rate* rather than a step: a wheel reports how far it turned.
+///
+/// The offset is unbounded here and clamped in `super::layout::scrolled`, which is the only place
+/// that knows how tall the stream and the region are. A reducer that clamped it would be a reducer
+/// claiming to know the size of a terminal.
+#[must_use]
+pub fn glide(view: &View, delta: isize, rows: usize) -> View {
+    let mut next = *view;
+    next.glide = next.glide.saturating_add(delta);
+    grounded(&next, rows)
 }
 
 /// The single reducer: the declaration resolved, once.

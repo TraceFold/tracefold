@@ -128,6 +128,20 @@ pub const STREAM_TICK: Duration = Duration::from_millis(500);
 /// How long the worker waits before opening the stream again after it ended.
 pub const REOPEN_AFTER: Duration = Duration::from_secs(2);
 
+/// How long an open connection may carry nothing before the face stops calling it live.
+///
+/// 🔴 **`req/38` SS1085's finding, as a number.** `ENGINE LIVE, 151 events` said the connection had
+/// been *made*; it said nothing about whether anything was still *arriving*, so a stream that had
+/// gone quiet and a stream that had died wore one face — the `Zero`/`Unknown` collapse this face
+/// refuses everywhere else, committed by its own badge. The dot is what separates them
+/// ([`LinkReport::dot`]), and this is the boundary it separates them at.
+///
+/// Sixty seconds, and the number is a **declaration rather than a measurement**: no ruling names a
+/// threshold, and one had to be picked for the distinction to exist at all. It is named here so a
+/// gate can fire both sides of it without a socket, and so the day it is wrong there is one line to
+/// change rather than a comparison buried in a renderer.
+pub const QUIET_AFTER: Duration = Duration::from_secs(60);
+
 /// The mark for a connection that is up.
 ///
 /// 🔴 Two arrows pointing at the screen: the engine is pushing this way. Inside `U+0020..=U+007E`
@@ -330,6 +344,17 @@ pub struct LinkReport {
     /// [`Link::Never`] from [`Link::Off`] on the screen: `off` never asked, `never` asked this many
     /// times and was never once answered with a body.
     pub attempts: u64,
+    /// How long ago the most recent event arrived, or [`None`] when none ever has.
+    ///
+    /// 🔴 **The fact `req/38` SS1085 found missing, and it is a duration rather than an instant.**
+    /// An instant is only meaningful beside the clock it was read from, so a report carrying one
+    /// would make every consumer re-read the clock and would make a test's answer depend on when it
+    /// ran. The elapsed time is read once, where the lock is already held, and travels as a value.
+    ///
+    /// [`None`] is **not** nought: *no event has ever arrived* and *an event arrived just now* are
+    /// two different facts, and folding the first into the second is the collapse this module's own
+    /// documentation refuses one field up.
+    pub silent_for: Option<Duration>,
 }
 
 impl Default for LinkReport {
@@ -348,6 +373,58 @@ impl LinkReport {
             unreadable: 0,
             reconnects: 0,
             attempts: 0,
+            silent_for: None,
+        }
+    }
+
+    /// Which of the six appearances the connection's state takes: the mark, and the paint role.
+    ///
+    /// 🔴 **The whole of `req/924` §TUI-57's second ruling in one function** (`req/38` SS1088, Owner
+    /// `#282-T`). The rail spelled `ENGINE LIVE, {n} events` and `engine ok`; those words are gone
+    /// and this mark stands in their place, which is the admission test
+    /// `INHERITED_PRINCIPLES` §3c-③'' states — *a mark earns its cells by carrying a meaning and
+    /// thereby deleting a word*.
+    ///
+    /// 🔴 **Six values and not one.** `§TUI-30` refused `✓` because it reduces the number of states
+    /// a reader can tell apart, and one dot would do the same thing more quietly: `SS1085` measured
+    /// a face on which *a quiet stream and a dead stream looked identical*. So every one of
+    /// [`LINKS`]'s five states keeps an appearance of its own, and [`Link::Open`] — the one state
+    /// that was hiding a second fact — is split at [`QUIET_AFTER`].
+    ///
+    /// The order of the answers is [`super::tokens::DOTS`]'s order, and the marks are read out of
+    /// that array rather than typed here, so the glyph allow-list gate covers every one of them.
+    #[must_use]
+    pub fn dot(&self) -> (&'static str, super::tokens::Role) {
+        use super::tokens::{Role, DOTS};
+        match self.link {
+            // 🔴 `None` takes the quiet arm rather than the live one: a connection that is up and
+            // has never carried anything is exactly the state the badge used to hide.
+            Link::Open => {
+                if self.silent_for.is_some_and(|since| since < QUIET_AFTER) {
+                    (DOTS[0], Role::LinkLive)
+                } else {
+                    (DOTS[1], Role::LinkQuiet)
+                }
+            }
+            Link::Opening => (DOTS[2], Role::LinkOpening),
+            Link::Never => (DOTS[3], Role::LinkNever),
+            Link::Closed => (DOTS[4], Role::LinkClosed),
+            Link::Off => (DOTS[5], Role::LinkOff),
+        }
+    }
+
+    /// When something last arrived, in words — the sentence the dot's shape stands for.
+    ///
+    /// 🔴 The dot says *live* or *quiet*; this says **how quiet**, and `req/38` SS1085 is the ruling
+    /// that the second one has to exist somewhere. It is spelled in the escape hatch rather than on
+    /// the standing frame, which is `req/924` §TUI-29 — a caveat takes a row when it is a caveat —
+    /// and `§TUI-21` is why a gate has to confirm the hatch really carries it.
+    #[must_use]
+    pub fn silence(&self) -> String {
+        match self.silent_for {
+            Some(since) => format!("last event {}s ago", since.as_secs()),
+            // Not `0s ago`. The two are different facts and this vocabulary keeps them apart.
+            None => "no event has arrived on this connection".to_string(),
         }
     }
 
@@ -703,6 +780,9 @@ impl Subscription {
                 unreadable: state.unreadable,
                 reconnects: reopenings(state.opens),
                 attempts: state.attempts,
+                // Read where the lock is already held, and as an elapsed time rather than an
+                // instant, for the reason `LinkReport::silent_for` gives.
+                silent_for: state.last.map(|at| at.elapsed()),
             })
     }
 

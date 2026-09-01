@@ -278,6 +278,25 @@ fn ac_070_two_receipts_differing_only_in_their_clock_share_a_digest() {
 /// inclusion proof. **Every other field changes the digest**, which is the half that keeps the leaf
 /// binding -- a reader who knows only that the rule deviates from 42 §3.11 cannot tell whether it
 /// deviates by two fields or by nine, and this counts them.
+///
+/// # req/1053 F-1 (`req/994` "ac_070 mutant旧11 field"): the count is derived, not written
+///
+/// This probe used to close with `assert_eq!(moved, 10)` against a struct the header above once
+/// called "eleven fields" -- and the struct's own doc comment (`src/receipt.rs`, just above the
+/// `pub struct ReceiptPayload` line) already names hand-written field counts as a defect class: "a
+/// hand-written count in prose is a second copy of a number that is already measured mechanically
+/// -- the same defect this lane retracted in 44". `ReceiptPayload` grew from eleven fields to
+/// twenty across four errata (`ac_018.rs`'s own `assert_eq!(fields.len(), 20, ...)` measures the
+/// same struct the same way) while this probe's `mutations` array and its `assert_eq!(moved, 10)`
+/// stayed at the shape written for the eleven-field struct -- nine fields (`confinement`,
+/// `catalogue_hash`, `read_set`, `reversibility`, `undo`, `determinism_boundary`, `receipt_kind`,
+/// `fingerprint_scope`, `payload_version`, `engine_version` minus the one this window adds no
+/// coverage for) were silently unmeasured: had a refactor dropped one of them from
+/// `ledger_digest`'s input, this test would still have printed `AC070_LEDGER_DIGEST_COVERS=10_OF_11`
+/// and passed. The fix below is the same one `ac_018.rs` already applies to 42 §3.10's table: parse
+/// the field list off `src/receipt.rs` at test time and assert the *set* of covered names against
+/// it, so a field added to or dropped from the struct without a matching mutation here fails loudly
+/// instead of leaving a coverage hole under a green checkmark.
 #[test]
 fn ac_070_the_ledger_digest_excludes_exactly_two_things() {
     let key = keypair(10);
@@ -297,8 +316,7 @@ fn ac_070_the_ledger_digest_excludes_exactly_two_things() {
     assert_eq!(resigned.ledger_digest().expect("canonical"), baseline);
 
     // Included: everything else. One field at a time, each must move the digest.
-    let mut moved = 0usize;
-    let mutations: [(&str, Edit); 8] = [
+    let mutations: [(&str, Edit); 18] = [
         ("key_id", Box::new(|p| p.key_id = "other".to_string())),
         // 🔴 **E-M5-11**: the seat is an `Option`, so the mutations reach through it. A payload
         // whose verdict is `None` here would be a fixture that is not the one under test, which is
@@ -329,7 +347,55 @@ fn ac_070_the_ledger_digest_excludes_exactly_two_things() {
             "fail_posture_engaged",
             Box::new(|p| p.fail_posture_engaged = !p.fail_posture_engaged),
         ),
+        // 🔴 req/1053 F-1 -- the ten fields below this line had no mutation before this window.
+        // `commit_receipt_in_a_log` builds a `CommitReceipt` (`support::commit_payload`), so the
+        // baseline each closure moves away from is that fixture's, not `verdict_payload`'s.
+        ("confinement", Box::new(|p| p.confinement = None)),
+        (
+            "catalogue_hash",
+            Box::new(|p| p.catalogue_hash = Some("ac070-mutant-hash".to_string())),
+        ),
+        (
+            "read_set",
+            Box::new(|p| p.read_set = Some(gx_witness::receipt::ReadSet::Nothing)),
+        ),
+        (
+            "reversibility",
+            Box::new(|p| p.reversibility = Some(gx_core::Reversibility::False)),
+        ),
+        (
+            "undo",
+            Box::new(|p| {
+                p.undo = Some(gx_witness::receipt::UndoAttestation {
+                    undoes: tid(4343),
+                    witness: gx_witness::receipt::UndoDisposition::Attested,
+                });
+            }),
+        ),
+        (
+            "determinism_boundary",
+            Box::new(|p| p.determinism_boundary = gx_core::DeterminismBoundary::Unknown),
+        ),
+        (
+            "receipt_kind",
+            Box::new(|p| p.receipt_kind = ReceiptKind::VerdictReceipt),
+        ),
+        (
+            "fingerprint_scope",
+            Box::new(|p| p.fingerprint_scope = "ac070-mutant-scope".to_string()),
+        ),
+        ("payload_version", Box::new(|p| p.payload_version = None)),
+        ("engine_version", Box::new(|p| p.engine_version = None)),
     ];
+    let mut covered: std::collections::BTreeSet<String> = mutations
+        .iter()
+        .map(|(name, _)| {
+            name.split('.')
+                .next()
+                .expect("a mutation name has at least one segment")
+                .to_string()
+        })
+        .collect();
     for (name, mutate) in mutations {
         let mut altered = payload.clone();
         mutate(&mut altered);
@@ -338,20 +404,60 @@ fn ac_070_the_ledger_digest_excludes_exactly_two_things() {
             baseline,
             "{name} is not covered by the ledger digest"
         );
-        moved += 1;
     }
     // The two fingerprints too, which the closure list cannot express without a second type.
     let mut altered = payload.clone();
     altered.precondition_fingerprint = support::fingerprint(99);
     assert_ne!(altered.ledger_digest().expect("canonical"), baseline);
+    covered.insert("precondition_fingerprint".to_string());
     let mut altered = payload.clone();
     altered.postcondition_fingerprint = None;
     assert_ne!(altered.ledger_digest().expect("canonical"), baseline);
-    moved += 2;
+    covered.insert("postcondition_fingerprint".to_string());
 
-    // Eleven fields, of which `inclusion_proof` is the one excluded.
-    assert_eq!(moved, 10);
-    println!("AC070_LEDGER_DIGEST_COVERS={moved}_OF_11 EXCLUDED=inclusion_proof,signature");
+    // The derived check: parse `ReceiptPayload`'s field names off the source `ac_018.rs` already
+    // reads mechanically, and require the covered set (above) plus the one deliberate exclusion to
+    // equal it exactly -- not a count, a set, so an added field lands as a named miss rather than an
+    // off-by-one.
+    let struct_src = include_str!("../src/receipt.rs");
+    let body = struct_src
+        .split("pub struct ReceiptPayload {")
+        .nth(1)
+        .expect("receipt.rs declares ReceiptPayload")
+        .split("\n}")
+        .next()
+        .expect("split always yields one");
+    let struct_fields: std::collections::BTreeSet<String> = body
+        .lines()
+        .map(str::trim)
+        .filter(|l| l.starts_with("pub ") && l.ends_with(','))
+        .map(|l| {
+            l.trim_start_matches("pub ")
+                .split(':')
+                .next()
+                .expect("a field declaration line has a colon")
+                .trim()
+                .to_string()
+        })
+        .collect();
+    let excluded: std::collections::BTreeSet<String> =
+        std::iter::once("inclusion_proof".to_string()).collect();
+    let accounted: std::collections::BTreeSet<String> =
+        covered.union(&excluded).cloned().collect();
+    println!(
+        "AC070_LEDGER_DIGEST_COVERS={}_OF_{} EXCLUDED={:?}",
+        covered.len(),
+        struct_fields.len(),
+        excluded
+    );
+    assert_eq!(
+        accounted,
+        struct_fields,
+        "ReceiptPayload's fields and this test's coverage disagree -- in the struct but not \
+         measured here: {:?}; measured here but not in the struct: {:?}",
+        struct_fields.difference(&accounted).collect::<Vec<_>>(),
+        accounted.difference(&struct_fields).collect::<Vec<_>>()
+    );
     assert_eq!(
         receipt.payload().expect("decodes").receipt_kind,
         ReceiptKind::CommitReceipt

@@ -39,7 +39,7 @@ use gx_core::{Fingerprint, SubstrateKind, Timestamp};
 use gx_engine::store::FingerprintRecord;
 use gx_engine::{replay, EngineJournal, EngineJournalRecord, Recovery, MAX_RECORD_BYTES};
 use proptest::prelude::*;
-use support::{cid, every_variant, iid, read_repo, scratch, tid};
+use support::{cid, every_variant, iid, provenance, read_repo, scratch, tid};
 
 fn encoded(records: &[EngineJournalRecord]) -> Vec<Vec<u8>> {
     records
@@ -143,6 +143,16 @@ fn any_record() -> impl Strategy<Value = EngineJournalRecord> {
             }),
             Just(EngineJournalRecord::CommittingStarted {
                 transformation: tid(seed),
+                at
+            }),
+            // req/1053 F-1 (`req/990` L1581): this arm was missing, so the property never
+            // covered `ProvenanceDerived`'s round trip even though `every_variant_survives_a_round_trip`
+            // below (the exhaustive companion, not the generated one) already did. `support::provenance`
+            // varies `engine_version`/`input_objects`/`intent_digest` with the seed, so this arm carries
+            // the same per-seed diversity `every` other arm here does.
+            Just(EngineJournalRecord::ProvenanceDerived {
+                transformation: tid(seed),
+                provenance: provenance(seed),
                 at
             }),
             Just(EngineJournalRecord::InverseEscrowed {

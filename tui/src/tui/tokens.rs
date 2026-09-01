@@ -154,11 +154,34 @@ pub enum Role {
     VerdictEscalate,
     /// 🔴 There is no verdict on the wire for this row. Not a fourth verdict: a fourth **mark**.
     VerdictNone,
+    /// The connection is up and something arrived inside [`super::live::QUIET_AFTER`].
+    ///
+    /// 🔴 The six `link.*` roles are one decision (`req/924` §TUI-57, `req/38` SS1088, Owner
+    /// `#282-T`). The rail used to spell `ENGINE LIVE, 151 events` and `engine ok`; a dot replaces
+    /// both, and a dot with one appearance would put `SS1085`'s finding back on the screen — *a
+    /// quiet stream and a dead stream wearing one face*. So the states are **not** collapsed: each
+    /// of [`super::live::LINKS`]'s five gets a role, and the one state that hides a second fact
+    /// inside it — an open connection nothing is arriving on — gets a sixth. Gate `g19` already
+    /// required the five to be drawn differently and still does.
+    ///
+    /// 🔴 They are **not** the seven words for nothing and must never borrow one of their roles
+    /// (`req/924` §TUI-48): being connected is not an absence, and being severed is a measurement.
+    LinkLive,
+    /// The connection is up and nothing has arrived for [`super::live::QUIET_AFTER`] or longer.
+    LinkQuiet,
+    /// The connection has been asked for and has not answered yet.
+    LinkOpening,
+    /// The connection has been asked for and has never once been up.
+    LinkNever,
+    /// The connection has been up and is not up now.
+    LinkClosed,
+    /// This run does not subscribe at all.
+    LinkOff,
 }
 
 /// Every paint role this face declares. Gate g14 requires each one to resolve to a value, and gate
 /// g16 pins which value.
-pub const ROLES: [Role; 15] = [
+pub const ROLES: [Role; 21] = [
     Role::Head,
     Role::Quiet,
     Role::Body,
@@ -174,6 +197,12 @@ pub const ROLES: [Role; 15] = [
     Role::VerdictDeny,
     Role::VerdictEscalate,
     Role::VerdictNone,
+    Role::LinkLive,
+    Role::LinkQuiet,
+    Role::LinkOpening,
+    Role::LinkNever,
+    Role::LinkClosed,
+    Role::LinkOff,
 ];
 
 impl Role {
@@ -196,6 +225,12 @@ impl Role {
             Role::VerdictDeny => "verdict.deny",
             Role::VerdictEscalate => "verdict.escalate",
             Role::VerdictNone => "verdict.none",
+            Role::LinkLive => "link.live",
+            Role::LinkQuiet => "link.quiet",
+            Role::LinkOpening => "link.opening",
+            Role::LinkNever => "link.never",
+            Role::LinkClosed => "link.closed",
+            Role::LinkOff => "link.off",
         }
     }
 
@@ -222,6 +257,16 @@ impl Role {
             Role::MarkDeleted | Role::VerdictDeny => Token::Refuse,
             Role::VerdictAdmit => Token::Affirm,
             Role::VerdictEscalate => Token::Accent,
+            // 🔴 Four hues over six states, and the glyph is what carries the sixth distinction —
+            // `INHERITED_PRINCIPLES` §3c-③''-③: no meaning may rest on **one** tier. On `mono`
+            // every hue is dropped and the six dots are still six different characters, so the
+            // reader who cannot see colour loses nothing. `link.never` and `link.closed` share
+            // `refuse` because both are the connection being down; they are told apart by the mark,
+            // which is the same rule `mark.zero`/`mark.empty` are told apart by one rung up.
+            Role::LinkLive => Token::Affirm,
+            Role::LinkQuiet => Token::Accent,
+            Role::LinkNever | Role::LinkClosed => Token::Refuse,
+            Role::LinkOpening | Role::LinkOff => Token::Thin,
         }
     }
 }
@@ -316,7 +361,7 @@ pub struct Glyph {
 /// is measured rather than aesthetic: a run of `─` is ink, a hundred and twenty cells of it is more
 /// ink than the four rows the enclosure was brought in to delete, and this lane's whole purpose is
 /// the ratio of ink spent on the machine to ink spent on the ledger.
-pub const GLYPHS: [Glyph; 8] = [
+pub const GLYPHS: [Glyph; 14] = [
     Glyph {
         text: "\u{2502}",
         means: "a boundary between two parts of one screen",
@@ -366,6 +411,59 @@ pub const GLYPHS: [Glyph; 8] = [
         means: "move the attention toward the bottom of the list",
         instead_of: "`next`",
     },
+    // 🔴 **The six dots** (`req/924` §TUI-57, `req/38` SS1088, Owner `#282-T`). They are admitted
+    // under the test this array exists to record and they pass it in the strong direction: the rail
+    // that spelled `ENGINE LIVE, 151 events` and `engine ok` is **gone**, and these marks are what
+    // stands in its place. `§TUI-30` refused `● CONNECTED` because the word stayed beside the mark;
+    // here the word is what leaves.
+    //
+    // Six and not one, because `SS1085` measured the defect a single dot would ship: `ENGINE LIVE`
+    // said the connection had been made and said nothing about whether anything was still arriving,
+    // so *a quiet stream and a dead stream wore one face*. The states are told apart by the mark
+    // itself and not only by the hue, which is `INHERITED_PRINCIPLES` §3c-③''-③.
+    Glyph {
+        text: "\u{25CF}",
+        means: "the connection is up and an event arrived recently",
+        // 🔴 **`engine ok` is not in this list** (independent audit F-05, 2026-09-02).
+        // [`super::live::LinkReport::dot`] matches on the connection's state alone and never reads
+        // the engine's health, so a degraded engine on a live stream draws this mark. The words
+        // `engine ok` replaced are spelled by the standing row's caveat clause
+        // (`super::layout::Shape::engine_caveat`), which appears exactly when one of the engine's
+        // two claims stops holding. A declaration that claimed both would be this face saying the
+        // mark measures more than it does.
+        instead_of: "`ENGINE LIVE, N events`",
+    },
+    Glyph {
+        text: "\u{25D0}",
+        // 🔴 **`or ever`** (independent audit F-05, 2026-09-02). The `None` arm of
+        // [`super::live::LinkReport::silent_for`] takes this mark, and a legend reading only *for a
+        // while* is false for a connection that has been up since it opened and carried nothing.
+        // The two are told apart in words by [`super::live::LinkReport::silence`], which the hatch
+        // draws — `no event has arrived on this connection` against `last event Ns ago`. The mark
+        // is one state; the sentence beside it is which of the two.
+        means: "the connection is up and nothing has arrived inside the quiet window, or ever",
+        instead_of: "`ENGINE LIVE, N events` — which said this and the state above with one phrase",
+    },
+    Glyph {
+        text: "\u{25CC}",
+        means: "the connection has been asked for and has not answered yet",
+        instead_of: "`connecting`",
+    },
+    Glyph {
+        text: "\u{00D7}",
+        means: "the connection has been asked for and has never once been up",
+        instead_of: "`never connected in N attempts`",
+    },
+    Glyph {
+        text: "\u{25CB}",
+        means: "the connection has been up and is not up now",
+        instead_of: "`closed after N events, M reconnects`",
+    },
+    Glyph {
+        text: "\u{00B7}",
+        means: "this run does not subscribe, so there is no connection for events to arrive on",
+        instead_of: "`not subscribed`",
+    },
 ];
 
 /// The boundary between two parts of one screen.
@@ -391,6 +489,20 @@ pub const CORNERS: [&str; 4] = [
     GLYPHS[2].text,
     GLYPHS[3].text,
     GLYPHS[4].text,
+];
+
+/// The six marks the connection's state is drawn with, read out of [`GLYPHS`] for the reason
+/// [`CORNERS`] is: a second spelling is a glyph the allow-list does not cover.
+///
+/// Order: live, quiet, opening, never, closed, off — the same order
+/// [`super::live::LinkReport::dot`] answers in, and gate `g74` requires the six to be six.
+pub const DOTS: [&str; 6] = [
+    GLYPHS[8].text,
+    GLYPHS[9].text,
+    GLYPHS[10].text,
+    GLYPHS[11].text,
+    GLYPHS[12].text,
+    GLYPHS[13].text,
 ];
 
 /// One resolved value: a colour in the spelling this tier can carry, and the emphasis.

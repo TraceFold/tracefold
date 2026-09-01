@@ -165,6 +165,9 @@ fn dump(options: &Options, tier: Tier) -> crate::Result<Answer> {
         layout::Attention {
             selected: super::tui::acts::View::default().selected,
             items: screen.transformations.items().len(),
+            // The same default view the shape above is read from: `--dump` draws one frame and
+            // nobody has scrolled it.
+            glide: super::tui::acts::View::default().glide,
         },
     );
     let buffer =
