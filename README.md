@@ -14,6 +14,7 @@ See the Scope Exclusions table below and [docs/LIMITS.md](docs/LIMITS.md) for wh
 <p>
 <a href="https://doi.org/10.5281/zenodo.22168558"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22168558-00dfd8?style=for-the-badge&logo=doi&logoColor=090a0f" alt="Zenodo DOI"></a>
 <a href="https://www.npmjs.com/package/@mahirhir/tracefold"><img src="https://img.shields.io/badge/npm-SDK%20v0.1-0070f3?style=for-the-badge&logo=npm&logoColor=ffffff" alt="npm SDK"></a>
+<a href="https://crates.io/crates/tracefold"><img src="https://img.shields.io/crates/v/tracefold.svg?style=for-the-badge&logo=rust&logoColor=ffffff&label=crates.io&color=dea584" alt="crates.io"></a>
 <a href="rust-toolchain.toml"><img src="https://img.shields.io/badge/Rust-1.97.1-7928ca?style=for-the-badge&logo=rust&logoColor=ffffff" alt="Rust 1.97.1"></a>
 <a href="lean/"><img src="https://img.shields.io/badge/Lean%204-154%20Theorems-00dfd8?style=for-the-badge&logoColor=090a0f" alt="Lean 4 Proofs"></a>
 <a href="mailto:mahirohirakawa@glovrex.com"><img src="https://img.shields.io/badge/Contact-mahirohirakawa%40glovrex.com-26231f?style=for-the-badge&logo=minutemailer&logoColor=ffffff" alt="Email"></a>

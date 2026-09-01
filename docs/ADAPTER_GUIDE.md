@@ -170,3 +170,38 @@ instructions and a released-SDK badge instead. A P1 crates.io publish lane ran t
 partially remediated same-day (crate-name collision, private-feature defaults) -- see
 `docs/LIMITS.md`'s 2026-09-01 entry for the full, sourced detail. `publish = false` and "no
 `cargo add` path" both still hold as measured; only the README quote above is stale.
+
+**Second currency note (2026-09-02, pub_sync#8 lane, ruling on the item the 2026-09-01 note
+left open).** `gx-adapter-time` is now public source (added to `tools/pub_sync_dryrun.sh`'s
+`SYNC_CRATES` this date) -- its "same posture as postgres and mysql in §5" line above no
+longer holds and is superseded by this note, not deleted. The ruling: unlike postgres/mysql
+(§3's `sql.rs`+`db.rs` dominate their line count -- SQL dialect and connection handling) or
+the MCP wire layer (§5's AC-051 no-bundled-client design choice) or `gx-confine` (a capability
+boundary crate, a different risk class from a substrate adapter), `gx-adapter-time` carries no
+external-service or credential surface at all (its own `Cargo.toml` doc comment: "No scheduler
+client... [it] starts no process") and is closer in shape to fs/git than to postgres/mysql: 8
+source files, 945 lines (`git show HEAD:crates/gx-adapter-time/src/*.rs` at ruling time), 7/7
+`SubstrateAdapter` methods implemented, all three dependencies (`gx-core`, `gx-canon`,
+`gx-substrate`) already public. It was leak-gate-scanned before this ruling: 0 hits across every
+category the sync script checks (retired handle, absolute local paths, `.env`-named files, CJK,
+secrets heuristics, private names) -- stronger than "no reason to suspect a problem." Its
+`Cargo.toml` `publish = false` is left unchanged (matches `gx-cli`/`gx-gate`'s existing pattern
+of public source that is not yet a crates.io publish target; flipping `publish` is the separate,
+already-blocked-once crates.io publish lane's decision, not this one). The prior 5-adapter
+figures in §1 and §3's table above are still not re-measured at 6 -- this note corrects the
+*private/public* claim only, not the line-count table, consistent with how the 2026-09-01 note
+above handled the same page.
+
+**Third currency note (2026-09-02, same lane, found while verifying the above).** §5's
+"`publish = false` on every crate's `Cargo.toml`... no `cargo add` path to any of this" is now
+stale for the 13-crate publish closure: `req/1050_CRATES_IO_PUBLISH_LANE_COMPLETE_2026-09-01.md`
+records 13/13 real publishes to crates.io at `0.1.2` (`tracefold`, `tracefold-core`,
+`tracefold-canon`, `tracefold-log`, `tracefold-witness`, `tracefold-substrate`, `tracefold-gate`,
+`tracefold-adapter-fs`, `tracefold-adapter-git`, `tracefold-engine`, `tracefold-adapter-mcp`,
+`tracefold-api`, `tracefold-tui`), independently re-verified anonymous (no `gh auth`) against
+`crates.io/api/v1/crates/<name>` by this lane before writing this note: all 13 return `200` with
+`default_version: "0.1.2"`. `gx-adapter-time` is not among them (its `publish = false` claim
+still holds, per this page's own second note above -- being in `SYNC_CRATES` makes its source
+readable on GitHub, not installable via `cargo add`, exactly the distinction §5's opening bullet
+already draws for `gx-cli`/`gx-gate`). `docs/LIMITS.md` was not re-checked by this note for the
+same staleness; that is this note's own unread range.

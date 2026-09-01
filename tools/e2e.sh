@@ -787,7 +787,9 @@ set -u
 #       through the engine: transplanting the signature `gx log checkpoint` signed into `gx
 #       verdict-checkpoint issue`'s output makes `gx verdict-checkpoint verify` refuse with
 #       `checks.signature=false`/exit 7. The re-run of D-2/D-3/D-4 under the wire only empirically
-#       measured `cargo test -p gx-adapter-mcp --test ac_051`'s existing dynamic scan (files=114
+#       measured `cargo test -p gx-adapter-mcp --test ac_051`'s existing dynamic scan (the package
+#       has since been renamed `tracefold-adapter-mcp`; the old name is kept here because it is what
+#       was measured, and annotated because a stale name in live tooling reads as a live claim) (files=114
 #       now includes gx-mcp-wire's 7 files, apply_sites stays 1 = unchanged), so the probe count does not move. The suite stays the existing `verdict_checkpoint_surface` (+0).
 # 🔴 **P1** (`req/115` §A, `req/38` §76's leftover-work lane that started after P3's DoD closed
 # and that `req/128b` carries this floor update for). **+33 probes over +7 suites** -- the 16th
