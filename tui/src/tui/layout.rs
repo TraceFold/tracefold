@@ -366,6 +366,42 @@ pub struct Measured {
     ///
     /// Pairs, not one string, so [`heading`] can drop them one at a time from the end.
     pub engine: Vec<(String, String)>,
+    /// The engine's own line **unfolded**, whatever the rail is drawing.
+    ///
+    /// 🔴 **The other half of the fold, and it is the shape [`Plan::provenance_full`] already
+    /// proved.** `req/924` §TUI-29 lets the rail spell `engine ok` while both of the engine's claims
+    /// hold, and `req/38` SS842 is the reason that is only half a decision: a reduction pass takes
+    /// the caveats out with the padding unless the caveat is *moved* rather than dropped. This is
+    /// where it moved to, and the help face is where a reader reaches it — so `engine_version`, which
+    /// no other row spells, is still on a screen this process can draw.
+    pub engine_full: Vec<(String, String)>,
+    /// Whether every one of the reads answered `200`.
+    ///
+    /// 🔴 A bool beside [`Measured::statuses`] rather than a `contains` on it later (`req/924`
+    /// §TUI-29). That sentence is composed for a reader and may be reworded; the decision this fact
+    /// drives — whether the provenance region has anything left to say — must not move when it is.
+    /// Two readings of one measurement, and only one of them is a string.
+    pub all_200: bool,
+    /// The columns whose every value in this reading is a mark for nothing.
+    ///
+    /// 🔴 **`req/924` §TUI-45 (`req/38` SS1076, Owner `#275-T`): a column that says nothing on every
+    /// row is a column spent saying nothing.** `created_at ?` down twenty-three rows says *measured,
+    /// and not knowable* twenty-three times where once is the whole of it. The column is not drawn
+    /// and is counted among the fields the disclosure names instead — and that second half is what
+    /// makes it a disclosure rather than a deletion.
+    ///
+    /// **The boundary is the ruling's**: only when **every** value is a mark for nothing. A column
+    /// where some rows carry a value is information and is kept, and so is one where the marks
+    /// disagree — `?` on one row and `--` on another is this face telling two kinds of nothing
+    /// apart, which is the distinction the whole vocabulary exists for.
+    ///
+    /// 🔴 **The mark travels with the key** (independent audit, finding 4). A `Vec<&str>` of keys
+    /// said only *this column was nothing*, and the help face could then say no more than "a mark
+    /// for nothing" — collapsing `?` and `--` and `...` for every column it dropped, inside the
+    /// lane whose other half exists to keep them apart. The pair is what the hatch spells.
+    ///
+    /// Measured in `super::renderer::vacant_columns`, which is where a record may be read.
+    pub vacant: Vec<(&'static str, String)>,
 }
 
 impl Measured {
@@ -536,6 +572,19 @@ pub struct Plan {
     /// was capped, not the number that survived the cap. Nought for an opened record, the same as
     /// [`note_rows`](Self::note_rows).
     pub grid_capacity: usize,
+    /// The engine's own line unfolded, for the face that discloses what the rail folded.
+    pub engine_full: Vec<(String, String)>,
+    /// The columns dropped because every value in this reading was a mark for nothing.
+    ///
+    /// 🔴 Held **separately** from [`Plan::dropped_fields`], which it is a subset of, because the
+    /// two are dropped for different reasons and the reader can act on the difference: a column let
+    /// go of by width comes back on a wider terminal, and one let go of by this rule does not. The
+    /// help face names them under a label of their own for that reason.
+    ///
+    /// 🔴 And it is **not** emptied for the record and help shapes the way `dropped_fields` is:
+    /// vacancy is a property of the reading rather than of the shape being drawn, and a reader who
+    /// pressed `?` is asking about the grid they came from.
+    pub vacant_fields: Vec<(&'static str, String)>,
 }
 
 impl Plan {
@@ -879,9 +928,32 @@ pub fn letting_go_order() -> Vec<RegionRole> {
 /// Which columns fit, and which wire keys are therefore not drawn.
 #[must_use]
 pub fn columns_for(width: u16) -> (Vec<Column>, Vec<&'static str>) {
+    columns_for_less(width, &[])
+}
+
+/// The same question, with the columns this reading found nothing in taken out of it first.
+///
+/// 🔴 **`req/924` §TUI-45's rule, applied *before* the width fit rather than after** (`req/38`
+/// SS1076, Owner `#275-T`). A column whose every value is a mark for nothing is not competing for
+/// cells a column carrying a value could use, so taking it out first is not a tidy-up: it is what
+/// lets a narrow terminal draw one more real column. Measured against the live bed, five of the ten
+/// keys came back a mark for nothing on all thirty-one records.
+///
+/// The dropped half is the union of the two reasons in **declaration** order, and both reasons end
+/// in the same place — [`Plan::dropped_fields`], which is what the disclosure counts. 🔴 That union
+/// is the ruling's other half: *do not drop it quietly; the disclosed number going up is the correct
+/// shape of this change.*
+#[must_use]
+pub fn columns_for_less(width: u16, vacant: &[&'static str]) -> (Vec<Column>, Vec<&'static str>) {
     let mut drawn = Vec::new();
     let mut dropped: Vec<&'static str> = Vec::new();
     let mut used = 0u16;
+    // 🔴 An explicit flag, and it is a repair this rule made necessary. The fold below used
+    // `!dropped.is_empty()` to mean *the budget has already overflowed*, which was true while the
+    // only way into that vector was overflowing. A vacant column now enters it before any width has
+    // been spent, so the old reading would have dropped every column declared after the first
+    // vacant one — a silent and total loss, caused by a tidier line above it.
+    let mut overflowed = false;
     // 🔴 The declaration decides which column goes first, and this **reads** it. The fold below
     // walks the array and gives up whatever is past the budget, so before this line the order was
     // the order the array happened to be typed in; `LEDGER_COLUMNS` was typed in priority order, so
@@ -893,12 +965,17 @@ pub fn columns_for(width: u16) -> (Vec<Column>, Vec<&'static str>) {
     let mut ordered = LEDGER_COLUMNS;
     ordered.sort_by_key(|column| column.priority);
     for column in ordered {
+        if vacant.contains(&column.key) {
+            dropped.push(column.key);
+            continue;
+        }
         let cost = if drawn.is_empty() {
             column.width
         } else {
             column.width + 1
         };
-        if !dropped.is_empty() || used + cost > width {
+        if overflowed || used + cost > width {
+            overflowed = true;
             dropped.push(column.key);
         } else {
             used += cost;
@@ -1136,6 +1213,14 @@ struct Shape<'a> {
     /// shapes `ledger_agrees yes` went off the right edge behind a `~` with no line saying so.
     /// A marked cut is better than a silent one and it is still not disclosure.
     engine_dropped: usize,
+    /// Whether the provenance region stood down because every route answered `200`.
+    ///
+    /// 🔴 Not the same fact as being in `dropped_regions` (`req/924` §TUI-29). That list is for a
+    /// region the ladder gave up because the screen ran out of rows; this is a region that left
+    /// because it had nothing left to report. *Cut for room* and *nothing to say* are different
+    /// facts — the distinction the seven words for nothing exist to keep — so they get different
+    /// clauses, and this one carries the road to the line in full.
+    provenance_stood_down: bool,
 }
 
 /// The disclosure line, in whichever of its two forms fits.
@@ -1166,6 +1251,7 @@ fn compose_disclosure(
         address_above,
         framed,
         engine_dropped,
+        provenance_stood_down,
     } = shape;
     // 🔴 One spelling of the page's address on the whole screen (`req/924` §TUI-22). Empty when the
     // top rail is carrying it, which is every shape wide enough to hold it with the apparatus drawn.
@@ -1296,6 +1382,16 @@ fn compose_disclosure(
         };
         long.push(format!("{engine_dropped} engine keys not drawn | {route}"));
     }
+    // 🔴 **The provenance stood down, and the road to it** (`req/924` §TUI-29, `req/38` SS1058,
+    // Owner `#268-T`; repeated as §TUI-45 row 5). Four routes that all answered `200` is the state
+    // `engine ok` on the rail already asserts, so a row saying it a second time is furniture — but
+    // the four measured facts do leave the screen, and a screen that lets something go without
+    // saying so is the one cut this face is not allowed to make. The line in full is
+    // [`Plan::provenance_full`], which `super::renderer::help_lines` draws on every frame, and this
+    // clause is the road there.
+    if provenance_stood_down {
+        long.push(format!("provenance -> {keys_address}"));
+    }
     // 🔴 The enclosure, when it is not on the screen. It is a mark that carries meaning, so its
     // absence is a fact about what this frame let go of and not a matter of taste.
     if !framed {
@@ -1387,6 +1483,13 @@ fn compose_disclosure(
     // this form is chosen at, and a mark that carries meaning cannot go quietly at the shapes where
     // it always goes.
     let frame = if framed { "" } else { " | no frame" };
+    // The same clause in the short form, for the reason the keys' clause is in both: a region that
+    // is not on the screen is a loss the reader can act on, and the act is the road.
+    let stood_down = if provenance_stood_down {
+        format!(" | provenance -> {keys_address}")
+    } else {
+        String::new()
+    };
     // The caveats are in the short form too, and for the reason they are in the long one: they
     // cannot be re-measured from anything else on the screen.
     let engine = if engine_dropped > 0 {
@@ -1395,7 +1498,7 @@ fn compose_disclosure(
         String::new()
     };
     format!(
-        "{folded}{} regions not drawn{named} | {head}{keys}{counts}{engine}{frame} | {} routes | {wide_address}",
+        "{folded}{} regions not drawn{named} | {head}{keys}{counts}{engine}{frame}{stood_down} | {} routes | {wide_address}",
         dropped_regions.len(),
         READ_NOT_DRAWN.len()
     )
@@ -1451,7 +1554,11 @@ pub fn resolve_attended(
     // The parameter's name is spent further down on the row count the subject region gets, and the
     // shape is wanted after that point, so it is held here rather than recomputed.
     let shape = subject;
-    let (columns, grid_dropped_fields) = columns_for(width);
+    // 🔴 `req/924` §TUI-45: the reading's own answer is applied before the width's, so the cells a
+    // column that says nothing was holding go to one that does not, and both reasons for a column
+    // being absent end in `dropped_fields`.
+    let vacant_keys: Vec<&'static str> = measured.vacant.iter().map(|(key, _)| *key).collect();
+    let (columns, grid_dropped_fields) = columns_for_less(width, &vacant_keys);
     // While a record is open no field is dropped by **width**: the record draws every member the
     // wire carried, one per row. So the plan's dropped set is empty, and it is empty as a computed
     // fact rather than as a special case in whoever reads it.
@@ -1503,6 +1610,35 @@ pub fn resolve_attended(
     // The enclosure is never offered where the apparatus has been let go of: there is no top rail
     // to open it with, and a screen closed at the bottom and open at the top is not an enclosure.
     let frame_room = heading_width(&head_cells) + FRAME_MARGIN as usize <= width as usize;
+    // 🔴 **The caveat takes a row when it is a caveat** (`req/924` §TUI-29, `req/38` SS1058, Owner
+    // `#268-T`; repeated as §TUI-45 row 5). `4 routes 09:52:28Z | worst 5ms | all 200` is a sentence
+    // a reader cannot act on while every route is answering `200`, and `engine ok` on the rail is
+    // the whole of what it was saying. So the region stands down — **folded, not deleted**: the line
+    // in full is [`Plan::provenance_full`], the help face draws it on every frame, and
+    // `compose_disclosure` spells the road.
+    //
+    // 🔴 **The whole region is [`Recoverable::Nowhere`], and the first cut of this comment narrowed
+    // that to the connection alone** (independent audit, finding 6). [`REGIONS`] declares `Nowhere`
+    // for the region, and [`Recoverable`]'s own doc says *nothing in it can be fetched again; a
+    // second read makes a new measurement* — which is true of the reading clock and of `worst Nms`
+    // as much as of the subscription. So standing the region down **does** put four unrecoverable
+    // facts behind `?`, and the honesty of that turns entirely on the road arriving: the disclosure
+    // spells `provenance -> ?` and `super::renderer::help_lines` moves the line to the front of the
+    // hatch exactly when it does (gate `g67`). What is special about the connection is only that it
+    // is the one fact the **rail** can carry, which is why the badge is what this condition reads.
+    let badge_on_rail = head_cells
+        .iter()
+        .any(|cell| cell.text.contains(super::live::LIVE_BADGE));
+    // 🔴 **And the sentence that is supposed to replace the region has to be *on* the rail**
+    // (independent audit, finding 2). The first cut asked only whether the badge fitted, so at
+    // sixty-six and sixty cells the rail read `list ENGINE LIVE, 151 events` — `engine ok` dropped
+    // off the end, `1 engine keys not drawn` in the disclosure — and the region stood down anyway.
+    // The justification for standing it down is *`engine ok` is the whole of what it was saying*,
+    // and at those two shapes that sentence was not on the screen. A premise that is false on the
+    // drawn frame is not a premise. `heading_engine_dropped` is read rather than a width compared,
+    // which is this module's rule everywhere else.
+    let claim_on_rail = badge_on_rail && engine_dropped == 0;
+    let provenance_wanted = !measured.all_200 || !claim_on_rail;
 
     // The declaration's order, read once. Three passes at most walk it, and it is four elements.
     let order = letting_go_order();
@@ -1549,7 +1685,7 @@ pub fn resolve_attended(
                 subject,
                 // A folded provenance carries its counts into the disclosure; only the bottom rung
                 // of a provenance that still has a region of its own gives them up.
-                counts_dropped: !folded && !rung.carries_counts(),
+                counts_dropped: provenance_wanted && !folded && !rung.carries_counts(),
                 keys_address: &keys_address,
                 wide_address: &wide_address,
                 // 🔴 Nought **inside the loop**, and the real count once below it. How many rows the
@@ -1561,6 +1697,7 @@ pub fn resolve_attended(
                 address_above,
                 framed,
                 engine_dropped,
+                provenance_stood_down: !provenance_wanted,
             },
         );
         disclosure_rows = rows_needed(&disclosure, inner).min(disclosure_cap(folded));
@@ -1569,7 +1706,7 @@ pub fn resolve_attended(
         } else {
             apparatus_rows
         };
-        let provenance = u16::from(!folded);
+        let provenance = u16::from(provenance_wanted && !folded);
         let need = subject_floor + apparatus + provenance + disclosure_rows;
         if need <= height {
             break;
@@ -1586,7 +1723,7 @@ pub fn resolve_attended(
                     dropped.push(RegionRole::Apparatus);
                     true
                 }
-                RegionRole::Provenance if !folded => {
+                RegionRole::Provenance if provenance_wanted && !folded => {
                     folded = true;
                     true
                 }
@@ -1610,7 +1747,7 @@ pub fn resolve_attended(
     } else {
         apparatus_rows
     };
-    let provenance = u16::from(!folded);
+    let provenance = u16::from(provenance_wanted && !folded);
     let spent = apparatus + provenance + disclosure_rows;
     let subject = height.saturating_sub(spent);
     if subject < subject_floor {
@@ -1713,13 +1850,14 @@ pub fn resolve_attended(
                 wide,
                 Shape {
                     subject: shape,
-                    counts_dropped: !folded && !rung.carries_counts(),
+                    counts_dropped: provenance_wanted && !folded && !rung.carries_counts(),
                     keys_address: &keys_address,
                     wide_address: &wide_address,
                     keys_not_drawn,
                     address_above,
                     framed,
                     engine_dropped,
+                    provenance_stood_down: !provenance_wanted,
                 },
             );
             if rows_needed(&disclosure, inner) > disclosure_rows {
@@ -1751,6 +1889,8 @@ pub fn resolve_attended(
         window,
         note_rows,
         grid_capacity,
+        engine_full: measured.engine_full.clone(),
+        vacant_fields: measured.vacant.clone(),
     }
 }
 

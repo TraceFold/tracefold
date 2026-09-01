@@ -158,11 +158,17 @@ export function makeBeforeToolCallHandler(cfg: PluginConfig) {
  * `api` is `any` on purpose. Importing `openclaw/plugin-sdk` would give a checked signature, and a
  * real plugin should; this demo does not take the dependency because it has not been run inside
  * OpenClaw, and a type-checked call is not evidence of a working one.
+ *
+ * `matcher` shape: measured, not guessed, as of the first real install (the req after `1034`). The
+ * first attempt passed `{ tools: [...] }`, which is what `req/1034` §5-3 flagged as unverified. A
+ * real `openclaw plugins install` run failed registration with `TypeError: tool hook matcher must be
+ * an array of tool names` -- so the matcher is the bare array, not an object wrapping it. The
+ * handler's own tool-name guard (`readWriteParams`'s caller above) is what actually holds the scope
+ * regardless of which shape the matcher takes, which is why the earlier wrong shape never mis-scoped
+ * anything -- it just never installed.
  */
 export function register(api: any, cfg: PluginConfig): void {
   api.on("before_tool_call", makeBeforeToolCallHandler(cfg), {
-    // Shape unverified -- see README's untestable list. The handler's own guard is what actually
-    // holds the scope.
-    matcher: { tools: [...cfg.tools] },
+    matcher: [...cfg.tools],
   });
 }

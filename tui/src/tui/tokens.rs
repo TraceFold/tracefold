@@ -316,7 +316,7 @@ pub struct Glyph {
 /// is measured rather than aesthetic: a run of `─` is ink, a hundred and twenty cells of it is more
 /// ink than the four rows the enclosure was brought in to delete, and this lane's whole purpose is
 /// the ratio of ink spent on the machine to ink spent on the ledger.
-pub const GLYPHS: [Glyph; 5] = [
+pub const GLYPHS: [Glyph; 8] = [
     Glyph {
         text: "\u{2502}",
         means: "a boundary between two parts of one screen",
@@ -346,6 +346,26 @@ pub const GLYPHS: [Glyph; 5] = [
         instead_of: "`screen: apparatus subject provenance disclosure`, and the repeated \
                      `GET /v1/transformations` each part used to spell for itself",
     },
+    // 🔴 **The three marks the note spells acts with** (`req/924` §TUI-45 row 4,
+    // `INHERITED_PRINCIPLES` §3c-③''). The admission test is the one this array was built to
+    // record: a mark earns its cells by carrying a meaning **and thereby deleting a word**, and
+    // `instead_of` is where the deleted word is written down. A declaration with an empty
+    // `instead_of` fails P6, which is that ruling made mechanical.
+    Glyph {
+        text: "\u{21b5}",
+        means: "the return key, and the act it produces: open the attended record",
+        instead_of: "`open:return` — both words go, because the mark is the key",
+    },
+    Glyph {
+        text: "\u{2191}",
+        means: "move the attention toward the top of the list",
+        instead_of: "`prev`",
+    },
+    Glyph {
+        text: "\u{2193}",
+        means: "move the attention toward the bottom of the list",
+        instead_of: "`next`",
+    },
 ];
 
 /// The boundary between two parts of one screen.
@@ -353,6 +373,15 @@ pub const GLYPHS: [Glyph; 5] = [
 /// 🔴 Read out of [`GLYPHS`] rather than typed a second time: a second spelling is a glyph the
 /// gate's allow-list does not cover, which is the failure the array exists to make impossible.
 pub const RULE: &str = GLYPHS[0].text;
+
+/// The declaration for one mark, found by the mark itself.
+///
+/// 🔴 So that a gate can ask *what did this glyph say it deleted* without indexing the array, which
+/// is the pairing an audit of this lane found to be positional and therefore silent under a swap.
+#[must_use]
+pub fn glyph(text: &str) -> Option<&'static Glyph> {
+    GLYPHS.iter().find(|glyph| glyph.text == text)
+}
 
 /// The four corners of the ledger's enclosure, read out of [`GLYPHS`] for the reason [`RULE`] is.
 ///

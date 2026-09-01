@@ -25,7 +25,7 @@ Longer-form pieces, written to be read on their own rather than as reference mat
 
 | Article | Subject |
 | :--- | :--- |
-| [`articles/verify-ai-agent-actions-offline.md`](articles/verify-ai-agent-actions-offline.md) | The mechanics behind the front page's flip-one-byte demonstration. |
+| [`articles/verify-ai-agent-actions-offline.md`](articles/verify-ai-agent-actions-offline.md) | The mechanics behind offline receipt verification and tamper detection — flip one byte, the verifier says no. |
 | [`articles/tamper-evident-receipts.md`](articles/tamper-evident-receipts.md) | What a receipt has to carry before it proves anything to someone who does not trust the issuer. |
 | [`articles/tamper-evident-audit-trails-compared.md`](articles/tamper-evident-audit-trails-compared.md) | How this approach differs from audit logs written after the fact. |
 

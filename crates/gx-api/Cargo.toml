@@ -7,13 +7,21 @@
 # not `/stream` — the discrepancy is raised and the implementation follows the words
 # ("everything except `/stream` and the list family").
 [package]
-name = "gx-api"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): publish name becomes
+# "tracefold-api"; [lib] name stays "gx_api" so no source line changes anywhere.
+name = "tracefold-api"
 description = "The Glovrex HTTP surface: thirteen synchronous endpoints, the gx_code map, Bearer auth and Idempotency-Key."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-api-003)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # crates.io metadata; also read by `dist generate`
+publish = true                        # req/1032/req/1035 blockers resolved -- this crate is a real publish target now
+readme = "README.md"                  # crates.io page body (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+[lib]
+name = "gx_api"
 
 # 🔴 **A house rule** applies to this table exactly as it applies to gx-cli's: `gx-canon` is
 # absent and may not be added. A design note wrote the same rule about the Console — "TS itself never
@@ -126,11 +134,11 @@ tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "signal",
 #   ; sem: SEM-gx-api-019).
 # `gx-log`    — `prove_inclusion` and `unsigned_checkpoint` for the two ledger endpoints.
 # `gx-core`   — ids, `Cid::from_text` (the `gx1:` parser the API spec needs, and **not** a mint), `Intent`.
-gx-core = { path = "../gx-core", version = "0.1.2" }
-gx-engine = { path = "../gx-engine", version = "0.1.2" }
-gx-gate = { path = "../gx-gate", version = "0.1.2" }
-gx-witness = { path = "../gx-witness", version = "0.1.2" }
-gx-log = { path = "../gx-log", version = "0.1.2" }
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
+gx-engine = { path = "../gx-engine", version = "0.1.2", package = "tracefold-engine" }
+gx-gate = { path = "../gx-gate", version = "0.1.2", package = "tracefold-gate" }
+gx-witness = { path = "../gx-witness", version = "0.1.2", package = "tracefold-witness" }
+gx-log = { path = "../gx-log", version = "0.1.2", package = "tracefold-log" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -142,7 +150,7 @@ serde_json = "1"
 # suites cost nothing the binary was not already carrying. `tokio` is a dev-dependency here and
 # becomes a shipping one in **a later hand**, which is the hand that writes `#[tokio::main]`.
 [dev-dependencies]
-gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.2" }
+gx-adapter-fs = { path = "../gx-adapter-fs", version = "0.1.2", package = "tracefold-adapter-fs" }
 # `macros` for `#[tokio::test]`, `rt-multi-thread` for the suites that drive a subscriber and a
 # writer at the same time. `http-body-util` reads one frame of a streaming body without draining it,
 # which is how `tests/stream.rs` observes a line arriving on a body that never ends; it is already in

@@ -1,14 +1,21 @@
 # Canonical form and content addressing. The architecture spec gives this crate its module list and its
 # dependency line; the encoding spec gives the rules those dependencies are asked to carry out.
 [package]
-name = "gx-canon"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): publish name becomes
+# "tracefold-canon"; [lib] name stays "gx_canon" so no source line changes anywhere in this workspace.
+name = "tracefold-canon"
 description = "Canonical DAG-CBOR form, CID, and the JCS compatibility layer."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-canon-001)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
-repository.workspace = true           # `dist generate` reads this
+publish = true                        # req/1032/req/1035 blockers resolved -- this crate is a real publish target now
+repository.workspace = true           # `dist generate` reads this; also crates.io metadata
+readme = "README.md"                  # crates.io page body (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+[lib]
+name = "gx_canon"
 
 # Every version below is the max_stable_version read off the crates.io API on 2026-08-07,
 # and every license was checked at three points -- the published Cargo.toml (crates.io
@@ -26,7 +33,7 @@ repository.workspace = true           # `dist generate` reads this
 # `cargo deny check bans` on its first real run (`deny.toml`, `wildcards = "deny"`); inside the
 # workspace the path still wins and nothing about resolution changes. Same in gx-log and
 # gx-witness.
-gx-core = { path = "../gx-core", version = "0.1.2" }
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
 
 # Named on this crate's dependency line in the architecture spec.
 blake3 = "1.8"                        # Cid = BLAKE3-256 (this workspace's default hash choice)
@@ -54,7 +61,7 @@ proptest = "1.11"                     # eight documented properties
 # Depending on this package from its own dev-dependencies is what turns `probe-bin` on for test
 # builds and only for them. `cargo test -p gx-canon` therefore builds the binary below and sets
 # CARGO_BIN_EXE_gx_cid_probe; `cargo build`, `cargo install` and a consumer's build do not.
-gx-canon = { path = ".", features = ["probe-bin"] }
+gx-canon = { path = ".", features = ["probe-bin"], package = "tracefold-canon" }
 
 # One acceptance criterion requires the second CID to come from "a separate binary" (sem: SEM-gx-canon-003), so the second binary is part of the
 # acceptance criterion. The path keeps it out of src/, which the architecture spec fixes at four modules; cargo

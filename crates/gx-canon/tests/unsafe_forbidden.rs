@@ -57,7 +57,7 @@ use std::path::{Path, PathBuf};
 /// `every_shipped_crate_root_is_in_the_list` below is the other half: it walks the tree and fails
 /// if a root exists that this list does not name, which is what stops the list from being a
 /// comfortable fiction.
-const SHIPPED_CRATE_ROOTS: [&str; 24] = [
+const SHIPPED_CRATE_ROOTS: [&str; 25] = [
     // M6 hand 1: the thirteenth, fourteenth and fifteenth. `gx-cli` has **two** roots because
     // NFR-019 asks for a single static binary and 44 spells every command `gx <verb>`: the library
     // is what the tests drive and `src/main.rs` is what a user runs, and `#![forbid(unsafe_code)]`
@@ -97,6 +97,13 @@ const SHIPPED_CRATE_ROOTS: [&str; 24] = [
     // other member carries it: an adapter is the only code allowed to touch its substrate, so it is
     // the last place a raw pointer should be reachable.
     "crates/gx-adapter-mysql/src/lib.rs",
+    // 🔴 **`req/1038`** (WM-4a): the twenty-first workspace member and the **sixth** real adapter
+    // root. `SubstrateKind::Custom(String)` used unmodified for the third time, and this one links
+    // no client at all -- the substrate is a schedule on disk and the thing that runs it is a party
+    // gx does not speak to (that crate's root says so at length). Its `#![forbid(unsafe_code)]` is
+    // here for the reason every adapter's is: an adapter is the only code allowed to touch its
+    // substrate, so it is the last place a raw pointer should be reachable.
+    "crates/gx-adapter-time/src/lib.rs",
     "crates/gx-core/src/lib.rs",
     "crates/gx-canon/src/lib.rs",
     // M5 hand 1: the tenth workspace member and the first crate that names every layer below it.

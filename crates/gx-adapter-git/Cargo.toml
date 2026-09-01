@@ -5,13 +5,21 @@
 #
 # An early hand built all seven adapter methods; `gx-adapter-mcp` followed a couple of hands later. (sem: SEM-gx-adapter-git-002)
 [package]
-name = "gx-adapter-git"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): publish name becomes
+# "tracefold-adapter-git"; [lib] name stays "gx_adapter_git" so no source line changes anywhere.
+name = "tracefold-adapter-git"
 description = "The git SubstrateAdapter: a file on a branch, moved by a commit, undone by a reference reset."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-adapter-git-003)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # crates.io metadata; also read by `dist generate`
+publish = true                        # req/1032/req/1035 blockers resolved -- this crate is a real publish target now
+readme = "README.md"                  # crates.io page body (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+[lib]
+name = "gx_adapter_git"
 
 # 🔴 **The first external dependency an adapter has had**, and the canon is what put it here rather
 # than this hand: the architecture spec's crate table writes `dep: gix (gitoxide)` on this row, and
@@ -40,9 +48,9 @@ publish = false                       # no crate in this workspace is a designat
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement, learned in an earlier build phase.
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.2" }
-gx-canon = { path = "../gx-canon", version = "0.1.2" }
-gx-substrate = { path = "../gx-substrate", version = "0.1.2" }
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
+gx-canon = { path = "../gx-canon", version = "0.1.2", package = "tracefold-canon" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.2", package = "tracefold-substrate" }
 
 serde = { version = "1", features = ["derive"] }  # the delta's field grammar
 gix = { version = "0.86", default-features = false, features = ["sha1"] }
@@ -68,6 +76,8 @@ gix = { version = "0.86", default-features = false, features = ["sha1"] }
 # that could ask what a rule says, and the architecture spec keeps judging in one function. It is a
 # path dependency already resolved in this workspace, so the package graph does not move either.
 [dev-dependencies]
-gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.2" }
-gx-gate = { path = "../gx-gate", version = "0.1.2" }
+# `version` intentionally dropped -- see gx-adapter-fs's identical dev-dependency for the reason
+# (not a publish target, deny.toml allow-wildcard-paths=true, publish-manifest auto-strip).
+gx-substrate-conformance = { path = "../gx-substrate-conformance" }
+gx-gate = { path = "../gx-gate", version = "0.1.2", package = "tracefold-gate" }
 gix = { version = "0.86", default-features = false, features = ["sha1"] }

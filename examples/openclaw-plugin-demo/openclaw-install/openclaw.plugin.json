@@ -1,0 +1,14 @@
+{
+  "id": "gx-escrow",
+  "name": "gx escrow",
+  "description": "Puts OpenClaw's write tool through the gx membrane before it reaches disk: refuse before it lands, take it back after it does.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "activation": {
+    "onStartup": true
+  }
+}

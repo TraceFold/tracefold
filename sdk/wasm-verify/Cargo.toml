@@ -33,8 +33,8 @@ crate-type = ["cdylib", "rlib"]        # cdylib: what `wasm-bindgen` links; rlib
                                         # runs the assertions below against, on the host target
 
 [dependencies]
-gx-core = { path = "../../crates/gx-core", version = "0.1.2" }
-gx-witness = { path = "../../crates/gx-witness", version = "0.1.2" }
+gx-core = { path = "../../crates/gx-core", version = "0.1.2", package = "tracefold-core" }
+gx-witness = { path = "../../crates/gx-witness", version = "0.1.2", package = "tracefold-witness" }
 serde_json = "1"
 
 # gh primary-source check (crates.io API + GitHub API, `Desktop/GitRepo/REFERENCES.md` 2026-08-14;
@@ -57,4 +57,4 @@ ed25519-dalek = "3"
 # hand-built `Checkpoint` would let the tests pass against a verifier that never walked an audit
 # path, which is the failure mode `crates/gx-witness/tests/ac_070.rs` already warns about. Dev-only:
 # the shipped function reads a checkpoint, it never builds one.
-gx-log = { path = "../../crates/gx-log", version = "0.1.2" }
+gx-log = { path = "../../crates/gx-log", version = "0.1.2", package = "tracefold-log" }

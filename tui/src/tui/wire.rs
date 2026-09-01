@@ -480,6 +480,43 @@ pub enum Nothing {
     Empty,
 }
 
+/// The three words for nothing that mean **no answer was obtained**.
+///
+/// 🔴 **Three, and it is the ruling's own enumeration.** `req/924` §TUI-45 writes the rule as
+/// 「列の全値が『無』の mark(`?` `--` `...`)なら、その列を落として開示に数えろ」 — [`Nothing::Loading`],
+/// [`Nothing::Unknown`], [`Nothing::Absent`], and no others.
+///
+/// 🔴 **The other four are measured answers and dropping them would be the breach this product
+/// exists to refuse.** `no` is the wire saying *false*; `0` is a count that was taken; `-x` is a
+/// record that was written and struck; `''` is a value that arrived and is empty. A ledger in which
+/// every record answers `enforced no` is a ledger making the most actionable statement a face like
+/// this can carry, and a rule written to save ink would have deleted the column and told the reader
+/// it "answered with a mark for nothing" — **folding *measured false* into *not measured*, in the
+/// product whose first principle is that those are different**. An independent audit of this lane
+/// found the first cut doing exactly that, over [`Nothing::ALL`].
+///
+/// The distinction is the same one [`Reading::nothing`] keeps: a read that has not happened is not
+/// a read that failed, and neither is an answer.
+pub const VACANT_MARKS: [Nothing; 3] = [Nothing::Loading, Nothing::Unknown, Nothing::Absent];
+
+/// Whether a resolved cell's text is one of the marks that mean no answer was obtained.
+///
+/// 🔴 Derived from [`VACANT_MARKS`] rather than typed, so the set is edited in one place and the
+/// argument for its size is written beside it rather than here.
+///
+/// It takes the **text** because the question is asked of a column of cells already resolved to
+/// what the screen would draw (`super::renderer::vacant_columns` reads
+/// `super::renderer::cell_mark`). 🔴 The audit's finding 5 stands against that choice — `cell_mark`
+/// holds the discriminator and throws it away — and the repair taken is the other one it asked
+/// for: the **mark is carried** rather than reduced to a bool, so what the column said is on the
+/// screen. A `Cell`-typed classifier is the deeper repair and is **not** made here, because
+/// `hoist`, `resolve_shared` and this function all read one column of resolved text and changing
+/// that type is a change to the seam rather than to this rule.
+#[must_use]
+pub fn is_vacant_mark(text: &str) -> bool {
+    VACANT_MARKS.iter().any(|nothing| nothing.mark() == text)
+}
+
 impl Nothing {
     /// All seven, in the order `req/942` §12-1 lists them, with `req/38` SS974's addition last.
     ///

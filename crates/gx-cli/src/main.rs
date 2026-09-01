@@ -45,7 +45,7 @@
 //! type; a sentence beside an answer does not have to.**
 
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
@@ -1073,9 +1073,10 @@ enum PolicyCmd {
     /// 44 §1.2: "Cedar policy syntax/schema verification" (sem: SEM-gx-cli-446) — and the invariant half (FR-027, M6-21).
     #[command(about = "Check a policy pack's syntax and schema, and the invariants it has to satisfy.", long_about = None)]
     Lint {
-        /// The pack to read.
-        #[arg(help = "The pack to read.", long_help = None)]
-        path: PathBuf,
+        /// The pack to read, or `-` for stdin (req/1022 §2-b).
+        #[arg(value_name = "PATH|-")]
+        #[arg(help = "The pack to read, or - to read it from stdin.", long_help = None)]
+        path: String,
         /// 44 §1.2's flag.
         #[arg(long)]
         #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
@@ -1085,9 +1086,10 @@ enum PolicyCmd {
     /// expected value" (sem: SEM-gx-cli-447).
     #[command(about = "Run the gate against scenarios and check each answer against the one expected.", long_about = None)]
     Test {
-        /// The pack to decide with.
-        #[arg(help = "The pack to decide with.", long_help = None)]
-        path: PathBuf,
+        /// The pack to decide with, or `-` for stdin (req/1022 §2-b).
+        #[arg(value_name = "PATH|-")]
+        #[arg(help = "The pack to decide with, or - to read it from stdin.", long_help = None)]
+        path: String,
         /// The scenarios: `Intent`/`Evidence`/expected `Verdict`, as JSON.
         #[arg(long, value_name = "FILE")]
         #[arg(help = "The scenarios as JSON: an intent, its evidence, and the verdict expected.", long_help = None)]
@@ -1183,9 +1185,10 @@ enum ObjectCmd {
     /// the whole point of exporting one.
     #[command(about = "Check a portable file: that it is what it says it is, and that it is signed.", long_about = None)]
     Verify {
-        /// The file to check.
-        #[arg(help = "The file to check.", long_help = None)]
-        file: PathBuf,
+        /// The file to check, or `-` for stdin (req/1022 §2-b).
+        #[arg(value_name = "FILE|-")]
+        #[arg(help = "The file to check, or - to read it from stdin.", long_help = None)]
+        file: String,
         /// The public key. Without it, the key the record names is looked for in the local store,
         /// which a third party does not have.
         #[arg(long, value_name = "FILE")]
@@ -1271,6 +1274,10 @@ enum ReceiptCmd {
         )]
         #[arg(help = "How far back a revocation reaches. from-revocation leaves earlier receipts valid; all refuses every receipt the key ever signed.", long_help = None)]
         retroaction: String,
+        /// 44 §1.2's flag.
+        #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
+        json: bool,
     },
     /// 🔴 **P-1b** (`req/544` §3 R-3c) — which of the four questions this receipt answers, and
     /// which it does not.
@@ -1339,9 +1346,11 @@ enum CheckpointCmd {
     #[command(about = "Name any contradiction across collected checkpoints, offline. Exit 7 when one is found.", long_about = None)]
     Audit {
         /// The checkpoint files to audit (the JSON `gx checkpoint export` writes). At least one.
-        #[arg(value_name = "FILE", required = true)]
-        #[arg(help = "The checkpoint files to audit. At least one.", long_help = None)]
-        files: Vec<PathBuf>,
+        /// Any one of them may be `-` for stdin (req/1022 §2-b) — not more than one, since stdin is
+        /// a single stream.
+        #[arg(value_name = "FILE|-", required = true)]
+        #[arg(help = "The checkpoint files to audit. At least one. One of them may be - for stdin.", long_help = None)]
+        files: Vec<String>,
         /// 🔴 The public key to verify each checkpoint's signature under before auditing it. Omitted,
         /// the arithmetic still runs but `signatures_verified` is `false`: a forged checkpoint could
         /// then manufacture a false equivocation, which is why passing it is the stronger audit.
@@ -1411,6 +1420,10 @@ enum LogCmd {
         #[arg(long, value_name = "PATH")]
         #[arg(help = "Also write the checkpoint here, byte for byte as stdout carries it.", long_help = None)]
         out: Option<PathBuf>,
+        /// 44 §1.2's flag.
+        #[arg(long)]
+        #[arg(help = "Accepted for compatibility. Output is JSON either way.", long_help = None)]
+        json: bool,
     },
 }
 
@@ -1796,6 +1809,73 @@ fn intent_bytes(path: &str) -> Result<Vec<u8>> {
         path: path.to_string(),
         source: e,
     })
+}
+
+/// 🔴 **DR-1022(b)** (`req/1022` §2-b) — a `PathBuf`-typed flag cannot spell "read stdin" the way
+/// `intent_bytes`'s `String`-typed one can, so `-` silently fails as a literal filename on those
+/// flags. Rather than reworking every downstream `&Path`-based reader (`policy::lint`,
+/// `policy::test`, `object::verify`, `ledger::audit`) to take bytes, this materializes stdin into a
+/// throwaway file and hands out its path, so the readers are unchanged.
+///
+/// Scope (req/1036's R6 selection: top-frequency PathBuf reads, not the full ~15): the four
+/// primary-input positionals that are the direct siblings of the `String`-typed args 44 §1.2
+/// already lets take `-` (`submit --intent`, `receipt verify <FILE|->`,
+/// `verdict-checkpoint verify <FILES|->`). Secondary cross-reference flags (`--checkpoint`,
+/// `--checkpoint-key`, `--key`, `--revocations`, `--proof`, `--face`, `--ledger-checkpoint`,
+/// `--passphrase-file`) are left as literal paths — lower practical frequency, and each is a
+/// supporting artifact rather than the document the verb is about.
+struct StdinTempFile {
+    path: PathBuf,
+    is_temp: bool,
+}
+
+impl StdinTempFile {
+    fn resolve(raw: &str) -> Result<Self> {
+        if raw != "-" {
+            return Ok(StdinTempFile {
+                path: PathBuf::from(raw),
+                is_temp: false,
+            });
+        }
+        let mut buf = Vec::new();
+        std::io::stdin()
+            .read_to_end(&mut buf)
+            .map_err(|e| Error::Io {
+                action: "read",
+                path: "<stdin>".to_string(),
+                source: e,
+            })?;
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path =
+            std::env::temp_dir().join(format!("gx-stdin-{}-{n}.tmp", std::process::id()));
+        std::fs::write(&path, &buf).map_err(|e| Error::Io {
+            action: "write",
+            path: path.display().to_string(),
+            source: e,
+        })?;
+        Ok(StdinTempFile {
+            path,
+            is_temp: true,
+        })
+    }
+}
+
+impl std::ops::Deref for StdinTempFile {
+    type Target = Path;
+    fn deref(&self) -> &Path {
+        &self.path
+    }
+}
+
+// ponytail: best-effort cleanup (ignores a failed remove); a one-shot CLI process leaking one temp
+// file on the rare `remove_file` error is not worth a retry loop.
+impl Drop for StdinTempFile {
+    fn drop(&mut self) {
+        if self.is_temp {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
 }
 
 /// 🔴 **P3** — the MCP server this invocation named, started and handshaken, or "none" (sem: SEM-gx-cli-468).
@@ -2225,12 +2305,18 @@ fn run(cli: &Cli) -> Result<Outcome> {
         }
         Command::Escalation { cmd } => escalation_cmd(cli, cmd),
         Command::Policy { cmd } => match cmd {
-            PolicyCmd::Lint { path, json: _ } => gx_cli::policy::lint(path),
+            PolicyCmd::Lint { path, json: _ } => {
+                let path = StdinTempFile::resolve(path)?;
+                gx_cli::policy::lint(&path)
+            }
             PolicyCmd::Test {
                 path,
                 scenario,
                 json: _,
-            } => gx_cli::policy::test(path, scenario),
+            } => {
+                let path = StdinTempFile::resolve(path)?;
+                gx_cli::policy::test(&path, scenario)
+            }
         },
         Command::Draft { cmd } => draft_cmd(cli, cmd),
         Command::Serve {
@@ -2400,7 +2486,13 @@ fn run(cli: &Cli) -> Result<Outcome> {
                     proof,
                     json: _,
                 },
-        } => gx_cli::ledger::audit(files, key.as_deref(), proof.as_deref()),
+        } => {
+            let resolved: Result<Vec<StdinTempFile>> =
+                files.iter().map(|f| StdinTempFile::resolve(f)).collect();
+            let resolved = resolved?;
+            let paths: Vec<PathBuf> = resolved.iter().map(|r| r.to_path_buf()).collect();
+            gx_cli::ledger::audit(&paths, key.as_deref(), proof.as_deref())
+        }
         Command::Replay {
             transformation,
             from,
@@ -2983,7 +3075,10 @@ fn object_cmd(cli: &Cli, cmd: &ObjectCmd) -> Result<Outcome> {
             let store = ReceiptStore::in_layout(&layout);
             gx_cli::object::export(&store, &id, out)
         }
-        ObjectCmd::Verify { file, key, json: _ } => gx_cli::object::verify(file, key.as_deref()),
+        ObjectCmd::Verify { file, key, json: _ } => {
+            let file = StdinTempFile::resolve(file)?;
+            gx_cli::object::verify(&file, key.as_deref())
+        }
     }
 }
 
@@ -3022,6 +3117,7 @@ fn receipt_cmd(cli: &Cli, cmd: &ReceiptCmd) -> Result<Outcome> {
             key,
             revocations,
             retroaction,
+            json: _,
         } => {
             // 🔴 Read the receipt **before** anything is resolved from it. AC-057's environment has
             // no project directory at all, and a verifier that opened `.gx/` on the way in would
@@ -3301,7 +3397,12 @@ fn log_cmd(cli: &Cli, cmd: &LogCmd) -> Result<Outcome> {
             let store = ledger::open(&layout)?;
             ledger::consistency(&store, *from, *to, Some(&layout))
         }
-        LogCmd::Checkpoint { key, origin, out } => {
+        LogCmd::Checkpoint {
+            key,
+            origin,
+            out,
+            json: _,
+        } => {
             let store = ledger::open(&layout)?;
             let path = key.as_ref().ok_or_else(|| Error::Usage {
                 detail:

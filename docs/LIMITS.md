@@ -3786,3 +3786,29 @@ in place of the literal `sync_all()` it used to find at that position; the **ord
 temp-file fsync, then rename, then the directory-durability step -- is unchanged, and the change is
 recorded in the test's own comment with the ruling it cites (`R-868-5`), per the discipline that a
 test may only be edited when a named, dated ruling says the behaviour it pinned was a defect.
+
+## A sixth adapter exists on `main` and is not in this build's public surface, and no `gx` crate is installable from a registry yet (2026-09-01, `req/1038`, `req/1032`)
+
+**Adapter count.** `crates/gx-adapter-time` landed on `main` 2026-09-01 (`req/1038`,
+`Cargo.toml` workspace-member comment), the sixth adapter after fs/git/mcp/postgres/mysql. It is
+not wired into `gx-cli` and carries no CLI feature -- deliberately, per `req/1038` §3-3: an entry
+is placed now and a surface is added only when a use case exists, the same posture already held
+for `gx-adapter-mysql`. Like postgres and mysql before it, it is **not** in `public/Cargo.toml`'s
+member list (`public/Cargo.toml`, checked 2026-09-01): a public clone of this repository cannot
+see or build it. `docs/ADAPTER_GUIDE.md` §1/§3's adapter table and cost estimate were written
+against 5 adapters and have not been re-derived at 6 as of this note.
+
+**Registry status.** A P1 crates.io publish lane ran 2026-09-01 (`req/1032`). Outcome as filed:
+**zero crates published, zero crates reached even a valid dry-run.** Two blockers were found
+during planning, before any dry-run was attempted: (A) `gx-core` and `gx-tui` were already
+registered on crates.io by an unrelated party under those names (verified live against the
+crates.io API), and (B) the private-workspace `gx-cli`/`gx-gate` manifests default-enable
+features that pull in private crates a real publish cannot carry. Same-day follow-up commits
+(`d18f5eed`, `12314ad4`) renamed the `gx-*` publish identity to `tracefold-*` and added
+readme/keywords metadata to what those commits call "the 13-crate publish closure" -- but as of
+this note no commit in this lane's history records a completed, live `cargo publish` to
+crates.io for any crate. The npm package `@mahirhir/tracefold` (a WASM receipt verifier,
+`sdk/typescript/`) is a separate artifact from the Rust adapter/engine crates this paragraph
+describes and its publication status is not what this note is about (see
+`docs/ADAPTER_GUIDE.md` §5). This paragraph should be updated, not replaced, the day a crate
+first publishes successfully.

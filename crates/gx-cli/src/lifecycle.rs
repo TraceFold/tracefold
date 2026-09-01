@@ -386,7 +386,8 @@ fn settle_preflight(
     match session.read().live_digest(id) {
         Ok(live) if live.0 == expected.0 => {
             crate::note!(
-                "gx undo settle: polls=1 elapsed_ms=0 result=matched (--settle {settle_secs}; the                  first probe answered under the lock, so nothing was held and nothing waited)"
+                "gx undo settle: polls=1 elapsed_ms=0 result=matched (--settle {settle_secs}; the \
+                 first probe answered under the lock, so nothing was held and nothing waited)"
             );
             return Ok(UndoWitness::Attested(expected));
         }
@@ -432,7 +433,8 @@ fn settle_preflight(
         // (`BUSY`, DR-43-2), it is the one whose correct response is a retry, and this is that
         // condition exactly.
         crate::note!(
-            "gx undo settle: the writer lock was released for the wait (req/234 H-03) and could              not be taken again: {e}"
+            "gx undo settle: the writer lock was released for the wait (req/234 H-03) and could \
+             not be taken again: {e}"
         );
         return Err(e);
     }
@@ -443,7 +445,8 @@ fn settle_preflight(
             "gx undo settle: {outcome} — and the world still matched when the lock came back"
         ),
         Ok(_) => crate::note!(
-            "gx undo settle: {outcome} — the world does not match what T_o attested, so DR-43-1's              CAS is what answers now"
+            "gx undo settle: {outcome} — the world does not match what T_o attested, so DR-43-1's \
+             CAS is what answers now"
         ),
         Err(e) => {
             // 🔴 **DR-46-46, repaired** — the twin of the site above, same defect, same repair.
@@ -484,7 +487,8 @@ fn settle_poll(
         let now = std::time::Instant::now();
         if now >= deadline {
             return format!(
-                "polls={polls} elapsed_ms={} result=timeout (--settle {settle_secs}; the wait was                  outside the project lock, so nothing else was blocked by it)",
+                "polls={polls} elapsed_ms={} result=timeout (--settle {settle_secs}; the wait was \
+                 outside the project lock, so nothing else was blocked by it)",
                 started.elapsed().as_millis()
             );
         }
@@ -574,24 +578,52 @@ fn settle_evidence(
             return Err(UndoWitness::Missing(WitnessMissing::NoReceipt));
         }
         Err(e) => {
-            crate::note!("gx undo refused: the receipt store would not answer: {e}");
-            // 🔴 **DR-46-50 (open, `req/973` §9-5, filed 2026-09-01)** — DR-46-46's shape, one type
-            // over, found by generalising its predicate rather than by a new report: this arm names
-            // a cause it does not have. What happened is that the receipt **store** would not
-            // answer; `WitnessMissing::Unreadable.reason()` says "the archived commit receipt would
-            // not decode", which is a claim about a document this arm never got to read. The two
-            // are different repairs for an operator — a store that will not open is a permissions
-            // or a filesystem problem, a payload that will not decode is a corrupt file.
+            // 🔴 The stderr note used to say "the receipt store would not answer" unconditionally,
+            // ahead of the `WitnessMissing` match below -- so a `Malformed` (the store answered, the
+            // document did not decode) still printed the store's wording on this line even after
+            // the match a few lines down learned to tell the two apart, and the same access/decode
+            // confusion DR-46-50 was filed against reappeared one line earlier than the fix reached.
+            // Compute the variant first and let its own `.reason()` be the one sentence this repair
+            // and the JSON `detail` both say, rather than keeping two answers that can drift again.
+            let missing = match e {
+                Error::Io { .. } => WitnessMissing::StoreUnreadable,
+                _ => WitnessMissing::Unreadable,
+            };
+            crate::note!("gx undo refused: {}: {e}", missing.reason());
+            // 🔴 **DR-46-50, repaired (`req/973` §9-5, filed 2026-09-01; `req/1036` R11)** — the
+            // struck paragraph is the true record of what this site returned and is kept for it
+            // (no-delete). DR-46-46's shape, one type over: this arm named a cause it did not have.
+            // What happened is that the receipt **store** would not answer;
+            // `WitnessMissing::Unreadable.reason()` said "the archived commit receipt would not
+            // decode", which is a claim about a document this arm never got to read. The two are
+            // different repairs for an operator — a store that will not open is a permissions or a
+            // filesystem problem, a payload that will not decode is a corrupt file.
+            //~~ Lighter than DR-46-46 and recorded rather than fixed here for that reason: `Missing`
+            //~~ is a **refusal**, so it mints no `TransformationId` and issues no receipt
+            //~~ (`UndoWitness::disposition()` answers `None`), and the wrong sentence therefore
+            //~~ reaches stderr and the refusal's `reason` but never the signed bytes. Owner: the next
+            //~~ cargo lane on this crate. Release condition: `WitnessMissing` gains a variant for a
+            //~~ store that would not answer, this arm names it, and a probe fires this arm. No
+            //~~ `UNDO_REFUSALS` row is added — `witness-missing` is one row that branches on
+            //~~ `missing`.
             //
-            // Lighter than DR-46-46 and recorded rather than fixed here for that reason: `Missing`
-            // is a **refusal**, so it mints no `TransformationId` and issues no receipt
-            // (`UndoWitness::disposition()` answers `None`), and the wrong sentence therefore
-            // reaches stderr and the refusal's `reason` but never the signed bytes. Owner: the next
-            // cargo lane on this crate. Release condition: `WitnessMissing` gains a variant for a
-            // store that would not answer, this arm names it, and a probe fires this arm. No
-            // `UNDO_REFUSALS` row is added — `witness-missing` is one row that branches on
-            // `missing`.
-            return Err(UndoWitness::Missing(WitnessMissing::Unreadable));
+            // `WitnessMissing` now carries `StoreUnreadable` for exactly this arm, and
+            // `crates/gx-cli/tests/dr4650_receipt_store_unreadable.rs` fires it through the real
+            // binary. `UNDO_REFUSALS` is unchanged (13 rows, not 14): `witness-missing` is one row
+            // that branches on `missing`, and this is a second branch inside the same row rather
+            // than a new refusal kind — the release condition this comment set for itself, kept.
+            //
+            // 🔴 **repair of the repair (same lane, same turn)** — `ReceiptStore::get` returns
+            // *two* different `Error` shapes here and this arm used to fold both into one variant:
+            // `Error::Io` when `std::fs::read` itself failed (the store did not answer — exactly
+            // `StoreUnreadable`'s claim) but also `Error::Malformed` when the read succeeded and
+            // `read_receipt`'s `serde_json::from_slice` failed (the store *did* answer with a
+            // document, and that document would not decode — `Unreadable`'s claim, unchanged since
+            // before this DR). Mapping `Malformed` to `StoreUnreadable` would have been the exact
+            // access/decode confusion DR-46-50 was filed to close, just moved to a different arm
+            // instead of closed. `missing` above already matched on the `Error` shape, so this arm
+            // and the note a few lines up cannot say two different things about the same failure.
+            return Err(UndoWitness::Missing(missing));
         }
     };
     // 🔴 **R4 / `req/225` H-02** — the key comes from the **receipt**, not from the row.

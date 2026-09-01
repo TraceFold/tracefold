@@ -25,24 +25,25 @@ See the Scope Exclusions table below and [docs/LIMITS.md](docs/LIMITS.md) for wh
 
 ---
 
-## Flip one byte, and the verifier says no
+## A real agent write, escrowed and reversed
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ 🔴 🟡 🟢  tracefold-demo-session — 10s Verification Probe                   │
+│ 🔴 🟡 🟢  gx x OpenClaw — real tool call, escrowed and reversed             │
 ├────────────────────────────────────────────────────────────────────────────┤
 ```
 <div align="center">
-<img src="https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.gif" alt="Verify a receipt, flip one byte, verify again" width="100%" />
+<img src="https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-openclaw-undo.gif" alt="A real DeepSeek-backed OpenClaw agent issues a write tool call, gx's before_tool_call escrow hook fires before the write lands, the write commits, gx undo reverses it, and the restored file is byte-identical to the original hash" width="100%" />
 </div>
 
-Three files on that terminal: a receipt, a signed checkpoint, a public key. No account, no network call.
-- **Valid receipt**: verifies instantly and exits `0`.
-- **Flip exactly one byte**: `cmp -l` confirms the 1-byte diff, and the exact same command exits `7`.
+A real OpenClaw agent (`deepseek/deepseek-chat`, a live API call, not a fixture) dispatches a write tool call. gx's `before_tool_call` hook fires and hands the write to escrow before it lands.
+- **After the write commits**: `gx undo <txid>` issues a new transformation — nothing is deleted, the write is superseded.
+- **Byte check**: `sha256sum` on the restored file matches the pre-write hash exactly.
+- **`gx receipt verify --pretty`**: signature, canonical CID, and inclusion all check `true` — offline, no trust required.
 
-[▶ View Asciinema Cast (Raw Timings)](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-10s.cast) &middot; [Read Offline Verification Mechanics](docs/articles/verify-ai-agent-actions-offline.md)
+[▶ View Asciinema Cast (Raw Timings)](https://github.com/TraceFold/tracefold/releases/download/demo-assets/tracefold-demo-openclaw-undo.cast)
 
-**Reproduction:** [`examples/demo_one_screen.sh`](examples/demo_one_screen.sh) runs the longer, 8-stage version of the same idea end to end — commit → receipt → tamper → verify → undo → redo — against a real cloned repository, not a fixture.
+**Reproduction (deterministic, no live LLM call):** [`examples/openclaw-plugin-demo/`](examples/openclaw-plugin-demo/README.md) runs the same `before_tool_call` escrow path — refuse before it lands, take it back after — against a real `gx` binary and a real filesystem, scripted so it does not need an API key.
 
 ---
 
@@ -145,6 +146,7 @@ full, dated detail (checked current as of 2026-09-01).
 <summary><b>▶ Expand Environment, Verification & Technical Specifications</b></summary>
 <br>
 
+- **Docs Index**: Every document and article in this repo, in reading order, plus a tutorial not linked below: [docs/README.md](docs/README.md).
 - **Formal Technical Report**: Complete mathematical proof and receipt encoding: [docs/TRACEFOLD_TR.md](docs/TRACEFOLD_TR.md).
 - **Foundational Paper**: [*A Mechanical World Model for Agents* (DOI: 10.5281/zenodo.22168558)](https://doi.org/10.5281/zenodo.22168558).
 - **Formal Verification Spec**: Machine-checked Lean 4 theorem suite: [lean/README.md](lean/README.md).

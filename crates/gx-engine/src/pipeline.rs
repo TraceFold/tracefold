@@ -9548,6 +9548,15 @@ pub enum WitnessMissing {
     NoReceipt,
     /// The archived receipt's payload would not decode.
     Unreadable,
+    /// 🔴 **DR-46-50 (`req/973` §9-5, `req/1036` R11)** — the receipt **store itself** would not
+    /// answer (a filesystem or permissions failure reading `.gx/receipts/`), as distinct from
+    /// [`WitnessMissing::Unreadable`], which is a document the store *did* hand back that then
+    /// would not decode. `Unreadable` used to cover both — DR-46-46's shape one type over, found by
+    /// generalising its predicate rather than by a new report: an operator told "the archived commit
+    /// receipt would not decode" for what was in fact an I/O error on the store never got to read a
+    /// document at all, and the two point at different repairs (fix the disk/permissions vs.
+    /// restore a corrupt file).
+    StoreUnreadable,
     /// The archived receipt's DSSE signature does not verify under the key the receipt names
     /// (`req/222` H-02; 🔴 **R4** widened *which* key that is — see [`WitnessMissing::UnknownKey`]).
     Unsigned,
@@ -9575,6 +9584,7 @@ impl WitnessMissing {
         match self {
             WitnessMissing::NoReceipt => "no archived commit receipt for the original",
             WitnessMissing::Unreadable => "the archived commit receipt would not decode",
+            WitnessMissing::StoreUnreadable => "the receipt store would not answer",
             WitnessMissing::Unsigned => {
                 "the archived commit receipt's signature does not verify under the key it names"
             }
@@ -9626,6 +9636,12 @@ impl WitnessMissing {
                  built without a place to keep one (gx_api::AppState::with_archive is where a \
                  deployment declares one). Every commit made here is final as far as gx is \
                  concerned"
+            }
+            WitnessMissing::StoreUnreadable => {
+                "the receipt store under .gx/receipts/ could not be read at all -- check that the \
+                 directory exists, is not blocked by a permissions or filesystem error, and try \
+                 again. This is not the same fault as a corrupt document: nothing was read to judge \
+                 whether it decodes"
             }
         }
     }

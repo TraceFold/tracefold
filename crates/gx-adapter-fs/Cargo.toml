@@ -5,13 +5,21 @@
 # `kind`/`snapshot`/`plan`/`precondition` were built first; `apply`/`invert` and `commutation`
 # followed in later hands. A ruling keeps landlock out of v0.1 entirely.
 [package]
-name = "gx-adapter-fs"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): publish name becomes
+# "tracefold-adapter-fs"; [lib] name stays "gx_adapter_fs" so no source line changes anywhere.
+name = "tracefold-adapter-fs"
 description = "The filesystem SubstrateAdapter: single-file whole replacement, lexical locators."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-adapter-fs-002)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # crates.io metadata; also read by `dist generate`
+publish = true                        # req/1032/req/1035 blockers resolved -- this crate is a real publish target now
+readme = "README.md"                  # crates.io page body (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+[lib]
+name = "gx_adapter_fs"
 
 # **Zero external dependencies**, in the sense the erratum trail means by "zero dependencies": the
 # three entries below are workspace members and `serde` is already resolved by every one of them, so
@@ -25,9 +33,9 @@ publish = false                       # no crate in this workspace is a designat
 # `version` beside `path`: `cargo deny check bans` reads a bare path dependency as a wildcard
 # requirement, learned in an earlier build phase.
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.2" }
-gx-canon = { path = "../gx-canon", version = "0.1.2" }
-gx-substrate = { path = "../gx-substrate", version = "0.1.2" }
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
+gx-canon = { path = "../gx-canon", version = "0.1.2", package = "tracefold-canon" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.2", package = "tracefold-substrate" }
 
 serde = { version = "1", features = ["derive"] }  # the fs delta's field grammar
 
@@ -44,8 +52,17 @@ serde = { version = "1", features = ["derive"] }  # the fs delta's field grammar
 # no shipped graph (`cargo tree -e normal` does not see it) and adds no package -- gx-gate is a
 # workspace member and everything it resolves is already in the graph (sem: SEM-gx-adapter-fs-006).
 [dev-dependencies]
-gx-gate = { path = "../gx-gate", version = "0.1.2" }
-gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.2" }
+gx-gate = { path = "../gx-gate", version = "0.1.2", package = "tracefold-gate" }
+# 🔴 `gx-substrate-conformance` is explicitly not a publish target (its own manifest, "conformance is
+# not a publish target -- the probe-bin precedent") and is not renamed. `version` intentionally
+# dropped here (deny.toml's `allow-wildcard-paths = true` means a bare path dev-dependency is not a
+# `cargo deny check bans` wildcard violation): with only `path` and no `version`, `cargo package`
+# strips this line from the *published* manifest entirely (Cargo's documented dev-dependency
+# behaviour), which is what a real `cargo publish` of tracefold-adapter-fs needs -- with `version`
+# present, publishing would try to resolve `gx-substrate-conformance` against the real registry and
+# fail (it will never be there). Local `cargo test -p gx-adapter-fs` is unaffected: the path still
+# resolves inside this workspace's own Cargo.lock either way.
+gx-substrate-conformance = { path = "../gx-substrate-conformance" }
 proptest = "1.11"
 
 # 🔴 `tests/pack_locators.rs` reads `policies/fs/scenarios.json`, the

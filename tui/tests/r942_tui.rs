@@ -1029,10 +1029,26 @@ fn p5_every_column_label_drawn_is_a_key_the_wire_carried() {
         "🔴 P5: {invented:?} are words this face made up. The label a reader sees is the key the \
          engine used, or it is a second vocabulary for the same fact"
     );
-    assert_eq!(
-        drawn.len(),
-        LEDGER_COLUMNS.len(),
-        "two hundred columns wide should carry every declared column: {drawn:?}"
+    // 🔴 **Rewritten under `req/924` §TUI-45** (`req/38` SS1076, Owner `#275-T`, 2026-09-01).
+    // *Two hundred cells carries every declared column* was the right property while width was the
+    // only reason a column could be absent. It is not any more: a column whose every value in this
+    // reading is a mark for nothing is not drawn at **any** width, and the fixture's `rollback` and
+    // `superseded_by` are `null` on every row. So the property is stated as the union it always
+    // was — at a width that drops nothing, every declared column is either drawn or is one this
+    // reading found nothing in — and a column that is neither is still a failure.
+    let vacant = vacant_of(&screen);
+    let unaccounted: Vec<&'static str> = LEDGER_COLUMNS
+        .iter()
+        .map(|column| column.key)
+        .filter(|key| {
+            !drawn.contains(key) && !vacant.iter().any(|(vacant_key, _)| vacant_key == key)
+        })
+        .collect();
+    println!("P5_VACANT={vacant:?}");
+    assert!(
+        unaccounted.is_empty(),
+        "🔴 P5: at two hundred cells a declared column is neither drawn nor found empty by the \
+         reading: {unaccounted:?} (drawn {drawn:?}, vacant {vacant:?})"
     );
 }
 
@@ -1341,9 +1357,33 @@ fn ac1_and_ac2_the_frame_carries_a_real_id_the_engine_version_and_four_measureme
         text.contains("Committed"),
         "🔴 a value that fits its column is drawn whole and unmarked:\n{text}"
     );
+    // 🔴 **AC-2, rewritten under `req/924` §TUI-29** (`req/38` SS1058, Owner `#268-T`,
+    // 2026-09-01; repeated as §TUI-45 row 3, SS1076, `#275-T`). The criterion is that the engine's
+    // own version is a fact this face carries, and that still holds. What the ruling changed is
+    // **which screen carries it while nothing is wrong**: `status ok ledger_agrees yes
+    // engine_version 0.1.0` on every frame is three claims that change no reader's next act, and
+    // the ruling folds them to one word. So the assertion is split rather than dropped — the list
+    // face has to spell the fold, and the version has to be reachable **without leaving the
+    // process**, which is the half that keeps this a fold instead of a deletion (SS842).
     assert!(
-        text.contains("engine_version") && text.contains("gx-engine 0.1.0"),
-        "🔴 AC-2: the page header carries the engine's own version:\n{text}"
+        flat(&text).contains("engine ok"),
+        "🔴 AC-2 (`req/924` §TUI-29): the rail does not spell the fold:\n{text}"
+    );
+    let ac2_hatch = flat(&renderer::buffer_text(&renderer::render_view_to_buffer(
+        &screen,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &View {
+            help: true,
+            ..View::default()
+        },
+    )));
+    assert!(
+        ac2_hatch.contains("engine_version") && ac2_hatch.contains("gx-engine 0.1.0"),
+        "🔴 AC-2: the rail folded the engine's version away and no screen this process can draw \
+         carries it. That is not a fold, it is a deletion:\n{ac2_hatch}"
     );
     for reading in screen.readings() {
         assert!(!reading.route.is_empty());
@@ -2301,22 +2341,45 @@ fn g17_every_key_the_note_spells_comes_from_the_binding_table() {
         .iter()
         .chain(renderer::NOTE_ORDER_EMPTY.iter())
     {
+        // 🔴 **`name:key` is now one of two shapes** (`req/924` §TUI-45 row 4, `req/38` SS1076,
+        // Owner `#275-T`; the admission test is `INHERITED_PRINCIPLES` §3c-③''). A mark may stand
+        // in for an act's name when the name then goes, and for `act.open` the mark **is** the key
+        // — `↵` names the return key — so that spelling carries no colon at all. The property this
+        // gate exists for is untouched and is asserted in both shapes: nothing here is composed by
+        // hand. Either the name is the act's own declared name or it is a mark declared in
+        // `renderer::ACT_MARKS`, and either the key is the act's own first declared key or the
+        // mark itself is the key.
         let text = renderer::spelled(*act);
-        let (name, key) = text
-            .split_once(':')
-            .expect("the note spells an act as name:key");
-        println!("G17 {} -> {text:?}", act.name());
-        assert_eq!(
-            name,
-            act.name().trim_start_matches("act."),
-            "🔴 g17: the note invented a name for {}",
-            act.name()
-        );
-        assert_eq!(
-            key,
-            act.keys()[0],
-            "🔴 g17: the note spells a key that is not the act's first declared key"
-        );
+        let mark = renderer::act_mark(*act);
+        println!("G17 {} -> {text:?} mark={mark:?}", act.name());
+        let key = match text.split_once(':') {
+            Some((name, key)) => {
+                assert!(
+                    name == act.name().trim_start_matches("act.") || Some(name) == mark,
+                    "🔴 g17: the note invented a name for {}: {name:?}",
+                    act.name()
+                );
+                assert_eq!(
+                    key,
+                    act.keys()[0],
+                    "🔴 g17: the note spells a key that is not the act's first declared key"
+                );
+                key.to_string()
+            }
+            None => {
+                assert_eq!(
+                    Some(text.as_str()),
+                    mark,
+                    "🔴 g17: the note spells {} with no colon and no declared mark",
+                    act.name()
+                );
+                let _ = mark;
+                // The mark stands alone only where the glyph is the key, which is what makes the
+                // name's absence a deletion of a word rather than a loss of a road.
+                act.keys()[0].to_string()
+            }
+        };
+        let key = key.as_str();
         assert!(
             !text.contains(' '),
             "🔴 g17: {text:?} holds a space, so `layout::wrap` can break between the act and its \
@@ -2342,6 +2405,26 @@ fn g17_every_key_the_note_spells_comes_from_the_binding_table() {
             acts::ACTS.contains(act),
             "🔴 g17: the note offers {} and the declaration does not carry it",
             act.name()
+        );
+    }
+
+    // 🔴 **The mark is paired with the act by its own declaration, not by an array index**
+    // (independent audit, finding 11). `renderer::ACT_MARKS` reads `tokens::GLYPHS[5..8]`, so
+    // swapping two of those entries — or inserting one above them — silently re-pairs all three,
+    // and the help face's `marks` line is generated from the same array so it lies in the same
+    // direction. `P6` only requires `means` and `instead_of` to be non-empty. What ties a mark to
+    // its act is the word the declaration says it deleted, and that is what is asked here.
+    for (act, mark) in renderer::ACT_MARKS {
+        let glyph = tokens::glyph(mark)
+            .unwrap_or_else(|| panic!("🔴 g17: {mark:?} is paired with an act and declared nowhere"));
+        let name = act.name().trim_start_matches("act.");
+        println!("G17_MARK {mark:?} -> {name} instead_of={:?}", glyph.instead_of);
+        assert!(
+            glyph.instead_of.contains(name),
+            "🔴 g17: {mark:?} is spelled for `{name}` and its declaration says it replaced {:?}. A \
+             mark earns its cells by deleting a word; a pairing nothing checks is a mark that can \
+             be swapped onto the opposite act in silence.",
+            glyph.instead_of
         );
     }
 
@@ -8014,5 +8097,815 @@ fn g62e_the_rails_not_ok_road_still_draws_the_real_reason() {
         Some("`.gx/VERSION` is not there, so this server refuses every write"),
         "🔴 g62e: the rail's engine line, read through `renderer::measured`, is {:?}",
         measured.engine
+    );
+}
+
+// =============================================================================================
+// g64..g67 — `req/924` §TUI-45 (`req/38` SS1076, Owner `#275-T`) and §TUI-29 (SS1058, `#268-T`).
+//
+// 🔴 **Every predicate below is written against API that exists on `main`**, and that is a
+// requirement rather than a style: a gate that names a function this lane adds cannot be **run** on
+// `main`, so the red half of red-first would be a compile error — which says nothing about the
+// face. These four compile against both trees and are red on one of them.
+//
+// 🔴 And they are asked of the **screen**, not of the plan's own declarations. `main`'s memory of
+// this month has a gate that validated a declaration while nothing read it
+// ([[feedback_gate_validates_declaration_not_behaviour]]); the drawn buffer is the ground truth a
+// reader actually gets.
+//
+// * **g64** a column whose every value is a mark for nothing is not drawn — three negative
+//   controls, because *only when every value is nothing* is the half of the rule that is cheap to
+//   over-apply and expensive to get wrong.
+// * **g65** what left the grid is inside the number the screen spells, and the hatch names it.
+// * **g66** a claim measured on the window is quantified by the window — SS1047 held from the
+//   other side.
+// * **g67** the region that stood down did not take the one fact no route can re-measure with it.
+// =============================================================================================
+
+/// Whether a resolved cell's text is one of the marks that mean **no answer was obtained**.
+///
+/// 🔴 Read out of [`wire::VACANT_MARKS`] rather than typed, which is the same declaration the face's
+/// own answer is derived from — so this is not a second understanding of the rule (SS855), it is the
+/// one declaration asked twice. A literal list here would be exactly the checker that measures the
+/// test's belief instead of the face's behaviour, and an independent audit of this lane found the
+/// first cut of this helper reading `Nothing::ALL` — carrying the production defect into the probe,
+/// so the two agreed about a rule that was wrong.
+fn says_nothing(mark: &str) -> bool {
+    wire::VACANT_MARKS
+        .iter()
+        .any(|nothing| nothing.mark() == mark)
+}
+
+/// Whether a resolved cell's text is any of the seven, vacant or answered.
+fn is_any_nothing(mark: &str) -> bool {
+    Nothing::ALL.iter().any(|nothing| nothing.mark() == mark)
+}
+
+/// A ledger of `count` records with `mutate` applied to each, so a gate can say in one line which
+/// bed it is reading rather than depending on a helper's incidental contents.
+fn ledger_with(count: usize, mutate: impl Fn(usize, &mut serde_json::Value)) -> Screen {
+    let mut items: Vec<serde_json::Value> = ledger(count)
+        .transformations
+        .items()
+        .into_iter()
+        .cloned()
+        .collect();
+    for (index, item) in items.iter_mut().enumerate() {
+        mutate(index, item);
+    }
+    let mut screen = ledger(count);
+    screen.transformations = answered(
+        "/v1/transformations",
+        serde_json::json!({ "items": items, "next_cursor": serde_json::Value::Null }),
+    );
+    screen
+}
+
+/// The declared columns of this reading in which **every** record answers one and the same word for
+/// nothing, asked through the face's own classifier.
+fn vacant_of(screen: &Screen) -> Vec<(&'static str, String)> {
+    let items = screen.transformations.items();
+    if items.len() < 2 {
+        return Vec::new();
+    }
+    LEDGER_COLUMNS
+        .iter()
+        .filter_map(|column| {
+            let marks: Vec<String> = items
+                .iter()
+                .map(|item| renderer::cell_mark(item, column.key).0)
+                .collect();
+            let uniform = marks.iter().all(|mark| mark == &marks[0]);
+            if uniform && says_nothing(&marks[0]) {
+                Some((column.key, marks[0].clone()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// 🔴 **g64 — a column that says nothing on every record is not drawn.**
+///
+/// `req/924` §TUI-45: 🔴 *列の全値が「無」の mark(`?` `--` `...`)なら、その列を落として開示に数えろ。*
+/// The live bed the ruling was measured on answers `null` for five of the ten declared keys on all
+/// thirty-one records, so five columns were spending a cell per row to say *measured, and not
+/// knowable* — twenty-three times each, where once is the whole of it.
+///
+/// 🔴 **Red on `main`**: `rollback` and `superseded_by` are `null` on every record of `ledger`, and
+/// `main` draws `rollback` at every shape wide enough to fit it.
+#[test]
+fn g64_a_column_whose_every_value_is_nothing_is_not_drawn() {
+    let screen = ledger(28);
+    let measured = renderer::measured(&screen);
+    let vacant = vacant_of(&screen);
+    let items = screen.transformations.items();
+    let mut offenders: Vec<String> = Vec::new();
+    for (width, height) in RULED_SHAPES {
+        let plan = layout::resolve_attended(
+            width,
+            height,
+            &measured,
+            false,
+            layout::Subject::Grid,
+            layout::Attention {
+                selected: 0,
+                items: items.len(),
+            },
+        );
+        let drawn: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
+        let still: Vec<&str> = vacant
+            .iter()
+            .map(|(key, _)| *key)
+            .filter(|key| drawn.contains(key))
+            .collect();
+        println!("G64 {width}x{height} drawn={drawn:?} vacant={vacant:?} still_drawn={still:?}");
+        if !still.is_empty() {
+            offenders.push(format!("{width}x{height}: {still:?}"));
+        }
+    }
+    assert!(
+        !vacant.is_empty(),
+        "🔴 g64: the bed carries no column that says nothing, so this gate measured nothing. \
+         `ledger` answers `null` for `rollback` and `superseded_by` on every record; if that has \
+         changed, the bed changes with it and not the assertion."
+    );
+    assert!(
+        offenders.is_empty(),
+        "🔴 g64 (`req/924` §TUI-45): a column is drawn whose every value is a mark for nothing. \
+         One line of it says everything twenty-eight lines of it say: {offenders:?}"
+    );
+}
+
+/// 🔴 **g64b — negative control: a column that is nothing on *some* rows is information and stays.**
+///
+/// The ruling's own boundary: 🔴 *一部の行だけが「無」なら落とすな。それは情報。* A `rollback` that is
+/// `null` on twenty-seven records and carries a value on one is the face saying *these did not roll
+/// back and that one did*, which is the whole reason a reader is looking at the column.
+#[test]
+fn g64b_a_column_that_is_nothing_on_only_some_rows_is_kept() {
+    let screen = ledger_with(28, |index, item| {
+        if index == 3 {
+            item["rollback"] = serde_json::json!("gx1:rolledbackzzz");
+        }
+    });
+    let vacant = vacant_of(&screen);
+    println!("G64B vacant={vacant:?}");
+    assert!(
+        !vacant.iter().any(|(key, _)| *key == "rollback"),
+        "🔴 g64b: the bed was meant to keep `rollback` out of the vacant set and did not, so this \
+         control measured nothing"
+    );
+    let measured = renderer::measured(&screen);
+    let plan = layout::resolve_attended(
+        120,
+        32,
+        &measured,
+        false,
+        layout::Subject::Grid,
+        layout::Attention {
+            selected: 0,
+            items: 28,
+        },
+    );
+    assert!(
+        plan.columns.iter().any(|column| column.key == "rollback"),
+        "🔴 g64b (`req/924` §TUI-45's boundary): `rollback` left the grid at 120x32 although one \
+         record carries a value. A column with one real answer in it is the column a reader came \
+         for: {:?}",
+        plan.columns
+            .iter()
+            .map(|column| column.key)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// 🔴 **g64c — negative control: two *different* words for nothing in one column are a distinction.**
+///
+/// 🔴 The ruling's other half, and the one that would be cheapest to lose: *列を落とす時も、残った
+/// mark の区別を潰すな.* A column that is `?` on some records and `--` on others is this face telling
+/// *measured and not knowable* from *never written* — the distinction the whole vocabulary exists
+/// for. Dropping it because "it is all nothing" collapses the two, which is the first-principle
+/// breach this product is against, committed by a rule written to reduce ink.
+#[test]
+fn g64c_two_different_words_for_nothing_in_one_column_are_not_vacant() {
+    // `null` reads `Unknown`; a key the object does not carry at all reads `Absent`.
+    let screen = ledger_with(28, |index, item| {
+        if index % 2 == 0 {
+            if let Some(map) = item.as_object_mut() {
+                map.remove("rollback");
+            }
+        }
+    });
+    let items = screen.transformations.items();
+    let marks: BTreeSet<String> = items
+        .iter()
+        .map(|item| renderer::cell_mark(item, "rollback").0)
+        .collect();
+    println!("G64C rollback marks={marks:?}");
+    assert_eq!(
+        marks.len(),
+        2,
+        "🔴 g64c: the bed was meant to produce two different words for nothing in one column and \
+         produced {marks:?}, so this control measured nothing"
+    );
+    assert!(
+        marks.iter().all(|mark| says_nothing(mark)),
+        "🔴 g64c: both marks have to be words for nothing or the control is not the control"
+    );
+    let vacant = vacant_of(&screen);
+    let measured = renderer::measured(&screen);
+    let plan = layout::resolve_attended(
+        120,
+        32,
+        &measured,
+        false,
+        layout::Subject::Grid,
+        layout::Attention {
+            selected: 0,
+            items: 28,
+        },
+    );
+    println!("G64C vacant={vacant:?}");
+    assert!(
+        !vacant.iter().any(|(key, _)| *key == "rollback"),
+        "🔴 g64c: the shared classifier called a column carrying two different words for nothing \
+         vacant. `?` and `--` are not one fact."
+    );
+    assert!(
+        plan.columns.iter().any(|column| column.key == "rollback"),
+        "🔴 g64c (`req/924` §TUI-45): a column carrying two different words for nothing left the \
+         grid, so the screen can no longer tell `?` from `--` on that key: {:?}",
+        plan.columns
+            .iter()
+            .map(|column| column.key)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// 🔴 **g64d — negative control: a column that answers `no` on every record is an answer, and stays.**
+///
+/// 🔴 The audit's finding 3, made mechanical. `req/924` §TUI-45 enumerates the marks the rule may
+/// drop a column for — 「`?` `--` `...`」 — and the first cut of this lane read `Nothing::ALL`
+/// instead. `wire::cell` maps a JSON `false` to [`Nothing::False`], whose mark is `no`, so a ledger
+/// in which nothing is enforced lost the `enforced` column at **every width** and the hatch told the
+/// reader it had "answered with a mark for nothing". *No transformation in this ledger is enforced*
+/// is not nothing; it is the most actionable sentence a face like this can carry, and folding it
+/// into *not measured* is the breach this product exists to refuse.
+#[test]
+fn g64d_a_column_that_answers_no_on_every_record_is_an_answer_and_is_drawn() {
+    let screen = ledger_with(28, |_, item| {
+        item["enforced"] = serde_json::Value::Bool(false);
+    });
+    let items = screen.transformations.items();
+    let marks: BTreeSet<String> = items
+        .iter()
+        .map(|item| renderer::cell_mark(item, "enforced").0)
+        .collect();
+    println!("G64D enforced marks={marks:?}");
+    assert_eq!(
+        marks.len(),
+        1,
+        "🔴 g64d: the bed was meant to answer one mark on every record: {marks:?}"
+    );
+    let mark = marks.iter().next().expect("one mark").clone();
+    assert!(
+        is_any_nothing(&mark) && !says_nothing(&mark),
+        "🔴 g64d: the control needs a mark that is one of the seven and is **not** one the rule may \
+         drop for. `enforced: false` drew {mark:?}, which is not that."
+    );
+    let vacant = vacant_of(&screen);
+    let measured = renderer::measured(&screen);
+    let plan = layout::resolve_attended(
+        120,
+        32,
+        &measured,
+        false,
+        layout::Subject::Grid,
+        layout::Attention {
+            selected: 0,
+            items: items.len(),
+        },
+    );
+    let drawn: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
+    println!("G64D vacant={vacant:?} drawn={drawn:?}");
+    assert!(
+        !vacant.iter().any(|(key, _)| *key == "enforced"),
+        "🔴 g64d: `enforced no` on every record was called *no answer obtained*"
+    );
+    assert!(
+        drawn.contains(&"enforced") || {
+            // The hoist may have taken it: constant over the fetched set is a legitimate fold, and
+            // the mark is then on the screen once rather than nowhere. Either is the answer being
+            // kept; the failure this control names is the column being deleted.
+            let frame = flat(&renderer::buffer_text(&renderer::render_view_to_buffer(
+                &screen,
+                120,
+                32,
+                Tier::Mono,
+                false,
+                &View::default(),
+            )));
+            frame.contains("enforced no")
+        },
+        "🔴 g64d (`req/924` §TUI-45's enumeration): the column carrying a measured `false` on every \
+         record is neither drawn nor hoisted: {drawn:?}"
+    );
+}
+
+/// 🔴 **g64e — negative control: a count of nought is a measurement, and stays.**
+///
+/// The same finding, on the other arm of `wire::cell`: a JSON `0` is [`Nothing::Zero`], whose mark
+/// is `0`. `req/38` SS974 added a seventh word precisely so `""` would stop being drawn as *a count
+/// of nought*; a rule that deletes any column reading `0` throws that repair away.
+#[test]
+fn g64e_a_column_that_counts_nought_on_every_record_is_a_measurement_and_is_drawn() {
+    let screen = ledger_with(28, |_, item| {
+        item["scope"] = serde_json::json!(0);
+    });
+    let items = screen.transformations.items();
+    let mark = renderer::cell_mark(items[0], "scope").0;
+    println!("G64E scope mark={mark:?}");
+    assert_eq!(
+        mark,
+        Nothing::Zero.mark(),
+        "🔴 g64e: the bed was meant to draw the count mark"
+    );
+    let vacant = vacant_of(&screen);
+    println!("G64E vacant={vacant:?}");
+    assert!(
+        !vacant.iter().any(|(key, _)| *key == "scope"),
+        "🔴 g64e (`req/924` §TUI-45's enumeration): a count of nought on every record was called \
+         *no answer obtained*: {vacant:?}"
+    );
+}
+
+/// 🔴 **g65 — what left the grid is inside the number the screen spells, and the hatch names it.**
+///
+/// `req/924` §TUI-45: 🔴 *落とし方: `N of 11 fields not drawn` に合流させる。黙って落とすな——開示の数
+/// が増えるのが正しい姿。* Three things have to hold together and any one alone is a deletion wearing
+/// a signpost's face: every column that says nothing is inside `dropped_fields`; the number on the
+/// screen is that set's size; and the hatch names its members.
+///
+/// The third is `g61`'s argument one rule up, and it is the one that has to be measured rather than
+/// assumed — a screen saying *six fields are not drawn* while the help face names three is a face
+/// that lost three columns and left a number behind.
+///
+/// 🔴 **Named ceiling: the count does not always go up, and that is correct.** Taking a vacant
+/// column out before the width fit gives its cells to a column that carries a value, so a shape can
+/// disclose the same number while disclosing a different set. What the rule guarantees is
+/// *reflection*, not growth. Growth is asserted on the bed where it must happen — the live one,
+/// five vacant keys of ten — so the gate still measures something rather than passing vacuously.
+#[test]
+fn g65_what_the_rule_dropped_is_counted_on_the_screen_and_named_in_the_hatch() {
+    // The live bed's shape: `created_at`, `scope`, `actor`, `rollback` and `superseded_by` are
+    // `null` on every record (`req/924` §TUI-39 measured exactly this against the running engine).
+    let screen = ledger_with(31, |_, item| {
+        for key in ["created_at", "scope", "actor"] {
+            item[key] = serde_json::Value::Null;
+        }
+    });
+    let vacant = vacant_of(&screen);
+    let measured = renderer::measured(&screen);
+    let items = screen.transformations.items();
+    let mut silent: Vec<String> = Vec::new();
+    let mut unnamed: Vec<String> = Vec::new();
+    let mut grew = 0usize;
+    for (width, height) in RULED_SHAPES {
+        let plan = layout::resolve_attended(
+            width,
+            height,
+            &measured,
+            false,
+            layout::Subject::Grid,
+            layout::Attention {
+                selected: 0,
+                items: items.len(),
+            },
+        );
+        let (_, width_only) = layout::columns_for(width);
+        if plan.dropped_fields.len() > width_only.len() {
+            grew += 1;
+        }
+        for (key, _) in &vacant {
+            if !plan.dropped_fields.contains(key) {
+                silent.push(format!(
+                    "{width}x{height}: `{key}` obtained no answer on any record and is neither \
+                     drawn nor counted"
+                ));
+            }
+        }
+        let frame = flat(&renderer::buffer_text(&renderer::render_view_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &View::default(),
+        )));
+        // The number a reader gets, read off the buffer rather than off the plan.
+        let long = format!("{} of {}", plan.dropped_fields.len(), plan.total_fields);
+        let short = format!("{}/{}", plan.dropped_fields.len(), plan.total_fields);
+        if !frame.contains(&long) && !frame.contains(&short) {
+            silent.push(format!(
+                "{width}x{height}: the screen spells neither {long:?} nor {short:?}\n{frame}"
+            ));
+        }
+        let hatch = flat(&renderer::buffer_text(&renderer::render_view_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &View {
+                help: true,
+                ..View::default()
+            },
+        )));
+        // 🔴 UNTESTABLE and not failed. `help_lines` cuts its own list at the height it was given
+        // and says how many it cut; a shape where the entry did not fit has not been measured, and
+        // folding *not measured* into *failed* is the defect
+        // [[feedback_untestable_is_not_failed]] names.
+        // 🔴 The guard is the **entry's own label** and nothing looser. A first cut of this asked
+        // for `"not drawn"`, which the help face's own disclosure line also carries — so a hatch
+        // cut long before its `all nothing` entry answered *yes, I am here* and the gate then
+        // demanded names from a page that had none. That is the same shape as the checker
+        // `req/38` SS1077's lane caught in itself: a predicate wide enough to match the chrome
+        // reports coverage it does not have.
+        // 🔴 **Identity and not presence** (independent audit, finding 9). The first cut asked only
+        // whether each vacant key appeared *somewhere* in the hatch, so printing `dropped_fields`
+        // there — a superset — would have kept this gate, `g61`, `g64` and `p5` all green while the
+        // line told the reader that width-dropped columns "obtained no answer", folding *cut for
+        // room* into *nothing to say*. So the entry's own line is isolated and asked for **exactly**
+        // the vacant set, with its marks.
+        let line = hatch
+            .split("no answer")
+            .nth(1)
+            .map(|tail| tail.split(" prev ").next().unwrap_or(tail).to_string());
+        match line {
+            Some(line) => {
+                for (key, mark) in &vacant {
+                    if !line.contains(&format!("{key} {mark}")) {
+                        unnamed.push(format!("{width}x{height}: {key} {mark} missing from {line:?}"));
+                    }
+                }
+                // The other direction: a key that is *not* vacant has no business on this line.
+                for column in LEDGER_COLUMNS {
+                    let vacant_key = vacant.iter().any(|(key, _)| *key == column.key);
+                    if !vacant_key && line.contains(column.key) {
+                        unnamed.push(format!(
+                            "{width}x{height}: {} is on the `no answer` line and is not vacant \
+                             ({line:?})",
+                            column.key
+                        ));
+                    }
+                }
+            }
+            None => {
+                let unseen = vacant
+                    .iter()
+                    .filter(|(key, _)| !hatch.contains(key))
+                    .count();
+                println!(
+                    "G65 {width}x{height} UNTESTABLE: the hatch was cut before its `no answer` \
+                     entry ({unseen} of {} names unreachable at this shape)",
+                    vacant.len()
+                );
+            }
+        }
+        println!(
+            "G65 {width}x{height} dropped={} width_only={} vacant={vacant:?}",
+            plan.dropped_fields.len(),
+            width_only.len()
+        );
+    }
+    assert!(
+        !vacant.is_empty(),
+        "🔴 g65: the bed carries no column that says nothing, so this gate measured nothing"
+    );
+    assert!(
+        grew > 0,
+        "🔴 g65: on a bed where five of ten keys say nothing on every record, no shape disclosed \
+         more than the width alone would have. Either the rule is not running or the count is not \
+         reaching the disclosure."
+    );
+    assert!(
+        silent.is_empty(),
+        "🔴 g65 (`req/924` §TUI-45): a column left the grid without the screen's count going up to \
+         say so. That is not a fold, it is a deletion: {silent:#?}"
+    );
+    assert!(
+        unnamed.is_empty(),
+        "🔴 g65 (`req/924` §TUI-21's clause, one rule up): the count grew and the hatch does not \
+         name what it grew by: {unnamed:#?}"
+    );
+}
+
+/// 🔴 **g66 — a claim measured on the window is quantified by the window, and never by the set.**
+///
+/// `req/38` SS1047 is the ruling held here from the other side: the face drew `verdict Admit`
+/// flatly, having measured it on the rows the terminal happened to be tall enough for, and *the
+/// truth of the sentence was a function of the terminal's height and of where the cursor stood*.
+/// §TUI-45 (SS1076) then separated two questions that had been one: a **claim** about the ledger is
+/// measured over every record the read carried and always will be; a column that says one word on
+/// every row of *this screen* may say it once, quantified `these N` where N is the rows drawn.
+///
+/// 🔴 Three directions, all read off the buffer: the repetition is gone; the number is the number
+/// of record rows actually on the screen; and `all <fetched> <key>` — the sentence SS1047 killed —
+/// is on no screen for a key that is not constant over the set.
+///
+/// 🔴 **Red on `main`**: `main` repeats `Admit Committed Escrowed` down every drawn row of this bed,
+/// because `hoist` measures over the fetched set and record 31 differs.
+#[test]
+fn g66_a_line_measured_on_the_window_says_these_n_and_never_all_m() {
+    // Thirty-one records of which the last differs: the live bed's own shape.
+    let screen = ledger_with(31, |index, item| {
+        if index == 30 {
+            item["verdict"] = serde_json::Value::Null;
+            item["state"] = serde_json::json!("Draft");
+            item["inverse_status"] = serde_json::Value::Null;
+        }
+    });
+    let items = screen.transformations.items();
+    let mut repeated: Vec<String> = Vec::new();
+    let mut lies: Vec<String> = Vec::new();
+    let mut fired = 0usize;
+    let mut compressed_at: Vec<String> = Vec::new();
+    for (width, height) in RULED_SHAPES {
+        let text = renderer::buffer_text(&renderer::render_view_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &View::default(),
+        ));
+        // The rows a reader can see, counted from the buffer: a record row is one carrying a
+        // ledger id, which is the same predicate the capture instrument uses.
+        let rows: Vec<&str> = text.lines().filter(|line| line.contains("gx1:")).collect();
+        let frame = flat(&text);
+        if rows.len() < 2 || rows.len() >= items.len() {
+            println!(
+                "G66 {width}x{height} UNTESTABLE rows={} items={} (a window that is the whole set \
+                 is a hoist, not a compression)",
+                rows.len(),
+                items.len()
+            );
+            continue;
+        }
+        fired += 1;
+        let on_every_row = rows.iter().all(|row| row.contains("Admit"));
+        // 🔴 **One, and it is asserted at the widest ruled shape only.** The ruling's own form is a
+        // ladder — *compress if the header can hold the clause* — and at eighty cells and below the
+        // clause costs more cells than the repetition it removes, because a hoisted `created_at`
+        // spells a twenty-character timestamp. So the shapes where the ladder refuses are
+        // **reported with their row counts** rather than failed, and 120x32 — the shape §TUI-45 was
+        // measured at — is where the behaviour is pinned. Failing the narrow shapes would be a gate
+        // demanding a screen that is worse: a header that overflows says nothing at all.
+        if !on_every_row {
+            compressed_at.push(format!("{width}x{height}"));
+        }
+        if (width, height) == (120, 32) && on_every_row {
+            repeated.push(format!(
+                "{width}x{height}: `Admit` repeated on all {} drawn rows",
+                rows.len()
+            ));
+        }
+        // 🔴 **Two, and the word is read from the declaration** (independent audit, finding 8). The
+        // first cut keyed the whole check on the literal `"these"`, so renaming `WINDOW_SCOPE` to
+        // `"all"` produced `all 24 verdict Admit` over a thirty-one record set — SS1047's exact lie
+        // — with every branch of this gate skipped and the suite green. The scope words are asserted
+        // to be different words first, then the clause is found by the declared one.
+        assert_ne!(
+            renderer::WINDOW_SCOPE,
+            renderer::FETCHED_SCOPE,
+            "🔴 g66: the two quantifiers are the same word, so no line on this face can say which \
+             set it was measured over"
+        );
+        let quantified = format!("{} {}", renderer::WINDOW_SCOPE, rows.len());
+        if !on_every_row && !frame.contains(&quantified) {
+            lies.push(format!(
+                "{width}x{height}: the column was compressed and the screen does not say \
+                 `{quantified}`\n{frame}"
+            ));
+        }
+        if frame.contains(renderer::WINDOW_SCOPE) && !frame.contains(&quantified) {
+            lies.push(format!(
+                "{width}x{height}: compressed and the quantifier is not `{quantified}`\n{frame}"
+            ));
+        }
+        // Three: the sentence SS1047 refused, by name.
+        for key in ["verdict", "state", "inverse_status"] {
+            let refused = format!("all {} {key}", items.len());
+            if frame.contains(&refused) {
+                lies.push(format!(
+                    "{width}x{height}: {refused:?} — a claim about thirty-one records measured on \
+                     {} of them, which is what SS1047 killed\n{frame}",
+                    rows.len()
+                ));
+            }
+        }
+        println!(
+            "G66 {width}x{height} rows={} items={} repeated={on_every_row}",
+            rows.len(),
+            items.len()
+        );
+    }
+    println!("G66_FIRED={fired} G66_COMPRESSED_AT={compressed_at:?}");
+    assert!(
+        fired > 0,
+        "🔴 g66: no ruled shape drew a proper subset of the bed, so this gate measured nothing"
+    );
+    assert!(
+        !compressed_at.is_empty(),
+        "🔴 g66: no ruled shape compressed anything, so nothing here was measured. On `main` this \
+         is the red half: the face repeats the word on every row at every shape."
+    );
+    assert!(
+        repeated.is_empty(),
+        "🔴 g66 (`req/924` §TUI-45): at the shape the ruling was measured on, a column says one \
+         word on every row of the screen and says it once per row. Sixty-nine cells to say `Admit` \
+         twenty-three times: {repeated:#?}"
+    );
+    assert!(
+        lies.is_empty(),
+        "🔴 g66 (`req/924` §TUI-45 holding `req/38` SS1047): {lies:#?}"
+    );
+}
+
+/// 🔴 **g68 — compressing a column does not leave the ledger unpainted.**
+///
+/// `req/924` §TUI-53 (`req/38` SS1084 ①): 🔴 *圧縮と強調は両立させろ。畳んで残った列が id 一色なら、
+/// 畳んだ事が読者から情報を奪っている.* Measured on the real face at 120x29, the first cut of this
+/// lane took the coloured rows from twenty-five to **two** — `req/924` §TUI-19's defect (*no
+/// handhold for telling one row from the next*) made worse by a cut meant to help.
+///
+/// Read off the **buffer** and not off the plan: what a reader gets is the painted cell.
+#[test]
+fn g68_a_compressed_column_still_paints_the_rows_it_was_lifted_off() {
+    // Thirty-one records with the last one differing: the bed the ruling was measured on, and the
+    // one shape of ledger where a window can be constant while the fetched set is not.
+    let screen = ledger_with(31, |index, item| {
+        if index == 30 {
+            item["verdict"] = serde_json::Value::Null;
+            item["state"] = serde_json::json!("Draft");
+            item["inverse_status"] = serde_json::Value::Null;
+        }
+    });
+    let mut bare: Vec<String> = Vec::new();
+    let mut measured_rows = 0usize;
+    for (width, height) in RULED_SHAPES {
+        let buffer = renderer::render_view_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Truecolor,
+            false,
+            &View::default(),
+        );
+        for y in 0..height {
+            let row: String = (0..width).map(|x| buffer[(x, y)].symbol()).collect();
+            if !row.contains("gx1:") {
+                continue;
+            }
+            measured_rows += 1;
+            // A painted row is one where some cell resolved to a colour. `Color::Reset` is what a
+            // cell nobody decided about carries, so its absence is the decision.
+            let painted = (0..width).any(|x| format!("{:?}", buffer[(x, y)].fg) != "Reset");
+            if !painted {
+                bare.push(format!("{width}x{height} row {y}: {}", row.trim_end()));
+            }
+        }
+    }
+    println!("G68_ROWS={measured_rows} G68_BARE={}", bare.len());
+    assert!(
+        measured_rows > 0,
+        "🔴 g68: no ruled shape drew a record, so this gate measured nothing"
+    );
+    assert!(
+        bare.is_empty(),
+        "🔴 g68 (`req/924` §TUI-53): a record row carries no colour at all. Compressing the columns \
+         that held the ledger's meaning and giving the rows nothing back is the cut taking a fact \
+         away from the reader: {bare:#?}"
+    );
+}
+
+/// 🔴 **g67 — the region that stood down did not take the unrecoverable fact with it.**
+///
+/// `req/924` §TUI-29 lets the provenance region stand down while every route answers `200`, because
+/// `engine ok` on the rail is then the whole of what it was saying. The subscription's state is the
+/// one thing on that row that **no route returns** — `Recoverable::Nowhere`, which is why the region
+/// sits at `Priority::One` — so a screen that drops the row without carrying the badge somewhere has
+/// destroyed a fact rather than folded one.
+///
+/// 🔴 **This is the gate on this lane's own cut, and that is why it is here.** SS842: a reduction
+/// pass takes the caveats out along with the padding, because on the page a caveat looks exactly
+/// like padding. On `main` the region never stands down, so this gate reports that it measured
+/// nothing — it is a tripwire on new behaviour rather than a defect found in old.
+#[test]
+fn g67_a_provenance_that_stood_down_left_the_badge_on_the_screen() {
+    let screen = ledger(28);
+    let live = report(Link::Open, 151, 0);
+    let measured = renderer::measured_with_link(&screen, live);
+    let mut destroyed: Vec<String> = Vec::new();
+    let mut stood_down = 0usize;
+    for (width, height) in RULED_SHAPES {
+        let plan = layout::resolve_attended(
+            width,
+            height,
+            &measured,
+            false,
+            layout::Subject::Grid,
+            layout::Attention {
+                selected: 0,
+                items: 28,
+            },
+        );
+        let drawn = plan.rows_for(RegionRole::Provenance) > 0;
+        let frame = flat(&renderer::buffer_text(&renderer::render_live_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &View::default(),
+            live,
+        )));
+        if !drawn && !plan.provenance_folded {
+            stood_down += 1;
+            if !frame.contains(live::LIVE_BADGE) {
+                destroyed.push(format!(
+                    "{width}x{height}: the region stood down and the badge is on no row\n{frame}"
+                ));
+            }
+            if !frame.contains("provenance ->") {
+                destroyed.push(format!(
+                    "{width}x{height}: the region stood down and no clause says where its line \
+                     went\n{frame}"
+                ));
+            }
+            // 🔴 **And the road has to arrive.** `req/924` §TUI-21: *数だけ残して名前を `?` へ逃がす
+            // のは可。ただし逃がし先が実際に列挙している事を gate で確かめるまで「逃がした」と言うな.*
+            // The first cut of this gate asked only whether the clause was spelled, and the clause
+            // was spelled at 80x24, 66x20 and 60x20 while the hatch at those three shapes carried
+            // no provenance line at all — a signpost pointing at nothing, shipped by the lane that
+            // wrote the signpost. `worst` is the word the line is keyed on because it is in every
+            // rung of `Measured` and in no other entry of the hatch.
+            let hatch = flat(&renderer::buffer_text(&renderer::render_live_to_buffer(
+                &screen,
+                width,
+                height,
+                Tier::Mono,
+                false,
+                &View {
+                    help: true,
+                    ..View::default()
+                },
+                live,
+            )));
+            if !hatch.contains("worst") {
+                destroyed.push(format!(
+                    "{width}x{height}: the disclosure sends the reader to `?` for the provenance \
+                     and `?` does not carry it\n{hatch}"
+                ));
+            }
+            // 🔴 **The sentence the stand-down claims replaces the region has to be on the screen**
+            // (independent audit, finding 2; caught green by this lane's own mutation battery, so
+            // the predicate is added rather than the finding called covered). `req/924` §TUI-29's
+            // whole argument is *`engine ok` is the whole of what the provenance row was saying* —
+            // at sixty-six and sixty cells the rail read `list ENGINE LIVE, 151 events` with
+            // `engine ok` dropped off the end and `1 engine keys not drawn` in the disclosure, and
+            // the region stood down anyway. A premise that is false on the drawn frame is not a
+            // premise, and the region is the thing that was paying for it.
+            let claim: Vec<String> = measured
+                .engine
+                .iter()
+                .filter(|(key, _)| !key.contains(live::LIVE_BADGE.split(' ').next().unwrap_or("")))
+                .map(|(key, value)| format!("{key} {value}"))
+                .collect();
+            for sentence in &claim {
+                if !frame.contains(sentence) {
+                    destroyed.push(format!(
+                        "{width}x{height}: the region stood down because {sentence:?} was supposed \
+                         to say everything it said, and {sentence:?} is not on the frame\n{frame}"
+                    ));
+                }
+            }
+        }
+        println!(
+            "G67 {width}x{height} provenance_drawn={drawn} folded={} badge={}",
+            plan.provenance_folded,
+            frame.contains(live::LIVE_BADGE)
+        );
+    }
+    assert!(
+        stood_down > 0,
+        "🔴 g67: the provenance region stood down at no ruled shape, so this gate measured nothing"
+    );
+    assert!(
+        destroyed.is_empty(),
+        "🔴 g67 (`req/924` §TUI-29): the provenance region stood down and took a \
+         `Recoverable::Nowhere` fact with it. A renderer cannot invert, so the one debt it does \
+         carry is saying what it let go of: {destroyed:#?}"
     );
 }

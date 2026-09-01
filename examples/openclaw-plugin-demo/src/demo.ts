@@ -452,7 +452,12 @@ async function main(): Promise<void> {
   say(`failures = ${failures}`);
   say(`DEMO = ${failures === 0 ? "PASS" : "FAIL"}`);
   say();
-  say("Not tested here: OpenClaw itself never ran. See README, 'What this demo does not show'.");
+  say(
+    "Not tested by this harness: it reproduces OpenClaw's firing order but is not OpenClaw. " +
+      "A real openclaw process has since loaded this plugin and called register() at gateway " +
+      "boot (req/1036) -- what remains untested is a real tool call reaching before_tool_call, " +
+      "which needs an agent turn this lane does not run. See README, 'What this demo does not show'.",
+  );
 
   process.exitCode = failures === 0 ? 0 : 1;
 }

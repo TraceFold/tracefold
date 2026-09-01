@@ -2,14 +2,22 @@
 # (`src/{lib,provenance,receipt,evidence,dsse,keys}.rs`) and its dependency line (`ed25519-dalek`);
 # the field-table spec gives the field tables those modules carry.
 [package]
-name = "gx-witness"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): publish name becomes
+# "tracefold-witness"; [lib] name stays "gx_witness" so no source line changes anywhere.
+name = "tracefold-witness"
 description = "Provenance, evidence and DSSE-signed receipts."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the
                                        # workspace, per the adopted MSRV decision (sem: SEM-gx-witness-001)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # crates.io metadata; also read by `dist generate`
+publish = true                        # req/1032/req/1035 blockers resolved -- this crate is a real publish target now
+readme = "README.md"                  # crates.io page body (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+[lib]
+name = "gx_witness"
 
 # The edge that an early ruling made one-way. This crate names gx-core
 # and gx-log names gx-core; neither names the other, so the cycle the field-table spec would have
@@ -19,7 +27,7 @@ publish = false                       # no crate in this workspace is a designat
 #
 # `version` beside `path`: see gx-canon's manifest for why (`cargo deny check bans`).
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.2" }
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
 
 # A later hand. The field-table spec gives `Evidence` an IdentityView row (all fields, no exclusions) (sem:
 # SEM-gx-witness-002), so the type needs a
@@ -29,7 +37,7 @@ gx-core = { path = "../gx-core", version = "0.1.2" }
 # `evidence.rs` implement the trait for a local type without gx-witness ever naming BLAKE3 or a CBOR
 # codec -- `tests/evidence_cid.rs` reads the source and fails if it does. No cycle: gx-canon names
 # gx-core and nothing else in this workspace.
-gx-canon = { path = "../gx-canon", version = "0.1.2" }
+gx-canon = { path = "../gx-canon", version = "0.1.2", package = "tracefold-canon" }
 
 # A later hand. One acceptance criterion verifies a `CommitReceipt`'s inclusion proof offline and a
 # ruling attaches a signature over `gx_log::proof::
@@ -39,7 +47,7 @@ gx-canon = { path = "../gx-canon", version = "0.1.2" }
 # graph and cargo, not a convention, is what says so. `tests/ac_018.rs` reads gx-log's manifest and
 # fails if that ever changes. The architecture spec's informal dep line for gx-witness names neither
 # this nor gx-canon.
-gx-log = { path = "../gx-log", version = "0.1.2" }
+gx-log = { path = "../gx-log", version = "0.1.2", package = "tracefold-log" }
 
 # Named on this crate's dependency line in the architecture spec and approved in a research note.
 # Versions are the max_stable_version read off the crates.io API on 2026-08-07; every license was

@@ -849,6 +849,11 @@ fn m07_the_no_archive_refusal_does_not_send_an_operator_to_a_directory_that_is_n
     for missing in [
         WitnessMissing::NoReceipt,
         WitnessMissing::Unreadable,
+        // 🔴 **DR-46-50** (`req/973` §9-5, `req/1036` R11) — the new variant this array had not
+        // been widened for; `crates/gx-cli/tests/dr4650_receipt_store_unreadable.rs` is the arm
+        // that measures its *word* is distinct from `Unreadable`'s through the real binary, this
+        // one only measures its remedy still names the directory.
+        WitnessMissing::StoreUnreadable,
         WitnessMissing::Unsigned,
         WitnessMissing::UnknownKey,
         WitnessMissing::WrongSubject,
@@ -856,7 +861,7 @@ fn m07_the_no_archive_refusal_does_not_send_an_operator_to_a_directory_that_is_n
         let remedy = missing.remedy();
         assert!(
             remedy.contains(".gx/receipts/"),
-            "the other five are about a document under `.gx/receipts/` and still say so: {remedy}"
+            "the other six are about a document under `.gx/receipts/` and still say so: {remedy}"
         );
     }
 }

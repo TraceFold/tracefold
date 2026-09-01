@@ -1,13 +1,26 @@
 # The core types of the calculus and nothing else. The architecture spec places this crate first in
 # the workspace and defines what it may not do: no I/O, deterministic, no unsafe.
 [package]
-name = "gx-core"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): "gx-core" collides with an
+# unrelated crates.io crate (github.com/gmeligio/gx's Galax project). Publish name becomes
+# "tracefold-core"; every dependent's [lib] target stays "gx_core" (below) so `use gx_core::...`
+# is unchanged in every crate's source -- only the registry-facing package identity moves.
+name = "tracefold-core"
 description = "Core types of the Glovrex transformation calculus. No I/O, deterministic."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-core-001)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # crates.io metadata; also read by `dist generate`
+publish = true                        # req/1032/req/1035 blockers resolved -- this crate is a real publish target now
+readme = "README.md"                  # crates.io page body (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+# Registry rename only: every internal `use` and every dependent's dependency-table key still reads
+# `gx_core`, because Cargo derives the extern-crate identifier from the *key* on the consuming
+# manifest's [dependencies] line, not from this crate's own package name.
+[lib]
+name = "gx_core"
 
 # The architecture spec allows this crate "serde, thiserror and not much more" and it spends exactly
 # that much. serde is not optional here: the acceptance criteria are stated as serde round-trip

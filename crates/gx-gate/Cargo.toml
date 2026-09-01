@@ -2,13 +2,24 @@
 # (`src/{lib,policy,invariant,verdict,packs/}.rs`) and its dependency line (`cedar-policy`);
 # the field-table spec gives the field tables `verdict.rs` and `policy.rs` carry.
 [package]
-name = "gx-gate"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): this is the crates.io
+# publish shape (default = [], no postgres pack -- matches the public GitHub mirror shape, chosen
+# for consistency across the two public surfaces rather than shipping a third shape; the private
+# `crates/gx-gate/Cargo.toml` with `default = ["pg"]` stays the internal-dev shape and is not
+# published). [lib] name stays "gx_gate" so no source line changes.
+name = "tracefold-gate"
 description = "Cedar policy evaluation, invariant registry and verdict composition."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-gate-001) -- see the cedar-policy block below
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # crates.io metadata
+publish = true                        # req/1032/req/1035 blockers resolved -- this is the real crates.io publish target for gx-gate
+readme = "README.md"                  # crates.io page body -- resolves to crates/gx-gate/README.md once this manifest is swapped in for publish (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+[lib]
+name = "gx_gate"
 
 # The direction of every edge here is fixed by two early rulings and checked by cargo rather than by
 # a convention. One erratum puts the opaque `PlannedDeltaBytes` in gx-core (a later hand supplies the
@@ -55,8 +66,8 @@ default = []
 pg = []  # needs `policies/postgres/deny-system-catalogs.cedar`, not in this distribution
 
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.2" }
-gx-witness = { path = "../gx-witness", version = "0.1.2" }
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
+gx-witness = { path = "../gx-witness", version = "0.1.2", package = "tracefold-witness" }
 
 # Earlier hands wrote here that gx-canon was NOT a dependency, on gx-witness's rule -- "a dependency
 # declared before its first use cannot be reviewed against a reason" -- and named the hand that
@@ -72,7 +83,7 @@ gx-witness = { path = "../gx-witness", version = "0.1.2" }
 # No package is added by it: gx-witness already depends on gx-canon, so the graph is unchanged
 # (223 before and after, measured directly). What changes is that this crate now says out loud
 # which digests it takes, rather than reaching them through a re-export.
-gx-canon = { path = "../gx-canon", version = "0.1.2" }
+gx-canon = { path = "../gx-canon", version = "0.1.2", package = "tracefold-canon" }
 
 # The architecture spec's dependency line for this crate, and this workspace's DEFAULT license
 # ruling. Measured before it was

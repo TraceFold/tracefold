@@ -108,13 +108,35 @@ pub fn measured_with_link(screen: &Screen, link: live::LinkReport) -> Measured {
     } else {
         format!("status {}", codes.join("/"))
     };
+    // 🔴 The bool beside the sentence (`req/924` §TUI-29). `statuses` is composed for a reader and
+    // may be reworded; the decision it drives one module up must not move when it is.
+    let all_200 = !codes.is_empty() && codes.iter().all(|code| code == "200");
+    let mut engine = engine_line(&screen.healthz, true);
+    // 🔴 **The badge rides the rail exactly when the provenance region is about to stand down**
+    // (`req/924` §TUI-29). It is inserted **first** because `layout::heading` keeps from the front
+    // and gives up from the end: what no route can re-measure is what has to survive the narrowest
+    // rail. `layout::resolve_attended` then reads the rail's own cells, so if the badge did not fit
+    // the region stays and says it — the decision is never a second width test.
+    //
+    // 🔴 Split out of [`live::LIVE_BADGE`] rather than typed again. Owner #227's ruling is that a
+    // face saying `LIVE` must say **whose** events it counts, and a second spelling here is exactly
+    // how a screen comes to say `LIVE` alone on the day the constant is edited (gate g43).
+    if all_200 && link.link == live::Link::Open {
+        let (badge, rest) = live::LIVE_BADGE
+            .split_once(' ')
+            .unwrap_or((live::LIVE_BADGE, ""));
+        engine.insert(0, (badge.to_string(), format!("{rest}, {} events", link.events)));
+    }
     Measured {
         routes: readings.len(),
         read_at,
         worst_ms,
         statuses,
         link,
-        engine: engine_line(&screen.healthz),
+        engine,
+        engine_full: engine_line(&screen.healthz, false),
+        all_200,
+        vacant: vacant_columns(&screen.transformations),
     }
 }
 
@@ -141,7 +163,23 @@ pub fn measured_with_link(screen: &Screen, link: live::LinkReport) -> Measured {
 /// the carve-out this key now reads through below, so the assertion this paragraph makes is one the
 /// classifier now keeps. The row this function decides to hide when the engine is `ok` is a
 /// **separate**, still-standing decision (`g59`) that this repair does not touch.
-fn engine_line(healthz: &Reading) -> Vec<(String, String)> {
+///
+/// 🔴 **`engine ok`, and the four words it replaces are not deleted** (`req/924` §TUI-29, `req/38`
+/// SS1058, Owner `#268-T`; repeated as §TUI-45 row 3). A caveat that holds on every normal frame is
+/// furniture: `status ok`, `ledger_agrees yes` and `engine_version 0.1.0` change no reader's next
+/// act while the engine is healthy, and they spend the cells the *unhealthy* frame will need. So the
+/// standing row is one word, and the moment either claim stops holding the row expands to the full
+/// spelling with `status_reason` in front of it.
+///
+/// 🔴 **This is not the defect `SS842` names.** Nothing is discarded — the words come back the
+/// instant they carry information, and [`help_lines`] spells all three, and the condition the rail
+/// draws them under, on every frame. `§TUI-29`'s own test is the one applied: *does this row change
+/// the reader's next act when everything is normal?*
+///
+/// `fold` is the caller's, because the rail and the hatch want different answers to the same
+/// question and neither of them should be re-deriving the other's: the rail asks for the line as it
+/// is drawn, and [`help_lines`] asks for it as it stands underneath.
+fn engine_line(healthz: &Reading, fold: bool) -> Vec<(String, String)> {
     let body = healthz.body.clone().unwrap_or(serde_json::Value::Null);
     let read = |key: &str| -> String {
         healthz
@@ -158,6 +196,13 @@ fn engine_line(healthz: &Reading) -> Vec<(String, String)> {
             )
             .text()
     };
+    if fold
+        && healthz.nothing().is_none()
+        && read("status") == HEALTHY
+        && read("ledger_agrees") == AGREES
+    {
+        return vec![(ENGINE_LABEL.to_string(), HEALTHY.to_string())];
+    }
     let mut line: Vec<(String, String)> = Vec::new();
     if healthz.nothing().is_some() || read("status") != HEALTHY {
         line.push(("status_reason".to_string(), read("status_reason")));
@@ -217,7 +262,23 @@ pub fn draw(frame: &mut Frame, screen: &Screen, plan: &Plan, tier: Tier, view: &
                 } else {
                     area.width
                 };
-                let wrapped = layout::wrap(&text, inner);
+                let mut wrapped = layout::wrap(&text, inner);
+                // 🔴 **The enclosure closes on a row the reader can see.** `wrap` can answer with
+                // more rows than this region was budgeted: the disclosure's height is settled in
+                // `layout::resolve_attended`'s loop and the clause that says how many keys the note
+                // never spelled is added **after** it, against the rows the loop produced — a
+                // ceiling that module names in full. A corner placed on the last *wrapped* row is
+                // then a corner on a row the `Paragraph` clips, and the ledger is open at the
+                // bottom while `plan.framed` says it is closed.
+                //
+                // The cut is already marked — `plan.truncated` puts `!` in front of the line — so
+                // what is left to get right is which row carries the corner, and the answer is the
+                // last one that is drawn. Measured at 80x32 over a ledger of twenty-eight, where
+                // this lane's shorter top rail (`engine ok`) bought the disclosure one row fewer
+                // and took `┘` off the screen with it: gate `g60` caught it.
+                if wrapped.len() > area.height as usize {
+                    wrapped.truncate((area.height as usize).max(1));
+                }
                 let last = wrapped.len().saturating_sub(1);
                 let lines: Vec<Line> = wrapped
                     .into_iter()
@@ -281,6 +342,21 @@ const RAIL_KEYS: [&str; 3] = ["status", "ledger_agrees", "engine_version"];
 /// 🔴 Declared rather than typed into the condition, because it is the word the whole of the
 /// `status_reason` ruling turns on and a gate has to be able to read it (`g59`).
 const HEALTHY: &str = "ok";
+
+/// The one value of `ledger_agrees` that means the engine's second claim about itself holds.
+///
+/// 🔴 Declared beside [`HEALTHY`] and not typed into the condition, for the same reason: it is the
+/// second of the two words the fold turns on, and `wire::cell` is what decides that a JSON `true`
+/// reads `yes` — so a gate has to be able to read the word this face compares against rather than
+/// re-deriving it.
+const AGREES: &str = "yes";
+
+/// The label the folded engine line wears.
+///
+/// 🔴 A word of this face's own and not a wire key, which is why it is declared rather than typed:
+/// `engine ok` is a **claim about two keys**, and spelling it with one of their names would say
+/// the face is drawing `status` when it is drawing the conjunction.
+const ENGINE_LABEL: &str = "engine";
 
 /// The engine's health, and the page's address, on one row inside the ledger's enclosure.
 ///
@@ -460,6 +536,152 @@ pub fn hoist(
     (kept, shared, shrunk)
 }
 
+/// The quantifier a line hoisted over **every record the read carried** wears.
+///
+/// 🔴 Declared, because `req/38` SS1047 is a ruling about exactly this word: an unquantified
+/// `verdict Admit` was a sentence whose truth was a function of the terminal's height. The two
+/// scopes are two constants so that a gate can read which one a line claimed rather than parsing it
+/// back out of a sentence.
+pub const FETCHED_SCOPE: &str = "all";
+
+/// The quantifier a line compressed over **the rows on this screen** wears.
+///
+/// 🔴 `req/924` §TUI-45 (`req/38` SS1076, Owner `#275-T`). The rejected alternative is named in the
+/// ruling and is refused here by construction: *fold on the window and say `all 31`* is the lie
+/// SS1047 killed. Saying `these 23` about twenty-three rows is a sentence about a set whose size the
+/// reader can count on the screen in front of them.
+pub const WINDOW_SCOPE: &str = "these";
+
+/// The columns of this reading in which every record says one of the seven words for nothing.
+///
+/// 🔴 **`req/924` §TUI-45's new rule** (`req/38` SS1076, Owner `#275-T`): *a column whose every
+/// value is a mark for nothing is a column used to say nothing.* `created_at ?` down twenty-three
+/// rows says *measured, and not knowable* twenty-three times, and once is the whole of it — so the
+/// column is not drawn and is **counted in the disclosure instead**, which is the half that makes it
+/// a disclosure rather than a deletion.
+///
+/// 🔴 **The boundary is the ruling's and it is narrower than it looks, twice over.**
+///
+/// First, [`layout::resolve_shared`] answers only for a column every row agrees on, so a column that
+/// is `?` on some rows and carries a value on others is untouched (*that is information*), and so is
+/// one that is `?` on some rows and `--` on others — two different words for nothing, in one column,
+/// is this face telling them apart, which is the distinction the vocabulary exists for.
+///
+/// 🔴 Second, and this is the half the first cut of this function got wrong: the mark must be one of
+/// [`wire::VACANT_MARKS`], **not** one of the seven. `no`, `0`, `-x` and `''` are answers that were
+/// obtained, and a ledger whose every record says `enforced no` is making the most actionable
+/// statement a face like this can carry. Dropping it and reporting that the column "answered with a
+/// mark for nothing" folds *measured false* into *not measured* — the first-principle breach this
+/// product exists to refuse, committed by a rule written to save ink. An independent audit of this
+/// lane found the first cut doing it; `g64d` and `g64e` are the controls that now hold it.
+///
+/// 🔴 The **mark travels out with the key**, so the hatch can spell `created_at ?` rather than "a
+/// mark for nothing" — otherwise this rule would collapse `?` and `--` and `...` for every column it
+/// drops, inside the lane whose other half exists to keep them apart (audit, finding 4).
+///
+/// **Named ceiling**: fewer than two records answers empty, because [`layout::resolve_shared`] is
+/// built on `uniform`, which proves nothing about repetition from a single row. One record whose
+/// `created_at` is `?` is a fact about that record; this function is about columns.
+#[must_use]
+pub fn vacant_columns(reading: &Reading) -> Vec<(&'static str, String)> {
+    let items = reading.items();
+    if items.len() < 2 {
+        return Vec::new();
+    }
+    // Every declared column and not the ones a width chose: vacancy is a property of the reading,
+    // and a column dropped for saying nothing is dropped at every terminal size.
+    let columns = layout::LEDGER_COLUMNS.to_vec();
+    let marks: Vec<Vec<String>> = items
+        .iter()
+        .map(|item| {
+            columns
+                .iter()
+                .map(|column| cell_mark(item, column.key).0)
+                .collect()
+        })
+        .collect();
+    let (_, shared) = layout::resolve_shared(&columns, &marks);
+    shared
+        .into_iter()
+        .filter(|(_, mark)| wire::is_vacant_mark(mark))
+        .collect()
+}
+
+/// Which of `columns` every row **on this screen** already agrees on, so the header can say it once.
+///
+/// 🔴 **`req/924` §TUI-45 (`req/38` SS1076, Owner `#275-T`), and it does not move `SS1047`.** The
+/// two questions are different and the ruling separates them: *may this face **claim** a column is
+/// constant?* is answered over the fetched set and always will be ([`hoist`]); *may a column that
+/// says one word on every row of this screen say it once?* is answered here, over the window, and
+/// carries [`WINDOW_SCOPE`] rather than [`FETCHED_SCOPE`] so the sentence is true of exactly the
+/// rows it was measured on. `all 31 verdict Admit` measured on twenty-three rows stays refused.
+///
+/// 🔴 **Named ceiling, and it is the one SS1047 named.** The column *set* is still a function of
+/// where the cursor stands: a window that reaches the one record whose verdict differs is a window
+/// whose verdicts disagree, and the header clause disappears. §TUI-45 took that trade knowingly
+/// (the ruling names it as a price it is paying); this paragraph is the record that it was taken rather than overlooked.
+///
+/// A ladder and not a width test, like every other line here: the compression is offered and taken
+/// only if the header row can hold it whole. It never returns an empty `kept` — the ledger's id is
+/// unique per record, so at least one column always varies — and the early-out is kept anyway,
+/// because a grid drawing no columns at all is worse than a grid repeating one word.
+#[must_use]
+pub fn compress_window(
+    items: &[&serde_json::Value],
+    columns: &[layout::Column],
+    window: layout::Window,
+    width: u16,
+) -> (Vec<layout::Column>, Vec<(&'static str, String)>) {
+    let untouched = (columns.to_vec(), Vec::new());
+    let last = (window.first + window.rows).min(items.len());
+    if window.first >= last || last - window.first < 2 {
+        return untouched;
+    }
+    let slice = &items[window.first..last];
+    let marks: Vec<Vec<String>> = slice
+        .iter()
+        .map(|item| {
+            columns
+                .iter()
+                .map(|column| cell_mark(item, column.key).0)
+                .collect()
+        })
+        .collect();
+    let (kept, shared) = layout::resolve_shared(columns, &marks);
+    if shared.is_empty() || kept.is_empty() {
+        return untouched;
+    }
+    if header_width(&kept, &shared, slice.len()) > width as usize {
+        return untouched;
+    }
+    (kept, shared)
+}
+
+/// How many cells a grid header carrying `shared` beside `kept` needs.
+///
+/// 🔴 One function, read by the ladder that decides and by the row that draws, so the row cannot be
+/// composed against one width and drawn at another — the defect `layout::FRAME_MARGIN` was declared
+/// once to prevent, in the one other place two call sites had to agree about a width.
+#[must_use]
+pub fn header_width(
+    kept: &[layout::Column],
+    shared: &[(&'static str, String)],
+    rows: usize,
+) -> usize {
+    let names: usize = kept.iter().map(|column| column.width as usize + 1).sum();
+    let scope = tokens::RULE.chars().count()
+        + 1
+        + WINDOW_SCOPE.chars().count()
+        + 1
+        + rows.to_string().chars().count()
+        + 1;
+    let clause: usize = shared
+        .iter()
+        .map(|(key, mark)| key.chars().count() + mark.chars().count() + 4)
+        .sum();
+    names + scope + clause
+}
+
 /// `GET /v1/transformations`, in the columns that fit.
 ///
 /// 🔴 A row is a list of **spans** rather than one string since `req/38` SS965 convert row (b). The
@@ -509,6 +731,13 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
     } else {
         (plan.columns.clone(), Vec::new(), plan.window)
     };
+    // 🔴 **What is constant *in the window* is compressed, never folded** (`req/924` §TUI-45).
+    // [`compress_window`] carries the whole of the argument and the ceiling it costs.
+    let (columns,window_shared) = if grid && !items.is_empty() {
+        compress_window(&items, &columns, window, area.width)
+    } else {
+        (columns, Vec::new())
+    };
     // The note is composed and budgeted **before** the rows it sits under, for the same reason the
     // opened record's note is: it is the line that says where the reader is and what the screen let
     // go of, and a line written after the thing it describes is a line that gets clipped.
@@ -516,10 +745,29 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         // One space between columns and none after the last: the width the plan computed is
         // `sum(width) + (n - 1)`, and a trailing separator would put the row one cell over the
         // screen the plan was asked about.
+        // 🔴 The compressed columns ride the row that already names the columns, so they cost
+        // nought rows — and the boundary glyph is what says the row has two halves, which is the
+        // same glyph and the same argument as the top rail's.
+        let heads = columns
+            .iter()
+            .map(|column| (pad(column.key, column.width), Role::Head));
+        let mut compressed: Vec<(String, Role)> = Vec::new();
+        if !window_shared.is_empty() {
+            let sample = items[window.first];
+            // 🔴 No trailing space in any cell: `spans` is what puts one beside the next, and a
+            // cell that ends in one draws two. Measured on a real terminal at 120x29, where the
+            // first cut of this row read `│  these 24  verdict Admit |  state Committed`. The
+            // separator is the one the hoisted row above already uses, for the same reason.
+            compressed.push((tokens::RULE.to_string(), Role::Quiet));
+            compressed.push((format!("{WINDOW_SCOPE} {}", window.rows), Role::Quiet));
+            for (index, (key, mark)) in window_shared.iter().enumerate() {
+                let (_, role) = cell_mark(sample, key);
+                let sep = if index + 1 < window_shared.len() { " |" } else { "" };
+                compressed.push((format!("{key} {mark}{sep}"), role));
+            }
+        }
         lines.push(Line::from(spans(
-            columns
-                .iter()
-                .map(|column| (pad(column.key, column.width), Role::Head)),
+            heads.chain(compressed.into_iter()),
             tier,
         )));
         if !shared.is_empty() {
@@ -537,7 +785,8 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
             // the ledger; with it, it is a sentence about a set of a stated size. The words it
             // replaces are the ones a reader would otherwise have to go and find: *is this true of
             // the rows I cannot see?*
-            let quantifier = std::iter::once((format!("all {}", items.len()), Role::Quiet));
+            let quantifier =
+                std::iter::once((format!("{FETCHED_SCOPE} {}", items.len()), Role::Quiet));
             let fields = shared.iter().enumerate().map(|(index, (key, mark))| {
                 let (_, role) = cell_mark(sample, key);
                 let sep = if index + 1 < shared.len() { " |" } else { "" };
@@ -656,6 +905,25 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         // own shared line spent, and never below two, so a smaller window here is always paid for
         // by a line already standing above these rows.
         let shown = window.rows;
+        // 🔴 **A compressed column keeps painting the rows it was lifted off** (`req/924` §TUI-53,
+        // `req/38` SS1084 ①). `compress_window` takes the columns every drawn row agrees on, and on
+        // this bed those are exactly the columns that carry a role — so the ledger came back as
+        // twenty-four rows of bare id in one colour, and the measured emphasis fell from twenty-five
+        // rows to two. That is the defect `req/924` §TUI-19 named (*no handhold for telling one row
+        // from the next*) made **worse** by a cut meant to help: the compression was taking a fact
+        // off the row and giving nothing back.
+        //
+        // The repair is a fact rather than a decoration, and that is why it is allowed: the column
+        // is constant across exactly these rows — that is what `compress_window` measured — so
+        // every one of them **is** `Admit`, and painting them in the verdict's own role says so.
+        // The header still spells the word once; the rows carry what it means.
+        //
+        // The first roled column wins and the rest are already spoken for by the header: stacking
+        // two would be two meanings on one cell, which the token table has no way to resolve.
+        let compressed_role = window_shared.iter().find_map(|(key, _)| {
+            let (_, role) = cell_mark(items[window.first], key);
+            (role != Role::Body).then_some(role)
+        });
         for (index, item) in items
             .iter()
             .enumerate()
@@ -664,6 +932,11 @@ fn subject(frame: &mut Frame, area: Rect, reading: &Reading, plan: &Plan, tier: 
         {
             let cells = columns.iter().map(|column| {
                 let (text, role) = cell_mark(item, column.key);
+                // Only a cell with nothing of its own to say takes the lifted column's role.
+                let role = match (role, compressed_role) {
+                    (Role::Body, Some(lifted)) => lifted,
+                    _ => role,
+                };
                 (pad(&text, column.width), role)
             });
             let line = Line::from(spans(cells, tier));
@@ -768,8 +1041,11 @@ fn help_lines(
     // wire keys it "did not draw" would be counting a grid nobody is looking at). The reader
     // pressing `?` wants the names the *grid* let go of at this width, which is this question.
     let (_, unseen) = layout::columns_for(width);
-    let mut names: Vec<&str> = unseen;
-    names.extend(layout::LEDGER_PAGE_KEYS);
+    // 🔴 **`columns_for` already carries the page keys**, and extending them again is why the hatch
+    // has been spelling `next_cursor, next_cursor` on every frame — on `main`, before this lane
+    // touched anything. Found in this lane's own base capture; repaired here because the line it is
+    // in is one this lane is editing anyway, and reported as **found rather than introduced**.
+    let names: Vec<&str> = unseen;
     entries.push(format!(
         "{} {}",
         pad("not drawn", 11),
@@ -789,10 +1065,52 @@ fn help_lines(
     // `req/924` §TUI-22 classified `status ok` and `ledger_agrees yes` as things that may be folded
     // and may **not** be discarded; a count whose members cannot be named anywhere is discarding
     // them with a number left behind.
+    // 🔴 **The names behind the count `req/924` §TUI-45 grew** (`req/38` SS1076), and it stands
+    // **third**, beside the other clause about what is not on the screen. The disclosure says
+    // `N of 11 fields not drawn` and the rule that raised N is a different rule from width, so a
+    // reader who cannot tell the two apart cannot act on either. `g61`'s argument, one rule up: a
+    // count whose members can be named nowhere is a deletion with a number left behind.
     entries.push(format!(
-        "{} {} | status_reason is on the rail only when status is not ok",
-        pad("engine", 11),
-        RAIL_KEYS.join(", ")
+        "{} {} | every record in this reading answered with that mark and no answer was obtained, \
+         so the column is not drawn at any width",
+        pad("no answer", 11),
+        if plan.vacant_fields.is_empty() {
+            wire::Nothing::Zero.mark().to_string()
+        } else {
+            plan.vacant_fields
+                .iter()
+                .map(|(key, mark)| format!("{key} {mark}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    ));
+    // 🔴 The engine's line **as it stands underneath the fold**, values and all. `req/924` §TUI-29
+    // folds the rail to `engine ok` while both claims hold, and SS842 is why that is only half a
+    // decision: `engine_version` is spelled on no other row of any screen, so folding it without
+    // moving it is a deletion. `plan.engine_full` is where it moved to, and this is where a reader
+    // reaches it. The condition sentence is kept word for word — `g59` reads it.
+    entries.push(format!(
+        "{} {} | status_reason is on the rail only when status is not ok | folded to \
+         `{ENGINE_LABEL} {HEALTHY}` while status is {HEALTHY} and ledger_agrees is {AGREES}",
+        pad(ENGINE_LABEL, 11),
+        plan.engine_full
+            .iter()
+            .map(|(key, value)| format!("{key} {value}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    // 🔴 The marks that stand in for an act's name, with the name they stand in for. Read out of
+    // the two declarations rather than spelled again: `ACT_MARKS` pairs them and
+    // `super::tokens::GLYPHS` holds the meaning and the deleted word, so a mark added without an
+    // argument fails P6 before it ever reaches this line.
+    entries.push(format!(
+        "{} {}",
+        pad("marks", 11),
+        ACT_MARKS
+            .iter()
+            .map(|(act, mark)| format!("{mark} {}", act.name().trim_start_matches("act.")))
+            .collect::<Vec<_>>()
+            .join(", ")
     ));
     entries.extend(acts::ACTS.into_iter().map(|act| {
         format!(
@@ -826,11 +1144,35 @@ fn help_lines(
     // Both labels are declared words. `RegionRole::short` is the region this belongs to and
     // `Link::name` is the state whose badge it explains, so the help face still introduces no
     // vocabulary of its own — the property that lets it be believed.
-    entries.push(format!(
+    let provenance = format!(
         "{} {}",
         pad(layout::RegionRole::Provenance.short(), 11),
         plan.provenance_full
-    ));
+    );
+    // 🔴 **It moves to the front exactly when something else on the screen promises it.**
+    //
+    // The retreat written above is real and is kept: placed first unconditionally, this line wraps
+    // to three of the four body rows at forty by ten and a reader who pressed `?` for the keys gets
+    // a clock. What changed is that `req/924` §TUI-29 lets the provenance **region** stand down when
+    // every route answered `200`, and the disclosure then spells `provenance -> ?`. A road that
+    // arrives at a page which was cut before this line is the defect `req/924` §TUI-21 names by its
+    // own words — *逃がし先が空なら、それは逃がしたのでなく消したのと同じ* — and `g61` is the gate
+    // written for it one clause over.
+    //
+    // 🔴 **Measured, not reasoned, and it was this lane's own defect**: with the entry last, the
+    // region stood down at 80x24, 66x20 and 60x20 while the hatch at those three shapes carried no
+    // `worst … ms` at all. Three of eight shapes shipped a signpost pointing at nothing.
+    //
+    // The retreat's own shape is untouched at forty by ten, and that is a fact rather than a hope:
+    // there the rail cannot carry the live badge, so `layout::resolve_attended` keeps the region —
+    // the branch below is not taken, and the ordering the retreat chose still stands where the
+    // retreat was measured.
+    let stood_down = plan.rows_for(layout::RegionRole::Provenance) == 0 && !plan.provenance_folded;
+    if stood_down {
+        entries.insert(1, provenance);
+    } else {
+        entries.push(provenance);
+    }
     entries.push(format!(
         "{} {}",
         pad(live::Link::Open.name(), 11),
@@ -967,13 +1309,55 @@ pub fn offered(rows: usize) -> &'static [Act] {
 /// break between the `G` and the `last`. A key severed from the act it produces is worse than no
 /// legend, because it reads as a typo. The name comes first to match the opened record's own note,
 /// which has spelled `close: escape` since before this line existed.
+/// 🔴 **And three of them are a mark now** (`req/924` §TUI-45 row 4, `INHERITED_PRINCIPLES`
+/// §3c-③''). The admission test is *a mark may replace a word only if the word then goes*; adding a
+/// mark beside a word that stays is weight. [`ACT_MARKS`] is the declaration and
+/// `super::tokens::GLYPHS` is where each one's meaning and the word it deleted are written down, so
+/// the three-tuple the ruling asks for is a thing that is read rather than a claim that is made.
 #[must_use]
 pub fn spelled(act: Act) -> String {
-    format!(
-        "{}:{}",
-        act.name().trim_start_matches("act."),
-        act.keys()[0]
-    )
+    match act_mark(act) {
+        // 🔴 The glyph **is** the key here, so nothing is spelled beside it. `↵` names the return
+        // key, and the act it produces is the only thing that key does on this face — so `open` and
+        // `return` both go, and eleven cells become one.
+        Some(mark) if act == Act::Open => mark.to_string(),
+        // The mark carries the act and the key stays, because `j` and `k` are not the arrows.
+        Some(mark) => format!("{mark}:{}", act.keys()[0]),
+        None => format!(
+            "{}:{}",
+            act.name().trim_start_matches("act."),
+            act.keys()[0]
+        ),
+    }
+}
+
+/// The acts whose name a mark carries, and the mark.
+///
+/// 🔴 **Three, and the rest keep their words on purpose.** `first`/`last`/`read`/`wide`/`leave`/
+/// `help` have no mark that carries them without a reader having to be taught it, and a mark that
+/// has to be taught is a word plus a lookup. The ruling admits direction indicators and the return
+/// key; it does not admit inventing a pictogram for *ask the engine again*.
+///
+/// Each mark's meaning and the words it deleted are declared in `super::tokens::GLYPHS`, which gate
+/// P6 refuses to let stand empty — so the pairing here cannot become a mark nobody argued for.
+/// 🔴 **The index is not the argument** (independent audit, finding 11). Reading `GLYPHS[5]` pairs
+/// an act with a *position*, so swapping two entries of that array, or inserting one above them,
+/// silently re-pairs all three — and the help face's `marks` line is generated from this same array,
+/// so it would lie in the same direction. What ties the two is the declaration's own
+/// `instead_of`, which names the word the mark deleted; gate `g17` requires it to name **this** act.
+pub const ACT_MARKS: [(Act, &str); 3] = [
+    (Act::Open, tokens::GLYPHS[5].text),
+    (Act::Prev, tokens::GLYPHS[6].text),
+    (Act::Next, tokens::GLYPHS[7].text),
+];
+
+/// The mark that carries this act's name, if one does.
+#[must_use]
+pub fn act_mark(act: Act) -> Option<&'static str> {
+    ACT_MARKS
+        .iter()
+        .find(|(declared, _)| *declared == act)
+        .map(|(_, mark)| *mark)
 }
 
 /// The note at one length: where the reader is, then the keys, then what was folded away.

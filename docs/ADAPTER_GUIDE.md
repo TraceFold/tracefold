@@ -158,3 +158,15 @@ unread-range disclosures (its §6) apply here by inheritance: the census this pa
 tool names by leading verb only, and `catalogue.rs`'s 3,235 lines were read in full for structure
 but not read in full for content beyond the first ~400 lines and the `ArgSource`/`PriorPointer`
 sections.
+
+**Currency note (2026-09-01, `req/1038`, `req/1032`; not re-derived from this page's own audit).**
+A sixth adapter, `crates/gx-adapter-time`, landed on `main` the same day this page's source audit
+was filed; §1's table and §3's cost table above are still the 5-adapter figures and have not been
+re-measured at 6. It is private (not in `public/Cargo.toml`'s members), same posture as postgres
+and mysql in §5. Separately, §5's claim that `public/README.md` states "Not released" in its own
+words no longer matches that file: `public/README.md` (checked 2026-09-01) carries npm install
+instructions and a released-SDK badge instead. A P1 crates.io publish lane ran the same day
+(`req/1032`): zero Rust crates published, zero reached a dry-run, two blockers found and
+partially remediated same-day (crate-name collision, private-feature defaults) -- see
+`docs/LIMITS.md`'s 2026-09-01 entry for the full, sourced detail. `publish = false` and "no
+`cargo add` path" both still hold as measured; only the README quote above is stale.

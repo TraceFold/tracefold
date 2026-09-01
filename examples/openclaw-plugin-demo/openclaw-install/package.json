@@ -1,0 +1,14 @@
+{
+  "name": "openclaw-plugin-gx-escrow",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "openclaw": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.5.17"
+    }
+  }
+}

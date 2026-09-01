@@ -95,12 +95,22 @@ commitCandidate / undoTransformation`) would be the test. It is not written.
 
 Stated plainly because a demo's limits rot faster than its claims.
 
-1. **OpenClaw never ran.** `harness.ts` reproduces the firing order read out of their wrapper; it is
-   not their wrapper. Every result here is a statement about *the plugin*, conditional on OpenClaw
-   firing hooks in the order its source was observed to fire them. **UNTESTED in OpenClaw.**
-2. **The `matcher` shape is unverified.** `normalizePluginToolMatcher` was not read, so
-   `{ tools: [...] }` in `register()` is a guess. The handler guards its own tool name so that the
-   guess is not load-bearing — but the registration line may need correcting against the real SDK.
+1. **This harness never ran inside OpenClaw.** `harness.ts` reproduces the firing order read out of
+   their wrapper; it is not their wrapper. Every scenario A-D result above is a statement about *the
+   plugin's decision logic*, conditional on OpenClaw firing hooks in the order its source was
+   observed to fire them. That conditional itself is no longer untested at the install layer: a real
+   `openclaw` gateway (`OpenClaw 2026.8.1`) has loaded `openclaw-install/` and called `register(api)`
+   at boot (`req/1036`, `openclaw plugins doctor` = `ok: true`, live log line `[gx-escrow]
+   register(api) called -- before_tool_call handler registered` inside `[gateway] http server
+   listening (... gx-escrow ...)`). What is **still** untested is a real tool call actually reaching
+   `before_tool_call` end to end — that needs an agent turn, which needs a model, which this project's
+   constraints do not let this lane spend. **UNTESTED: real tool-call firing. TESTED: real plugin
+   load and hook registration.**
+2. **The `matcher` shape was guessed, then corrected against the real SDK.** The first version passed
+   `{ tools: [...] }` to `register()`'s third argument; a real `openclaw plugins install` run failed
+   that registration with `TypeError: tool hook matcher must be an array of tool names` (req/1036).
+   `register()` now passes the bare array. The handler's own tool-name guard held the scope either
+   way, which is why the wrong shape never mis-scoped anything — it simply never installed.
 3. **No genuine third-party plugin is known to use `before_tool_call`.** `registerTypedHook` applies
    no origin gate to it (`req/1031` §2), and `extensions/onepassword` uses the same public API — but
    that extension is `origin: "bundled"`. ClawHub was never searched.
@@ -135,5 +145,7 @@ Stated plainly because a demo's limits rot faster than its claims.
 | `src/plugin.ts` | The `before_tool_call` handler and its registration |
 | `src/harness.ts` | A stand-in for OpenClaw's tool wrapper — **not** OpenClaw |
 | `src/demo.ts` | The four scenarios and their assertions |
+| `src/openclaw-entry.ts` | A `definePluginEntry` wrapper around `register()`, loadable by a real `openclaw` process via `plugins.load.paths` on a single file (no manifest, so it is discoverable but not auto-activated at boot — see `openclaw-install/`) |
+| `openclaw-install/` | The manifest form (`openclaw.plugin.json` with `activation.onStartup: true`, `package.json`, `src/index.ts`) that a real `openclaw plugins install <dir>` accepts and that actually loads at gateway boot. Confirmed working against `OpenClaw 2026.8.1` in `req/1036`. |
 
 No line of OpenClaw source is reproduced in any of them.

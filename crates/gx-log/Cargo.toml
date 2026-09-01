@@ -2,25 +2,33 @@
 # (`src/{lib,tile,proof,store}.rs`) and its dependency line (`rs_merkle` or homegrown, tile design after (sem: SEM-gx-log-001)
 # Rekor v2); the same spec gives the hash rules and the field tables.
 [package]
-name = "gx-log"
+# 🔴 registry rename (req/1032 §5 point 1 -> LOOP_STATE #312, 2026-09-01): publish name becomes
+# "tracefold-log"; [lib] name stays "gx_log" so no source line changes anywhere in this workspace.
+name = "tracefold-log"
 description = "Append-only Merkle tile log: inclusion and consistency proofs."
 version = "0.1.2"
 edition = "2021"
 rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision (sem: SEM-gx-log-002)
 license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
-publish = false                       # no crate in this workspace is a designated publish target yet (public/README.md 'Not released'); additive guard against accidental cargo publish
+repository.workspace = true           # crates.io metadata; also read by `dist generate`
+publish = true                        # req/1032/req/1035 blockers resolved -- this crate is a real publish target now
+readme = "README.md"                  # crates.io page body (2026-09-01, this lane: metadata completeness check)
+keywords = ["agent-safety", "reversibility", "provenance", "verification"]
+
+[lib]
+name = "gx_log"
 
 # One way, like gx-witness's: an early ruling put `InclusionProof` and `Checkpoint` in gx-core so
 # this crate and gx-witness need never name each other.
 #
 # `version` beside `path`: see gx-canon's manifest for why (`cargo deny check bans`).
 [dependencies]
-gx-core = { path = "../gx-core", version = "0.1.2" }
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
 
 # An early ruling: `BLAKE3(0x00 || canonical_dagcbor(LedgerLeaf))` is minted by gx-canon, not
 # here. That edge is what lets this crate name neither a CBOR codec nor a hash -- the architecture spec's
 # "canonical encoding goes through gx-canon alone" (sem: SEM-gx-log-003), checked by one of gx-canon's acceptance criteria.
-gx-canon = { path = "../gx-canon", version = "0.1.2" }
+gx-canon = { path = "../gx-canon", version = "0.1.2", package = "tracefold-canon" }
 #
 # The architecture spec wrote the merkle dependency as a choice: "rs_merkle or homegrown (tile design follows Rekor v2)", (sem: SEM-gx-log-004)
 # and an early hand declared `rs_merkle = "1.5"` to make the choice concrete rather than to spend it.
