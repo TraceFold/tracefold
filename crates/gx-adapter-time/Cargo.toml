@@ -1,0 +1,42 @@
+# The time substrate: a schedule, and the entries an agent puts in it.
+#
+# 🔴 What this crate is for, in one sentence: an agent that says "run this later" is making a change
+# to the world *now* whose effect lands *later*, and until this crate existed gx had no substrate
+# that could hold such a change under a gate. `req/1007` §1 lists `time` among the five substrates
+# of layer 4 that were not covered; `req/1007` §4 item 3 is the ticket ([WM-4a]).
+#
+# Dependencies are the three every adapter has plus serde, the same set `gx-adapter-fs` declares and
+# for the same reason: the payload is canonical DAG-CBOR and this workspace admits exactly one
+# encoder (`gx-canon`), so an adapter that wrote its own parser would be a second road to a
+# canonical form. **No external package is added** -- all four are already resolved by every other
+# member, so `cargo tree -e normal`'s package count does not move.
+#
+# 🔴 No scheduler client. This crate does not depend on cron, systemd, `at`, or any scheduling
+# service, and it starts no process. The substrate is the *schedule* -- the entries -- and the thing
+# that runs them is somebody else. That is a scope decision (`req/1038` §3-1), not an omission, and
+# it is what keeps this adapter's reach equal to "files it was given the position of".
+[package]
+name = "gx-adapter-time"
+description = "The time SubstrateAdapter: scheduled entries, and the firedness a schedule records."
+version = "0.1.2"
+edition = "2021"
+rust-version.workspace = true         # declared once, in the workspace, per the adopted MSRV decision
+license = "Apache-2.0"                # Apache-2.0 is this workspace's default license choice
+publish = false                       # no crate in this workspace is a designated publish target yet
+
+# 🔴 The `package =` overrides are `req/1032` Blocker A's convention (commit `d18f5eed`): the
+# crates.io identity of the publish closure is `tracefold-*` while every `use gx_core::…` line in
+# the workspace stays as it is, because each renamed crate keeps an explicit `[lib] name = gx_*`.
+# A path dependency therefore names the *package* by its new name and keeps the old key. This crate
+# is private (`publish = false`), so it is renamed nowhere -- the same shape `gx-adapter-mysql` has.
+[dependencies]
+gx-core = { path = "../gx-core", version = "0.1.2", package = "tracefold-core" }
+gx-canon = { path = "../gx-canon", version = "0.1.2", package = "tracefold-canon" }
+gx-substrate = { path = "../gx-substrate", version = "0.1.2", package = "tracefold-substrate" }
+
+serde = { version = "1", features = ["derive"] }  # the schedule entry's field grammar
+
+# The shared contract harness, called from exactly one `#[test]` (`tests/conformance.rs`), which is
+# how an adapter crate inherits 51 §7's seven obligations rather than restating them.
+[dev-dependencies]
+gx-substrate-conformance = { path = "../gx-substrate-conformance", version = "0.1.2" }
