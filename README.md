@@ -82,7 +82,7 @@ console.log(result.valid, result.checks.inclusion); // true "verified"
 
 | Dimension | Traditional Post-Hoc Audit Logs | TraceFold Pre-Fact Provenance |
 | :--- | :--- | :--- |
-| **Execution Order** | Action executes first $ightarrow$ Logged afterwards | Inverse constructed & checked $ightarrow$ **Action lands** |
+| **Execution Order** | Action executes first $\rightarrow$ Logged afterwards | Inverse constructed & checked $\rightarrow$ **Action lands** |
 | **Irreversible Damage** | Discovered only after system corruption | **Blocked at the gate**; escalates to human approval |
 | **Verification Trust** | Must trust the host/server that produced the log | **Zero-trust offline verification** via standalone WASM |
 | **Verdict Precision** | Binary (Pass/Fail) conflates errors with attacks | **Tri-state**: `Verified`, `Refuted`, `Unknown/Unparseable` |
@@ -122,7 +122,7 @@ TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws
 
 | Dimension | Measured Value | Conditions & Scope |
 | :--- | --: | :--- |
-| **Test Floor** | **2,602** probes | 454 suites + SDK 36 passed &middot; fresh clone &middot; 25 Aug 2026 &middot; point-in-time — this number has moved on nearly every commit since; run `tools/e2e.sh` yourself for the count as of your clone, do not treat it as current |
+| **Test Floor** | **2,918** probes passing | 508 suites (2,980 total probes exist in source; 60 failing — mostly unmet live-DB/prebuilt-binary preconditions in the measuring run, not necessarily code regressions; 2 ignored) + SDK 36 passed &middot; fresh clone &middot; 1 Sep 2026 &middot; point-in-time — this number has moved on nearly every commit since; run `tools/e2e.sh` yourself for the count as of your clone, do not treat it as current; freshness of this row is machine-checked by `tools/gates/test_floor_freshness_gate.mjs` |
 | **Lean Formal Proofs** | **154** theorems | Lean 4, 14 files: **154 theorems, 14 of them counterexamples, 1 axiom, sorry 0**, recounted 1 Sep 2026 with the attribute-aware predicate (SS1001-consistent; see docs/LIMITS.md item 8) |
 | **Open High Holes** | **0** | Out of 44 adversarial audit rounds, same 25 Aug 2026 table/commit as above (not independently re-dated by this pass) |
 | **Unmeasured Platforms** | 3 environments | Windows native, OneDrive, SMB |

@@ -102,10 +102,10 @@ restoring that tool's effect looks like.
 
 A `Fixture` implementation is what an adapter author actually writes; the harness itself
 (`gx-substrate-conformance`) is a fixed, pre-written suite. `Fixture` (public trait, in
-`gx-substrate-conformance/src/lib.rs`) has 11 methods: **5 required** (`adapter`, `locator`,
-`intent`, `reset`, `disturb`) and **6 with defaults** (`uninvertible`, `commuting_pair`,
-`conflicting_pair`, and 3 more) that only need overriding if the substrate has a real subject for
-that case.
+`gx-substrate-conformance/src/lib.rs`) has 12 methods: **5 required** (`adapter`, `locator`,
+`intent`, `reset`, `disturb`) and **7 with defaults** (`uninvertible`, `commuting_pair`,
+`conflicting_pair`, `promised_target`, `normalise`, `equivalent_spellings`, `resolve`) that only
+need overriding if the substrate has a real subject for that case.
 
 `run_all`, `run_contracts`, and `run_laws` are public functions, callable from one `#[test]` in the
 adapter's own crate. Each check reports one of three outcomes, not two: `Pass`, `Fail`, or
@@ -205,3 +205,30 @@ still holds, per this page's own second note above -- being in `SYNC_CRATES` mak
 readable on GitHub, not installable via `cargo add`, exactly the distinction §5's opening bullet
 already draws for `gx-cli`/`gx-gate`). `docs/LIMITS.md` was not re-checked by this note for the
 same staleness; that is this note's own unread range.
+
+**Fourth currency note (2026-09-02, drift-repair lane).** §4 said `Fixture` "has 11 methods: 5
+required ... and 6 with defaults (`uninvertible`, `commuting_pair`, `conflicting_pair`, and 3
+more)". Independently recounted against `crates/gx-substrate-conformance/src/lib.rs` (the `trait
+Fixture` block, `:310`-`:379`): 5 required methods at `:312` (`adapter`), `:316` (`locator`),
+`:319` (`intent`), `:327` (`reset`), `:333` (`disturb`) -- unchanged -- plus **7** methods with
+defaults, not 6, at `:336` (`uninvertible`), `:341` (`commuting_pair`), `:346`
+(`conflicting_pair`), `:356` (`promised_target`), `:361` (`normalise`), `:366`
+(`equivalent_spellings`), `:376` (`resolve`). Total = **12**, corrected in §4 above (this note
+does not delete the wrong figure from history -- it names what changed and why, per this page's
+own no-delete pattern for the notes above). This was found while auditing this page end to end for
+the same class of drift after Owner flagged the 11-vs-12 mismatch; the rest of the page's
+numeric/name/signature claims (§1's 7-method `SubstrateAdapter` table, §2's MCP-census
+percentages against `req/1009`'s own table, the `ArgSource` enum's 8 variants, the `run_all` /
+`run_contracts` / `run_laws` / `is_conformant` / `is_complete` / `meets_51_7` function names, the
+two `gx-adapter-fs/tests/conformance.rs` test names, and the "16 = 7 contracts + 9 laws" identity
+against `CONTRACT_IDS`/`LAW_IDS` in `gx-substrate-conformance`) were independently recounted
+against the current source in the same pass and matched -- this method-count pair was the only
+mismatch found. §3's per-crate line-count table was not recounted (it is already framed above as
+a dated `HEAD`-time audit snapshot, not a live figure, and carries its own currency-note pattern
+for exactly this kind of staleness); a spot check found `gx-adapter-mcp/src/catalogue.rs` now at
+3,094 lines against the table's "3,235 alone" -- ordinary drift consistent with that framing, not
+a new logical error, so left to the next lane that re-measures §3 rather than patched here as a
+one-off. Machine gate: `tools/gates/doc_trait_method_count.mjs` (new, this lane) parses this
+page's `Fixture`/`SubstrateAdapter` method-count sentences and the corresponding Rust trait blocks
+and fails on any mismatch -- see `req/1083_985_FOLDBACK_AND_ADAPTER_GUIDE_DRIFT_REPAIR_2026-09-02.md`
+§B for the red/green proof.

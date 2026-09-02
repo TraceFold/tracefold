@@ -52,13 +52,42 @@ const HEALTHZ: &str = r#"{"status":"ok","engine_version":"gx-engine 0.1.0","ledg
 /// fixture's imagination: `verdict` is `null` on the second row (measured, not knowable),
 /// `created_at` is **missing** from it (never carried), `enforced` is `false` there, and
 /// `journal_rows` above is `0`.
+///
+/// 🔴 **`inverse_status` was `Escrowed`, which no engine in this workspace can emit** (`req/984`
+/// §7-B S-4, `req/924` §TUI-55; gate `g71`, `tools/gates/fixture_vocab_gate.mjs`; repaired by
+/// `[T-r55]`, 2026-09-02). `gx_engine::store::InverseStatus` has seven words and that is not one of
+/// them, so every assertion resting on it was an assertion about a screen no reader will ever see —
+/// **green about a fiction**. `Available` is the word 42 §3.12 gives for the fact the fixture meant
+/// (*the escrowed inverse is still there*), and it is the word the engine sends. Five sites in this
+/// file carried it; all five moved together, because a fixture and the assertions that read it are
+/// one statement.
 const TRANSFORMATIONS: &str = r#"{"items":[
-{"transformation":"gx1:t3sto0000000001","state":"Committed","verdict":"Admit","enforced":true,"created_at":"2026-08-30T09:00:00Z","actor":"agent-a","scope":"src/lib.rs","inverse_status":"Escrowed","rollback":null,"superseded_by":null},
+{"transformation":"gx1:t3sto0000000001","state":"Committed","verdict":"Admit","enforced":true,"created_at":"2026-08-30T09:00:00Z","actor":"agent-a","scope":"src/lib.rs","inverse_status":"Available","rollback":null,"superseded_by":null},
 {"transformation":"gx1:t3sto0000000002","state":"Draft","verdict":null,"enforced":false,"actor":"agent-b","scope":"README.md","inverse_status":null,"rollback":null,"superseded_by":null}
 ],"next_cursor":null}"#;
 
 const CANDIDATES: &str = r#"{"items":[],"next_cursor":null}"#;
 const ESCALATIONS: &str = r#"{"items":[],"next_cursor":null}"#;
+
+/// The one id this fixture server holds a receipt for. Every other id gets the `404` the engine
+/// gives, which is the branch `wire::ReceiptMark::NotHere` exists for.
+const RECEIPT_HOLDER: &str = "gx1:t3sto0000000001";
+
+/// `GET /v1/transformations/{id}`, in the six members `crates/gx-api/src/handlers.rs`'s
+/// `get_transformation` answers with.
+///
+/// 🔴 `state`, `superseded_by`, `rollback` and `inverse_status` are **the same values the page's
+/// first row carries**, so the face's own comparison says `agrees` on this bed. `g78`'s second half
+/// moves one of them and requires the row to say which one moved: a comparison that can only ever
+/// answer *agrees* is not a comparison.
+const ONE_TRANSFORMATION: &str = r#"{"transformation":{"id":"gx1:t3sto0000000001"},"state":"Committed","receipt":null,"superseded_by":null,"rollback":null,"inverse_status":"Available"}"#;
+
+/// `GET /v1/receipts/{tid}`: the document, and the decoded half the engine mounts beside it.
+///
+/// 🔴 `receipt_view` is `handlers.rs`'s own key list. `postcondition_fingerprint` is present and is
+/// **not** drawn by this face — a fixture carrying a member the face ignores is what keeps `g79`
+/// from passing by accident on a bed shaped to the face rather than to the wire.
+const RECEIPT: &str = r#"{"envelope":{"payloadType":"application/vnd.gx.receipt+dag-cbor","payload":"omdzdWJqZWN0","signatures":[]},"issued_at":"2026-09-02T00:00:00Z","receipt_view":{"subject":"gx1:t3sto0000000001","tree_size":12,"leaf_index":3,"root":"gx1:r00tzzzzzzzzzz","key_id":"gx1:k3yzzzzzzzzzz","postcondition_fingerprint":null,"issued_at":"2026-09-02T00:00:00Z"},"server_health":{"status":"ok","status_reason":null}}"#;
 
 struct Fixture {
     base_url: String,
@@ -132,6 +161,20 @@ fn serve_one(mut stream: TcpStream, seen: &Arc<Mutex<Vec<String>>>, refuse: bool
     let guarded = path != "/v1/healthz";
     let (status, body) = if refuse && guarded {
         (401, r#"{"title":"unauthorized","gx_code":"UNAUTHORIZED"}"#)
+    } else if let Some(tid) = path.strip_prefix("/v1/receipts/") {
+        // 🔴 **`404` is an answer and this server gives it** (`[T-r55]`, 2026-09-02). 44 §2.2 makes
+        // `GET /receipts/{tid}` "the receipt for a **committed** transformation" and
+        // `crates/gx-api/src/handlers.rs`'s `get_receipt` answers `404` with a refusal naming
+        // **two** facts at once — *it has not been committed*, or *this server holds neither its
+        // row nor its archive*. A fixture that answered `200 {}` for every id would let the face's
+        // classifier off the one branch it exists for.
+        if tid == RECEIPT_HOLDER {
+            (200, RECEIPT)
+        } else {
+            (404, r#"{"title":"not found","gx_code":"NOT_FOUND"}"#)
+        }
+    } else if path.starts_with("/v1/transformations/") {
+        (200, ONE_TRANSFORMATION)
     } else {
         (
             200,
@@ -1421,15 +1464,23 @@ fn ac1_and_ac2_the_frame_carries_a_real_id_the_engine_version_and_four_measureme
     // can: the drawn cell is a **prefix** of the wire id, character for character, and the cut is
     // **marked**. The unabbreviated value is at the route the disclosure line spells.
     // `req/942_artifacts/build_lane_report.md` carries this as a deviation rather than a pass.
-    let expected = if id.chars().count() > 16 {
-        format!("{}~", id.chars().take(15).collect::<String>())
+    //
+    // 🔴 **The width is read off the declaration and was typed here** (`[T-r71]`, 2026-09-02,
+    // `req/942_artifacts/tui_r71_2026-09-02/RULING.md`). Sixteen and fifteen stood in this expression, so a ruling that moved the
+    // identity column's width broke a test whose *property* — the drawn cell is a prefix of the wire
+    // id and the cut is marked — had not moved at all. The literal is replaced by the declaration
+    // rather than by a new literal: this is the same assertion, and it is now the assertion it
+    // always meant to be.
+    let cells = usize::from(layout::LEDGER_COLUMNS[0].width);
+    let expected = if id.chars().count() > cells {
+        format!("{}~", id.chars().take(cells - 1).collect::<String>())
     } else {
         id.clone()
     };
     assert!(
         flat(&text).contains(&expected),
         "🔴 AC-1: the frame does not carry {expected:?}, which is what the wire's {id:?} draws as \
-         in a sixteen-cell column:\n{text}"
+         in a {cells}-cell column:\n{text}"
     );
     assert!(
         text.contains("Committed"),
@@ -2003,17 +2054,38 @@ fn p12_the_view_reaches_the_frame() {
     ));
     println!("--- closed 40x24 ---\n{closed}\n--- opened 40x24 ---\n{opened}");
     assert!(
-        !flat(&closed).contains("inverse_status Escrowed"),
+        // 🔴 `Escrowed` until `[T-r55]` (2026-09-02): see `TRANSFORMATIONS`' own note and gate
+        // `g71`. The property is unchanged; the word is now one the engine can send.
+        !flat(&closed).contains("inverse_status Available"),
         "the grid at forty cells has no column for it; the closed frame must not carry it"
     );
     assert!(
-        flat(&opened).contains("inverse_status Escrowed"),
+        flat(&opened).contains("inverse_status Available"),
         "🔴 P12: `act.open` is declared as 'see everything this record carries' and the frame does \
          not carry it:\n{opened}"
     );
+    // 🔴 **The sentence this replaces was `flat(&opened).contains("10 of 10 members")`**
+    // (`[T-r58]`, 2026-09-02, defect 4). It required a row saying *nothing was cut* on a screen
+    // where nothing was cut — a permanent line reporting an event that had not happened, which the
+    // seat's ruling on the real capture names as slop. The probe's subject is *the opened record
+    // carries what the grid could not*, and that is what is asserted: at forty cells the grid has no
+    // `inverse_status` column and the record does, and every one of the ten members is on the
+    // screen. Counted off the drawing rather than off the drawing's claim about itself.
+    let member_words = |text: &str| -> usize {
+        text.lines()
+            .flat_map(|line| line.split_whitespace())
+            .filter(|word| LEDGER_COLUMNS.iter().any(|column| column.key == *word))
+            .count()
+    };
+    assert_eq!(
+        member_words(&opened),
+        10,
+        "🔴 P12: forty by twenty-four has room for every member and the record is not drawing \
+         them:\n{opened}"
+    );
     assert!(
-        flat(&opened).contains("10 of 10 members"),
-        "the opened record has to say how much of itself is on the screen:\n{opened}"
+        !flat(&opened).contains("not drawn:"),
+        "🔴 P12: nothing was cut at forty by twenty-four and the screen reports a cut:\n{opened}"
     );
     // 🔴 And when it does not fit, the count says so rather than the screen quietly showing five.
     // 🔴 **Thirteen, and it was fourteen** (`req/924` §TUI-57 (`req/38` SS1088, Owner `#282-T`, 2026-09-01)).
@@ -2021,10 +2093,16 @@ fn p12_the_view_reaches_the_frame() {
     // forty by fourteen every one of the ten members now fits and the shape stopped being a
     // discriminator. The probe's subject is *the note names the cut when there is one*, which is
     // unchanged; the shape that produces a cut moved by one row and this follows it.
+    // 🔴 **Ten, and it was twelve** (`[T-r58]`, 2026-09-02, defect 2). The members whose value is a
+    // mark gather onto one row per kind of nothing, so the ten members of this bed now need nine
+    // rows instead of ten and forty by twelve stopped being a shape that cuts them. The probe's
+    // subject is *the screen names the cut when there is one*, which is unchanged; the shape that
+    // produces a cut moved by two rows and this follows it, for the same reason the comment above
+    // records it moving by one.
     let cramped = renderer::buffer_text(&renderer::render_view_to_buffer(
         &screen,
         40,
-        12,
+        10,
         Tier::Mono,
         false,
         &View {
@@ -2033,24 +2111,20 @@ fn p12_the_view_reaches_the_frame() {
             ..View::default()
         },
     ));
-    println!("--- opened 40x12 ---\n{cramped}");
-    let drawn = flat(&cramped)
-        .split(" of 10 members")
-        .next()
-        .and_then(|head| head.split(' ').next_back().map(str::to_string))
-        .expect("the note names how many members were drawn");
-    let drawn: usize = drawn.parse().expect("the count is a number");
+    println!("--- opened 40x10 ---\n{cramped}");
+    let drawn = member_words(&cramped);
     assert!(
-        drawn < 10 && flat(&cramped).contains(&format!("{drawn} of 10 members")),
-        "🔴 P12: forty by twelve cannot hold ten members and the note has to name the cut: \
-         {drawn}\n{cramped}"
+        drawn < 10,
+        "🔴 P12: forty by twelve cannot hold ten members, so a shape that draws all ten is not \
+         measuring a cut: {drawn}\n{cramped}"
     );
-    // 🔴 The note is wrapped rather than clipped: the line that says what was cut must not itself
-    // be the thing that is cut. Its last word is the key that closes the record, and a clipped
-    // note loses it.
+    // 🔴 The line that says what was cut must not itself be the thing that is cut. The row it needs
+    // is taken off the region's budget **before** the counts are settled, so it cannot be.
     assert!(
-        flat(&cramped).contains(&format!("close: {}", Act::Close.keys()[0])),
-        "🔴 P12: the disclosure of the cut was itself cut:\n{cramped}"
+        flat(&cramped).contains(&format!("{} of 10 members", 10 - drawn)),
+        "🔴 P12: the record dropped {} of its ten members and the screen does not name the \
+         number:\n{cramped}",
+        10 - drawn
     );
 
     // The attention mark: the attended row is drawn differently from the row above it, and by a
@@ -2363,9 +2437,19 @@ fn p14_no_grid_header_stands_over_an_opened_record() {
             },
         ))
     };
+    // 🔴 **A header is column names with no values beside them** (`[T-r58]`, 2026-09-02). The
+    // predicate was `contains("transformation") && contains("verdict")`, and that is what a header
+    // looks like only while nothing else on the face spells two column names on one row. The record
+    // face's head row now does: it folds the three `Priority::One` keys and **their values** into
+    // one row (`renderer::record_own`), so it names `transformation` beside `gx1:…` rather than
+    // over an empty column. The property this probe is for — *no signpost standing over columns the
+    // frame does not draw* — is unchanged; what is repaired is a predicate that could not tell a
+    // signpost from a fact. The grid's header carries no address, which is the discriminator.
     let header_rows = |text: &str| {
         text.lines()
-            .filter(|line| line.contains("transformation") && line.contains("verdict"))
+            .filter(|line| {
+                line.contains("transformation") && line.contains("verdict") && !line.contains("gx1:")
+            })
             .count()
     };
 
@@ -2387,16 +2471,20 @@ fn p14_no_grid_header_stands_over_an_opened_record() {
          not draw:\n{opened}"
     );
 
-    // And the row it stopped taking went to the record. The record's own note is what says so, and
-    // it is the number a reader acts on.
+    // And the row it stopped taking went to the record.
+    //
+    // 🔴 **Counted off the screen rather than off a note** (`[T-r58]`, 2026-09-02, defect 4). The
+    // note that spelled `N of 10 members` at every shape is gone: it is drawn only where there is a
+    // cut, and it names what was **dropped**. So the members are counted the way a reader counts
+    // them — the rows that begin with a key this ledger declares, plus the keys folded into the head
+    // row and into the gathered marks row. The number is the same number; what changed is that it is
+    // now read from the drawing instead of from the drawing's own claim about itself, which is
+    // strictly the stronger measurement.
     let members = |text: &str| -> usize {
-        flat(text)
-            .split(" of 10 members")
-            .next()
-            .and_then(|head| head.split(' ').next_back().map(str::to_string))
-            .expect("the note names how many members were drawn")
-            .parse()
-            .expect("the count is a number")
+        text.lines()
+            .flat_map(|line| line.split_whitespace())
+            .filter(|word| LEDGER_COLUMNS.iter().any(|column| column.key == *word))
+            .count()
     };
     let cramped = renderer::buffer_text(&renderer::render_view_to_buffer(
         &screen,
@@ -3513,7 +3601,8 @@ fn g20_an_empty_string_is_not_a_count_of_nought() {
 fn p18_the_screen_draws_an_empty_string_as_itself() {
     let healthz: serde_json::Value = serde_json::from_str(HEALTHZ).expect("fixture parses");
     let rows: serde_json::Value = serde_json::from_str(
-        r#"{"items":[{"transformation":"gx1:t3sto0000000009","state":"","verdict":"Admit","enforced":true,"created_at":"2026-08-31T00:00:00Z","actor":"agent-a","scope":"src/lib.rs","inverse_status":"Escrowed","rollback":null,"superseded_by":null}],"next_cursor":null}"#,
+        // 🔴 `Escrowed` until `[T-r55]` (2026-09-02): see `TRANSFORMATIONS`' own note and gate `g71`.
+        r#"{"items":[{"transformation":"gx1:t3sto0000000009","state":"","verdict":"Admit","enforced":true,"created_at":"2026-08-31T00:00:00Z","actor":"agent-a","scope":"src/lib.rs","inverse_status":"Available","rollback":null,"superseded_by":null}],"next_cursor":null}"#,
     )
     .expect("fixture parses");
     let answered = |route: &str, body: serde_json::Value| wire::Reading {
@@ -3789,18 +3878,62 @@ fn g24_the_disclosure_describes_the_screen_that_was_actually_drawn() {
 
     // 2. The grid drops fields by width; the record does not drop any by width at all.
     let grid = layout::resolve(80, 24, &measured, false, layout::Subject::Grid);
-    let record = layout::resolve(80, 24, &measured, false, layout::Subject::Record);
+    // 🔴 A record plan resolved from `Attention::default()` is a record with nought rows of its own,
+    // which is not a screen this face can draw. The counts come from the one function that measures
+    // them (`[T-r58]`, 2026-09-02).
+    let record_plan = |width: u16, height: u16| {
+        let held = wire::Held::none();
+        let (record_members, record_beyond) =
+            renderer::record_extent(&screen, &held, &opened, width);
+        layout::resolve_attended(
+            width,
+            height,
+            &measured,
+            false,
+            layout::Subject::Record,
+            layout::Attention {
+                selected: 0,
+                items: items.len(),
+                glide: 0,
+                record_members,
+                record_beyond,
+            },
+        )
+    };
+    let record = record_plan(80, 24);
     println!("G24_GRID={}", grid.disclosure);
     println!("G24_RECORD={}", record.disclosure);
     assert!(
         !grid.dropped_fields.is_empty(),
         "eighty cells cannot hold eleven fields; a grid that drops none is not measuring"
     );
-    assert!(
+    // 🔴 **This assertion read `record.dropped_fields.is_empty()`, and it is superseded**
+    // (`[T-r58]`, 2026-09-02 — the seat's ruling on the real capture at
+    // `req/942_artifacts/tui_r55_2026-09-02/pty/record_120x32.txt`, defect 3). The sentence it
+    // encoded — *a record draws every member the wire carried, so nothing is dropped by width* —
+    // is still true **of the record**, and it was true of the **screen** only while the record was
+    // the whole screen. It is not: the capture showed thirteen blank rows at 120x32, a third of the
+    // terminal standing empty, and the ruling is that an empty panel is furniture rather than
+    // information (`SS831`). The rows the record does not need go back to the ledger it was opened
+    // from, and a ledger drops columns by width.
+    //
+    // So the requirement is now the pairing, which is strictly more than the old one asserted: the
+    // record's own members are never dropped by width, **and** the disclosure names the ledger's
+    // columns exactly when there is a ledger under the record to drop them from.
+    assert_eq!(
         record.dropped_fields.is_empty(),
-        "🔴 g24: a record draws every member the wire carried, so nothing is dropped by width: \
-         {:?}",
-        record.dropped_fields
+        record.grid_capacity == 0,
+        "🔴 g24: the disclosure and the region disagree about whether a ledger is drawn under the \
+         opened record. dropped={:?} ledger_rows={}",
+        record.dropped_fields,
+        record.grid_capacity
+    );
+    let cramped_record = record_plan(40, 10);
+    assert!(
+        cramped_record.dropped_fields.is_empty(),
+        "🔴 g24: at forty by ten the record fills the region and there is no ledger under it, so a \
+         clause naming dropped columns describes a screen that is not there: {:?}",
+        cramped_record.dropped_fields
     );
     // 🔴 **The count, not one spelling of it** (`req/924` §TUI-57 (`req/38` SS1088, Owner `#282-T`, 2026-09-01)).
     // The standing chrome is one row, so the long form (`N of 11 fields not drawn`) is chosen only
@@ -3815,11 +3948,24 @@ fn g24_the_disclosure_describes_the_screen_that_was_actually_drawn() {
         "the grid's disclosure has to keep saying what the columns cut: {}",
         grid.disclosure
     );
+    // 🔴 **Paired rather than forbidden** (`[T-r58]`, 2026-09-02, defect 3). The clause was
+    // forbidden over a record because a record was the whole screen; a record with a ledger under it
+    // does drop columns, and the one screen that drops columns and says nothing would be the defect.
+    // Either form of the clause: the long form spells `N of 11 fields not drawn` and the short one
+    // `N/11 fields`, which is the same pairing the grid's assertion above is written against.
+    assert_eq!(
+        record.disclosure.contains("fields"),
+        record.grid_capacity > 0,
+        "🔴 g24: the disclosure and the region disagree about whether columns were dropped from a \
+         ledger under the opened record: {} (ledger rows {})",
+        record.disclosure,
+        record.grid_capacity
+    );
     assert!(
-        !record.disclosure.contains("fields not drawn"),
-        "🔴 g24: the disclosure is reporting the grid's dropped columns over a region that is not \
-         drawing a grid: {}",
-        record.disclosure
+        !cramped_record.disclosure.contains("fields"),
+        "🔴 g24: at forty by ten the record fills the region and the disclosure is reporting a \
+         grid's dropped columns over a screen that has no grid: {}",
+        cramped_record.disclosure
     );
     // 🔴 **Either form of the same clause** (`req/924` §TUI-57 (`req/38` SS1088, Owner `#282-T`, 2026-09-01)).
     // The standing chrome is one row, so the short form (`record open`) is chosen where the long
@@ -3843,7 +3989,15 @@ fn g24_the_disclosure_describes_the_screen_that_was_actually_drawn() {
     );
 
     // 4. And on a frame, through the same `draw` a live frame goes through: the members the record
-    //    shows are on the screen **and** the bottom line is not calling them undrawn.
+    //    shows are on the screen **and** the bottom line describes that screen.
+    //
+    // 🔴 **The two assertions here were `contains("members")` and `!contains("fields not drawn")`,
+    // and both are superseded** (`[T-r58]`, 2026-09-02, defects 3 and 4). The first required the
+    // record's own counting line at a shape where nothing was cut, which is a permanent row
+    // reporting an event that did not happen; the second forbade the columns clause over a screen
+    // that now really does draw a ledger under the record. What replaces them is the same property
+    // stated over the drawing: every member the wire carried is on the screen, and the bottom line
+    // is describing that screen rather than another one.
     let drawn = flat(&renderer::buffer_text(&renderer::render_view_to_buffer(
         &screen,
         80,
@@ -3853,14 +4007,21 @@ fn g24_the_disclosure_describes_the_screen_that_was_actually_drawn() {
         &opened,
     )));
     println!("G24_FRAME={drawn}");
+    for column in LEDGER_COLUMNS {
+        assert!(
+            drawn.contains(column.key),
+            "🔴 g24: eighty by twenty-four has room for every member and `{}` is not on the \
+             frame: {drawn}",
+            column.key
+        );
+    }
     assert!(
-        drawn.contains("members"),
-        "the record's own line is what counts them, and it is not on the frame: {drawn}"
+        !drawn.contains("not drawn:"),
+        "🔴 g24: nothing was cut at eighty by twenty-four and the record reports a cut: {drawn}"
     );
     assert!(
-        !drawn.contains("fields not drawn"),
-        "🔴 g24: the frame draws a record and its bottom line reports the grid's cut columns: \
-         {drawn}"
+        drawn.contains("record open"),
+        "🔴 g24: the bottom line does not say which of the three screens it is describing: {drawn}"
     );
 
     // 5. The second ceiling: the rung is a decision the plan carries, and the rung that gives up
@@ -4393,7 +4554,8 @@ fn ledger(count: usize) -> Screen {
                 "created_at": "2026-08-30T09:00:00Z",
                 "actor": "agent-a",
                 "scope": format!("src/row{n}.rs"),
-                "inverse_status": "Escrowed",
+                // 🔴 `Escrowed` until `[T-r55]` (2026-09-02): see `TRANSFORMATIONS`' note, gate `g71`.
+                "inverse_status": "Available",
                 "rollback": serde_json::Value::Null,
                 "superseded_by": serde_json::Value::Null,
             })
@@ -4762,6 +4924,9 @@ fn g30_the_order_of_letting_go_is_the_order_that_was_declared() {
                     selected: 0,
                     items: 28,
                     glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
                 },
             );
             let mut given_up: Vec<RegionRole> = plan.dropped.clone();
@@ -5145,6 +5310,9 @@ fn shape_at(screen: &Screen, width: u16, height: u16, rows: usize) -> (layout::P
             selected: 0,
             items: rows,
             glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
         },
     );
     let text = renderer::buffer_text(&renderer::render_view_to_buffer(
@@ -5492,6 +5660,9 @@ fn ac12_the_draw_road_is_measured_cold_and_warm_at_five_shapes() {
                     selected: 0,
                     items: 28,
                     glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
                 },
             );
             plans.push(started.elapsed().as_micros());
@@ -5623,6 +5794,9 @@ fn g36_the_help_face_is_reachable_and_the_empty_list_stays_a_fixed_point() {
             selected: 0,
             items: 28,
             glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
         },
     );
     assert!(
@@ -5892,6 +6066,9 @@ fn read_note(screen: &Screen, width: u16, height: u16, records: usize) -> Option
             selected: 0,
             items: records,
             glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
         },
     );
     let now = plan.note.clone();
@@ -7932,6 +8109,9 @@ fn g58_the_column_set_does_not_move_when_the_attention_does() {
                 selected,
                 items: items.len(),
                 glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
             },
         )
     };
@@ -8447,6 +8627,9 @@ fn g64_a_column_whose_every_value_is_nothing_is_not_drawn() {
                 selected: 0,
                 items: items.len(),
                 glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
             },
         );
         let drawn: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
@@ -8510,6 +8693,9 @@ fn g64b_a_column_that_is_nothing_on_only_some_rows_is_kept() {
             selected: 0,
             items: 28,
             glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
         },
     );
     assert!(
@@ -8576,6 +8762,9 @@ fn g64c_two_different_words_for_nothing_in_one_column_are_not_vacant() {
             selected: 0,
             items: 28,
             glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
         },
     );
     println!("G64C vacant={vacant:?}");
@@ -8638,6 +8827,9 @@ fn g64d_a_column_that_answers_no_on_every_record_is_an_answer_and_is_drawn() {
             selected: 0,
             items: items.len(),
             glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
         },
     );
     let drawn: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
@@ -8735,6 +8927,9 @@ fn g65_what_the_rule_dropped_is_counted_on_the_screen_and_named_in_the_hatch() {
                 selected: 0,
                 items: items.len(),
                 glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
             },
         );
         let (_, width_only) = layout::columns_for(width);
@@ -8872,6 +9067,11 @@ fn g65_what_the_rule_dropped_is_counted_on_the_screen_and_named_in_the_hatch() {
 ///
 /// 🔴 **Red on `main`**: `main` repeats `Admit Committed Escrowed` down every drawn row of this bed,
 /// because `hoist` measures over the fetched set and record 31 differs.
+///
+/// 🔴 **The word in the sentence above is `Available` now** (`[T-r55]`, 2026-09-02, gate `g71`).
+/// `Escrowed` is not a word `gx_engine::store::InverseStatus` can send, so this bed no longer feeds
+/// it; the observation the paragraph records was made when it did, and is kept in the words it was
+/// made in rather than rewritten to look as though it had always said the other thing.
 #[test]
 fn g66_a_line_measured_on_the_window_says_these_n_and_never_all_m() {
     // Thirty-one records of which the last differs: the live bed's own shape.
@@ -9188,6 +9388,9 @@ fn g73_the_standing_chrome_is_one_row_and_the_preamble_scrolls() {
                 selected: 0,
                 items: records,
                 glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
             },
         );
         // Every row this face draws is either the standing chrome or the body. A third role with
@@ -9425,8 +9628,54 @@ fn g74_the_dot_carries_more_than_two_states_and_survives_mono() {
 /// The record face spells it once, in its own closing line, and that is the one spelling on that
 /// screen — so the bound is *at most one* rather than *never*, and the census prints which face
 /// carried it.
+///
+/// 🔴 **The predicate was counting a prefix, and the property is about an address** (`[T-r55]`,
+/// 2026-09-02, under the ruling that wired the record's own routes: `req/924` §TUI-64 / `req/38`
+/// SS1095, Owner `#285-T`). `GET /v1/transformations/{id}` **contains** `GET /v1/transformations`
+/// and is not a second spelling of it — it is a different road to a different thing, and the hatch
+/// is the one screen meant to carry both. A bare `matches().count()` reported the address twice on
+/// the help face at every wide shape.
+///
+/// **The sentence this gate asserts is unchanged and the floor is not lowered**: what changed is
+/// that the counter measures the address rather than its first twenty-two characters. A match
+/// followed by `/` is a longer address, and the two controls at the end fire on both halves of that
+/// — a genuine double spelling is still counted twice, and a sub-route is counted not at all. This
+/// is `g70`'s own repair one gate over (`req/38` SS1094: *a scanning predicate that does not know
+/// the whole shape of its subject*).
+/// 🔴 **And the denominator had to grow with the screen it guards** (`[T-r55]`, 2026-09-02,
+/// independent audit finding S1). Narrowing the predicate to stop counting a sub-route as a
+/// spelling of its parent is right — and on its own it makes this gate *quieter about a screen this
+/// lane made busier*: two spellings of `GET /v1/transformations/{id}` would then count nought, and
+/// `GET /v1/receipts/{tid}` would be measured not at all. A gate whose subject grows and whose
+/// denominator does not is a gate absorbing the very thing it was written to notice.
+///
+/// So the sweep is over **every address this face declares** — `LEDGER_ADDRESS` and both of
+/// `wire::RECORD_ROUTES` — each counted for itself, and the parent counted only where it is not the
+/// head of one of the children. The set is read from the declaration, so a route added later is
+/// measured by this gate without anybody remembering to add a line.
 #[test]
 fn g75_the_address_is_spelled_at_most_once_on_a_screen() {
+    // Every address this face declares, longest first so a parent never eats a child.
+    fn declared() -> Vec<String> {
+        let mut all = vec![LEDGER_ADDRESS.to_string()];
+        all.extend(
+            wire::RECORD_ROUTES
+                .iter()
+                .map(|route| format!("GET {route}")),
+        );
+        all.sort_by_key(|address| std::cmp::Reverse(address.len()));
+        all
+    }
+    // One address, and not something it is merely the beginning of.
+    fn spellings(text: &str, address: &str) -> usize {
+        text.match_indices(address)
+            .filter(|(at, _)| !text[at + address.len()..].starts_with('/'))
+            .count()
+    }
+    // The parent's own count, for the two controls at the end that are written about it.
+    fn addresses(text: &str) -> usize {
+        spellings(text, LEDGER_ADDRESS)
+    }
     let screen = ledger(31);
     let mut twice: Vec<String> = Vec::new();
     let mut census: Vec<String> = Vec::new();
@@ -9457,14 +9706,22 @@ fn g75_the_address_is_spelled_at_most_once_on_a_screen() {
                 false,
                 &view,
             )));
-            let times = text.matches(LEDGER_ADDRESS).count();
-            census.push(format!("{width}x{height} {name}={times}"));
-            if times > 1 {
-                twice.push(format!("{width}x{height} {name}: {times} times"));
+            for address in declared() {
+                let times = spellings(&text, &address);
+                census.push(format!("{width}x{height} {name} [{address}]={times}"));
+                if times > 1 {
+                    twice.push(format!(
+                        "{width}x{height} {name}: `{address}` {times} times"
+                    ));
+                }
             }
         }
     }
-    println!("G72_CENSUS={census:?}");
+    // 🔴 The name said `G72` and this is `g75`. Corrected here rather than filed, because the whole
+    // subject of `req/38` SS1097 was that `gNN` is **one flat identifier space** and a census line
+    // printing a number that belongs to another gate is that space being reported wrongly by the
+    // instrument that reports it (`[T-r55]`, 2026-09-02).
+    println!("G75_CENSUS={census:?}");
     assert!(
         twice.is_empty(),
         "🔴 g75 (`req/924` §TUI-22 / §TUI-57): the address is spelled more than once at {} \
@@ -9476,9 +9733,44 @@ fn g75_the_address_is_spelled_at_most_once_on_a_screen() {
     // green on a face that spells the address nowhere and on a predicate that matches nothing.
     let doubled = format!("{LEDGER_ADDRESS} and again {LEDGER_ADDRESS}");
     assert_eq!(
-        doubled.matches(LEDGER_ADDRESS).count(),
+        addresses(&doubled),
         2,
         "🔴 g75: the predicate cannot see two spellings of the address, so it is measuring nothing"
+    );
+    // 🔴 The second control, and it is the one the narrowing is for: a longer address that begins
+    // with this one is **not** this one. Without it the refinement above could have been written as
+    // "count nothing" and both this gate and the one it protects would have gone green.
+    let sub_route = format!("{LEDGER_ADDRESS}/{{id}}");
+    assert_eq!(
+        addresses(&sub_route),
+        0,
+        "🔴 g75: `{sub_route}` is a different address and must not be counted as a spelling of \
+         `{LEDGER_ADDRESS}`"
+    );
+    // 🔴 And the pair together: one real spelling beside one sub-route is one, not two and not
+    // nought. Either control alone admits a predicate that is wrong in the other direction.
+    let both = format!("{LEDGER_ADDRESS}/{{id}} then {LEDGER_ADDRESS}");
+    assert_eq!(
+        addresses(&both),
+        1,
+        "🔴 g75: an address beside a longer address that contains it is one spelling"
+    );
+    // 🔴 The fourth control, and it is the one finding S1 asked for: the **children** are measured
+    // too, or the narrowing above bought this gate's silence about the addresses this lane added.
+    for address in declared() {
+        let doubled = format!("{address} and again {address}");
+        assert_eq!(
+            spellings(&doubled, &address),
+            2,
+            "🔴 g75: `{address}` is in the declared set and the predicate cannot see two spellings \
+             of it, so it is carried in the sweep and measured by nothing"
+        );
+    }
+    assert_eq!(
+        declared().len(),
+        1 + wire::RECORD_ROUTES.len(),
+        "🔴 g75: the declared set is not the declaration — a route was added to \
+         `wire::RECORD_ROUTES` and this sweep did not grow with it"
     );
 }
 
@@ -9544,6 +9836,9 @@ fn g76_the_hatch_carries_what_the_standing_row_moved_there() {
                 selected: 0,
                 items: records,
                 glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
             },
         );
         let wanted: Vec<(&str, String)> = vec![
@@ -9802,5 +10097,3045 @@ fn g77_the_table_shape_is_not_a_function_of_the_cursor_and_the_pointer_moves_the
     assert!(
         !ruled.is_empty(),
         "🔴 g77: no group rule is drawn at all, so the separator is a declaration nothing reads"
+    );
+}
+
+// =============================================================================================
+// `[T-r55]` — the record's own two routes (`req/924` §TUI-64, `req/38` SS1095, Owner `#285-T`).
+//
+// g78..g82. The ids were minted after a fresh grep of **both** suites and `tools/gates/`, which
+// `req/38` SS1097 ruled to be one flat space; the highest in use was `g77`.
+// =============================================================================================
+
+/// The view a record is open in, at the first row.
+fn opened() -> View {
+    View {
+        open: true,
+        ..View::default()
+    }
+}
+
+/// 🔴 **g83 — the record's members are drawn in a declared order, not in the map's.**
+///
+/// # The defect this was written for was invisible to every gate in this file
+///
+/// The record face read `serde_json::Map::keys()`. That order is a `BTreeMap`'s (alphabetical)
+/// unless `serde_json/preserve_order` is on, in which case it is an `IndexMap`'s (the order the wire
+/// serialised). Cargo unifies features across a build, and measured on this workspace with
+/// `cargo tree -e features` (`[T-r55]`, 2026-09-02):
+///
+/// * `-p tracefold-tui` — `preserve_order` **absent**. This binary. Every gate here.
+/// * `-p gx-cli` — `preserve_order` **present**, transitively. The `gx` binary a reader runs.
+///
+/// So the reader saw one order and every instrument saw another, and **no test in this file could
+/// have caught it**, because a test cannot photograph a screen drawn by a binary it is not linked
+/// into. It was found by comparing this lane's own red-first output against its own real-pty
+/// capture — two artefacts that existed for other reasons.
+///
+/// The gate is therefore written to hold **under either feature set**: the row is built with its
+/// keys in a scrambled order, so a face reading the map would draw the scramble under
+/// `preserve_order` and the alphabet without it, and neither is what is asserted.
+#[test]
+fn g83_the_record_draws_its_members_in_a_declared_order() {
+    // Scrambled on purpose: neither insertion order nor alphabetical order is the answer.
+    let row = serde_json::json!({
+        "superseded_by": serde_json::Value::Null,
+        "verdict": "Admit",
+        "actor": "agent-a",
+        "transformation": "gx1:t3sto0000000001",
+        "zz_unknown_to_this_face": "later",
+        "rollback": serde_json::Value::Null,
+        "state": "Committed",
+        "enforced": true,
+        "created_at": "2026-08-30T09:00:00Z",
+        "inverse_status": "Available",
+        "scope": "src/lib.rs",
+    });
+    let screen = Screen {
+        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        transformations: answered(
+            wire::ROUTES[1],
+            serde_json::json!({"items": [row], "next_cursor": null}),
+        ),
+        candidates: answered(
+            wire::ROUTES[2],
+            serde_json::from_str(CANDIDATES).expect("fixture parses"),
+        ),
+        escalations: answered(
+            wire::ROUTES[3],
+            serde_json::from_str(ESCALATIONS).expect("fixture parses"),
+        ),
+    };
+    let text = renderer::buffer_text(&renderer::render_view_to_buffer(
+        &screen,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &opened(),
+    ));
+    // The order the keys were drawn in, read off the screen.
+    //
+    // 🔴 **Every word, not the first word of every line** (`[T-r58]`, 2026-09-02, defects 1 and 2).
+    // The record no longer draws one flat `key value` row per member: the three `Priority::One` keys
+    // fold into one head row beside their values, and the members whose value is a mark gather onto
+    // one row per kind of nothing (`renderer::record_own`). Reading only the first word of each line
+    // would now see three of eleven keys and call the other eight missing — the instrument measuring
+    // the old arrangement rather than the declared order, which is what this gate is actually for.
+    // The declared order is unchanged and is still what is asserted.
+    let drawn: Vec<String> = text
+        .lines()
+        .flat_map(|line| line.split_whitespace())
+        .filter(|word| {
+            LEDGER_COLUMNS.iter().any(|column| column.key == *word)
+                || *word == "zz_unknown_to_this_face"
+        })
+        .map(str::to_string)
+        .collect();
+    // 🔴 The keys whose value is a mark leave the sequence in place and arrive at the end, gathered.
+    // Which ones those are is read from the **bed**, not written down here, so a bed that changes
+    // moves this expectation with it rather than falsifying it.
+    let gathered: Vec<String> = ["rollback", "superseded_by"]
+        .iter()
+        .map(|key| (*key).to_string())
+        .collect();
+    for key in &gathered {
+        assert!(
+            row.get(key).is_some_and(serde_json::Value::is_null),
+            "🔴 g83: the bed no longer gives `{key}` a mark, so the gathered group this gate \
+             expects is not the group the face draws"
+        );
+    }
+    let mut wanted: Vec<String> = LEDGER_COLUMNS
+        .iter()
+        .map(|column| column.key.to_string())
+        .filter(|key| !gathered.contains(key))
+        .collect();
+    wanted.push("zz_unknown_to_this_face".to_string());
+    wanted.extend(gathered.iter().cloned());
+    assert_eq!(
+        drawn, wanted,
+        "🔴 g83: the record's members are drawn in an order the face does not declare. It is \
+         `serde_json::Map`'s, which is alphabetical here and the wire's order in the `gx` binary \
+         (`serde_json/preserve_order` is unified in through `gx-cli`), so the reader and every \
+         gate in this file see two different screens.\n{text}"
+    );
+    // The controls: neither of the two orders a map would have given is what was asserted, or the
+    // assertion above would pass on the very defect it exists to catch.
+    let mut alphabetical = wanted.clone();
+    alphabetical.sort();
+    assert_ne!(
+        drawn, alphabetical,
+        "🔴 g83: the declared order and the alphabet are the same list, so this gate cannot tell \
+         a declaration from a `BTreeMap`"
+    );
+    let scrambled: Vec<String> = row
+        .as_object()
+        .expect("an object")
+        .keys()
+        .cloned()
+        .collect();
+    assert_ne!(
+        drawn, scrambled,
+        "🔴 g83: the declared order and this bed's map order are the same list, so this gate \
+         cannot tell a declaration from an `IndexMap`"
+    );
+}
+
+/// 🔴 **AC-13 — the record road, measured, because `ac10` and `ac12` have no ceiling.**
+///
+/// `ac10` and `ac12` assert `> 0` and print. That is the right shape for a **threshold** (a number
+/// chosen before the first measurement is a number the next lane bends the measurement to meet) and
+/// it is the wrong shape for a **road nobody has ever timed**. This lane put two loopback reads
+/// between a keypress and a frame, and "it is two GETs, so it is fine" is not a measurement.
+///
+/// Three figures, told apart, because they have three different remedies:
+///
+/// * **draw** — rendering the opened record from a `Held` already in hand. Pure; no socket. This is
+///   what happens on a resize, a scroll and every redraw while the record stays open.
+/// * **read** — `wire::Held::read` against a loopback fixture: the two sockets. This happens
+///   **once per record opened**, and it is the only new cost a keypress can feel.
+///   🔴 **And this figure is about the fixture, not about the face.** Measured on this bed the
+///   median came out at ~10.3 ms with p10 and p90 inside 150 µs of it — a number that flat is not a
+///   distribution of work, it is a constant being waited on. `Fixture::spawn`'s accept loop sleeps
+///   5 ms between polls and this road opens **two** connections, so what is being timed is
+///   2 x 5 ms of test-server latency. It is reported anyway, and reported as an **upper bound on
+///   this instrument** rather than as a cost of the face: a figure whose provenance is not stated
+///   is a figure a later reader will attribute to the wrong thing.
+/// * **plan** — the layout on its own, so the drawing and the arithmetic can be told apart, in the
+///   same shape `ac12` reports it.
+///
+/// **No threshold is asserted**, for `ac10`'s reason, and the figures are printed at every ruled
+/// shape so the report carries numbers rather than an adjective.
+#[test]
+fn ac13_the_record_road_is_measured_at_every_ruled_shape() {
+    const ROUNDS: usize = 60;
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    let held = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+    assert!(
+        held.refusal.is_none() && held.transformation.is_ok(),
+        "🔴 ac13: the bed did not answer, so what follows would be timing a failure road"
+    );
+
+    let mut reads: Vec<u128> = Vec::with_capacity(ROUNDS);
+    for _ in 0..ROUNDS {
+        let started = Instant::now();
+        let one = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+        reads.push(started.elapsed().as_micros());
+        assert!(
+            one.transformation.is_ok(),
+            "🔴 ac13: a read in the batch did not answer; the median would be a median of failures"
+        );
+    }
+    reads.sort_unstable();
+    println!(
+        "AC13_READ_US median={} p10={} p90={} n={ROUNDS} routes=2",
+        reads[ROUNDS / 2],
+        reads[ROUNDS / 10],
+        reads[ROUNDS * 9 / 10]
+    );
+
+    let measured = renderer::measured(&screen);
+    for (width, height) in RULED_SHAPES {
+        let started = Instant::now();
+        let _ = renderer::render_held_to_buffer(
+            &screen,
+            &held,
+            width,
+            height,
+            Tier::Truecolor,
+            false,
+            &opened(),
+            gx_tui::tui::live::LinkReport::off(),
+        );
+        let cold_us = started.elapsed().as_micros();
+
+        let mut warm: Vec<u128> = Vec::with_capacity(ROUNDS);
+        let mut plans: Vec<u128> = Vec::with_capacity(ROUNDS);
+        for _ in 0..ROUNDS {
+            let started = Instant::now();
+            let _ = renderer::render_held_to_buffer(
+                &screen,
+                &held,
+                width,
+                height,
+                Tier::Truecolor,
+                false,
+                &opened(),
+                gx_tui::tui::live::LinkReport::off(),
+            );
+            warm.push(started.elapsed().as_micros());
+            let started = Instant::now();
+            let _ = layout::resolve_attended(
+                width,
+                height,
+                &measured,
+                false,
+                layout::Subject::Record,
+                layout::Attention {
+                    selected: 0,
+                    items: screen.transformations.items().len(),
+                    glide: 0,
+            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+            // these plans is resolved for a grid, so the default is the measurement.
+            ..layout::Attention::default()
+                },
+            );
+            plans.push(started.elapsed().as_micros());
+        }
+        warm.sort_unstable();
+        plans.sort_unstable();
+        println!(
+            "AC13_DRAW_US {width}x{height} cold={cold_us} warm_median={} warm_p10={} warm_p90={} \
+             plan_median={} n={ROUNDS}",
+            warm[ROUNDS / 2],
+            warm[ROUNDS / 10],
+            warm[ROUNDS * 9 / 10],
+            plans[ROUNDS / 2]
+        );
+        // The clock moved, which is the one thing a printed figure has to earn before it is read.
+        assert!(
+            cold_us > 0 || warm[ROUNDS - 1] > 0,
+            "🔴 ac13 at {width}x{height}: every figure is nought, so the clock did not move and \
+             these numbers are about the timer rather than about the face"
+        );
+    }
+}
+
+/// 🔴 **g78 — an id off the wire cannot make this face write anything but `GET `.**
+///
+/// # Why this gate exists
+///
+/// `tui/src/tui/wire.rs`'s heading says the claim *this face performs no effect* is "**structural
+/// rather than promised**": one function writes `GET ` and no code path writes another method. That
+/// argument rested on every path ever written being a `&'static str` declared in that file.
+/// [`wire::RECORD_ROUTES`] ends it — the path now carries a value **the engine sent** — and an id
+/// carrying a carriage return would let a row of the ledger compose a second request line. A method
+/// this module cannot write becoming a method this module can be *made* to write is the membrane
+/// breaking, and it would break at the layer the whole face rests on.
+///
+/// # Three directions, and the third is the one that makes the first two mean something
+///
+/// 1. **the hostile id is refused before a socket is opened** — the server sees nothing at all;
+/// 2. **the ordinary id is not refused** — exactly two requests arrive and both are `GET`, so a
+///    guard that refused everything would fail here rather than pass everything;
+/// 3. **the second layer answers on its own** — `wire::read_route` is handed the hostile path
+///    directly, bypassing `record_path`, and still refuses. Without this the gate would be
+///    measuring one guard and reporting two.
+#[test]
+fn g78_a_hostile_id_never_reaches_a_request_line() {
+    let hostile = "gx1:t3sto0000000001 HTTP/1.1\r\nDELETE /v1/transformations/x";
+    let fixture = Fixture::start();
+
+    let refused = wire::Held::read(&fixture.base_url, None, hostile);
+    assert!(
+        refused.refusal.is_some(),
+        "🔴 g78: `{hostile:?}` was not refused, so an id off the wire reached a request line"
+    );
+    assert!(
+        refused.transformation.is_pending() && refused.receipt.is_pending(),
+        "🔴 g78: a refused id still produced a reading, so something was asked"
+    );
+    let asked = fixture.seen.lock().expect("fixture lock").clone();
+    assert!(
+        asked.is_empty(),
+        "🔴 g78: the server was asked {} time(s) about an id this face declared unaddressable: \
+         {asked:#?}",
+        asked.len()
+    );
+
+    // The negative control for the guard itself: an ordinary id is asked, twice, with `GET`.
+    let held = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+    assert!(
+        held.refusal.is_none(),
+        "🔴 g78: `{RECEIPT_HOLDER}` was refused, so the guard refuses everything and the assertion \
+         above is vacuous: {:?}",
+        held.refusal
+    );
+    let asked = fixture.seen.lock().expect("fixture lock").clone();
+    assert_eq!(
+        asked.len(),
+        2,
+        "🔴 g78: an opened record asks its two routes and this bed saw {}: {asked:#?}",
+        asked.len()
+    );
+    for line in &asked {
+        assert!(
+            line.starts_with("GET "),
+            "🔴 g78: the membrane's first clause is broken — `{line}`"
+        );
+    }
+
+    // The second layer, on its own. `record_path` is not in this road at all.
+    let direct = wire::read_route(&fixture.base_url, "/v1/transformations/a b", None);
+    assert!(
+        direct.status.is_none() && direct.error.is_some(),
+        "🔴 g78: `open` wrote a request target with a space in it — the second layer is not there"
+    );
+    let asked_after = fixture.seen.lock().expect("fixture lock").len();
+    assert_eq!(
+        asked_after, 2,
+        "🔴 g78: the second layer let the request through: {asked_after} request(s) seen"
+    );
+
+    // 🔴 **`addressable` has three clauses and only one of them was being exercised**
+    // (`[T-r55]`, 2026-09-02, independent audit finding S4). Everything above is refused by the
+    // **character** clause alone, so `!id.is_empty()` and `id.len() <= MAX_ID_BYTES` could both
+    // have been deleted with all of this still green — including the paragraph on `MAX_ID_BYTES`
+    // that says "a length that is not checked is a length the wire chooses", guarding a bound
+    // nothing checked. Each clause now has an input only it refuses, and a neighbour it admits.
+    assert!(
+        !wire::addressable(""),
+        "🔴 g78: an empty id is addressable, so an empty path segment reaches a request line"
+    );
+    let at_the_bound = "a".repeat(wire::MAX_ID_BYTES);
+    let over_the_bound = "a".repeat(wire::MAX_ID_BYTES + 1);
+    assert!(
+        wire::addressable(&at_the_bound),
+        "🔴 g78: an id of exactly {} bytes is refused, so the bound is off by one and the clause \
+         below proves nothing",
+        wire::MAX_ID_BYTES
+    );
+    assert!(
+        !wire::addressable(&over_the_bound),
+        "🔴 g78: an id of {} bytes is addressable, so `MAX_ID_BYTES` is a paragraph and not a bound",
+        over_the_bound.len()
+    );
+    // Every character the allow-list admits, and a neighbour of each kind it does not. Written as
+    // a table rather than as prose so that a character added to the set has to be added here too.
+    for (id, allowed) in [
+        ("gx1:t3sto0000000001", true),
+        ("A-Za-z0-9_.~-", true),
+        ("gx1:with%2Fpercent", false), // percent-encoding is not a road around the allow-list
+        ("gx1:with/slash", false),
+        ("gx1:with?query", false),
+        ("gx1:with space", false),
+        ("gx1:with\ttab", false),
+        ("gx1:ｆｕｌｌｗｉｄｔｈ", false), // not ASCII alphanumeric, whatever it looks like
+    ] {
+        assert_eq!(
+            wire::addressable(id),
+            allowed,
+            "🔴 g78: `addressable({id:?})` is not {allowed}"
+        );
+    }
+}
+
+/// 🔴 **g84 — the two repairs an independent audit asked for, each with the defect it closes.**
+///
+/// Both were sound-looking code that asserted something it had not measured, which is the shape
+/// this whole face exists to refuse — so both get a gate rather than a comment.
+///
+/// * **S2**: `renderer::agreement` compared four keys between the page's row and the singular
+///   route's answer and **never checked the two were about the same transformation**. On the
+///   common row all four match, so the face would draw `read again agrees` — *this record has not
+///   moved* — from a comparison that was never made about it.
+/// * **S5**: `wire::Held::receipt_mark` mapped **any** `404` to `NotHere`, whose whole meaning is
+///   the two facts `get_receipt` names. A `404` from an older engine, a proxy or the wrong port is
+///   a third preimage, and folding it in makes the face say *there is no receipt for this row*
+///   about every row while talking to a server that cannot answer.
+#[test]
+fn g84_a_reading_is_not_believed_about_a_row_it_may_not_be_about() {
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    let rows = screen.transformations.items();
+    let (first, second) = (rows[0], rows[1]);
+
+    // S2. The `Held` is about row one; it is drawn beside row two.
+    let held = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+    assert_eq!(
+        first.get(wire::LEDGER_ID_KEY).and_then(|v| v.as_str()),
+        Some(RECEIPT_HOLDER),
+        "🔴 g84: the bed's first row is not the id this reading is about, so the pairing below \
+         tests nothing"
+    );
+    let text = flat(&renderer::buffer_text(&renderer::render_held_to_buffer(
+        &screen,
+        &held,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &View {
+            selected: 1,
+            ..opened()
+        },
+        gx_tui::tui::live::LinkReport::off(),
+    )));
+    assert!(
+        text.contains("read again about another row"),
+        "🔴 g84 (S2): a reading about `{RECEIPT_HOLDER}` is drawn over `{}` and the face does not \
+         say so\n{text}",
+        second
+            .get(wire::LEDGER_ID_KEY)
+            .and_then(|v| v.as_str())
+            .unwrap_or("?")
+    );
+    assert!(
+        !text.contains("read again agrees"),
+        "🔴 g84 (S2): the face asserts the row has not moved, from a comparison made about a \
+         different row\n{text}"
+    );
+    // The control: on the row it IS about, the same comparison still answers.
+    let same = flat(&renderer::buffer_text(&renderer::render_held_to_buffer(
+        &screen,
+        &held,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &opened(),
+        gx_tui::tui::live::LinkReport::off(),
+    )));
+    assert!(
+        same.contains("read again agrees"),
+        "🔴 g84 (S2): the identity check refuses the row it is about, so it refuses everything and \
+         the assertion above is vacuous\n{same}"
+    );
+
+    // S5. A `404` that is not this surface's refusal is not `NotHere`.
+    let engine_404 = held_answering(404, serde_json::json!({"title": "not found", "gx_code": "NOT_FOUND"}));
+    let stranger_404 = held_answering(404, serde_json::json!({"error": "Not Found"}));
+    assert_eq!(
+        engine_404.receipt_mark(),
+        wire::ReceiptMark::NotHere,
+        "🔴 g84 (S5): this surface's own refusal no longer reaches the mark that stands for it"
+    );
+    assert_eq!(
+        stranger_404.receipt_mark(),
+        wire::ReceiptMark::Unknown,
+        "🔴 g84 (S5): a `404` carrying no `{}` is drawn as *there is no receipt for this row*, \
+         which is a fact about a row asserted from a status code alone",
+        wire::GX_CODE_KEY
+    );
+}
+
+/// A `Held` whose receipt read answered with a given status and body, and whose id is addressable.
+fn held_answering(status: u16, body: serde_json::Value) -> wire::Held {
+    let mut held = wire::Held::pending(RECEIPT_HOLDER);
+    held.receipt = wire::Reading {
+        route: format!("GET {}", wire::RECORD_ROUTES[1]),
+        status: Some(status),
+        read_at: "2026-09-02T00:00:00.000000000Z".to_string(),
+        elapsed_ms: 1,
+        body: Some(body),
+        error: None,
+    };
+    held
+}
+
+/// 🔴 **g79 — the five things `GET /v1/receipts/{tid}` can amount to are five spellings.**
+///
+/// The `404` is the one that costs something to keep. `handlers.rs`'s `get_receipt` spells **two**
+/// facts in one refusal — *it has not been committed*, or *this server holds neither its row nor
+/// its archive* — so neither `--` (it was never written) nor `?` (this face could not measure) is
+/// the truth, and both would be the face picking one of two preimages. It is spelled in words, and
+/// this gate is the reason a later reduction pass cannot quietly turn it into a mark.
+///
+/// The second half drives the real wire: a receipt that **is** held draws its decoded coordinates
+/// and the sentence saying this face has not graded it, and a `✓` appears nowhere.
+#[test]
+fn g79_the_receipt_marks_are_five_spellings_and_a_404_is_not_a_mark() {
+    let marks: BTreeSet<&str> = wire::ReceiptMark::ALL.iter().map(|m| m.mark()).collect();
+    assert_eq!(
+        marks.len(),
+        wire::ReceiptMark::ALL.len(),
+        "🔴 g79: {} of {} receipt marks are distinct — two of them are drawn the same way",
+        marks.len(),
+        wire::ReceiptMark::ALL.len()
+    );
+    for collapsed in [Nothing::Absent, Nothing::Unknown] {
+        assert_ne!(
+            wire::ReceiptMark::NotHere.mark(),
+            collapsed.mark(),
+            "🔴 g79: a `404` covering two facts is drawn as `{}`, which asserts one of them",
+            collapsed.mark()
+        );
+    }
+
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    // The bed's first row is the id this server holds a receipt for.
+    let held = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+    assert_eq!(
+        held.receipt_mark(),
+        wire::ReceiptMark::Held,
+        "🔴 g79: the bed holds a receipt for `{RECEIPT_HOLDER}` and the face did not read one"
+    );
+    let text = flat(&renderer::buffer_text(&renderer::render_held_to_buffer(
+        &screen,
+        &held,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &opened(),
+        gx_tui::tui::live::LinkReport::off(),
+    )));
+    for wanted in [
+        "key_id gx1:k3yzzzzzzzzzz",
+        "leaf 3 of 12",
+        "root gx1:r00tzzzzzzzzzz",
+    ] {
+        assert!(
+            text.contains(wanted),
+            "🔴 g79: the decoded half of the receipt is not on the screen: `{wanted}`\n{text}"
+        );
+    }
+    assert!(
+        text.contains(&format!(
+            "checked {} -- {}",
+            renderer::NOT_CHECKED,
+            renderer::RECEIPT_VERIFY_ADDRESS
+        )),
+        "🔴 g79: the face drew a receipt and did not say it has not checked it\n{text}"
+    );
+    assert!(
+        !text.contains('✓') && !text.contains('✔'),
+        "🔴 g79 (`req/924` §TUI-30): a tick is a two-valued mark and *verified* / *not checked* / \
+         *failed* are three answers\n{text}"
+    );
+
+    // The `404`, on the same road, with a row this server holds no receipt for.
+    let missing = wire::Held::read(&fixture.base_url, None, "gx1:t3sto0000000002");
+    assert_eq!(
+        missing.receipt_mark(),
+        wire::ReceiptMark::NotHere,
+        "🔴 g79: a `404` did not reach the classifier as its own value"
+    );
+    let text = flat(&renderer::buffer_text(&renderer::render_held_to_buffer(
+        &screen,
+        &missing,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &View {
+            selected: 1,
+            ..opened()
+        },
+        gx_tui::tui::live::LinkReport::off(),
+    )));
+    assert!(
+        text.contains(&format!("receipt {}", wire::ReceiptMark::NotHere.mark())),
+        "🔴 g79: the `404` is not spelled on the screen\n{text}"
+    );
+    assert!(
+        !text.contains("key_id"),
+        "🔴 g79: there is no receipt and the face drew its members anyway\n{text}"
+    );
+}
+
+/// 🔴 **g80 — the record's address is a key of the list, and the two routes are filled from it.**
+///
+/// A record face exists only because every row of the ledger carries the address it can be asked
+/// about (`crates/gx-api/src/list.rs`'s `row_json`). Two spellings of *which member is the address*
+/// would be two answers, and the one in `wire` is what fills the request line while the one in
+/// `layout` is what the reader sees.
+#[test]
+fn g80_the_record_address_is_a_key_the_ledger_draws() {
+    assert!(
+        LEDGER_COLUMNS
+            .iter()
+            .any(|column| column.key == wire::LEDGER_ID_KEY),
+        "🔴 g80: `{}` is not a column this face draws, so the id it asks with is not the id it \
+         shows",
+        wire::LEDGER_ID_KEY
+    );
+    assert_eq!(
+        wire::RECORD_ROUTES.len(),
+        wire::RECORD_HOLES.len(),
+        "🔴 g80: the routes and the holes they carry are declared in unequal numbers"
+    );
+    for (route, hole) in wire::RECORD_ROUTES.iter().zip(wire::RECORD_HOLES) {
+        assert!(
+            route.contains(hole),
+            "🔴 g80: `{route}` does not carry `{hole}`, so the pairing is by position and by nothing else"
+        );
+        let filled = wire::record_path(route, RECEIPT_HOLDER)
+            .unwrap_or_else(|| panic!("🔴 g80: `{route}` would not take an ordinary id"));
+        assert!(
+            filled.contains(RECEIPT_HOLDER) && !filled.contains('{'),
+            "🔴 g80: `{route}` filled to `{filled}`"
+        );
+    }
+    // The control: the filler refuses what the guard refuses, or the two are separate opinions.
+    assert!(
+        wire::record_path(wire::RECORD_ROUTES[0], "a b").is_none(),
+        "🔴 g80: `record_path` filled a template with an id `addressable` refuses"
+    );
+}
+
+/// 🔴 **g81 — the lifecycle chain is not drawn, and the fact that it is not drawn is on a screen.**
+///
+/// `req/924` §TUI-30's sketch draws `submitted -> planned -> verified -> committed`. No route this
+/// face reads carries it: `state` is one word for where the row is *now*, and nothing answers
+/// *which states it passed through*. Drawing it from the vocabulary with the current position
+/// marked would put three arrows on the screen for three transitions nobody measured.
+///
+/// So the membrane's second obligation applies — **a renderer cannot invert, so what it owes
+/// instead is to name what it let go of** — and this gate holds the two halves together: the arrows
+/// are on no frame, and the sentence is on the one screen that exists to carry what the others
+/// dropped.
+#[test]
+fn g81_the_chain_is_dropped_and_the_drop_is_named() {
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    let held = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+    // An arrow between states is the shape the sketch asks for; any of these is one.
+    let arrows = ["──▶", "-->", "->", "▶", "→"];
+    // 🔴 **The state words are DERIVED from the bed and not only typed** (`[T-r55]`, 2026-09-02,
+    // found by attacking this gate rather than by running it). The first shape of this list held
+    // the four words of `req/924` §TUI-30's sketch — `submitted`, `planned`, `verified`,
+    // `committed` — and **those are the sketch's vocabulary, not the engine's**. A chain drawn as
+    // `Draft --> Committed` would have been invisible to a gate written to catch chains. So the
+    // words the bed actually puts in the `state` column are added to the set the predicate sweeps,
+    // which means a bed carrying a state this file has never heard of grows the gate rather than
+    // escaping it. The sketch's four stay: they are what the drop is a drop *of*.
+    let mut states: Vec<String> = ["submitted", "planned", "verified", "committed"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    for item in screen.transformations.items() {
+        if let Some(state) = item.get("state").and_then(serde_json::Value::as_str) {
+            if !state.is_empty() && !states.iter().any(|known| known == state) {
+                states.push(state.to_string());
+            }
+        }
+    }
+    assert!(
+        states.len() > 4,
+        "🔴 g81: the bed put no state word into the sweep, so this gate is measuring only the \
+         sketch's own four and would miss a chain drawn in the engine's words: {states:?}"
+    );
+    let mut carried: Vec<String> = Vec::new();
+    for (width, height) in RULED_SHAPES {
+        for (name, view) in [
+            ("list", View::default()),
+            ("record", opened()),
+            (
+                "help",
+                View {
+                    help: true,
+                    ..View::default()
+                },
+            ),
+        ] {
+            let text = flat(&renderer::buffer_text(&renderer::render_held_to_buffer(
+                &screen,
+                &held,
+                width,
+                height,
+                Tier::Mono,
+                false,
+                &view,
+                gx_tui::tui::live::LinkReport::off(),
+            )));
+            for arrow in arrows {
+                // The hatch spells the sentence that names the drop, and that sentence is prose
+                // about the chain rather than a chain. It is allowed to say `->` in words -- the
+                // disclosure already ends a clause with `-> help:?` -- and it is not allowed to
+                // draw one between state names.
+                for state in &states {
+                    if text.contains(&format!("{state} {arrow}"))
+                        || text.contains(&format!("{state}{arrow}"))
+                    {
+                        carried.push(format!("{width}x{height} {name}: `{state} {arrow}`"));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        carried.is_empty(),
+        "🔴 g81: a chain of states is drawn at {} face(s), and no route carries one: {carried:#?}",
+        carried.len()
+    );
+    // The control: the predicate can see a chain, or the green above is green on any string.
+    let planted = "submitted ──▶ planned";
+    assert!(
+        arrows
+            .iter()
+            .any(|arrow| planted.contains(&format!("submitted {arrow}"))),
+        "🔴 g81: the predicate cannot see `{planted}`, so it is measuring nothing"
+    );
+    // And the sentence, on the screen that carries what the others dropped.
+    let hatch = flat(&renderer::buffer_text(&renderer::render_held_to_buffer(
+        &screen,
+        &held,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &View {
+            help: true,
+            ..View::default()
+        },
+        gx_tui::tui::live::LinkReport::off(),
+    )));
+    assert!(
+        hatch.contains("lifecycle chain"),
+        "🔴 g81: the chain is dropped and no screen says so, which turns §TUI-57's *moved* into \
+         §TUI-21's *deleted*\n{hatch}"
+    );
+    for route in wire::RECORD_ROUTES {
+        assert!(
+            hatch.contains(route),
+            "🔴 g81: `GET {route}` is spelled on no screen, so the record's own reads have no \
+             address a reader can retype\n{hatch}"
+        );
+    }
+}
+
+/// 🔴 **g82 — the record's cut is named exactly when there is one, and never otherwise.**
+///
+/// The record face draws two things: the members the wire carried, and the rows its own two routes
+/// added. A disclosure that counted one of them would be describing half a screen.
+///
+/// The invariants are predicates rather than line numbers: the members are paid for first (a face
+/// that cut the subject to make room for the commentary would be answering a question nobody
+/// asked), so **rows beyond the members are drawn only once every member is**; neither count may
+/// exceed its own total; and the line that says what was cut must never itself be the thing cut.
+///
+/// # 🔴 The predicate this gate required is superseded, and the old sentence is kept above
+///
+/// (`[T-r58]`, 2026-09-02 — the seat's ruling on the real capture at
+/// `req/942_artifacts/tui_r55_2026-09-02/pty/record_120x32.txt`, defect 4.) This gate used to
+/// require the record's note **at every shape**, and the note read
+/// `record 1 of 31 | 10 of 10 members | 7 of 7 more rows | GET /v1/transformations | close: escape`
+/// — drawn at 120x32, where **nothing had been cut**. A permanent row reporting an event that had
+/// not happened, standing beside a second permanent row that said *a record is open: its own line
+/// counts what it drew*. The ruling names two status rows and a sentence about the face's own
+/// arrangement as defects, so the requirement that produced them is a requirement for a defect and
+/// `INHERITED_PRINCIPLES` (*a test that requires a defect is not a floor*) permits it to be
+/// rewritten rather than obeyed.
+///
+/// What the gate measured is measured still, from the plan that decides it and the screen that
+/// draws it, and **one clause is added**: at a shape with room, there is no line at all.
+#[test]
+fn g82_the_record_note_counts_both_groups_at_every_shape() {
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    let held = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+    let mut census: Vec<String> = Vec::new();
+    for (width, height) in RULED_SHAPES {
+        let text = flat(&renderer::buffer_text(&renderer::render_held_to_buffer(
+            &screen,
+            &held,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &opened(),
+            gx_tui::tui::live::LinkReport::off(),
+        )));
+        // The totals come from the one function that counts them, which is the same function the
+        // plan was resolved from — so this gate cannot drift from the arithmetic it is measuring by
+        // counting a second time.
+        let (members_total, beyond_total) =
+            renderer::record_extent(&screen, &held, &opened(), width);
+        let plan = layout::resolve_attended(
+            width,
+            height,
+            &renderer::measured(&screen),
+            false,
+            layout::Subject::Record,
+            layout::Attention {
+                selected: 0,
+                items: screen.transformations.items().len(),
+                glide: 0,
+                record_members: members_total,
+                record_beyond: beyond_total,
+            },
+        );
+        let members = plan.record_members_shown;
+        let beyond = plan.record_beyond_shown;
+        census.push(format!(
+            "{width}x{height} members={members}/{members_total} beyond={beyond}/{beyond_total} cut={}",
+            plan.record_cut
+        ));
+        assert!(
+            members <= members_total && beyond <= beyond_total,
+            "🔴 g82 at {width}x{height}: a count exceeds its own total: \
+             {members}/{members_total}, {beyond}/{beyond_total}\n{text}"
+        );
+        assert!(
+            beyond == 0 || members == members_total,
+            "🔴 g82 at {width}x{height}: {beyond} row(s) beyond the record are drawn while only \
+             {members} of {members_total} members are — the subject was cut for the commentary\n{text}"
+        );
+        assert_eq!(
+            plan.record_cut,
+            members < members_total || beyond < beyond_total,
+            "🔴 g82 at {width}x{height}: the flag that buys the row for the disclosure and the \
+             arithmetic that decides what is cut are two answers\n{text}"
+        );
+        if plan.record_cut {
+            assert!(
+                text.contains("not drawn:"),
+                "🔴 g82 at {width}x{height}: {members}/{members_total} members and \
+                 {beyond}/{beyond_total} rows are on the screen and nothing says so. The line that \
+                 says what was cut must never itself be the thing that is cut — the row for it is \
+                 taken off the budget before the counts are settled\n{text}"
+            );
+            if members < members_total {
+                // 🔴 The screen counts **keys**, not rows: one gathered row holds several members,
+                // so `members_total` (a row count, which is what the plan cuts by) is not the
+                // denominator on the line.
+                //
+                // 🔴 **And the printed number is checked against the drawing, at every shape**
+                // (independent audit, 2026-09-02, S5). The first version of this rewrite asserted
+                // only that the clause was *named*, and left the arithmetic of the number to `p12`
+                // — which measures it at **one** shape and one bed. The old gate this replaced
+                // parsed the count off the screen at all seven. What is done here is the same
+                // cross-check `p12` makes, generalised: parse `A of B members` off the drawing,
+                // count the wire keys the drawing actually spells, and require `B - A` to be that
+                // count. Neither number is taken from the plan, so this cannot agree with the plan
+                // by construction.
+                let clause = text
+                    .split(" members")
+                    .next()
+                    .and_then(|head| {
+                        let mut words = head.split_whitespace().rev();
+                        let total: usize = words.next()?.parse().ok()?;
+                        let dropped: usize = words.nth(1)?.parse().ok()?;
+                        Some((dropped, total))
+                    })
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "🔴 g82 at {width}x{height}: members were cut and no `N of M members` \
+                             is on the screen\n{text}"
+                        )
+                    });
+                let drawn_keys = text
+                    .split_whitespace()
+                    .filter(|word| LEDGER_COLUMNS.iter().any(|column| column.key == *word))
+                    .count();
+                assert_eq!(
+                    clause.1 - clause.0,
+                    drawn_keys,
+                    "🔴 g82 at {width}x{height}: the screen says {} of {} members were dropped, so \
+                     {} should be drawn, and {drawn_keys} are\n{text}",
+                    clause.0,
+                    clause.1,
+                    clause.1 - clause.0
+                );
+            }
+        } else {
+            assert!(
+                !text.contains("not drawn:"),
+                "🔴 g82 at {width}x{height}: nothing was cut and the screen reports a cut — a \
+                 permanent row describing an event that did not happen, which is the defect this \
+                 gate was rewritten for\n{text}"
+            );
+        }
+        assert!(
+            beyond_total > 0,
+            "🔴 g82 at {width}x{height}: the record adds no rows at all, so the second count is a \
+             number that can never move\n{text}"
+        );
+    }
+    println!("G82_CENSUS={census:?}");
+    // The control at the top of the range: the widest shape has room for everything, so a screen
+    // that reported a cut there would be reporting one that did not happen.
+    let widest = census.first().expect("seven shapes");
+    assert!(
+        widest.contains("cut=false"),
+        "🔴 g82: at the widest ruled shape every member has to be on the screen: {widest}"
+    );
+    // 🔴 **The controls for the ordering predicate, and they exist because the branch they guard is
+    // unreachable while the code is right.** `beyond == 0 || members == members_total` can only be
+    // false if the face draws commentary over a cut subject, which the arithmetic in
+    // `renderer::subject` makes impossible — so no shape above will ever fire it, and an assertion
+    // that can never fire is indistinguishable from one that is wrong. Fired here on numbers
+    // instead, in both directions: it must refuse a cut subject with commentary under it, and it
+    // must permit both of the shapes that are legal.
+    let ordering = |members: usize, members_total: usize, beyond: usize| {
+        beyond == 0 || members == members_total
+    };
+    assert!(
+        !ordering(3, 10, 2),
+        "🔴 g82: the ordering predicate admits 2 rows of commentary over 3 of 10 members, so it \
+         would pass the defect it exists to catch"
+    );
+    assert!(
+        ordering(3, 10, 0) && ordering(10, 10, 5),
+        "🔴 g82: the ordering predicate refuses a legal screen, so a green above means nothing"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// g85 — g88: the four predicates `[T-r58]` (2026-09-02) was opened for.
+//
+// Each one is a sentence from the seat's ruling on the real capture at
+// `req/942_artifacts/tui_r55_2026-09-02/pty/record_120x32.txt`, written as a predicate over the
+// **drawing** rather than over a line number, and measured at all seven ruled shapes.
+// ---------------------------------------------------------------------------------------------
+
+/// An opened record over a ledger long enough to fill any of the seven shapes.
+///
+/// 🔴 The fixture server's two rows cannot produce the property these gates are for: a face that
+/// gives its spare rows back to the ledger has no spare rows to give when the ledger is two records
+/// long, and a gate measured on that bed would be measuring the bed.
+fn opened_frame(width: u16, height: u16, records: usize) -> String {
+    renderer::buffer_text(&renderer::render_view_to_buffer(
+        &ledger(records),
+        width,
+        height,
+        Tier::Mono,
+        false,
+        &opened(),
+    ))
+}
+
+/// 🔴 **g85 — no shape leaves more than a quarter of the screen blank.**
+///
+/// The capture this gate was written from drew **thirteen blank rows at 120x32** — a third of the
+/// terminal — because an opened record has about a dozen facts and a terminal has thirty-two rows.
+/// `SS831` names a standing empty panel as furniture rather than information, and a face that
+/// answers *the record is short* by leaving a third of the screen empty is standing one.
+///
+/// The bound is a **quarter**, and it is a quarter rather than nought because the last shape of a
+/// list that ends is genuinely blank underneath and padding it would be the defect in the other
+/// direction. What the bound refuses is a face whose emptiness is structural.
+#[test]
+fn g85_no_shape_leaves_more_than_a_quarter_of_the_screen_blank() {
+    let mut census: Vec<String> = Vec::new();
+    for (width, height) in RULED_SHAPES {
+        let text = opened_frame(width, height, 40);
+        let blank = text.lines().filter(|line| line.trim().is_empty()).count();
+        census.push(format!("{width}x{height} blank={blank}/{height}"));
+        assert!(
+            blank * 4 <= height as usize,
+            "🔴 g85 at {width}x{height}: {blank} of {height} rows are blank. An opened record is a \
+             dozen facts and a terminal is thirty-two rows; the rows it does not need belong to the \
+             ledger it was opened from, not to an empty panel\n{text}"
+        );
+    }
+    println!("G85_CENSUS={census:?}");
+    // 🔴 The control, because a predicate that cannot fail is not a measurement. The same
+    // arithmetic on the shape this gate was written against: eighteen drawn rows on a thirty-two
+    // row terminal left thirteen blank, and thirteen is more than eight.
+    assert!(
+        13 * 4 > 32,
+        "🔴 g85: the bound admits the capture this gate was written from, so a green means nothing"
+    );
+    // And it must permit the honest blank: a ledger with fewer records than the screen has rows.
+    let short = opened_frame(120, 32, 2);
+    let short_blank = short.lines().filter(|line| line.trim().is_empty()).count();
+    println!("G85_SHORT_LEDGER_BLANK={short_blank}");
+    assert!(
+        short_blank > 8,
+        "🔴 g85: a two-record ledger cannot fill a thirty-two row screen, and a gate that reports \
+         otherwise is not counting blank rows at all\n{short}"
+    );
+}
+
+/// 🔴 **g86 — the marks gather, and two kinds of nothing never share a row.**
+///
+/// Five of the seventeen rows on the capture were the same mark (`created_at ?`, `scope ?`,
+/// `rollback ?`, `superseded_by ?`, `actor ?`), and the ruling is that five rows spelling *this
+/// process does not have it* are one fact about five keys. So they gather.
+///
+/// 🔴 **What the gathering may not do is collapse the vocabulary.** `?` is *measured and not
+/// known*, `--` is *never written*, `no` is *the answer*, `0` is a count and `''` is a value the
+/// wire opened and closed. `INHERITED_PRINCIPLES` puts the seven words outside the reach of every
+/// reduction pass — they are the product. A gathering keyed on anything looser than the mark itself
+/// would put two of them on one row and the row would then draw one word and mean two.
+#[test]
+fn g86_the_marks_gather_without_collapsing_two_kinds_of_nothing() {
+    // Four kinds on one record, each produced by the wire shape `wire::cell` maps to it.
+    let row = serde_json::json!({
+        "transformation": "gx1:t3sto0000000001",
+        "verdict": "Admit",
+        "state": "Committed",
+        "created_at": serde_json::Value::Null,   // `?`  — asked and not answered
+        "scope": serde_json::Value::Null,        // `?`  — the same kind, so it joins the same row
+        "enforced": false,                       // `no` — the answer, in the word for it
+        "actor": "",                             // `''` — opened and closed with nothing between
+        "rollback": 0,                           // `0`  — the count
+        "superseded_by": serde_json::Value::Null,
+    });
+    let screen = Screen {
+        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        transformations: answered(
+            wire::ROUTES[1],
+            serde_json::json!({"items": [row], "next_cursor": null}),
+        ),
+        candidates: answered(
+            wire::ROUTES[2],
+            serde_json::from_str(CANDIDATES).expect("fixture parses"),
+        ),
+        escalations: answered(
+            wire::ROUTES[3],
+            serde_json::from_str(ESCALATIONS).expect("fixture parses"),
+        ),
+    };
+    let text = renderer::buffer_text(&renderer::render_view_to_buffer(
+        &screen,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &opened(),
+    ));
+    println!("G86_FRAME=\n{text}");
+    // The marks each row of the record carries, read off the drawing. A gathered row **leads** with
+    // its mark, which is what makes the mark the row's subject rather than a value beside a key.
+    //
+    // 🔴 **The record's own rows, and the discriminator is the left margin.** A ledger row draws one
+    // cell per column and several of them can be marks — `? ? no --` across four columns is a table
+    // saying four different things about one record, which is correct and is not a gathering.
+    // Written without a discriminator this gate reports the ledger under the record as a collapsed
+    // vocabulary, which is a finding about the gate's own grammar.
+    //
+    // 🔴 **The discriminator was the row's *lead* and that was too narrow** (independent audit,
+    // 2026-09-02, S4). Keying on *the first word is a mark* means the assertion is only ever reached
+    // by rows already shaped the way the repair shapes them: a `record_own` that emitted
+    // `created_at ? actor ''` — keys leading, marks inline — would put **two kinds of nothing on one
+    // row**, keep every kind on the screen, and pass both halves of this gate. The discriminator is
+    // now structural instead: the record's own rows are drawn from column nought and the ledger's
+    // carry `layout::LEFT_MARGIN` (`renderer::margin`), so *begins with a space* separates them
+    // whatever shape the record's rows take.
+    let mut rows_with_marks = 0usize;
+    for line in text.lines() {
+        if line.starts_with(' ') || line.trim().is_empty() {
+            continue;
+        }
+        let words: Vec<&str> = line.split_whitespace().collect();
+        if !words
+            .iter()
+            .any(|word| wire::Nothing::ALL.iter().any(|kind| kind.mark() == *word))
+        {
+            continue;
+        }
+        let marks: Vec<&str> = words
+            .iter()
+            .filter(|word| wire::Nothing::ALL.iter().any(|kind| kind.mark() == **word))
+            .copied()
+            .collect();
+        rows_with_marks += 1;
+        let distinct: BTreeSet<&str> = marks.iter().copied().collect();
+        assert_eq!(
+            distinct.len(),
+            1,
+            "🔴 g86: one row carries {:?}. The seven words are the product — `?` is measured and \
+             not known, `--` is never written, `no` is the answer, `0` is a count and `''` is a \
+             value that arrived and said nothing. A row that draws two of them means neither.\
+             \nline: {line}\n{text}",
+            distinct
+        );
+    }
+    // 🔴 **The stronger half, and it is stronger because a collapse does not have to look like two
+    // marks on one row.** Fired against the gathering keyed on a predicate that is always true, the
+    // rows-with-marks check above stayed **green**: every member joined the first group, so the row
+    // drew `?` once and read as one kind. The vocabulary had been collapsed and the screen said
+    // nothing — which is the defect exactly, and is invisible to a predicate that only counts marks
+    // per row. What catches it is the count of kinds: four went in and one came out.
+    let drawn_kinds: BTreeSet<String> = text
+        .lines()
+        .flat_map(|line| line.split_whitespace())
+        .filter(|word| wire::Nothing::ALL.iter().any(|kind| kind.mark() == *word))
+        .map(str::to_string)
+        .collect();
+    println!("G86_KINDS={drawn_kinds:?} ROWS_WITH_MARKS={rows_with_marks}");
+    for kind in ["?", "no", "''", "0"] {
+        assert!(
+            drawn_kinds.contains(kind),
+            "🔴 g86: this bed carries four kinds of nothing and `{kind}` is not on the screen. \
+             `?` is measured and not known, `--` is never written, `no` is the answer, `0` is a \
+             count and `''` is a value that arrived and said nothing — a gathering that puts two of \
+             them under one mark has deleted a word of the product's vocabulary, and it does that \
+             without ever drawing two marks on one row.\ndrawn: {drawn_kinds:?}\n{text}"
+        );
+    }
+    // And the gathering happened: five members produced by two kinds occupy fewer rows than five.
+    // The structural discriminator has to be worth something, or the loop above ran over the whole
+    // screen and the ledger's honest multi-mark rows would have failed it. Fired as a number: the
+    // ledger under this record draws at least one row carrying two kinds, and it is excluded.
+    let ledger_multi = text
+        .lines()
+        .filter(|line| line.starts_with(' '))
+        .filter(|line| {
+            line.split_whitespace()
+                .filter(|w| wire::Nothing::ALL.iter().any(|k| k.mark() == *w))
+                .collect::<BTreeSet<&str>>()
+                .len()
+                > 1
+        })
+        .count();
+    println!("G86_LEDGER_ROWS_WITH_TWO_KINDS={ledger_multi}");
+    assert!(
+        ledger_multi > 0,
+        "🔴 g86: no row of the ledger under this record carries two kinds of nothing, so the \
+         discriminator that excludes them is excluding nothing and this gate cannot tell a table \
+         from a gathering\n{text}"
+    );
+    let gathered_row = text
+        .lines()
+        .find(|line| line.trim_start().starts_with("? "))
+        .unwrap_or_else(|| panic!("🔴 g86: the two `?` members did not gather onto a row\n{text}"));
+    let keys_on_it = gathered_row
+        .split_whitespace()
+        .filter(|word| LEDGER_COLUMNS.iter().any(|column| column.key == *word))
+        .count();
+    assert!(
+        keys_on_it >= 2,
+        "🔴 g86: the `?` row carries {keys_on_it} key(s), so nothing was gathered and the five flat \
+         rows the ruling names are still five\n{text}"
+    );
+}
+
+/// 🔴 **g87 — one standing row, and no second line counting what the screen drew.**
+///
+/// The capture carried **two**: the standing row, and the record's own note
+/// (`record 1 of 31 | 10 of 10 members | 7 of 7 more rows | GET /v1/transformations | close:
+/// escape`) drawn at every shape whether or not anything had been cut. The standing row carried the
+/// other half of the defect — `a record is open: its own line counts what it drew`, a sentence about
+/// the face's own arrangement.
+///
+/// Both are gone and this is what keeps them gone: the line that says where the reader is stands
+/// once, the sentence about the face's arrangement is spelled nowhere, and no line has the shape of
+/// the deleted note.
+#[test]
+fn g87_the_record_face_stands_on_exactly_one_status_row() {
+    for (width, height) in RULED_SHAPES {
+        let text = opened_frame(width, height, 40);
+        let plan = layout::resolve_attended(
+            width,
+            height,
+            &renderer::measured(&ledger(40)),
+            false,
+            layout::Subject::Record,
+            layout::Attention {
+                selected: 0,
+                items: 40,
+                glide: 0,
+                record_members: renderer::record_extent(
+                    &ledger(40),
+                    &wire::Held::none(),
+                    &opened(),
+                    width,
+                )
+                .0,
+                record_beyond: renderer::record_extent(
+                    &ledger(40),
+                    &wire::Held::none(),
+                    &opened(),
+                    width,
+                )
+                .1,
+            },
+        );
+        let note = plan.note.trim().to_string();
+        assert!(
+            !note.is_empty(),
+            "🔴 g87 at {width}x{height}: the standing row carries no note at all, so this gate \
+             cannot count the rows it stands on"
+        );
+        let standing = text.lines().filter(|line| line.contains(&note)).count();
+        assert_eq!(
+            standing, 1,
+            "🔴 g87 at {width}x{height}: the reader's position is drawn on {standing} rows. One \
+             standing row is the ruling (`req/924` §TUI-57, gate g73) and a second line counting \
+             what the screen drew is the defect `[T-r58]` was opened for\n{text}"
+        );
+        // The deleted note's own shape, and the deleted sentence, by name.
+        for gone in ["record 1 of", "its own line counts"] {
+            assert!(
+                !flat(&text).contains(gone),
+                "🔴 g87 at {width}x{height}: `{gone}` is back on the screen\n{text}"
+            );
+        }
+    }
+    // The control: the predicate has to be able to see a second occurrence, or a green above is a
+    // statement about the search rather than about the screen.
+    let doubled = "1 of 40 | x\nsomething\n1 of 40 | x";
+    assert_eq!(
+        doubled.lines().filter(|line| line.contains("1 of 40 | x")).count(),
+        2,
+        "🔴 g87: the counting predicate cannot see two standing rows, so it cannot refuse them"
+    );
+}
+
+/// 🔴 **g88 — nothing the record draws stops mid-word without saying so.**
+///
+/// At 46x12 the capture drew `undo not from this face -- gx undo gx1:2hc4zanmdgh0001` on a
+/// forty-six cell screen. The row is fifty-two cells. A terminal clips from the right in silence,
+/// so the address a reader was being told to retype ended six characters early and nothing on the
+/// screen said it had. That is the same defect as drawing `--` for a fact nobody measured, one
+/// layer down: the face asserting something it does not know, this time about where a value ends.
+///
+/// The predicate is over the drawing at every ruled shape: a drawn row either fits, or ends in the
+/// mark [`pad`] writes for a cut. There is no third case.
+#[test]
+fn g88_no_row_of_the_record_is_cut_without_the_cut_being_marked() {
+    let mut cut_rows = 0usize;
+    // 🔴 **The domain is narrow and the narrowing is printed** (independent audit, 2026-09-02, S1;
+    // `SS858`: a gate that narrows in silence is a fail-open with ceremony). Only rows whose trimmed
+    // length is exactly the width can be examined — a shorter row is not at the edge and a row
+    // padded past its content is indistinguishable from one that ends there. At 120x32 and 100x30
+    // **nothing this face draws reaches the edge**, so this gate's verdict at those two shapes is
+    // vacuously true and is evidence of nothing. The census below is what says so out loud.
+    let mut inspected = 0usize;
+    let mut exempt_punctuation = 0usize;
+    let mut exempt_single_word = 0usize;
+    let mut census: Vec<String> = Vec::new();
+    for (width, height) in RULED_SHAPES {
+        let text = opened_frame(width, height, 40);
+        let at_edge = text
+            .lines()
+            .filter(|l| l.trim_end().chars().count() == width as usize)
+            .count();
+        census.push(format!("{width}x{height} at_edge={at_edge}"));
+        for line in text.lines() {
+            let trimmed = line.trim_end();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let cells = trimmed.chars().count();
+            assert!(
+                cells <= width as usize,
+                "🔴 g88 at {width}x{height}: a row is {cells} cells on a {width} cell screen\
+                 \nline: {line}\n{text}"
+            );
+            if cells < width as usize {
+                continue;
+            }
+            inspected += 1;
+            // The row reaches the right edge. Either it ends on a word boundary — the last cell is
+            // the last cell of a word that finished — or it was cut, and a cut is marked. `~` is
+            // `pad`'s mark; `!` is the standing row's, which marks its own cut at the front.
+            let marked = trimmed.ends_with('~') || trimmed.starts_with('!');
+            if marked {
+                cut_rows += 1;
+                continue;
+            }
+            // Not marked: then it has to be a row that genuinely ends here. The only way to know is
+            // that the row is not longer than the screen, which the region cannot report — so the
+            // honest predicate is the one the drawing can answer: a full-width unmarked row must end
+            // in a character that can end a value, and a value cut mid-word ends in a letter with
+            // more letters owed. This face's own rows are the domain; the ledger's cells are padded
+            // by `pad` and carry its mark already.
+            //
+            // 🔴 **Two exemptions, and they are counted rather than assumed** (independent audit,
+            // 2026-09-02, S2). A cut landing on the `:` of `gx1:`, on a `-`, or on the `/` of a
+            // route would end in punctuation and be admitted; a single long word cut anywhere would
+            // be admitted too. Both are real holes. They are kept because closing them needs the
+            // renderer's knowledge of whether a value was truncated, which the *capture* does not
+            // carry — and they are **counted**, so a green with a non-zero exemption count is a
+            // different fact from a green with nought.
+            if trimmed.ends_with(|c: char| c.is_ascii_alphanumeric())
+                && trimmed.split_whitespace().count() == 1
+            {
+                exempt_single_word += 1;
+                continue;
+            }
+            if !trimmed.ends_with(|c: char| c.is_ascii_alphanumeric()) {
+                exempt_punctuation += 1;
+                continue;
+            }
+            panic!(
+                "🔴 g88 at {width}x{height}: a row fills the screen, ends inside a word, and \
+                 carries no mark saying it was cut\nline: {line}\n{text}"
+            );
+        }
+    }
+    println!(
+        "G88_DOMAIN {census:?} inspected={inspected} marked_cut={cut_rows} \
+         exempt_punctuation={exempt_punctuation} exempt_single_word={exempt_single_word}"
+    );
+    // 🔴 The gate has to look at something, at at least one shape, or a green is a statement about
+    // the search. Not asserted per shape on purpose: at 120x32 and 100x30 nothing reaches the edge
+    // and that is the face being correct, not the gate being blind.
+    assert!(
+        inspected > 0,
+        "🔴 g88: no row at any of the seven ruled shapes reached the right edge, so this gate \
+         examined nothing and its green means nothing: {census:?}"
+    );
+    // 🔴 The control. The predicate must refuse the exact row the capture drew: fifty-two cells of
+    // `undo …` clipped to forty-six with nothing marking it.
+    let clipped = "undo not from this face -- gx undo gx1:2hc4zanmdgh00";
+    assert!(
+        clipped.ends_with(|c: char| c.is_ascii_alphanumeric()) && clipped.split_whitespace().count() > 1,
+        "🔴 g88: the predicate admits the row this gate was written from, so a green means nothing"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// g89 — g90: the two predicates `[T-r66]` (2026-09-02) was opened for.
+//
+// `[T-r58]` found this arithmetic and did not repair it. Its own words, in `renderer::subject`:
+// "`columns_for_less` prices the columns against `LEFT_MARGIN + sum(width) + (n-1) * COLUMN_GAP`
+// and on a reading where every column carries a value the row still arrives one cell or more over
+// the screen … This is **not** a defect this lane introduced and it is **not** repaired here: the
+// grid's own loop is another lane's write-target." It drew the *record* face's ledger slice through
+// `fit` and left the ledger's own loop drawing rows a terminal clips in silence.
+//
+// Two questions, and they are different questions:
+//   g89 asks the **drawing**: does any row this face draws stop mid-value with no mark?
+//   g90 asks the **arithmetic**: is the width a row is priced against the width it is drawn at?
+// g89 can be green on a bed whose columns happen not to fill the screen — five of the ten keys came
+// back a mark for nothing on the live thirty-one row bed, so the budget never bound there. g90 is
+// green or red on the code regardless of what any bed happens to carry, which is why both exist.
+// ---------------------------------------------------------------------------------------------
+
+/// A **closed** ledger over a bed long enough to fill any of the seven shapes.
+///
+/// The sibling of [`opened_frame`], and the same argument holds: a face whose rows are the ledger's
+/// rows has nothing to draw when the ledger is two records long, and a gate measured on that bed
+/// would be measuring the bed.
+fn ledger_frame(width: u16, height: u16, records: usize) -> String {
+    renderer::buffer_text(&renderer::render_view_to_buffer(
+        &ledger(records),
+        width,
+        height,
+        Tier::Mono,
+        false,
+        &View {
+            open: false,
+            ..View::default()
+        },
+    ))
+}
+
+/// 🔴 **g89 — nothing the ledger draws stops mid-value without saying so.**
+///
+/// The sibling of `g88`, asked of the other face. `g88` covers the rows an opened record draws,
+/// which `renderer::subject` composes through `fit`; every row the **grid** draws — the column
+/// header, the `all N` clause, and the records themselves — was composed with `spans_with` and no
+/// `fit` at all, so a row wider than the screen was handed to a terminal that clips from the right
+/// and says nothing. A reader could not tell `Committed` from `Committe`.
+///
+/// The predicate is `g88`'s, deliberately: **the same question is asked in the same words**, so
+/// there is no second vocabulary for *this row stopped early* and no second answer to what counts as
+/// a mark. `~` is [`pad`]'s; `!` is the standing row's, which marks its own cut at the front.
+///
+/// 🔴 **The domain is printed per shape, including where it is empty** (`SS870`, and the failure the
+/// brief for this lane names by name: a `0 → 0` measurement is vacuously true and is evidence of
+/// nothing). Only a row whose trimmed length is exactly the width can be examined — a shorter row is
+/// not at the edge, and a row padded past its content is indistinguishable from one that ends there.
+#[test]
+fn g89_no_row_of_the_ledger_is_cut_without_the_cut_being_marked() {
+    let mut inspected = 0usize;
+    let mut cut_rows = 0usize;
+    let mut exempt_punctuation = 0usize;
+    let mut exempt_single_word = 0usize;
+    let mut census: Vec<String> = Vec::new();
+    // 🔴 Collected rather than panicked on at the first row: a gate that dies on row one reports one
+    // row, and the number this lane has to be able to state is *how many rows at which shapes*.
+    let mut unmarked: Vec<String> = Vec::new();
+    // 🔴 **The seven ruled shapes and five narrower ones** (`[T-r66]`, 2026-09-02). The ruled shapes
+    // start at forty cells and `columns_for_less`'s floor only bites below nineteen, so measured on
+    // those alone this gate would never once see the case the ruling in `renderer::fit` is *about*
+    // — the width that cannot pay for the mark. The narrow five are not terminals anyone owns; they
+    // are where the degenerate branch lives, and a ruling no gate exercises is a paragraph.
+    const NARROW_SHAPES: [(u16, u16); 5] = [(18, 10), (17, 10), (12, 8), (6, 6), (3, 6)];
+    for (width, height) in RULED_SHAPES.into_iter().chain(NARROW_SHAPES) {
+        let text = ledger_frame(width, height, 40);
+        let at_edge = text
+            .lines()
+            .filter(|line| line.trim_end().chars().count() == width as usize)
+            .count();
+        let mut here = 0usize;
+        for line in text.lines() {
+            let trimmed = line.trim_end();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let cells = trimmed.chars().count();
+            assert!(
+                cells <= width as usize,
+                "🔴 g89 at {width}x{height}: a row is {cells} cells on a {width} cell screen\
+                 \nline: {line}\n{text}"
+            );
+            if cells < width as usize {
+                continue;
+            }
+            inspected += 1;
+            if trimmed.ends_with('~') || trimmed.starts_with('!') {
+                cut_rows += 1;
+                continue;
+            }
+            // Unmarked and at the edge: then it has to be a row that genuinely ends here. The two
+            // exemptions are `g88`'s, kept for `g88`'s reason — closing them needs the renderer's
+            // knowledge of whether a value was truncated, which the drawing does not carry — and
+            // they are **counted**, so a green with a non-zero exemption count is a different fact
+            // from a green with nought.
+            if trimmed.ends_with(|c: char| c.is_ascii_alphanumeric())
+                && trimmed.split_whitespace().count() == 1
+            {
+                exempt_single_word += 1;
+                continue;
+            }
+            if !trimmed.ends_with(|c: char| c.is_ascii_alphanumeric()) {
+                exempt_punctuation += 1;
+                continue;
+            }
+            here += 1;
+            unmarked.push(format!("{width}x{height}: {trimmed}"));
+        }
+        // 🔴 The census carries the domain **and** the verdict for every shape, and it says
+        // `EMPTY_DOMAIN` where no row reached the edge — at such a shape this gate compared nothing,
+        // which is a third thing and not a pass (`SS870`: a measurement of `0 → 0` over an empty
+        // domain is vacuously true and is evidence of nothing).
+        census.push(if at_edge == 0 {
+            format!("{width}x{height} at_edge=0 EMPTY_DOMAIN")
+        } else {
+            format!("{width}x{height} at_edge={at_edge} unmarked_cut={here}")
+        });
+    }
+    println!(
+        "G89_DOMAIN {census:?} inspected={inspected} marked_cut={cut_rows} \
+         exempt_punctuation={exempt_punctuation} exempt_single_word={exempt_single_word} \
+         unmarked_cut_total={}",
+        unmarked.len()
+    );
+    assert!(
+        unmarked.is_empty(),
+        "🔴 g89: {} rows of the ledger fill the screen, end inside a value, and carry no mark \
+         saying they were cut. A terminal clips from the right in silence, so a reader cannot tell \
+         a value that ends from a value that ran out:\n{}",
+        unmarked.len(),
+        unmarked.join("\n")
+    );
+    assert!(
+        inspected > 0,
+        "🔴 g89: no row at any of the twelve shapes reached the right edge, so this gate examined \
+         nothing and its green means nothing: {census:?}"
+    );
+    // 🔴 **The ledger says something at every width** (`[T-r66]`, and this lane's own regression).
+    // Refusing the first column when the screen could not pay for it drew nine blank rows over a
+    // thirty-one record ledger at eighteen cells, measured on the live bed. A face that answers
+    // *too narrow* by drawing nothing has not disclosed a loss, it has hidden one.
+    for (width, height) in NARROW_SHAPES {
+        let text = ledger_frame(width, height, 40);
+        let drawn = text.lines().filter(|line| !line.trim().is_empty()).count();
+        assert!(
+            drawn > 0,
+            "🔴 g89 at {width}x{height}: the ledger has forty records and drew {drawn} rows with \
+             anything on them\n{text}"
+        );
+    }
+    // 🔴 The control. The predicate has to refuse the exact row the arithmetic produced: a
+    // sixty-seven cell row clipped to sixty-six, ending on the digit `created_at` lost its `Z` from.
+    let clipped = "   gx1:t3sto0000000~  Admit      Committed      2026-08-30T09:00:0";
+    assert!(
+        clipped.ends_with(|c: char| c.is_ascii_alphanumeric())
+            && clipped.split_whitespace().count() > 1
+            && !clipped.trim_end().ends_with('~'),
+        "🔴 g89: the predicate admits the row this gate was written from, so a green means nothing"
+    );
+}
+
+/// 🔴 **g90 — the width a ledger row is priced against is the width it is drawn at.**
+///
+/// [`layout::row_width`] is the one spelling of *how many cells a row of these columns takes*. This
+/// asks the only question that matters about the budget: **whatever [`layout::columns_for_less`]
+/// keeps must fit on the screen it was asked about.**
+///
+/// Asked at every width from nought to two hundred rather than at the seven ruled shapes, because
+/// the defect is a boundary defect: it only shows where the budget actually binds, and which widths
+/// those are is a function of the column table rather than of the terminals anyone owns. Asked with
+/// two vacant sets — none, and the one the fixture bed produces — because a vacant column is taken
+/// out before the fit and therefore moves every boundary.
+///
+/// Unlike `g89` this cannot be vacuously green: every width has an answer, the answer is a number,
+/// and the number is compared.
+#[test]
+fn g90_the_price_of_a_ledger_row_is_the_row_that_is_drawn() {
+    // The fixture bed's own vacant keys, asked through the face's own classifier rather than typed.
+    let vacant: Vec<&'static str> = vacant_of(&ledger(40))
+        .into_iter()
+        .map(|(key, _)| key)
+        .collect();
+    let mut over: Vec<String> = Vec::new();
+    let mut bound = 0usize;
+    let mut floored = 0usize;
+    for width in 0u16..=200 {
+        for (label, keys) in [("none", &[][..]), ("fixture", &vacant[..])] {
+            let (drawn, _) = layout::columns_for_less(width, keys);
+            let cells = layout::row_width(&drawn);
+            // 🔴 **The floor is part of the invariant, not an exemption from it** (`[T-r66]`). One
+            // column is kept whatever the width, because a ledger that draws nothing has disclosed
+            // no loss — so `drawn.len() == 1` is a ruled outcome and `renderer::fit` is what marks
+            // the row. Every *other* set has to fit, and a second column appearing at a width that
+            // cannot hold it is the defect this gate exists to refuse.
+            if cells > width && drawn.len() > 1 {
+                over.push(format!("{width} vacant={label} drawn={cells} columns={}", drawn.len()));
+            }
+            if cells > width && drawn.len() == 1 {
+                floored += 1;
+            }
+            // The budget binds here: one more column would not have fitted. Counted so that a green
+            // cannot come from a table whose columns are all narrower than every width asked.
+            if !drawn.is_empty() && cells + layout::COLUMN_GAP > width {
+                bound += 1;
+            }
+        }
+    }
+    println!(
+        "G90 widths=0..=200 vacant_sets=2 binding={bound} floored={floored} over={over:?} \
+         fixture_vacant={vacant:?}"
+    );
+    assert!(
+        over.is_empty(),
+        "🔴 g90: the ledger keeps columns that do not fit the screen they were priced against. A \
+         terminal clips from the right in silence, so every one of these draws a value that ends \
+         early with nothing saying so: {over:?}"
+    );
+    assert!(
+        bound > 0,
+        "🔴 g90: at no width from nought to two hundred did the budget bind, so this gate compared \
+         numbers that could not have differed"
+    );
+    assert!(
+        floored > 0,
+        "🔴 g90: at no width did the floor bite, so the branch that keeps one column on a screen \
+         too narrow for it went unmeasured and `floored` is a number about nothing"
+    );
+    // 🔴 The control, in both directions. `row_width` must charge the margin **and** a gap for the
+    // first column — the sentence the repaired arithmetic replaced charged the margin only, and a
+    // predicate built on that sentence would call the defect a fit.
+    let one = layout::Column {
+        key: "transformation",
+        width: 16,
+        priority: Priority::One,
+    };
+    assert_eq!(
+        layout::row_width(&[one]),
+        layout::LEFT_MARGIN + layout::COLUMN_GAP + 16,
+        "🔴 g90: `row_width` does not charge the gap `spans_with` draws after the margin cell, so \
+         it cannot see the defect it exists to refuse"
+    );
+    assert_eq!(
+        layout::row_width(&[one, one]),
+        layout::LEFT_MARGIN + 2 * (layout::COLUMN_GAP + 16),
+        "🔴 g90: `row_width` does not charge one gap per column"
+    );
+    assert_eq!(
+        layout::row_width(&[]),
+        0,
+        "🔴 g90: a row with no column on it is charged for a margin it does not draw"
+    );
+}
+
+/// 🔴 **g92 — the identity column's declared width is the label's, and the label is what binds.**
+///
+/// # What lost
+///
+/// `req/38` SS1101 measured this face against twelve products on eight axes and recorded one axis
+/// lost to **all eleven comparable rivals**: the leading column. They lead with a file name, a commit
+/// subject, a process name. This face leads with `gx1:<hash>~`.
+///
+/// `[T-r71]` (2026-09-02) asked the engine what could go there instead and the answer is **nothing**
+/// the list row carries — that is `req/942_artifacts/tui_r71_2026-09-02/RULING.md`'s ruling and it is an engine gap, not a defect of
+/// this file. What the face could do was stop spending sixteen cells. Two numbers were measured
+/// against a live engine on a twenty-nine row bed grown by the product's own loop, and they disagree
+/// about what holds the cells:
+///
+/// * the **values** need thirteen: three characters past the shared `gx1:` separated every row, and
+///   [`renderer::ID_PREFIX_MARGIN`] / [`renderer::ID_PREFIX_FLOOR`] are the budget on top.
+/// * the **label** needs fourteen, and `transformation` is a wire key drawn unchanged (`req/942` §9,
+///   gate P5).
+///
+/// So the header binds, the declaration is the label's length, and the eleven characters that used to
+/// be drawn were separating rows that three characters already separated.
+///
+/// # The three halves
+///
+/// **(a) the declaration is exactly the label.** Not more — that is the two cells this lane returns —
+/// and not less, because a column that cannot spell its own key draws `transformatio~` in the one row
+/// that names the table (measured: three gates went red on that, in this lane, before this shape).
+///
+/// **(b) the declaration is still enough for the rows, measured.** [`renderer::id_cells_needed`] is
+/// the number the reading asks for, and the day a ledger asks for more than the label can hold, this
+/// goes red naming it rather than the column silently cutting further.
+///
+/// **(c) the two cells buy a column, and where they buy nothing that is printed.** The declared width
+/// and the width this lane replaced are put through the *same* `columns_for_less`, and the widths
+/// where the column set differs are counted. 🔴 **A zero fails**: `SS870` and this lane's brief name
+/// the shape — a `0 → 0` improvement is vacuously true and is evidence of nothing.
+///
+/// # Red first
+///
+/// The `before` arm of (c) **is** the base: the same function, the same fixture, the width this file
+/// carried on `main`. It is red on (a) and green after, in one run, so the red is caused by this
+/// lane's change and by nothing else.
+#[test]
+fn g92_the_identity_column_is_the_width_of_its_own_label() {
+    let column = layout::LEDGER_COLUMNS[0];
+
+    // ---- (a) the declaration is exactly the label ---------------------------------------------
+    let label = column.key.chars().count();
+    assert_eq!(
+        usize::from(column.width),
+        label,
+        "🔴 g92: the identity column is not the width of its own key. Wider and it is spending cells \
+         on a value measured not to need them; narrower and the column header — the one row that \
+         names the table — draws `{}~` instead of `{}`",
+        &column.key[..label.saturating_sub(1)],
+        column.key
+    );
+
+    // ---- (b) the declaration is still enough for the rows, measured ---------------------------
+    let bed = ledger(29);
+    let needed = renderer::id_cells_needed(&bed.transformations)
+        .expect("🔴 g92: the fixture ledger is measurable and the measurement declined it");
+    let separation = renderer::id_separation(&bed.transformations).expect("measurable");
+    println!(
+        "G92 declared={} label={label} separation_past_common={separation} needed_with_budget={needed} \
+         margin={} floor={}",
+        column.width,
+        renderer::ID_PREFIX_MARGIN,
+        renderer::ID_PREFIX_FLOOR
+    );
+    assert!(
+        needed <= column.width,
+        "🔴 g92: this reading needs {needed} cells of identity and the column declares {}. The face \
+         will cut further and mark it, which is honest, but the declaration has stopped being \
+         justified by anything and this is the line that says so",
+        column.width
+    );
+
+    // The four readings this cannot be measured on, each a `None` rather than a number. A measurement
+    // that answers where it cannot measure is a face choosing a width and calling it a measurement.
+    assert_eq!(
+        renderer::id_separation(&ledger(1).transformations),
+        None,
+        "🔴 g92: one row is not a set to tell apart, and a number taken from it is not a measurement"
+    );
+    let nothing_id = ledger_with(4, |_, row| {
+        row["transformation"] = serde_json::Value::Null;
+    });
+    assert_eq!(
+        renderer::id_separation(&nothing_id.transformations),
+        None,
+        "🔴 g92: a mark for nothing carries no separation, so a number measured against one is \
+         measuring this face's own vocabulary"
+    );
+    let one_id = ledger_with(4, |_, row| {
+        row["transformation"] = serde_json::Value::String(record_id(0));
+    });
+    assert_eq!(
+        renderer::id_separation(&one_id.transformations),
+        None,
+        "🔴 g92: two rows with one id is a ledger this face may not paper over with a number"
+    );
+    assert_eq!(
+        renderer::id_cells_needed(&one_id.transformations),
+        None,
+        "🔴 g92: the cell count answered where the separation could not be measured"
+    );
+
+    // ---- (c) what the two cells buy, and the domain they were looked for in -------------------
+    // 🔴 The width this file carried on `main`, named here so the control is the base and not a
+    // number chosen to make the gate green.
+    const BEFORE: u16 = 16;
+    let vacant: Vec<&'static str> = vacant_of(&bed).into_iter().map(|(key, _)| key).collect();
+    let mut gained: Vec<String> = Vec::new();
+    let mut lost: Vec<String> = Vec::new();
+    let mut widths = 0usize;
+    for width in 0u16..=200 {
+        widths += 1;
+        let (after, _) = layout::columns_for_less(width, &vacant);
+        // The base's arithmetic, reproduced by asking the same question with the cells the base
+        // spent added back to the row's price.
+        let before_price = layout::row_width(&after) + (BEFORE - column.width);
+        let before_len = if before_price > width && after.len() > 1 {
+            after.len() - 1
+        } else {
+            after.len()
+        };
+        if after.len() > before_len {
+            gained.push(format!("{width}:{before_len}->{}", after.len()));
+        }
+        if after.len() < before_len {
+            lost.push(format!("{width}:{before_len}->{}", after.len()));
+        }
+    }
+    println!("G92 widths={widths} gained_a_column_at={gained:?} lost_a_column_at={lost:?}");
+    assert!(
+        lost.is_empty(),
+        "🔴 g92: narrowing the identity column cost a column somewhere. A repair that is \
+         arithmetically correct and makes the face worse is a shape this suite has caught \
+         before: {lost:?}"
+    );
+    assert!(
+        !gained.is_empty(),
+        "🔴 g92: the two cells changed the column set at none of {widths} widths, so they are a \
+         number about nothing. An improvement whose domain is empty is vacuously true and is \
+         evidence of nothing"
+    );
+
+    // ---- the disclosure ----------------------------------------------------------------------
+    // 🔴 A column whose characters cannot be carried anywhere, and no line saying so, is this face
+    // letting a reader copy a value that will be refused on both roads it could take it to.
+    let help = renderer::buffer_text(&renderer::render_view_to_buffer(
+        &bed,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &View {
+            help: true,
+            ..View::default()
+        },
+    ));
+    assert!(
+        flat(&help).contains(&format!(
+            "id column: {} of a `{}`;",
+            column.width - 1,
+            column.key
+        )),
+        "🔴 g92: no line names what the identity column draws:\n{help}"
+    );
+    assert!(
+        flat(&help).contains("no prefix resolves"),
+        "🔴 g92: the disclosure does not carry the thing that makes it worth drawing -- that no \
+         prefix of an id resolves on either road, so a reader who copies what that column shows \
+         gets a refusal:\n{help}"
+    );
+    // 🔴 The negative control for the road: the key named in that clause is the key the act is
+    // actually bound to, so the disclosure cannot go on naming a road after the binding moves.
+    assert!(
+        flat(&help).contains(&format!(
+            "{} opens the whole",
+            Act::Open.keys().first().copied().unwrap_or_default()
+        )),
+        "🔴 g92: the clause names no road to the whole id, or names one nothing is bound to:\n{help}"
+    );
+}
+// ---------------------------------------------------------------------------------------------
+// [T-r76] - one address is drawn once, and the receipt's undrawn members are named.
+// ---------------------------------------------------------------------------------------------
+
+/// The seven shapes the record face is photographed at.
+const R76_SHAPES: [(u16, u16); 7] = [
+    (120, 32),
+    (100, 30),
+    (80, 24),
+    (66, 20),
+    (60, 20),
+    (46, 12),
+    (40, 10),
+];
+
+/// The `gx1:` tokens one line carries, with `pad`'s cut mark taken off.
+///
+/// `pad` cuts with a literal `~` and this reads it back off. A token that was cut is a **prefix**
+/// of the value, which is why the comparison below is containment and not equality.
+fn r76_addresses_on(line: &str) -> Vec<String> {
+    line.split_whitespace()
+        .filter(|word| word.starts_with("gx1:"))
+        .map(|word| word.trim_end_matches('~').to_string())
+        .collect()
+}
+
+/// The record's own rows, told from the ledger's by the left margin -- the structural
+/// discriminator `g86` settled on, reused here rather than re-invented.
+fn r76_record_rows(text: &str) -> Vec<String> {
+    text.lines()
+        .filter(|line| !line.starts_with(' ') && !line.trim().is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Every ordered pair of addresses drawn on two different record rows, sorted into three values.
+///
+/// Returns `(repeated, distinct, untestable)`.
+///
+/// * **repeated** -- one is a prefix of the other and enough of it survived the cut to say so.
+/// * **distinct** -- neither is a prefix of the other. Two facts, two addresses, correctly drawn.
+/// * **untestable** -- one was cut to fewer than [`R76_DECIDABLE`] body characters, so *prefix of*
+///   cannot separate "the same id twice" from "two ids that begin alike". Not a finding and not a
+///   clean bill: it is printed and counted on its own, because folding it into either would be this
+///   suite committing the collapse the product exists to refuse.
+fn r76_pairs(rows: &[String]) -> (Vec<String>, Vec<String>, Vec<String>) {
+    let mut repeated = Vec::new();
+    let mut distinct = Vec::new();
+    let mut untestable = Vec::new();
+    for (i, a_row) in rows.iter().enumerate() {
+        for (j, b_row) in rows.iter().enumerate().skip(i + 1) {
+            for a in r76_addresses_on(a_row) {
+                for b in r76_addresses_on(b_row) {
+                    let short = a.len().min(b.len());
+                    let note = format!("row{i}+row{j} {a} | {b}");
+                    if short < R76_DECIDABLE {
+                        untestable.push(note);
+                    } else if a.starts_with(&b) || b.starts_with(&a) {
+                        repeated.push(note);
+                    } else {
+                        distinct.push(note);
+                    }
+                }
+            }
+        }
+    }
+    (repeated, distinct, untestable)
+}
+
+/// A shape narrower than any ruled one, chosen so that `state` cannot fit and the disclosure has to
+/// carry it instead.
+///
+/// 🔴 **Outside [`R76_SHAPES`] on purpose, and declared rather than typed inline.** It is a control
+/// for a branch, not an eighth shape anybody has ruled on: `g97`'s road assertion is a disjunction
+/// whose second arm the seven ruled shapes never take, and a disjunction with an unfired arm is a
+/// gate reporting on a path no run has walked.
+const G97_NARROW: (u16, u16) = (30, 10);
+
+/// How much of an address has to survive the cut before *prefix of* decides anything.
+///
+/// `gx1:` plus eight body characters. Chosen as the length at which the two fixture ids below
+/// already differ many times over, and declared rather than typed inline so the number the third
+/// value is drawn at is one number.
+const R76_DECIDABLE: usize = 12;
+
+/// A one-record screen carrying whatever `inverse_status` and `superseded_by` are handed.
+fn r76_screen(inverse: serde_json::Value, superseded: serde_json::Value) -> Screen {
+    let row = serde_json::json!({
+        "transformation": "gx1:trbspcdedw2dt63rvfltsgle2zilpjr3tihzyrzabk2wvmndihtq",
+        "verdict": "Admit",
+        "state": "Superseded",
+        "enforced": true,
+        "inverse_status": inverse,
+        "superseded_by": superseded,
+    });
+    Screen {
+        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        transformations: answered(
+            wire::ROUTES[1],
+            serde_json::json!({"items": [row], "next_cursor": null}),
+        ),
+        candidates: answered(
+            wire::ROUTES[2],
+            serde_json::from_str(CANDIDATES).expect("fixture parses"),
+        ),
+        escalations: answered(
+            wire::ROUTES[3],
+            serde_json::from_str(ESCALATIONS).expect("fixture parses"),
+        ),
+    }
+}
+
+/// How many characters of an address are on the screen -- the longest drawn token that is a prefix
+/// of `address`, with `pad`'s cut mark already taken off by [`r76_addresses_on`].
+fn r76_visible(text: &str, address: &str) -> usize {
+    r76_record_rows(text)
+        .iter()
+        .flat_map(|row| r76_addresses_on(row))
+        .filter(|token| address.starts_with(token.as_str()))
+        .map(|token| token.len())
+        .max()
+        .unwrap_or(0)
+}
+
+/// 🔴 **The characters of the address the fold costs, derived from the two labels rather than
+/// typed** (`[T-r82]`, 2026-09-02, closing the audit's D1).
+///
+/// # What was found, and why it is a cost rather than a bug
+///
+/// `[T-r76]` justified folding `superseded_by` into `inverse_status` with *the second spelling says
+/// nothing the first did not*. An independent audit measured the lane's own committed captures and
+/// found that **false at narrow widths**, and a seat reproduced it from the same files:
+///
+/// | shape | 120x32 | 100x30 | 80x24 | 66x20 | 60x20 | 46x12 | 40x10 |
+/// |---|---|---|---|---|---|---|---|
+/// | before | 56 | 56 | 56 | 50 | 44 | 30 | 24 |
+/// | after | 56 | 56 | **54** | **40** | **34** | **20** | **14** |
+///
+/// Five of seven shapes lost characters, at most ten. The reason is arithmetic and is the constant
+/// below: the row that was folded away began its address at `superseded_by` + a gap, and the row
+/// that survived begins it at `inverse_status` + a gap + `Consumed` + a space. **The row that was
+/// dropped was the one that could show more of the value.**
+///
+/// # Why the fold is kept anyway, and what is bought instead
+///
+/// The direction was not reversed. Moving the sentence onto the `inverse_status` row would put a
+/// cross-reference where `InverseMark::Consumed`'s **member** goes -- and that variant exists
+/// precisely so that the member is never spent on something other than the fact (its own doc says
+/// so). It would also invert the entailment on the screen: `Consumed { by: X }` is the fact the
+/// engine writes and `superseded_by` is the one derived from it, so folding the derived spelling
+/// into the source one is the direction that matches `wire::supersede_agrees`.
+///
+/// So the cost is kept, **named, and gated**: it may never exceed this constant, the surviving
+/// address may never fall below [`R76_DECIDABLE`], and the census is printed at every shape. What
+/// the lane must not do -- and did -- is remove the characters *silently*.
+const R76_FOLD_COST: usize =
+    wire::INVERSE_STATUS_KEY.len() + wire::CONSUMED_KIND.len() + 1 - wire::SUPERSEDED_BY_KEY.len();
+
+/// The id the undo consumed the inverse with, and the one it did not.
+const R76_UNDOER: &str = "gx1:647lk6fewteprs7hv3cxwuijrj4xsaigmkrd52bq6mgycr5rszja";
+const R76_OTHER: &str = "gx1:ex2qzqwxr4epzq5m3nn4hhcvbhqvnhbmrbawbrmldp2wkxxwvyoq";
+
+fn r76_frame(screen: &Screen, width: u16, height: u16) -> String {
+    renderer::buffer_text(&renderer::render_view_to_buffer(
+        screen,
+        width,
+        height,
+        Tier::Mono,
+        false,
+        &opened(),
+    ))
+}
+
+/// **g94 -- one address, two keys, and the address is drawn once.**
+///
+/// # What the ruling is, and where it was taken from
+///
+/// The captured record drew `inverse_status Consumed gx1:647...rszja` and
+/// `superseded_by gx1:647...rszja` on adjacent rows; at 40x10 those were two of the nine rows the
+/// record had. Folding them is only honest if the engine cannot make them differ, and
+/// `wire::supersede_agrees` carries that reading of the engine's live source: 43 T-12 writes the
+/// supersedes edge, the escrow row's `Consumed { by }` and the table's `superseded_by` from **one
+/// binding**, in the one place any of them is written, and replay rebuilds both from one journal
+/// field. So `Consumed { by: X }` entails `superseded_by == X`.
+///
+/// # Why this gate has a negative control and what it controls for
+///
+/// A gate that only looks at the folded row is green on a face that folds **everything**. The
+/// second half hands the same face two *different* addresses on the same two keys -- the shape a
+/// replay over a journal missing an `Escrowed` record produces -- and requires **both** to be on
+/// the screen. Without it, "no address appears twice" is satisfied by a face that draws no address
+/// at all.
+#[test]
+fn g94_one_address_is_drawn_once_and_two_addresses_are_both_drawn() {
+    // ---- the declaration, before any drawing -------------------------------------------------
+    // 🔴 The one spelling of the key, and the two frozen tables that also spell it. A rename that
+    // moved one and not the others used to be a column that quietly stopped agreeing with the row.
+    assert!(
+        LEDGER_COLUMNS
+            .iter()
+            .any(|column| column.key == wire::SUPERSEDED_BY_KEY),
+        "🔴 g94: `wire::SUPERSEDED_BY_KEY` names no column the ledger draws"
+    );
+    assert!(
+        renderer::AGREEMENT_KEYS.contains(&wire::SUPERSEDED_BY_KEY),
+        "🔴 g94: the key the record folds is not the key the second read compares"
+    );
+
+    let consumed = serde_json::json!({"Consumed": {"by": R76_UNDOER}});
+    let same = r76_screen(consumed.clone(), serde_json::json!(R76_UNDOER));
+    let different = r76_screen(consumed.clone(), serde_json::json!(R76_OTHER));
+    let no_escrow = r76_screen(serde_json::Value::Null, serde_json::json!(R76_UNDOER));
+
+    // ---- the predicate is three-valued, and the third value is not the second ------------------
+    let item_of = |screen: &Screen| -> serde_json::Value {
+        screen.transformations.items().first().map(|item| (*item).clone()).expect("one row")
+    };
+    assert!(
+        wire::supersede_agrees(&item_of(&same)),
+        "🔴 g94: the two keys carry one address and the face was not told so"
+    );
+    assert!(
+        !wire::supersede_agrees(&item_of(&different)),
+        "🔴 g94: two different addresses were reported as one. A fold taken on values that are \
+         equal by accident is the product's own lie told on its own screen"
+    );
+    assert!(
+        !wire::supersede_agrees(&item_of(&no_escrow)),
+        "🔴 g94: `inverse_status` is `null` -- there is no escrow row to have been consumed -- and \
+         the face folded anyway. The entailment runs one way only"
+    );
+
+    // ---- the instrument's own positive control ------------------------------------------------
+    // 🔴 A detector whose domain is empty is green about nothing. Fired at the shape it exists to
+    // catch, spelled by hand, before it is asked about a real frame.
+    let planted = vec![
+        format!("inverse_status  Consumed {R76_UNDOER}"),
+        format!("superseded_by  {R76_UNDOER}"),
+    ];
+    let (planted_repeat, _, _) = r76_pairs(&planted);
+    assert_eq!(
+        planted_repeat.len(),
+        1,
+        "🔴 g94: the detector does not report a repeat it was handed on a plate, so every green \
+         below is a green about the detector: {planted_repeat:?}"
+    );
+    // And the cut shape, which string equality would have called clean.
+    let planted_cut = vec![
+        format!("inverse_status  Consumed {}~", &R76_UNDOER[..18]),
+        format!("superseded_by  {}~", &R76_UNDOER[..26]),
+    ];
+    // 🔴 **The third value, planted and fired** (`[T-r82]`, 2026-09-02). Until this control the
+    // `untestable` arm of `r76_pairs` had never once been taken: `G94_CENSUS` reads
+    // `untestable=0` at all seven shapes, so a branch this suite advertises as its three-valued
+    // discipline was carried entirely by a doc comment. Planted below `R76_DECIDABLE` on purpose,
+    // and the plant is printed before its count is believed.
+    let planted_untestable = vec![
+        format!("inverse_status  Consumed {}~", &R76_UNDOER[..R76_DECIDABLE - 1]),
+        format!("superseded_by  {}~", &R76_UNDOER[..26]),
+    ];
+    println!("G94_PLANTED_UNTESTABLE={planted_untestable:?}");
+    let (untestable_repeat, untestable_distinct, untestable_third) = r76_pairs(&planted_untestable);
+    assert_eq!(
+        (untestable_repeat.len(), untestable_distinct.len(), untestable_third.len()),
+        (0, 0, 1),
+        "🔴 g94: a pair cut below `R76_DECIDABLE` has to land in the third value and in neither of \
+         the other two. Folding it into `repeat` invents a finding and folding it into `distinct` \
+         issues a clean bill about a question that was not asked -- and this suite committing \
+         either is the collapse the product exists to refuse"
+    );
+
+    let (cut_repeat, _, _) = r76_pairs(&planted_cut);
+    assert_eq!(
+        cut_repeat.len(),
+        1,
+        "🔴 g94: two cuts of one address were read as two addresses. At forty cells the rows read \
+         `gx1:647lk6fewt~` and `gx1:647lk6fewteprs7hv3cx~`, which are not equal strings and are \
+         the same fifty-two characters: {cut_repeat:?}"
+    );
+
+    // ---- the frames ---------------------------------------------------------------------------
+    let mut census: Vec<String> = Vec::new();
+    let mut legibility: Vec<String> = Vec::new();
+    let mut decided = 0usize;
+    for (width, height) in R76_SHAPES {
+        let folded = r76_frame(&same, width, height);
+        let rows = r76_record_rows(&folded);
+        let (repeat, distinct, untestable) = r76_pairs(&rows);
+        census.push(format!(
+            "{width}x{height} rows={} repeat={} distinct={} untestable={}",
+            rows.len(),
+            repeat.len(),
+            distinct.len(),
+            untestable.len()
+        ));
+        decided += repeat.len() + distinct.len();
+        assert!(
+            repeat.is_empty(),
+            "🔴 g94 at {width}x{height}: one address is on two of the record's rows. The engine \
+             writes both from one binding, so the second spelling of it says nothing the first did \
+             not: {repeat:?}\n{folded}"
+        );
+        // Both words survive. Neither key is deleted by the fold.
+        let flat_folded = flat(&folded);
+        assert!(
+            flat_folded.contains(wire::CONSUMED_KIND),
+            "🔴 g94 at {width}x{height}: `Consumed` left the screen. The fold removes a repeated \
+             address, not a word\n{folded}"
+        );
+        assert!(
+            flat_folded.contains(wire::SUPERSEDED_BY_KEY),
+            "🔴 g94 at {width}x{height}: `superseded_by` left the screen\n{folded}"
+        );
+        assert!(
+            flat_folded.contains(wire::SUPERSEDE_AGREEMENT),
+            "🔴 g94 at {width}x{height}: the row that gave up the address says nothing in its \
+             place, so a reader is told a key exists and not what it holds\n{folded}"
+        );
+        // 🔴 The address itself is still on the screen once: a fold that removed both spellings
+        // would pass the repeat check and lose the fact.
+        assert!(
+            rows.iter().any(|row| r76_addresses_on(row)
+                .iter()
+                .any(|address| R76_UNDOER.starts_with(address.as_str()))),
+            "🔴 g94 at {width}x{height}: the address is on none of the record's rows. Drawing it \
+             once is the repair; drawing it nought times is the defect wearing the repair's face\
+             \n{folded}"
+        );
+
+        // ---- the negative control: two addresses, and both are drawn --------------------------
+        let unfolded = r76_frame(&different, width, height);
+        let control_rows = r76_record_rows(&unfolded);
+        let (control_repeat, control_distinct, _) = r76_pairs(&control_rows);
+        assert!(
+            control_repeat.is_empty(),
+            "🔴 g94 at {width}x{height}: the control planted two different addresses and the \
+             detector reported a repeat, so it is measuring something other than sameness: \
+             {control_repeat:?}\n{unfolded}"
+        );
+        assert!(
+            !control_distinct.is_empty(),
+            "🔴 g94 at {width}x{height}: the control's two addresses are not both on the screen. \
+             A face that folds two facts it was never shown to be one about would satisfy every \
+             assertion above by drawing nothing\n{unfolded}"
+        );
+        assert!(
+            !flat(&unfolded).contains(wire::SUPERSEDE_AGREEMENT),
+            "🔴 g94 at {width}x{height}: the face said the two keys agree on a row where they \
+             carry different addresses\n{unfolded}"
+        );
+
+        // ---- how much of the address a reader can still read ----------------------------------
+        // 🔴 The audit's D1. The unfolded control is the base: it draws the undoer on the
+        // `inverse_status` row and a second address on the bare `superseded_by` row, so the two
+        // measured at the same width are exactly the two starting offsets `R76_FOLD_COST` is the
+        // difference of. Measured on a rendered frame, not asserted from the arithmetic.
+        let kept = r76_visible(&folded, R76_UNDOER);
+        let on_inverse_row = r76_visible(&unfolded, R76_UNDOER);
+        let on_supersede_row = r76_visible(&unfolded, R76_OTHER);
+        legibility.push(format!(
+            "{width}x{height} kept={kept} inverse_row={on_inverse_row} supersede_row={on_supersede_row}"
+        ));
+        assert_eq!(
+            kept, on_inverse_row,
+            "🔴 g94 at {width}x{height}: the fold changed how much of the surviving address is \
+             drawn. It is allowed to remove a row; it is not allowed to shorten the row it kept"
+        );
+        assert!(
+            kept >= R76_DECIDABLE,
+            "🔴 g94 at {width}x{height}: the fold left {kept} characters of the address, which is \
+             below the length this suite's own detector needs to tell one address from another. \
+             Below `R76_DECIDABLE` the screen is drawing something a reader cannot use as an \
+             identity\n{folded}"
+        );
+        assert!(
+            on_supersede_row <= kept + R76_FOLD_COST,
+            "🔴 g94 at {width}x{height}: the fold cost {} characters of legibility and the two \
+             labels only account for {R76_FOLD_COST}. The cost is allowed to be the arithmetic of \
+             the labels and nothing else -- anything beyond it is the fold taking something it was \
+             not measured to take",
+            on_supersede_row - kept
+        );
+    }
+    println!("G94_CENSUS={census:?}");
+    // 🔴 The measured cost of the fold, printed at every shape because it is a cost and the lane
+    // that took it reported none.
+    println!("G94_LEGIBILITY={legibility:?} fold_cost={R76_FOLD_COST}");
+    // 🔴 The domain, printed and required. An improvement measured on no rows is vacuously true.
+    assert!(
+        decided > 0,
+        "🔴 g94: the predicate was decidable on no pair at any of {} shapes. A gate whose domain \
+         is empty is evidence of nothing: {census:?}",
+        R76_SHAPES.len()
+    );
+}
+
+/// **g95 -- `receipt_view` has seven members, this face draws four, and the other three are named.**
+///
+/// 🔴 The banner read `g94` until `[T-r82]` (2026-09-02): two gates carried one id in their
+/// human-readable line while the functions below them were `g94_…` and `g95_…`. It was invisible to
+/// `tools/gates/gate_id_uniqueness_gate.mjs`, which reads banners under `tools/gates/` and test
+/// **function** names — and never a doc banner in a test file. Corrected here; the gate's scope is
+/// another lane's.
+///
+/// `[T-r58]` named `subject`, `postcondition_fingerprint` and `issued_at` as undisclosed and did
+/// not close them. The membrane's second obligation admits two closures -- draw it, or drop it and
+/// say the name -- and this is the second, so the gate has to hold that the naming is **complete**
+/// rather than that it exists.
+///
+/// # 🔴 The denominator is derived from the engine's source, and says so when it cannot be
+///
+/// The seven members are read out of `crates/gx-api/src/handlers.rs`'s `receipt_view`, so a member
+/// the engine adds tomorrow turns this red instead of vanishing unnamed. A checkout that does not
+/// carry that file (a published crate, a partial tree) makes the derived half **UNTESTABLE**, which
+/// is printed and never folded into a pass: a gate that silently falls back to a weaker ground
+/// truth reports the weaker answer as though it were the stronger one.
+#[test]
+fn g95_the_receipt_view_members_this_face_drops_are_named_in_full() {
+    let drawn: BTreeSet<&str> = wire::RECEIPT_VIEW_KEYS.iter().copied().collect();
+    let dropped: BTreeSet<&str> = wire::RECEIPT_VIEW_NOT_DRAWN.iter().copied().collect();
+    assert!(
+        drawn.is_disjoint(&dropped),
+        "🔴 g95: a member is declared both drawn and dropped, so the face cannot be asked which"
+    );
+
+    // ---- the derived denominator --------------------------------------------------------------
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../crates/gx-api/src/handlers.rs");
+    match std::fs::read_to_string(&source) {
+        Err(error) => {
+            println!(
+                "G95_DENOMINATOR=UNTESTABLE reason={error} path={}",
+                source.display()
+            );
+        }
+        Ok(text) => {
+            let mut members: BTreeSet<String> = BTreeSet::new();
+            let mut inside = false;
+            let mut collecting = false;
+            for line in text.lines() {
+                if line.contains("fn receipt_view(") {
+                    inside = true;
+                    continue;
+                }
+                if !inside {
+                    continue;
+                }
+                if line.contains("serde_json::json!({") {
+                    collecting = true;
+                    continue;
+                }
+                if !collecting {
+                    continue;
+                }
+                let trimmed = line.trim();
+                if trimmed.starts_with("})") {
+                    break;
+                }
+                if let Some(rest) = trimmed.strip_prefix('"') {
+                    if let Some(end) = rest.find('"') {
+                        members.insert(rest[..end].to_string());
+                    }
+                }
+            }
+            println!("G95_DENOMINATOR={members:?}");
+            assert!(
+                !members.is_empty(),
+                "🔴 g95: the engine's object was read as nought members. A denominator of zero \
+                 makes every coverage claim below vacuous, and the file is there -- so the reader \
+                 is what broke, not the claim"
+            );
+            let declared: BTreeSet<String> = drawn
+                .iter()
+                .chain(dropped.iter())
+                .map(|key| (*key).to_string())
+                .collect();
+            let unnamed: Vec<&String> = members.difference(&declared).collect();
+            let invented: Vec<&String> = declared.difference(&members).collect();
+            assert!(
+                unnamed.is_empty(),
+                "🔴 g95: the engine writes {unnamed:?} and this face neither draws them nor names \
+                 them as dropped. A renderer cannot invert, so what it owes instead is to say what \
+                 it let go of"
+            );
+            assert!(
+                invented.is_empty(),
+                "🔴 g95: {invented:?} is declared and the engine does not write it. Naming a \
+                 member nobody sends is a disclosure about a fiction"
+            );
+        }
+    }
+
+    // ---- the names reach a reader, on the row the object they belong to is drawn from -----------
+    // 🔴 The real wire, because the disclosure now rides a row that only exists when the engine
+    // answered with a receipt this face could decode. A fixture screen with no `Held` would draw no
+    // receipt block at all, and the assertion would be green about a region nobody rendered.
+    let fixture = Fixture::start();
+    let screen = fixture.read();
+    let held = wire::Held::read(&fixture.base_url, None, RECEIPT_HOLDER);
+    assert_eq!(
+        held.receipt_mark(),
+        wire::ReceiptMark::Held,
+        "🔴 g95: the bed did not hand this face a receipt, so the rows the disclosure rides do not \
+         exist and everything below is green about nothing"
+    );
+    let face = renderer::buffer_text(&renderer::render_held_to_buffer(
+        &screen,
+        &held,
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &opened(),
+        gx_tui::tui::live::LinkReport::off(),
+    ));
+    let flat_face = flat(&face);
+    for name in wire::RECEIPT_VIEW_NOT_DRAWN {
+        assert!(
+            flat_face.contains(name),
+            "🔴 g95: `{name}` is dropped and the face does not say the word. Dropped and unnamed is \
+             the one closure the membrane does not admit\n{face}"
+        );
+    }
+    // 🔴 The doorway count, and it is nought: the three names are on a row the reader is already
+    // looking at, so nothing has to be pressed to reach them. They are also all on **one** row --
+    // an escape hatch whose entrance is wider than the thing it discloses is the increase it was
+    // meant to remove.
+    let doorways = face
+        .lines()
+        .filter(|line| wire::RECEIPT_VIEW_NOT_DRAWN.iter().any(|name| line.contains(name)))
+        .count();
+    println!("G95_ROWS_CARRYING_THE_NAMES={doorways}");
+    assert_eq!(
+        doorways, 1,
+        "🔴 g95: the three names are spread over {doorways} rows of the record\n{face}"
+    );
+    // 🔴 **Where the clause is readable, measured at every shape and printed.** A disclosure that
+    // exists at one width and vanishes at the rest is a disclosure a reader cannot rely on, so the
+    // three states are separated and none is folded into another: FULL (all three names on the
+    // screen), CUT (the row is drawn and `pad`'s `~` says it ran out), ABSENT (the row is not on
+    // the screen at all).
+    //
+    // 🔴 **The first cut of this clause asserted that `gx tui --wide` un-cuts it, and that
+    // assertion was vacuously green**: it was written `!narrow.contains(last) || wide.contains(last)`
+    // and the left side was true, so the right was never reached. Measured properly, `--wide` does
+    // **not** widen this row -- so the road does not arrive, and what stands in its place is this
+    // census, which says where the names are readable rather than claiming they always are.
+    let last = wire::RECEIPT_VIEW_NOT_DRAWN[wire::RECEIPT_VIEW_NOT_DRAWN.len() - 1];
+    let mut reach: Vec<String> = Vec::new();
+    let mut full = 0usize;
+    for (width, height) in R76_SHAPES {
+        let drawn = renderer::buffer_text(&renderer::render_held_to_buffer(
+            &screen,
+            &held,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &opened(),
+            gx_tui::tui::live::LinkReport::off(),
+        ));
+        let row = drawn
+            .lines()
+            .find(|line| line.contains(wire::RECEIPT_VIEW_DROP_PHRASE))
+            .map(str::to_string);
+        let state = match &row {
+            None => "ABSENT",
+            Some(line) if line.contains(last) => {
+                full += 1;
+                "FULL"
+            }
+            Some(_) => "CUT",
+        };
+        reach.push(format!("{width}x{height}={state}"));
+        // 🔴 The clause never rides a row this lane added: every row it could have been given
+        // belongs to the ledger underneath (`g85`), so it rides the row that introduces the object.
+        if let Some(line) = row {
+            assert!(
+                line.starts_with("receipt "),
+                "🔴 g95 at {width}x{height}: the clause is on `{line}`, which is not the row that \
+                 introduces the receipt. A disclosure on a row of its own is a row taken from the \
+                 ledger\n{drawn}"
+            );
+        }
+    }
+    println!("G95_REACH={reach:?} full={full}/{}", R76_SHAPES.len());
+    assert!(
+        full > 0,
+        "🔴 g95: the three names are readable at none of {} shapes, so they are declared in code \
+         and said on no screen: {reach:?}",
+        R76_SHAPES.len()
+    );
+    // 🔴 **ABSENT is permitted and only under one condition**: the row it rides may be cut for room
+    // like any other, and when it is, the record's own cut note has to say so. Silence is what the
+    // membrane forbids, not brevity. Asked of the drawing rather than assumed -- and the fixture
+    // record is larger than the engine-backed one, so the shape that goes ABSENT here is not the
+    // shape that goes ABSENT on the real capture (there the row survives at 40x10 and is CUT).
+    for (index, (width, height)) in R76_SHAPES.into_iter().enumerate() {
+        if !reach[index].ends_with("=ABSENT") {
+            continue;
+        }
+        let drawn = renderer::buffer_text(&renderer::render_held_to_buffer(
+            &screen,
+            &held,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &opened(),
+            gx_tui::tui::live::LinkReport::off(),
+        ));
+        assert!(
+            drawn.contains("not drawn:"),
+            "🔴 g95 at {width}x{height}: the row carrying the names is not on the screen and \
+             nothing says rows were cut. A disclosure that disappears without a word is the \
+             silence the membrane forbids\n{drawn}"
+        );
+    }
+    // 🔴 The negative control for the condition it is drawn under: with no decoded view there is no
+    // object whose members could have been let go of, and naming them anyway would be a disclosure
+    // about a fiction.
+    let no_view = renderer::buffer_text(&renderer::render_held_to_buffer(
+        &screen,
+        &wire::Held::none(),
+        120,
+        32,
+        Tier::Mono,
+        false,
+        &opened(),
+        gx_tui::tui::live::LinkReport::off(),
+    ));
+    assert!(
+        !no_view.contains(wire::RECEIPT_VIEW_DROP_PHRASE),
+        "🔴 g95: this reading holds no decoded receipt and the face still names three members of \
+         it. A disclosure about an object nobody was sent is a disclosure about a fiction\n{no_view}"
+    );
+    // 🔴 And the row they ride already existed: the disclosure may not be bought with a row, because
+    // every row it could have been bought with belongs to the ledger underneath (`g85`).
+    let (_, beyond_after) = renderer::record_extent(&screen, &held, &opened(), 120);
+    println!("G95_BEYOND_ROWS={beyond_after}");
+    assert!(
+        face.lines().any(|line| line.starts_with(&format!("{} ", wire::RECEIPT_KEY_ID))),
+        "🔴 g95: the names are not on the `key_id` row, so they are on a row this lane added and \
+         the ledger paid for it\n{face}"
+    );
+}/// **g96 -- what the columns only one record answered in cost, measured and left standing.**
+///
+/// # 🔴 This gate exists because a brief asked for a change the canon refuses
+///
+/// A brief reached `[T-r76]` (2026-09-02) with a real measurement -- on a bed of thirty-two
+/// records, `created_at`, `actor` and `scope` each carried a value on **one** of them, so the
+/// columns stood and about forty-four cells of a 118x29 screen went on `?` -- and asked for the
+/// columns to be folded. **Two standing rulings name this exact shape and refuse it:**
+///
+/// * `req/924` §TUI-45's own boundary, which `g64b` already holds: 一部の行だけが「無」なら落とすな
+///   (それは情報)。全値が「無」の時だけ。
+/// * `req/924` §TUI-48 (SS1079), which ruled *this state* specifically -- the `null` is the engine
+///   saying *this process does not hold the body*, the value is fetchable, and 列を落として開示へ
+///   合流 is listed among the 却下した2案 because a reader then cannot learn it is fetchable.
+///   §TUI-48's accepted direction is a mark of its own, **spelled by the Owner**, not by a lane.
+///
+/// So the fold is not implemented and this gate does not assert one. What it does is turn the
+/// measurement the brief arrived with into an instrument that runs every time, so the Owner's
+/// adjudication has a number in front of it. **It is not a gate that only prints**: it asserts the
+/// boundary the two rulings draw, and it goes red the day a lane folds these columns -- which is
+/// what this lane nearly shipped.
+#[test]
+fn g96_the_one_answer_column_keeps_its_place_and_its_price_is_printed() {
+    // The measured shape, rebuilt: one record of thirty-two answers, the rest say nothing.
+    let bed = ledger_with(32, |n, item| {
+        if n != 0 {
+            item["created_at"] = serde_json::Value::Null;
+            item["scope"] = serde_json::Value::Null;
+            item["actor"] = serde_json::Value::Null;
+        }
+    });
+    // 🔴 The control on the control: if the bed does not produce the shape, everything below is a
+    // measurement of nothing.
+    let answered: Vec<(&str, usize)> = ["created_at", "scope", "actor"]
+        .into_iter()
+        .map(|key| {
+            let count = bed
+                .transformations
+                .items()
+                .iter()
+                .filter(|item| !says_nothing(&renderer::cell_mark(item, key).0))
+                .count();
+            (key, count)
+        })
+        .collect();
+    println!("G96_ANSWERED={answered:?} of {}", bed.transformations.items().len());
+    for (key, count) in &answered {
+        assert_eq!(
+            *count, 1,
+            "🔴 g96: the bed was meant to leave exactly one answer in `{key}` and left {count}, so \
+             this gate measures a shape nobody ruled on"
+        );
+    }
+
+    // ---- the boundary the two rulings draw ------------------------------------------------------
+    let vacant = renderer::vacant_columns(&bed.transformations);
+    println!("G96_VACANT={vacant:?}");
+    for (key, _) in &answered {
+        assert!(
+            !vacant.iter().any(|(column, _)| column == key),
+            "🔴 g96: `{key}` was answered by one record and the face folded the column away. \
+             `req/924` §TUI-45's boundary is 一部の行だけが「無」なら落とすな, and §TUI-48 ruled \
+             this state specifically -- the value is fetchable, and a fold tells the reader it is \
+             not. If this is to change it changes by an Owner ruling, not by a lane"
+        );
+    }
+
+    // ---- the price, at every shape this lane photographs -----------------------------------------
+    // 🔴 Printed and not asserted against a bound. A threshold here would be this gate deciding the
+    // question §TUI-48 reserved; the number is evidence, and evidence is what was missing.
+    let unknown = Nothing::Unknown.mark();
+    let mut census: Vec<String> = Vec::new();
+    for (width, height) in R76_SHAPES {
+        let text = renderer::buffer_text(&renderer::render_view_to_buffer(
+            &bed,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &View::default(),
+        ));
+        let marks = text.matches(unknown).count();
+        let header = text.lines().next().unwrap_or_default().to_string();
+        let standing = answered
+            .iter()
+            .filter(|(key, _)| header.contains(key))
+            .count();
+        census.push(format!(
+            "{width}x{height} unknown_marks={marks} one_answer_columns_drawn={standing}/3"
+        ));
+    }
+    println!("G96_PRICE={census:?}");
+    // 🔴 The domain, because a census taken where the predicate never applies is a census of
+    // nothing -- and this one has a shape where it genuinely does not apply, which is printed
+    // above rather than folded into the total.
+    let ever_drawn: usize = census
+        .iter()
+        .filter(|row| !row.ends_with("one_answer_columns_drawn=0/3"))
+        .count();
+    assert!(
+        ever_drawn > 0,
+        "🔴 g96: none of the three columns is drawn at any of {} shapes, so the price this gate \
+         reports is a price nobody pays and the boundary above was never exercised: {census:?}",
+        R76_SHAPES.len()
+    );
+}
+/// **g97 -- `state` carries two wire types, and the two `null` inverse states keep a road apart.**
+///
+/// # What was measured, on the Owner's running engine, read-only
+///
+/// `req/942_artifacts/tui_r76_2026-09-02/live_census.txt`: of thirty-two rows, `state` is a
+/// **string** on thirty-one and a **single-key object** `{"Aborted":"Expired"}` on one. `wire::cell`
+/// turned that object into its own JSON and a thirteen-cell column drew `{"Aborted":"~` -- the whole
+/// column spent on punctuation, and `Expired`, the only fact it carried, lost. That is verbatim the
+/// defect `wire::InverseMark::Consumed` was created to prevent one column over.
+///
+/// # And the collapse the same two rows carry
+///
+/// The two rows whose `inverse_status` is `null` are exactly one `Candidate` and one
+/// `{"Aborted":"Expired"}`. `req/924` §TUI-97 (SS1136) rules those two nothings different -- *not
+/// yet* against *never* -- and this face draws both `--`. No eighth mark is minted here (§TUI-48
+/// reserves that spelling to the Owner); what is held instead is the **road**: `state` separates
+/// them and sits on the same row, so the collapse is one a reader can undo. This gate measures that
+/// the road is still there, at every shape, rather than a comment asserting it.
+#[test]
+fn g97_the_state_column_reads_an_object_and_the_two_null_inverse_rows_keep_a_road() {
+    let row = |id: &str, state: serde_json::Value, inverse: serde_json::Value| {
+        serde_json::json!({
+            "transformation": id,
+            "verdict": serde_json::Value::Null,
+            "state": state,
+            "enforced": true,
+            "inverse_status": inverse,
+            "superseded_by": serde_json::Value::Null,
+        })
+    };
+    let rows = vec![
+        row(
+            "gx1:aborted00000000000000000000000000000000000000000000000",
+            serde_json::json!({"Aborted": "Expired"}),
+            serde_json::Value::Null,
+        ),
+        row(
+            "gx1:candidate0000000000000000000000000000000000000000000",
+            serde_json::json!("Candidate"),
+            serde_json::Value::Null,
+        ),
+        row(
+            "gx1:committed0000000000000000000000000000000000000000000",
+            serde_json::json!("Committed"),
+            serde_json::json!("Available"),
+        ),
+    ];
+    let screen = Screen {
+        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        transformations: answered(
+            wire::ROUTES[1],
+            serde_json::json!({"items": rows, "next_cursor": null}),
+        ),
+        candidates: answered(
+            wire::ROUTES[2],
+            serde_json::from_str(CANDIDATES).expect("fixture parses"),
+        ),
+        escalations: answered(
+            wire::ROUTES[3],
+            serde_json::from_str(ESCALATIONS).expect("fixture parses"),
+        ),
+    };
+    let items = screen.transformations.items();
+    assert_eq!(items.len(), 3, "🔴 g97: the bed is not the bed this gate was written for");
+
+    // ---- (a) the object is read, and no punctuation reaches the cell ---------------------------
+    let aborted = renderer::cell_mark(items[0], wire::STATE_KEY).0;
+    println!("G97_ABORTED_CELL={aborted:?}");
+    assert_eq!(
+        aborted, "Aborted Expired",
+        "🔴 g97: a single-key object in `state` is drawn as `{aborted}`. `wire::cell` stringifies \
+         it, so a thirteen-cell column spends itself on punctuation and loses the member -- the \
+         defect `InverseMark::Consumed` was written to prevent, one column over"
+    );
+    for punctuation in ['{', '}', '"', ':'] {
+        assert!(
+            !aborted.contains(punctuation),
+            "🔴 g97: `{punctuation}` reached the cell, so the column is still drawing a \
+             serialisation rather than the fact it carries"
+        );
+    }
+
+    // ---- (b) negative control: a bare string is untouched ---------------------------------------
+    assert_eq!(
+        renderer::cell_mark(items[2], wire::STATE_KEY).0,
+        "Committed",
+        "🔴 g97: the repair changed a state the engine spelled as a string, so it is not a repair \
+         to the object arm but a rewrite of the column"
+    );
+
+    // ---- (c) negative control: an unread shape is drawn as it arrived, not guessed at -----------
+    // 🔴 A face that folded a two-key object into `kind member` would be reporting the shape it
+    // expected instead of the shape it was sent. Two keys, and one key holding a number.
+    let two_keys = serde_json::json!({"state": {"Aborted": "Expired", "By": "someone"}});
+    let numeric = serde_json::json!({"state": {"Aborted": 7}});
+    for (name, odd) in [("two keys", &two_keys), ("member not a string", &numeric)] {
+        let drawn = wire::state(odd).mark();
+        println!("G97_UNREAD_SHAPE {name} -> {drawn:?}");
+        assert!(
+            drawn.contains('{'),
+            "🔴 g97: `{name}` was folded into the two-word spelling, so this face is claiming a \
+             shape the wire did not send it: {drawn}"
+        );
+    }
+
+    // ---- (d) the collapse, no longer declared but closed -----------------------------------------
+    // 🔴 **This block asserted the defect, and it is rewritten under a named, dated ruling**
+    // (`req/924` §TUI-101, SS1145, 2026-09-02; `[T-r82]`). What stood here required *both* `null`
+    // rows to draw `--`, on the reasoning that §TUI-48 reserves an eighth mark to the Owner and so
+    // the collapse could only be declared. The ruling found the premise wrong on both halves: the
+    // `Candidate` row's *not yet* is spelled by a word **already in `Nothing::ALL`**
+    // (`Nothing::Loading`), so closing it mints nothing; and the row's `verdict` was carrying the
+    // same collapse one column over, unexamined, so the old assertion was pinning half a defect.
+    //
+    // It is rewritten rather than deleted (`INHERITED_PRINCIPLES`: a test may change only under a
+    // ruling that names it, and the reference goes on the test). `wire::NULL_MEANING_BY_STATE`
+    // carries the reasoning; `g98` carries the freshness and the full census.
+    let absent = wire::Nothing::Absent.mark();
+    let not_yet = wire::Nothing::Loading.mark();
+    assert_eq!(
+        renderer::cell_mark(items[0], wire::INVERSE_STATUS_KEY).0,
+        absent,
+        "🔴 g97: a terminal `Aborted` has nothing escrowed and nothing ever will be, which is what \
+         `{absent}` says. This is the one of the four cells `[T-r76]` had right"
+    );
+    assert_eq!(
+        renderer::cell_mark(items[1], wire::INVERSE_STATUS_KEY).0,
+        not_yet,
+        "🔴 g97: a `Candidate`'s missing inverse is *not yet* and is being drawn as *never*. That \
+         is the first line of the nothing vertical -- a nothing that comes from time drawn as a \
+         semantic one (`req/924` §TUI-101)"
+    );
+    assert_ne!(
+        renderer::cell_mark(items[0], wire::INVERSE_STATUS_KEY).0,
+        renderer::cell_mark(items[1], wire::INVERSE_STATUS_KEY).0,
+        "🔴 g97: the two rows §TUI-97 ruled must be visibly different are drawing the same mark \
+         again"
+    );
+    assert!(
+        wire::INVERSE_NULL_STATES
+            .iter()
+            .any(|state| renderer::cell_mark(items[0], wire::STATE_KEY).0.starts_with(state)),
+        "🔴 g97: the aborted row's state is not one the declaration names, so the array and the \
+         bed have drifted apart"
+    );
+    assert_ne!(
+        renderer::cell_mark(items[0], wire::STATE_KEY).0,
+        renderer::cell_mark(items[1], wire::STATE_KEY).0,
+        "🔴 g97: the two rows the wire flattens to one `null` are drawn identically in `state` too, \
+         so the collapse has no road out of it and the screen destroys the difference"
+    );
+
+    // ---- (e) the road, at every shape, and where it is not there --------------------------------
+    // 🔴 **Two repairs to this block, both from the audit's D5** (`[T-r82]`, 2026-09-02).
+    //
+    // 1. The disclosure half asserted `contains("fields not drawn")`, which is **one spelling of a
+    //    clause that has two**. `req/924` §TUI-57 rules the long form (`N of 11 fields not drawn`)
+    //    and the short form (`N/11 fields`) equally honest, and the short form is what the Owner's
+    //    own 40x10 capture draws (`pty_after/list_40x10.txt` reads `9/11 fields`). So the branch
+    //    `[T-r76]`'s report said this assertion existed for would have gone **red on the real
+    //    screen for a stale-probe reason**, not because a road was lost. `g24` already owns the
+    //    two-form predicate and this now asks the same question.
+    // 2. The report claimed the gate asserts *`state` is on the row or the disclosure counts it*.
+    //    It asserted only that **a note exists** -- a face that dropped `state` and disclosed some
+    //    other field passed. It now asks `layout::columns_for_less`, the same function the plan is
+    //    resolved through, whether `state` is in the dropped set.
+    let vacant_keys: Vec<&'static str> = renderer::vacant_columns(&screen.transformations)
+        .into_iter()
+        .map(|(key, _)| key)
+        .collect();
+    let probe = |width: u16, height: u16| {
+        let text = renderer::buffer_text(&renderer::render_view_to_buffer(
+            &screen,
+            width,
+            height,
+            Tier::Mono,
+            false,
+            &View::default(),
+        ));
+        let header = text.lines().next().unwrap_or_default().to_string();
+        let road = header.contains(wire::STATE_KEY);
+        let (_, dropped) = layout::columns_for_less(width, &vacant_keys);
+        let in_dropped_set = dropped.contains(&wire::STATE_KEY);
+        // Either form of the clause: `req/924` §TUI-57 rules `N of 11 fields not drawn` and
+        // `N/11 fields` equally honest, so the word both forms share is what is asked for.
+        let clause = flat(&text).contains("fields");
+        (road, in_dropped_set && clause, in_dropped_set, text)
+    };
+    let mut census: Vec<String> = Vec::new();
+    let mut with_road = 0usize;
+    for (width, height) in R76_SHAPES {
+        let (road, counted, _, text) = probe(width, height);
+        census.push(format!("{width}x{height} state_drawn={road} counted={counted}"));
+        if road {
+            with_road += 1;
+        }
+        // 🔴 Silence is the only thing forbidden: the column may leave for room like any other, and
+        // when it does the screen has to count it.
+        assert!(
+            road || counted,
+            "🔴 g97 at {width}x{height}: `state` is not on the row and the disclosure does not \
+             count it. That is the collapse becoming silent -- two rows the wire flattened to one \
+             `--`, and no road back\n{text}"
+        );
+    }
+    println!("G97_ROAD={census:?} with_road={with_road}/{}", R76_SHAPES.len());
+
+    // ---- (f) both arms of the disjunction have to be walked, and now both are ------------------
+    // 🔴 On `[T-r76]`'s bed this read `with_road=7/7`: every green above was carried by `road`
+    // alone, and the second arm -- the one the report described as the branch the assertion exists
+    // for -- had never once been evaluated. It is walked now, and by a **ruled** shape rather than
+    // by a plant: §TUI-101 gives the three rows three different marks in `verdict`, so that column
+    // is no longer vacant, no longer freed, and `state` leaves the row at 40x10 exactly as it does
+    // on the Owner's engine. The fixture and the live screen agree for the first time here.
+    assert!(
+        with_road < R76_SHAPES.len(),
+        "🔴 g97: `state` is drawn at every one of {} shapes, so the disclosure arm of the road \
+         assertion is never evaluated and this gate is green about a branch no run walks: \
+         {census:?}",
+        R76_SHAPES.len()
+    );
+
+    // 🔴 **A planted control at an unruled width, and its answer is the third value.** It was added
+    // to force the disclosure arm and it found something else: at thirty cells the standing row is
+    // itself cut mid-clause (`... help:? · 9/`), so the count is on the screen and the word is not.
+    // That is **not asserted as a failure** -- thirty cells is outside the seven shapes anybody has
+    // ruled on, and requiring the chrome to survive there would be this gate inventing a ruling.
+    // What is asserted is the half that is decidable: the layout **counted** the column. The rest
+    // is printed for the seat.
+    let (narrow_width, narrow_height) = G97_NARROW;
+    let (narrow_road, narrow_counted, narrow_in_set, narrow_text) =
+        probe(narrow_width, narrow_height);
+    println!(
+        "G97_PLANTED_NARROW={narrow_width}x{narrow_height} state_drawn={narrow_road} \
+         in_dropped_set={narrow_in_set} clause_readable={narrow_counted}"
+    );
+    if !narrow_counted {
+        println!(
+            "G97_NARROW_CLAUSE=UNTESTABLE at {narrow_width}x{narrow_height}: the standing row is \
+             cut before the word the disclosure is read by. Unruled width, so neither a pass nor a \
+             failure -- reported, not folded"
+        );
+    }
+    assert!(
+        !narrow_road,
+        "🔴 g97: the planted control was chosen as a width at which `state` cannot fit and it fit, \
+         so it is measuring nothing\n{narrow_text}"
+    );
+    assert!(
+        narrow_in_set,
+        "🔴 g97 at {narrow_width}x{narrow_height}: `state` left the row and the layout did not put \
+         it in the dropped set, so nothing downstream can count it. That is the collapse becoming \
+         silent at the layer where it is decided\n{narrow_text}"
+    );
+    assert!(
+        with_road > 0,
+        "🔴 g97: `state` is drawn at none of {} shapes, so the road this gate holds open is a road \
+         to nowhere and the assertion above passes on the disclosure alone: {census:?}",
+        R76_SHAPES.len()
+    );
+}
+/// **g98 -- the kind of nothing a judged field takes is read from the row's `state`.**
+///
+/// # The ruling (`req/924` §TUI-101, SS1145, 2026-09-02)
+///
+/// Two rows of the Owner's bed carry `verdict: null` and `inverse_status: null`, and the wire's
+/// `state` tells them apart on every record. Four cells, of which `[T-r76]` drew **three wrong**:
+/// a terminal `Aborted`'s missing verdict was `?` (*measured and not knowable*) when it is `--`
+/// (*never written*), and a `Candidate`'s two missing judged fields were `?` and `--` when both are
+/// *not yet*. The `Candidate` and the `Aborted` were therefore receiving the **identical symbol
+/// pair** -- the two §TUI-97 had already ruled must be visibly different.
+///
+/// # What this gate holds, in four parts, and why each is here
+///
+/// 1. **The declaration is checked against the engine, at test time.** `[T-r76]` hand-wrote its
+///    state array and attached no freshness check, in a lane whose own doc comment said a
+///    hand-written list of lifecycle states would go stale in silence. It read the engine's source
+///    for `g95`'s denominator one column over and did not do it here. This does.
+/// 2. **The declaration is not what is measured.** A gate that checks a table against a table would
+///    be green on a face that reads neither. The four cells are asked of `renderer::cell_mark`,
+///    which is the function the row loop and the record both go through.
+/// 3. **The predicate is generalised and counted.** The defect being repaired *is* the failure to
+///    do this: `[T-r76]` fixed the cell it had photographed and left the neighbouring column and
+///    the neighbouring row. Every cell of the bed the wire carried as `null` is enumerated and
+///    reported `n/N`.
+/// 4. **The negative controls are planted, printed, and only then believed.** A state with no
+///    ruling must keep the general classifier, and the two rows must never come out equal.
+#[test]
+fn g98_the_kind_of_nothing_a_judged_field_takes_is_read_from_the_state() {
+    // ---- (1) the declaration, against the engine's own list -------------------------------------
+    let ruled: BTreeSet<&str> = wire::NULL_MEANING_BY_STATE.iter().map(|(name, _)| *name).collect();
+    assert_eq!(
+        ruled.len(),
+        wire::NULL_MEANING_BY_STATE.len(),
+        "g98: a state is ruled on twice, so which mark it takes depends on array order"
+    );
+    for (_, nothing) in wire::NULL_MEANING_BY_STATE {
+        assert!(
+            wire::Nothing::ALL.contains(&nothing),
+            "g98: {nothing:?} is not one of the seven. `req/924` TUI-48 reserves the spelling of an \
+             eighth kind of nothing to the Owner, and a lane minting one is the failure that \
+             ruling was written about"
+        );
+    }
+
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../crates/gx-engine/src/pipeline.rs");
+    match std::fs::read_to_string(&source) {
+        Err(error) => {
+            // The third value. A checkout without the engine's source (a published crate, a partial
+            // tree) cannot answer this, and a gate that quietly fell back to comparing the face
+            // against itself would report the weaker answer as though it were the stronger one.
+            println!("G98_LIFECYCLE=UNTESTABLE reason={error} path={}", source.display());
+        }
+        Ok(text) => {
+            let mut states: Vec<String> = Vec::new();
+            let mut inside = false;
+            for line in text.lines() {
+                if line.contains("pub const LIFECYCLE_STATES") {
+                    inside = true;
+                    continue;
+                }
+                if !inside {
+                    continue;
+                }
+                let trimmed = line.trim();
+                if trimmed.starts_with(']') {
+                    break;
+                }
+                if let Some(rest) = trimmed.strip_prefix('"') {
+                    if let Some(end) = rest.find('"') {
+                        states.push(rest[..end].to_string());
+                    }
+                }
+            }
+            println!("G98_LIFECYCLE={states:?} n={}", states.len());
+            assert!(
+                !states.is_empty(),
+                "g98: the engine's declared state list was read as nought names and the file is \
+                 there, so the reader is what broke and not the claim"
+            );
+            // The tripwire. The list is never copied into this crate -- this one number is what
+            // makes a twelfth state red instead of silently unruled.
+            assert_eq!(
+                states.len(),
+                wire::LIFECYCLE_STATE_COUNT_AT_RULING,
+                "g98: the engine declares {} lifecycle states and TUI-101 was ruled against {}. A \
+                 state was added or removed and nobody asked what a `null` means on it",
+                states.len(),
+                wire::LIFECYCLE_STATE_COUNT_AT_RULING
+            );
+            // No phantom members: every ruled state has to be a state the engine can send.
+            let declared: BTreeSet<&str> = states.iter().map(String::as_str).collect();
+            let invented: Vec<&&str> = ruled.difference(&declared).collect();
+            assert!(
+                invented.is_empty(),
+                "g98: {invented:?} is ruled on and the engine has no such state. A ruling about a \
+                 state nobody sends is a ruling about a fiction"
+            );
+            // The remainder is printed rather than left silent: these are the states no reading has
+            // been ruled for, and they keep the general classifier on purpose.
+            let unruled: Vec<&&str> = declared.difference(&ruled).collect();
+            println!("G98_UNRULED_STATES={unruled:?} ruled={}/{}", ruled.len(), declared.len());
+        }
+    }
+
+    // The member an `Aborted` carries comes from a second closed enum, and the bed's value is in it.
+    let reasons = Path::new(env!("CARGO_MANIFEST_DIR")).join("../crates/gx-core/src/error.rs");
+    match std::fs::read_to_string(&reasons) {
+        Err(error) => println!("G98_ABORT_REASONS=UNTESTABLE reason={error}"),
+        Ok(text) => {
+            let mut variants: Vec<String> = Vec::new();
+            let mut inside = false;
+            for line in text.lines() {
+                if line.contains("pub enum AbortReason") {
+                    inside = true;
+                    continue;
+                }
+                if !inside {
+                    continue;
+                }
+                let trimmed = line.trim();
+                if trimmed == "}" {
+                    break;
+                }
+                if trimmed.starts_with("///") || trimmed.starts_with("//") || trimmed.is_empty() {
+                    continue;
+                }
+                variants.push(trimmed.trim_end_matches(',').to_string());
+            }
+            println!("G98_ABORT_REASONS={variants:?}");
+            assert!(
+                variants.iter().any(|name| name == "Expired"),
+                "g98: the reason the measured bed's one aborted row carries is not in the engine's \
+                 closed enumeration, so this gate's reader is broken: {variants:?}"
+            );
+        }
+    }
+
+    // ---- (2) what the face actually draws, asked of the classifier the rows go through ----------
+    let row = |state: serde_json::Value| {
+        serde_json::json!({
+            "transformation": "gx1:trbspcdedw2dt63rvfltsgle2zilpjr3tihzyrzabk2wvmndihtq",
+            "verdict": serde_json::Value::Null,
+            "state": state,
+            "enforced": true,
+            "inverse_status": serde_json::Value::Null,
+        })
+    };
+    let aborted = row(serde_json::json!({"Aborted": "Expired"}));
+    let candidate = row(serde_json::json!("Candidate"));
+    let committed = row(serde_json::json!("Committed"));
+
+    let pair = |item: &serde_json::Value| {
+        (
+            renderer::cell_mark(item, wire::VERDICT_KEY).0,
+            renderer::cell_mark(item, wire::INVERSE_STATUS_KEY).0,
+        )
+    };
+    let never = wire::Nothing::Absent.mark().to_string();
+    let not_yet = wire::Nothing::Loading.mark().to_string();
+    let unknown = wire::Nothing::Unknown.mark().to_string();
+
+    let aborted_pair = pair(&aborted);
+    let candidate_pair = pair(&candidate);
+    let committed_pair = pair(&committed);
+    println!(
+        "G98_PAIRS aborted={aborted_pair:?} candidate={candidate_pair:?} \
+         committed={committed_pair:?}"
+    );
+    assert_eq!(
+        aborted_pair,
+        (never.clone(), never.clone()),
+        "g98: a terminal abort was never verdicted and never escrowed, and neither will ever be \
+         written. Both cells are `{never}`"
+    );
+    assert_eq!(
+        candidate_pair,
+        (not_yet.clone(), not_yet.clone()),
+        "g98: a `Candidate` has not reached T-3, so both judged fields are *not yet*. Drawing them \
+         as `{unknown}` or `{never}` is a nothing that comes from time drawn as a semantic one"
+    );
+
+    // ---- (3) the negative controls, planted and printed before they are believed ----------------
+    println!("G98_PLANTED_UNRULED_STATE=Committed");
+    assert_eq!(
+        committed_pair,
+        (unknown.clone(), never.clone()),
+        "g98: `Committed` has no ruling in `wire::NULL_MEANING_BY_STATE` and its cells changed \
+         anyway, so the table is being applied by row rather than by state. A `Committed` record \
+         with no verdict is an engine gap and the face may not explain it away"
+    );
+    println!("G98_PLANTED_SAME_PAIR_CHECK=candidate_vs_aborted");
+    assert_ne!(
+        candidate_pair, aborted_pair,
+        "g98: the `Candidate` and the `Aborted` came out with the identical symbol pair. Those are \
+         the exact two rows `req/924` TUI-97 ruled must be visibly different"
+    );
+    // And the rule the whole vocabulary rests on: a word the wire carried is never a mark.
+    let unavailable = renderer::cell_mark(
+        &serde_json::json!({"state": "Candidate", "inverse_status": "Unavailable"}),
+        wire::INVERSE_STATUS_KEY,
+    )
+    .0;
+    println!("G98_PLANTED_WORD_NOT_MARK={unavailable:?}");
+    assert_eq!(
+        unavailable, "Unavailable",
+        "g98: a `Candidate` row carrying the word `Unavailable` had its word replaced by a mark. \
+         The table speaks only for a `null`; an answer the engine gave is drawn as it arrived"
+    );
+
+    // ---- (4) the predicate generalised over every null cell on the bed, with a denominator ------
+    // The failure being repaired is a repair that was not generalised, so this gate is required to
+    // state where else the question applies and what happened there.
+    let bed = [aborted.clone(), candidate.clone(), committed.clone()];
+    let keys = [
+        wire::VERDICT_KEY,
+        wire::STATE_KEY,
+        wire::INVERSE_STATUS_KEY,
+        wire::SUPERSEDED_BY_KEY,
+        "created_at",
+        "scope",
+        "actor",
+        "rollback",
+        "enforced",
+    ];
+    let mut null_cells = 0usize;
+    let mut read_through_state = 0usize;
+    let mut census: Vec<String> = Vec::new();
+    for (index, item) in bed.iter().enumerate() {
+        for key in keys {
+            if item.get(key) != Some(&serde_json::Value::Null) {
+                continue;
+            }
+            null_cells += 1;
+            let judged = wire::NULL_MEANING_FIELDS.contains(&key);
+            let ruled_state = wire::null_meaning(item).is_some();
+            if judged && ruled_state {
+                read_through_state += 1;
+            }
+            census.push(format!(
+                "row{index} {key} drawn={:?} through_state={}",
+                renderer::cell_mark(item, key).0,
+                judged && ruled_state
+            ));
+        }
+    }
+    println!(
+        "G98_NULL_CELLS={read_through_state}/{null_cells} read through `state`; the rest keep the \
+         general classifier"
+    );
+    println!("G98_NULL_CENSUS={census:?}");
+    assert!(
+        null_cells > 0,
+        "g98: the bed carries no `null` at all, so every cell above was decided on a value that \
+         was never sent and this census is a census of nothing"
+    );
+    assert_eq!(
+        read_through_state, 4,
+        "g98: the four cells `req/924` TUI-101 ruled on are the four this face reads through \
+         `state`, and it read {read_through_state}: {census:?}"
     );
 }

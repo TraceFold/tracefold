@@ -10,7 +10,7 @@
   },
   "scripts": {
     "demo": "node src/demo.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "node ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit"
   },
   "//": "The demo runs the .ts sources directly on Node's own type stripping: no build, no node_modules. `typecheck` is the optional stricter pass and is the only script that needs typescript and @types/node installed.",
   "devDependencies": {

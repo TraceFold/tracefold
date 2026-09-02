@@ -275,9 +275,31 @@ pub struct Column {
 /// 🔴 The key list is `crates/gx-api/src/list.rs`'s `row_json` plus the three the transformations
 /// list adds, and the labels drawn on screen are these strings unchanged (`req/942` §9, gate P5).
 pub const LEDGER_COLUMNS: [Column; 10] = [
+    // 🔴 **Sixteen cells, and nothing on this screen needed sixteen** (`[T-r71]`, 2026-09-02,
+    // `req/942_artifacts/tui_r71_2026-09-02/RULING.md`). The one column that is never dropped had the one width nothing had
+    // measured. Both halves were measured against a live engine on a twenty-nine row bed grown by
+    // the product's own loop, and they disagree about what holds the cells:
+    //
+    // * **the values need thirteen.** Three characters past the shared `gx1:` separated every row;
+    //   `super::renderer::id_separation` is that measurement and `ID_PREFIX_MARGIN` /
+    //   `ID_PREFIX_FLOOR` are the budget taken on top of it for the rows a page did not carry.
+    //   Eleven characters were drawn.
+    // * **the label needs fourteen**, and `transformation` is a wire key that is drawn unchanged
+    //   (`req/942` §9, gate P5). So the header is what binds, not the hash — and the honest width is
+    //   the label's, which is what is declared here.
+    //
+    // 🔴 The two cells are not a rounding: at 66 cells they are the difference between four columns
+    // and three, which gate `g92` measures rather than this comment asserting it.
+    //
+    // 🔴 And the other eight characters were not buying a **name**. Measured on both roads a reader
+    // has — `gx receipt show <id>` and `GET /v1/transformations/{id}` — no prefix of an id resolves
+    // at any length: three, six, eleven and **fifty-one of fifty-two** all answer
+    // `VALIDATION_ERROR` / `422`, and only the whole fifty-two answers `200`. Whatever this column
+    // draws is a discriminator and never an address, at any width, and
+    // `super::renderer::help_lines` is where that is now said out loud.
     Column {
         key: "transformation",
-        width: 16,
+        width: 14,
         priority: Priority::One,
     },
     Column {
@@ -662,6 +684,20 @@ pub struct Plan {
     /// Nought once the reader has moved far enough down the ledger, which is what makes them
     /// scrolling content rather than a fixed header, and what gate `g73` measures.
     pub preamble_shown: usize,
+    /// How many of an opened record's own rows the height took.
+    ///
+    /// 🔴 Decided **here**, for the reason [`Plan::window`] is: the order in which a screen lets go
+    /// of what it was asked to draw is a declaration, and a region that chose its own cut could not
+    /// be asked what it let go of (`req/942` §11-3).
+    pub record_members_shown: usize,
+    /// How many of the rows beyond an opened record's members the height took.
+    pub record_beyond_shown: usize,
+    /// Whether either of the two above is short of what was asked for, so the region owes a line
+    /// saying so.
+    ///
+    /// 🔴 The row that line costs is **inside** the budget above: it is subtracted before the two
+    /// counts are settled, so the disclosure of a cut can never be the thing the cut takes.
+    pub record_cut: bool,
 }
 
 impl Plan {
@@ -907,6 +943,26 @@ pub fn subject_shape(reading: &super::wire::Reading, view: &super::acts::View) -
     }
 }
 
+/// How an opened record's rows and the ledger's rows share the subject region.
+///
+/// 🔴 One function, called twice by [`resolve_attended`] — once to decide whether the disclosure has
+/// a ledger to describe, and once with the settled height to fill the plan in — so the clause that
+/// says what is missing and the region that does the missing cannot arrive at two answers
+/// (`req/964` §16, applied to the split `[T-r58]` introduced).
+///
+/// Returns, in order: how many of the record's own rows the height took, how many of the rows beyond
+/// them it took, whether either is short of what was asked for, and how many rows are left for the
+/// ledger underneath.
+#[must_use]
+fn record_split(subject_height: usize, members: usize, beyond: usize) -> (usize, usize, bool, usize) {
+    let cut = members + beyond > subject_height;
+    let room = subject_height.saturating_sub(usize::from(cut));
+    let members_shown = members.min(room);
+    let beyond_shown = beyond.min(room - members_shown);
+    let ledger = subject_height.saturating_sub(members_shown + beyond_shown + usize::from(cut));
+    (members_shown, beyond_shown, cut, ledger)
+}
+
 /// The slice of a list the subject region draws.
 ///
 /// 🔴 `first` is an index into the records the **read** carried rather than into the rows the
@@ -938,6 +994,22 @@ pub struct Attention {
     /// together: a plan is resolved for a reading, for a reader, and now for where that reader has
     /// pushed the stream.
     pub glide: isize,
+    /// How many rows an opened record's **own** part needs: the head, the members that carry a
+    /// value, and one row per kind of nothing the wire gave.
+    ///
+    /// 🔴 A count and not the rows themselves, for the reason [`Attention::items`] is a count: this
+    /// module is built from a width and a height and never reaches into a record
+    /// (`req/984` §10-33). `super::renderer::record_extent` is the one function that counts them,
+    /// and both of the callers that draw a held record ask it rather than counting again.
+    ///
+    /// Nought at every shape but [`Subject::Record`], and it is read nowhere else.
+    pub record_members: usize,
+    /// How many rows the routes **beyond** an opened record's own members need.
+    ///
+    /// Held apart from [`Attention::record_members`] because the two are not cut in the same order:
+    /// the members are what the wire carried about this row and are paid for first; the rows below
+    /// them are what other routes said about it (`super::renderer::record_rows`).
+    pub record_beyond: usize,
 }
 
 /// Which records fit, and which one the window starts at.
@@ -1045,6 +1117,44 @@ pub const COLUMN_GAP: u16 = 2;
 /// The cells before the first column of every row of the ledger.
 pub const LEFT_MARGIN: u16 = 1;
 
+/// How many cells a ledger row carrying exactly these columns occupies on the screen.
+///
+/// 🔴 **One function, and it is the price *and* the row** (`[T-r66]`, 2026-09-02). The arithmetic
+/// this replaces was written twice — once as an incremental cost inside [`columns_for_less`] and
+/// once as a sentence in `super::renderer::subject` — and the two disagreed by exactly
+/// [`COLUMN_GAP`]. The sentence said `LEFT_MARGIN + sum(width) + (n - 1) * COLUMN_GAP`; the row is
+/// drawn as [`LEFT_MARGIN`] **in a cell of its own** (`super::renderer::margin`, ruled that way by
+/// `req/924` §TUI-62 so that `pad` never eats a character to make room for a space), and
+/// `super::renderer::spans_with` puts a gap after **every** cell it has already drawn — including
+/// that one. So the row is the margin, and then `n` times *(gap, column)*: one gap more than the
+/// price knew about.
+///
+/// The consequence was not a rounding error. A budget two cells looser than the screen keeps one
+/// column too many, the terminal clips from the right in silence, and the value in the last column
+/// ends early with nothing saying so — `2026-08-30T09:00:00Z` drawn as `2026-08-30T09:00:0` at
+/// sixty-six cells. That is the face asserting a fact it does not have, which is the one thing this
+/// membrane exists not to do.
+///
+/// Nought for no columns rather than [`LEFT_MARGIN`]: a row with no column on it is not drawn as a
+/// lone margin — there is nothing for the margin to be before.
+///
+/// 🔴 **This is what a row *takes*, not a promise that it fits.** [`columns_for_less`] keeps one
+/// column whatever the width (its floor), so at a screen narrower than
+/// `LEFT_MARGIN + COLUMN_GAP + the first column` this answers a number larger than the screen and
+/// that is the ruled outcome, not a defect: `super::renderer::fit` then cuts the row **and marks the
+/// cut**. Gate `g90` states the invariant in exactly that shape.
+#[must_use]
+pub fn row_width(columns: &[Column]) -> u16 {
+    if columns.is_empty() {
+        return 0;
+    }
+    LEFT_MARGIN
+        + columns
+            .iter()
+            .map(|column| COLUMN_GAP + column.width)
+            .sum::<u16>()
+}
+
 /// How many records share one group before the next rule.
 ///
 /// 🔴 **`req/924` §TUI-62 裁定3, 区切り**: *a rule every N rows, or a blank line between groups.*
@@ -1127,7 +1237,6 @@ pub fn columns_for(width: u16) -> (Vec<Column>, Vec<&'static str>) {
 pub fn columns_for_less(width: u16, vacant: &[&'static str]) -> (Vec<Column>, Vec<&'static str>) {
     let mut drawn = Vec::new();
     let mut dropped: Vec<&'static str> = Vec::new();
-    let mut used = 0u16;
     // 🔴 An explicit flag, and it is a repair this rule made necessary. The fold below used
     // `!dropped.is_empty()` to mean *the budget has already overflowed*, which was true while the
     // only way into that vector was overflowing. A vacant column now enters it before any width has
@@ -1149,21 +1258,42 @@ pub fn columns_for_less(width: u16, vacant: &[&'static str]) -> (Vec<Column>, Ve
             dropped.push(column.key);
             continue;
         }
-        // 🔴 The gap is [`COLUMN_GAP`] and the row starts [`LEFT_MARGIN`] cells in
-        // (`req/924` §TUI-62 (`req/38` SS1093, Owner `#284-T`, 2026-09-01)). It was one cell, hard-typed here and in
-        // `super::renderer::spans`; the ruling asks for room and the room has to be priced where
-        // the columns are chosen or the row is composed at one width and drawn at another.
-        let cost = if drawn.is_empty() {
-            column.width + LEFT_MARGIN
-        } else {
-            column.width + COLUMN_GAP
-        };
-        if overflowed || used + cost > width {
-            overflowed = true;
-            dropped.push(column.key);
-        } else {
-            used += cost;
+        // 🔴 **The price is [`row_width`], which is the row** (`[T-r66]`, 2026-09-02, repairing the
+        // defect `[T-r58]` found and left open). The arithmetic that stood here charged
+        // [`LEFT_MARGIN`] for the first column and [`COLUMN_GAP`] for each one after it — the
+        // sentence `LEFT_MARGIN + sum(width) + (n - 1) * COLUMN_GAP`, written in this loop and again
+        // as a comment in `super::renderer::subject`. The row is drawn with the margin **in a cell
+        // of its own**, so `super::renderer::spans_with` puts a gap after it too: `n` gaps, not
+        // `n - 1`. Every kept set was therefore two cells wider than the width it was chosen
+        // against, and at the widths where the budget binds the terminal clipped the last column in
+        // silence. Asking [`row_width`] instead of adding up a second time is what makes the two
+        // unable to disagree again.
+        //
+        // Push, measure, and take it back off if it did not fit: the candidate set is the thing the
+        // question is about, so it is the thing that is measured.
+        //
+        // 🔴 **The floor: `drawn.len() > 1`, so the first column is kept whatever the width**
+        // (`[T-r66]`, 2026-09-02, and it is a repair of this lane's own first attempt). Refusing the
+        // first column too was arithmetically correct and drew, at eighteen cells on the live bed,
+        // **nine blank rows** — a ledger of thirty-one records showing nothing at all. That is the
+        // worse half of the defect being repaired, not the repair: a screen that cuts a value in
+        // silence at least tells the reader something, and a screen that draws nothing tells them
+        // the ledger is empty.
+        //
+        // So the ruling in `super::renderer::fit` is taken at this layer too, in the direction that
+        // layer's degenerate case calls for: the identity column is kept, the row goes out wider
+        // than the screen, and `fit` cuts it **with the mark**. `   gx1:f6hb5y2r3~` at eighteen
+        // cells is a true partial answer; `gx1:f6hb5y2r3oi` — the same row with the `~` itself
+        // clipped off, which is what stood here before this lane — is a false whole one.
+        if !overflowed {
             drawn.push(column);
+            if drawn.len() > 1 && row_width(&drawn) > width {
+                drawn.pop();
+                overflowed = true;
+            }
+        }
+        if overflowed {
+            dropped.push(column.key);
         }
     }
     dropped.extend(LEDGER_PAGE_KEYS);
@@ -1444,22 +1574,41 @@ fn compose_disclosure(
     if !engine_caveat.is_empty() {
         long.push(engine_caveat.to_string());
     }
-    // 🔴 The field count belongs to the **grid**. While a record is open there is no grid, every
-    // member the wire carried is a row of its own, and the record's own line is what says how many
-    // of them the height allowed. Saying `4 of 11 fields not drawn` over a record that is drawing
-    // all eleven is the disclosure describing a screen that is not there.
+    // 🔴 The field count belongs to whatever **grid** is on the screen, and it is asked of the set
+    // rather than of the shape. The set is empty for the help face, which draws no wire value at
+    // all, and empty for a record with no room under it; it is not empty for a record with a ledger
+    // beneath it, which is a screen that did not exist until `[T-r58]` (2026-09-02) gave the rows a
+    // record does not need back to the list it was opened from. Written as a branch on the shape,
+    // that third screen would have been the one screen that drops columns and says nothing.
+    if !dropped_fields.is_empty() {
+        long.push(format!(
+            "{} of {total_fields} fields not drawn{road}",
+            dropped_fields.len()
+        ));
+    }
     match subject {
-        Subject::Grid => {
-            if !dropped_fields.is_empty() {
-                long.push(format!(
-                    "{} of {total_fields} fields not drawn{road}",
-                    dropped_fields.len()
-                ));
-            }
-        }
-        Subject::Record => long.push(format!(
-            "a record is open: its own line counts what it drew{road}"
-        )),
+        Subject::Grid => {}
+        // 🔴 **Nothing, and the sentence that stood here is deleted rather than shortened**
+        // (`[T-r58]`, 2026-09-02, the seat's ruling on the real capture, defect 4). It read
+        // *a record is open: its own line counts what it drew* — a sentence about **this face's own
+        // arrangement**, addressed to nobody who is trying to read a record. It named no fact of the
+        // engine, no fact of the reading, and no road; it told the reader which line of the screen to
+        // trust, which is a thing a screen should not need to say. Five words
+        // (`own line counts drew`, and `record` beside them) paid for by the one row this face has.
+        //
+        // What it was standing in for is still on the screen and is measured: `Subject::name`
+        // already puts `record open` on this row, so *which of the three screens is this* is
+        // answered; and the count of members the height would not take is drawn by the record
+        // itself, in the region that made the cut, exactly when there is a cut
+        // (`super::renderer::subject`). A clause that is true on every frame changes no reader's
+        // next act — §TUI-29's own test, applied to a sentence that was exempt from it because it
+        // was about the face rather than about the world.
+        //
+        // 🔴 What is kept is **the two words the short form already spells**, and nothing more: this
+        // line does have to say which of the three screens it is describing, or a reader cannot tell
+        // a count about a ledger from a count about a record. Two forms of one clause, one wording;
+        // the long form used to pay five extra words for the same fact.
+        Subject::Record => long.push("record open".to_string()),
         // The help face draws the declaration, not the wire, so a count of wire fields would be
         // describing a screen nobody is looking at -- the error the record arm exists to avoid.
         Subject::Help => long.push(format!(
@@ -1613,6 +1762,16 @@ fn compose_disclosure(
     // cells, so the two rows cannot disagree about whether the road is on the screen.
     let head = match subject {
         Subject::Grid => format!("{}/{total_fields} fields{road}", dropped_fields.len()),
+        // 🔴 **Two facts, and the second one is only there when it is true** (`[T-r58]`,
+        // 2026-09-02, defect 3). *Which screen is this* is what the record's head has always
+        // carried; a record with a ledger under it also drops columns, and the short form is the
+        // form the narrow shapes choose — so a record that said only `record open` would be the one
+        // form of the one screen that drops columns in silence. The set is empty for a record that
+        // fills its region, so the clause disappears exactly where there is nothing to say.
+        Subject::Record if !dropped_fields.is_empty() => format!(
+            "record open {}/{total_fields} fields{road}",
+            dropped_fields.len()
+        ),
         Subject::Record => "record open".to_string(),
         Subject::Help => "help open".to_string(),
     };
@@ -1764,8 +1923,31 @@ pub fn resolve_attended(
     // fact rather than as a special case in whoever reads it.
     // The help face is the same case one step further out: it draws no wire value at all, so a set
     // of wire keys it "did not draw" would be counting a grid that is not on the screen.
+    // 🔴 **An opened record with room under it is drawing a ledger, and a ledger drops columns by
+    // width** (`[T-r58]`, 2026-09-02, defect 3). The sentence this replaces — *a record draws every
+    // member the wire carried, so nothing is dropped by width* — is still true of the **record**, and
+    // it was true of the whole screen only while the record was the whole screen. It is not any more:
+    // the rows the record does not need go back to the ledger it was opened from, and those rows
+    // carry the columns that fit. Saying nothing about them would be the disclosure describing the
+    // screen this face used to draw.
+    //
+    // 🔴 **Named ceiling.** The split is asked here against the **ruled** standing frame of one row
+    // (`req/924` §TUI-57, gate `g73`), because the disclosure cannot be composed against a height
+    // that is not settled until the disclosure exists. Under `w` the long form may take more than
+    // one row, the region then has fewer, and at a height where that takes the ledger's last row
+    // this clause names columns of a ledger with no rows left. The region clamps
+    // (`super::renderer::subject` draws what the plan settled), so the count is the only thing that
+    // can overstate, and it overstates only under `w`.
+    let ledger_below = match subject {
+        Subject::Grid | Subject::Help => false,
+        Subject::Record => {
+            let standing = height.saturating_sub(u16::from(height > 0)) as usize;
+            record_split(standing, attention.record_members, attention.record_beyond).3 > 0
+        }
+    };
     let dropped_fields = match subject {
         Subject::Grid => grid_dropped_fields,
+        Subject::Record if ledger_below => grid_dropped_fields,
         Subject::Record | Subject::Help => Vec::new(),
     };
     let total_fields = LEDGER_COLUMNS.len() + LEDGER_PAGE_KEYS.len();
@@ -1956,12 +2138,40 @@ pub fn resolve_attended(
         Subject::Grid => 1usize,
         Subject::Record | Subject::Help => 0,
     };
+    // 🔴 **How an opened record is cut, and it is cut here** (`[T-r58]`, 2026-09-02, defect 3).
+    //
+    // The members are paid for first and the rows beyond them take what is left — the order
+    // `super::renderer::record_rows` argues for: the members are what the wire carried *about this
+    // row* and the rows below them are what other routes said about it, so a face that cut the
+    // subject to make room for the commentary would be answering a question nobody asked.
+    //
+    // The row the cut's own disclosure needs is taken off the budget **before** the two counts are
+    // settled. Taken after, the last row the height allowed would have gone to a member and the
+    // sentence saying a member was dropped would itself have been dropped.
+    let (record_members_shown, record_beyond_shown, record_cut, record_ledger) = match shape {
+        Subject::Grid | Subject::Help => (0usize, 0usize, false, 0usize),
+        Subject::Record => record_split(
+            subject_height as usize,
+            attention.record_members,
+            attention.record_beyond,
+        ),
+    };
+    // 🔴 **An opened record does not own the whole region, and this is the row count that says so**
+    // (`[T-r58]`, 2026-09-02, defect 3). Measured on the real capture: at 120x32 the record drew
+    // eighteen rows and **thirteen rows of the screen were blank** — a third of the terminal
+    // standing empty, which is furniture rather than information (`SS831`: do not stand an empty
+    // panel). The rows the record does not need go back to the ledger it was opened from, so the
+    // reader keeps the one fact a detail face otherwise destroys — **where this record sits among
+    // the others** — and the sentence `record 1 of 31` is *shown* instead of spelled.
+    //
+    // Nought when the record fills the region, which is every shape at 46x12 and below.
     let grid_capacity = match shape {
-        Subject::Record | Subject::Help => 0,
+        Subject::Help => 0,
         Subject::Grid => subject_height as usize,
+        Subject::Record => record_ledger,
     };
     let (preamble_shown, window) = match shape {
-        Subject::Record | Subject::Help => (0usize, Window::default()),
+        Subject::Help => (0usize, Window::default()),
         Subject::Grid => scrolled(
             attention.selected,
             attention.items,
@@ -1969,6 +2179,12 @@ pub fn resolve_attended(
             grid_capacity,
             attention.glide,
         ),
+        // 🔴 [`window`] and not [`scrolled`]: the ledger under an opened record has no preamble to
+        // scroll away and no glide of its own — the reader is not steering it, they are steering the
+        // record above it. What `window` guarantees is the one property this needs, which is that
+        // the attended record is inside the slice (gate `g28`), so the row whose detail is drawn
+        // above is the row marked below.
+        Subject::Record => (0usize, window(attention.selected, attention.items, grid_capacity)),
     };
     // 🔴 **Nought, and it is not a loss** (`req/924` §TUI-57). The note used to be the last line of
     // the subject region, paid for out of the rows the records left over — and
@@ -2100,6 +2316,9 @@ pub fn resolve_attended(
         note,
         preamble,
         preamble_shown,
+        record_members_shown,
+        record_beyond_shown,
+        record_cut,
     }
 }
 

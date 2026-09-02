@@ -31,9 +31,9 @@ It is a test-only crate and is not a publish target.
 ## Running it
 
 ```bash
-cargo test -p gx-adapter-fs --test conformance
-cargo test -p gx-adapter-git --test git_conformance
-cargo test -p gx-adapter-mcp --test mcp_conformance
+cargo test -p tracefold-adapter-fs --test conformance
+cargo test -p tracefold-adapter-git --test git_conformance
+cargo test -p tracefold-adapter-mcp --test mcp_conformance
 cargo test -p gx-substrate-conformance --test broken_fixture   # the negative control
 ```
 

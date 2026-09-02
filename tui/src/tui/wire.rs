@@ -36,12 +36,121 @@ use std::time::{Duration, Instant};
 
 /// The four routes this face reads. Same denominator as the browser face (`req/942` §9), so that a
 /// difference between the two faces is a difference of medium and not of scope.
+///
+/// 🔴 **That sentence is AXIS A, not the whole face.** `req/38` SS1106 (2026-09-02, lane
+/// [T-r59-parity-truth]) named it a false claim of exhaustiveness: this face has read
+/// [`RECORD_ROUTES`] below since the two-route split was written, so "the four routes this face
+/// reads" undercounts by two the moment a reader opens a row. The heading above is kept in the words
+/// it was written in — the same choice this module's own "six words for nothing, which are now
+/// seven" heading made — because a heading silently edited to read as though it had always been
+/// exhaustive takes the reader's chance to see that this face's own gate got it wrong once
+/// (`tools/gates/surface_parity_gate.mjs` derived its coverage set from this array alone and
+/// reported [`RECORD_ROUTES`]'s two paths MISS; see that file's doc comment for the fix).
+///
+/// Read the line above as answering exactly one question — **AXIS A, the browser-parity
+/// denominator**: does this face still declare the same route-*count* the browser face does. That
+/// is what `tui/tests/r942_tui.rs`'s `assert_eq!(wire::ROUTES.len(), 4)` pins, and it is why
+/// [`RECORD_ROUTES`] stays a second array rather than growing this one (see its own doc comment —
+/// the separation is deliberate, not an omission).
+///
+/// A different question — **AXIS B, coverage**: everything this face actually reads — has a
+/// different answer, `ROUTES` ∪ [`RECORD_ROUTES`] (plus `live.rs`'s `STREAM_ROUTE` when read beyond
+/// its own declaration). Splitting the two axes was always the right call; not telling
+/// `surface_parity_gate.mjs` about the split was the defect, and that gate now derives the AXIS B
+/// union from every path-shaped `pub const` array this file declares rather than reading `ROUTES`
+/// alone, so a third array of the same shape is picked up with no further edit to either file.
 pub const ROUTES: [&str; 4] = [
     "/v1/healthz",
     "/v1/transformations",
     "/v1/candidates",
     "/v1/escalations",
 ];
+
+/// The two routes this face reads about **one** record, as the templates `route-table.json`
+/// declares them.
+///
+/// 🔴 **Kept out of [`ROUTES`] rather than added to it, and the separation is a claim rather than
+/// tidiness.** [`ROUTES`] is a **denominator**: `tui/tests/r942_tui.rs` measures that it is the same
+/// four the browser face reads, "so that a difference between the two faces is a difference of
+/// medium and not of scope". These two are not in that denominator — they are read about **one row,
+/// when a reader opens it**, and a face that never opens a row reads neither. Folding them in would
+/// move the number the parity test compares and quietly change what that test is about.
+///
+/// 🔴 **They are spelled with their holes in.** `route-table.json` writes `{id}` and `{tid}`, the
+/// screen writes `{id}` and `{tid}`, and [`record_path`] is the one place either is filled. A road a
+/// reader can retype is worth more than a road already resolved — the resolved one is on the row
+/// above it.
+pub const RECORD_ROUTES: [&str; 2] = ["/v1/transformations/{id}", "/v1/receipts/{tid}"];
+
+/// The hole each of [`RECORD_ROUTES`] carries, in the same order.
+///
+/// 🔴 Two spellings for one substitution, because the engine gives them two: 44 §2.2 names the
+/// transformation's own id `{id}` on one route and `{tid}` on the other. This face does not
+/// normalise them — a template edited to say something the route table does not say is a second
+/// contract.
+pub const RECORD_HOLES: [&str; 2] = ["{id}", "{tid}"];
+
+/// The most bytes of id this face will put into a request line.
+///
+/// 🔴 A bound rather than trust: `gx1:` ids are short and fixed-width, and a length that is not
+/// checked is a length the wire chooses.
+pub const MAX_ID_BYTES: usize = 128;
+
+/// Whether this face will put `id` into a request line.
+///
+/// # 🔴 The membrane's first clause stops being structural the moment a path stops being a constant
+///
+/// This module's own heading says the claim *this face performs no effect* is "**structural rather
+/// than promised**": one function writes the four bytes `GET ` and no code path writes another
+/// method.
+///
+/// 🔴 **That function is [`open`], and the heading's `Request::send` names nothing** (`[T-r55]`,
+/// 2026-09-02, independent audit finding M1). There is no `Request` type in this file; `send`
+/// exists and delegates; the bytes are written in `open`, which says so of itself. The heading is
+/// left in the words it was written in — it is the claim's own history — and this paragraph is the
+/// correction, because a doc link that resolves to nothing is a road that arrives nowhere and this
+/// lane copied it into new prose before checking it.
+///
+/// The argument holds because every path `open` has ever written was a `&'static str` declared
+/// in this file. [`RECORD_ROUTES`] breaks that: the path now carries a value **the engine sent us**,
+/// and an id carrying a carriage return would let a list row compose a second request line — which
+/// is a method this module cannot write becoming a method this module can be *made* to write.
+///
+/// So the set is named, and it is named as an allow-list rather than as a list of characters to
+/// refuse: a deny-list is a claim about every character that exists, and this is a claim about the
+/// eight-odd this face needs. `gx1:` ids are base32 text after a scheme and a colon
+/// (`crates/gx-core`'s `Cid::to_text`), and the four punctuation marks below are RFC 3986's
+/// unreserved set plus the colon a scheme needs.
+///
+/// 🔴 **It is not the only guard, and that is deliberate.** [`open`] refuses a path with a control
+/// character or a space in it as well, so a caller that reaches it by some road this function does
+/// not sit on still cannot write two request lines. Two layers, and each one says out loud what it
+/// is for — the same shape as `acts::grounded` being asked by the reducer *and* by the draw road.
+#[must_use]
+pub fn addressable(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= MAX_ID_BYTES
+        && id.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '_' | '~' | '-')
+        })
+}
+
+/// The address of one record on one of [`RECORD_ROUTES`], or `None` for an id this face will not
+/// put on a socket.
+///
+/// `None` is **not** an error to be drawn as a kind of nothing: it is this face declining to ask,
+/// and [`Held::refusal`] is where that is said in words. A mark would report the engine's silence
+/// for a question the engine was never asked.
+#[must_use]
+pub fn record_path(template: &str, id: &str) -> Option<String> {
+    if !addressable(id) {
+        return None;
+    }
+    RECORD_HOLES
+        .iter()
+        .find(|hole| template.contains(**hole))
+        .map(|hole| template.replace(hole, id))
+}
 
 /// The default the terminal face reads when neither flag nor environment names one.
 ///
@@ -86,6 +195,18 @@ pub struct Reading {
 
 impl Reading {
     /// The state before any read has happened: the only producer of [`Nothing::Loading`].
+    ///
+    /// 🔴 **Corrected the same turn a second producer was added** (`[T-r82]`, 2026-09-02;
+    /// `req/924` §TUI-101). [`null_meaning`] now resolves a `Candidate` row's missing judged fields
+    /// to the same mark, so *the only producer* is no longer true and is corrected here rather than
+    /// left to be inherited — a doc comment that has drifted from the implementation is a lie the
+    /// next reader has no way to catch.
+    ///
+    /// The two producers say the **same thing to a reader** — *not measured yet; something is still
+    /// coming* — which is why an existing word was re-seated instead of an eighth being minted
+    /// (§TUI-48 reserves that spelling to the Owner). They differ in **what** is still coming: here
+    /// it is this process's read, and there it is the engine's own next transition. If those two
+    /// ever need telling apart on the screen, that is a spelling question and it goes to the Owner.
     #[must_use]
     pub fn pending(path: &str) -> Self {
         Self {
@@ -237,6 +358,364 @@ pub fn read_route(base_url: &str, path: &str, token: Option<&str>) -> Reading {
     }
 }
 
+/// The key a row names itself with.
+///
+/// 🔴 **The one thing that makes a record face possible**, and it is a key of the list rather than
+/// a name this face chose: `crates/gx-api/src/list.rs`'s `row_json` writes `"transformation":
+/// id.0.to_text()`, so every row on the ledger carries the address it can be asked about. Declared
+/// here rather than typed at the one call site because [`RECORD_ROUTES`] is filled from it —
+/// a second spelling would be a second answer to *which member is the address*, and gate `g80`
+/// measures that this is the same key `super::layout::LEDGER_COLUMNS` draws.
+pub const LEDGER_ID_KEY: &str = "transformation";
+
+/// The key `GET /v1/receipts/{tid}` mounts its decoded half under.
+///
+/// 🔴 The document itself is `envelope` + `issued_at`, and everything a receipt *says* is canonical
+/// DAG-CBOR inside `envelope.payload`. `crates/gx-api/src/handlers.rs`'s `get_receipt` mounts
+/// `receipt_view` **beside** the document rather than inside it, expressly so that a reader does not
+/// have to carry a decoder. This face is that reader.
+pub const RECEIPT_VIEW_KEY: &str = "receipt_view";
+
+/// The members of `receipt_view` this face draws, in the order it draws them.
+///
+/// 🔴 **`alg` is not here and never will be**, and that is the engine's ruling rather than this
+/// face's economy: `handlers.rs`'s `receipt_view` records that 33 NFR-011 makes the algorithm a
+/// property of the **key**, and forbids a wire-side alg-like field. A face that spelled `Ed25519`
+/// beside a receipt would be naming a fact no route carries — the reader's answer to *which
+/// algorithm* is [`RECEIPT_KEY_ID`], resolved against the key they pinned.
+pub const RECEIPT_VIEW_KEYS: [&str; 4] = ["key_id", "leaf_index", "tree_size", "root"];
+
+/// The members of `receipt_view` this face **does not** draw, named because they were let go of.
+///
+/// 🔴 `[T-r58]` named these three and did not close them; `[T-r76]` closes them the second way the
+/// membrane's second obligation allows — *drawn, or dropped and named* — and this array is the
+/// naming. [`help_lines`](super::renderer::help_lines) spells it on the `record` entry, on the same
+/// row that already names the route these members come off, so the hatch grows no new doorway: a
+/// reader reaches all three from the one key they already press.
+///
+/// `crates/gx-api/src/handlers.rs`'s `receipt_view` writes seven members, and its own table gives
+/// the reason each of these is dropped rather than drawn:
+///
+/// * **`subject`** — `payload.transformation`, which is *this record's own id*. The record already
+///   spells it on its head row as `transformation`, so drawing it here would put the same
+///   fifty-two characters on the screen a third time. That is the defect this lane exists to
+///   remove, and closing one instance of it by adding another would be absurd.
+/// * **`postcondition_fingerprint`** — a digest of what the transformation left behind. This face
+///   has no route that carries the *thing* it fingerprints, so the value is a number a reader can
+///   neither check nor use here; `gx receipt verify` is the road, and [`help_lines`]'s `beyond`
+///   entry already spells it.
+/// * **`issued_at`** — when the **receipt** was issued, which the record's own doc comment already
+///   warns is a different fact from `created_at`. Two instants three rows apart, one labelled and
+///   one not, is how two facts become one; the row is not bought.
+///
+/// 🔴 Together with [`RECEIPT_VIEW_KEYS`] this is the **whole** of the engine's object. Gate `g95`
+/// asserts the two arrays are disjoint and cover all seven members named in `handlers.rs`'s table,
+/// so a member the engine adds tomorrow makes the gate red rather than vanishing unnamed.
+pub const RECEIPT_VIEW_NOT_DRAWN: [&str; 3] =
+    ["subject", "postcondition_fingerprint", "issued_at"];
+
+/// How the receipt block introduces [`RECEIPT_VIEW_NOT_DRAWN`].
+///
+/// 🔴 **Declared beside the array it introduces, and spelled `not spelled` rather than `not drawn`,
+/// because a gate found the collision the other word makes.** `[T-r76]` first wrote `not drawn:`,
+/// which is the face's idiom for the **cut note** — `not drawn: 5 of 6 more rows`, a sentence about
+/// rows that ran out of screen. `g82` reads that string to decide whether the screen is claiming a
+/// cut, and went red at every shape: one spelling had been given a second meaning and the screen
+/// was reporting an event that had not happened. Two facts, one word, inside the module whose
+/// subject is that they are two.
+///
+/// 🔴 The two differ in kind as well, which is why the second spelling is right rather than merely
+/// convenient: the cut note is about **rows that ran out of screen** and a wider terminal undoes
+/// it, and this is about **members this face will not draw at any width**.
+pub const RECEIPT_VIEW_DROP_PHRASE: &str = "not spelled:";
+
+/// The member that answers *which key signed this*, which is as close as any route comes to
+/// answering *which algorithm*.
+pub const RECEIPT_KEY_ID: &str = "key_id";
+
+/// The three members of `receipt_view` whose `null` is [`Nothing::Absent`] and not
+/// [`Nothing::Unknown`].
+///
+/// 🔴 **The third carve-out on this file's general rule, on the same evidence as the first two.**
+/// [`inverse_status`] and [`status_reason`] are carved out because the engine's own source says what
+/// its `null` means on those keys; so does this one. `crates/gx-api/src/handlers.rs`'s `receipt_view`
+/// carries a table with a `null when` column, and for these three it reads *no inclusion proof
+/// (ASM-14: every `VerdictReceipt`)*. A receipt with no inclusion proof is a receipt for which these
+/// coordinates were **never written**, which is `Absent`'s definition — "a line where nothing was
+/// ever written". Drawing `?` would say this face asked and could not know, and it knows.
+///
+/// 🔴 `key_id` is deliberately **not** in this set: the same table says `null` **never** for it, so a
+/// `null` there is the engine breaking its own contract, and [`cell`]'s general rule drawing `?` is
+/// the honest answer to a fact this face cannot account for.
+pub const RECEIPT_NEVER_WRITTEN: [&str; 3] = ["leaf_index", "tree_size", "root"];
+
+/// Classify one member of `receipt_view`.
+///
+/// See [`RECEIPT_NEVER_WRITTEN`] for why three keys do not read through [`cell`]'s general rule.
+#[must_use]
+pub fn receipt_cell(view: &serde_json::Value, key: &str) -> Cell {
+    let Some(value) = view.get(key) else {
+        return Cell::Nothing(Nothing::Absent);
+    };
+    if value.is_null() && RECEIPT_NEVER_WRITTEN.contains(&key) {
+        return Cell::Nothing(Nothing::Absent);
+    }
+    cell(view, key)
+}
+
+/// What `GET /v1/receipts/{tid}` amounted to.
+///
+/// 🔴 **Five values and not two, and the fourth is the one that costs something to keep.** A face
+/// that asked *is there a receipt* and answered yes-or-no would fold four different facts into two,
+/// which is the collapse the seven words exist to refuse, committed one layer up from them.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ReceiptMark {
+    /// The read has not happened yet.
+    Loading,
+    /// The engine answered with a document.
+    Held,
+    /// 🔴 The engine answered `404`, and **that answer covers two facts this face cannot tell
+    /// apart**. `handlers.rs`'s `get_receipt` spells both in one refusal: *it has not been
+    /// committed*, **or** *this server holds neither its row nor its archive*. The first is an
+    /// absence; the second is this server's ignorance about a document that may well exist. One
+    /// status code, two preimages.
+    ///
+    /// So this face draws neither `--` nor `?` for it — both would pick one of the two — and spells
+    /// a phrase instead. The row beside it carries `state`, which is what lets a reader finish the
+    /// sentence themselves: a row that is not `Committed` has no receipt to hold. **The face
+    /// reports; the reader concludes.**
+    NotHere,
+    /// The read did not reach an answer: no body, or a status that is neither `2xx` nor `404`.
+    Unknown,
+    /// This face declined to ask. See [`addressable`].
+    Refused,
+}
+
+impl ReceiptMark {
+    /// All five, so a gate that sweeps them measures the set rather than a copy of it.
+    pub const ALL: [ReceiptMark; 5] = [
+        ReceiptMark::Loading,
+        ReceiptMark::Held,
+        ReceiptMark::NotHere,
+        ReceiptMark::Unknown,
+        ReceiptMark::Refused,
+    ];
+
+    /// What is drawn.
+    ///
+    /// 🔴 Three of the five borrow a mark from [`Nothing`] and two spell words, and the split is the
+    /// ruling: a mark is available exactly when one of the seven words is the whole truth. For
+    /// [`ReceiptMark::NotHere`] and [`ReceiptMark::Refused`] none of them is, so the screen spends
+    /// the characters.
+    #[must_use]
+    pub fn mark(self) -> &'static str {
+        match self {
+            ReceiptMark::Loading => Nothing::Loading.mark(),
+            ReceiptMark::Held => "held",
+            ReceiptMark::NotHere => "not here",
+            ReceiptMark::Unknown => Nothing::Unknown.mark(),
+            ReceiptMark::Refused => "not asked",
+        }
+    }
+
+    /// The paint role it is drawn in.
+    #[must_use]
+    pub fn role(self) -> super::tokens::Role {
+        match self {
+            ReceiptMark::Loading => Nothing::Loading.role(),
+            ReceiptMark::Held => super::tokens::Role::Body,
+            ReceiptMark::NotHere | ReceiptMark::Refused => Nothing::Absent.role(),
+            ReceiptMark::Unknown => Nothing::Unknown.role(),
+        }
+    }
+
+    /// What the mark means, for the page `?` opens.
+    ///
+    /// 🔴 Declared beside [`ReceiptMark::mark`] rather than written out in
+    /// `super::renderer::help_lines`, for the reason [`Nothing::word`] is: a second copy of these
+    /// five sentences is five sentences that stop being true one at a time. `held` and `not here`
+    /// are already words rather than marks, and they still need this — **a word on the screen is
+    /// not self-explaining just because it is a word**, and `not here` in particular is the one
+    /// that has to say *which two facts* the engine folded into one status code.
+    /// 🔴 **Declared, and no screen reads it yet.** That is the shape of a dead declaration, which
+    /// this face has been caught with before (`super::renderer::help_lines`'s own heading: two
+    /// declarations written, gated for internal consistency, and called by nothing that draws), so
+    /// it is said out loud rather than left for an audit.
+    ///
+    /// The entry that would have drawn it was written and **measured off the page**: at 120x32 the
+    /// hatch has a fixed number of rows, and a fourth entry of `[T-r55]`'s turned gates `g36` and
+    /// `g65` red by pushing four acts' intents and the vacant-field names off it. Room was bought
+    /// back out of that lane's own two entries and was still not enough. Taking it out of another
+    /// entry was refused: displacing an act's intent to explain `key_id` trades one road for
+    /// another, which is the reduction pass that cuts the honesty rather than the padding.
+    ///
+    /// So this stays, callable, as the single source the day the hatch can scroll or carry a second
+    /// page — either of which is a ruling, not a lane's own decision. The full argument and the
+    /// measured numbers are in `help_lines`, at the point where the entry would stand.
+    ///
+    /// What may **not** be shortened when that day comes is [`ReceiptMark::NotHere`]: it is the one
+    /// mark standing for **two** facts, and a gloss naming only one of them would be the collapse
+    /// the type exists to refuse.
+    #[must_use]
+    pub fn means(self) -> &'static str {
+        match self {
+            ReceiptMark::Loading => "not asked yet",
+            ReceiptMark::Held => "a signed document",
+            ReceiptMark::NotHere => "404: not committed, or this server does not hold it",
+            ReceiptMark::Unknown => "no answer",
+            ReceiptMark::Refused => "this face would not ask with that id",
+        }
+    }
+}
+
+/// The status `GET /v1/receipts/{tid}` answers when it holds no receipt.
+const NO_RECEIPT: u16 = 404;
+
+/// The key every refusal this surface issues carries (44 §2.3's table).
+///
+/// 🔴 Read as a **signature of the speaker**, not as a value: [`Held::receipt_mark`] uses it to tell
+/// a refusal `crates/gx-api` issued from a `404` that came from somewhere else entirely.
+pub const GX_CODE_KEY: &str = "gx_code";
+
+/// What this face knows about **one** record, over and above the row the list carried.
+///
+/// 🔴 **Not a member of [`Screen`], and the reason is a measurement rather than a preference.**
+/// `Screen` is constructed as a literal in ten places in `tui/tests/r942_tui.rs`; a fifth member
+/// would edit ten tests that have nothing to do with this, and an edit to a test is a thing this
+/// repository requires a dated ruling for. It is also the truer shape: `Screen` is *what one frame
+/// of the ledger is*, and this is *what one row of it says about itself* — the two are read on
+/// different occasions and one of them is usually not read at all.
+#[derive(Clone, Debug)]
+pub struct Held {
+    /// The record this is about. Empty when no record is open, which is the discriminator
+    /// [`Held::is_open`] reads.
+    pub id: String,
+    /// `GET /v1/transformations/{id}` — the row read again, about itself.
+    pub transformation: Reading,
+    /// `GET /v1/receipts/{tid}` — the signed document, if this server holds one.
+    pub receipt: Reading,
+    /// 🔴 Why this face did not ask, in words, when [`addressable`] refused the id. `None` is the
+    /// ordinary case and does not mean "the reads succeeded" — the two [`Reading`]s say that.
+    pub refusal: Option<String>,
+}
+
+impl Held {
+    /// No record is open. Both reads are pending and neither will ever be performed.
+    #[must_use]
+    pub fn none() -> Self {
+        Self {
+            id: String::new(),
+            transformation: Reading::pending(RECORD_ROUTES[0]),
+            receipt: Reading::pending(RECORD_ROUTES[1]),
+            refusal: None,
+        }
+    }
+
+    /// A record is open and neither read has returned.
+    #[must_use]
+    pub fn pending(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            ..Self::none()
+        }
+    }
+
+    /// Whether a record is open at all.
+    #[must_use]
+    pub fn is_open(&self) -> bool {
+        !self.id.is_empty()
+    }
+
+    /// Read both, in declaration order.
+    ///
+    /// 🔴 The refusal is decided **once**, before either socket is opened, and it refuses **both**
+    /// reads rather than each separately: an id this face will not put in one request line is an id
+    /// it will not put in the other, and deciding twice is two answers.
+    #[must_use]
+    pub fn read(base_url: &str, token: Option<&str>, id: &str) -> Self {
+        let mut held = Self::pending(id);
+        let Some(transformation) = record_path(RECORD_ROUTES[0], id) else {
+            held.refusal = Some(format!(
+                "this face will not ask about {id:?}: an id it can put in a request line is \
+                 alphanumeric with `:._~-`, and no longer than {MAX_ID_BYTES} bytes"
+            ));
+            return held;
+        };
+        // `record_path` refused nothing above, so the second template resolves for the same reason.
+        let Some(receipt) = record_path(RECORD_ROUTES[1], id) else {
+            held.refusal = Some(format!(
+                "{:?} carries neither of the two holes this face knows how to fill",
+                RECORD_ROUTES[1]
+            ));
+            return held;
+        };
+        held.transformation = read_route(base_url, &transformation, token);
+        held.receipt = read_route(base_url, &receipt, token);
+        held
+    }
+
+    /// Both readings, in the order [`RECORD_ROUTES`] declares them.
+    #[must_use]
+    pub fn readings(&self) -> [&Reading; 2] {
+        [&self.transformation, &self.receipt]
+    }
+
+    /// What the receipt read amounted to.
+    ///
+    /// 🔴 **A `404` is [`ReceiptMark::NotHere`] only when it came from this engine's own refusal**
+    /// (`[T-r55]`, 2026-09-02, independent audit finding S5). The two facts `NotHere` stands for are
+    /// the two `crates/gx-api/src/handlers.rs`'s `get_receipt` names, and they are facts **about a
+    /// row**. A `404` that never reached that handler is a third preimage and a different kind of
+    /// thing entirely: a server too old to carry the route, a proxy, or the wrong port — and this
+    /// file documents a live port disagreement of its own two paragraphs above [`DEFAULT_BASE_URL`],
+    /// so the wrong-server case is measured rather than imagined. Folding it in would make the face
+    /// answer *there is no receipt for this row* about **every** row while talking to a server that
+    /// cannot answer at all, which is the collapse this type exists to refuse, committed by the
+    /// classifier that refuses it.
+    ///
+    /// The discriminator is the engine's own error contract: 44 §2.3 gives every refusal a
+    /// [`GX_CODE_KEY`], so a body carrying one is a refusal this surface issued and a body without
+    /// one is something else answering. **It is not proof** — a proxy could forge the key — and the
+    /// point is not proof, it is that the face stops asserting a fact about a row on the strength of
+    /// a status code alone.
+    #[must_use]
+    pub fn receipt_mark(&self) -> ReceiptMark {
+        if self.refusal.is_some() {
+            return ReceiptMark::Refused;
+        }
+        if self.receipt.is_pending() {
+            return ReceiptMark::Loading;
+        }
+        match self.receipt.status {
+            Some(NO_RECEIPT) if self.speaks_gx() => ReceiptMark::NotHere,
+            _ if self.receipt.is_ok() && self.receipt.body.is_some() => ReceiptMark::Held,
+            _ => ReceiptMark::Unknown,
+        }
+    }
+
+    /// Whether the receipt read's body is a refusal **this surface** issued.
+    #[must_use]
+    fn speaks_gx(&self) -> bool {
+        self.receipt
+            .body
+            .as_ref()
+            .and_then(|body| body.get(GX_CODE_KEY))
+            .is_some_and(serde_json::Value::is_string)
+    }
+
+    /// The decoded half of the receipt, when there is one.
+    ///
+    /// `None` covers two shapes and the caller may not tell them apart from here: no receipt at all,
+    /// and a receipt whose payload would not decode (`handlers.rs`'s `receipt_view` answers `null`
+    /// for that, and serves the document anyway, so that a stranger can establish it is malformed).
+    /// [`Held::receipt_mark`] is what separates the first from the second.
+    #[must_use]
+    pub fn view(&self) -> Option<&serde_json::Value> {
+        let view = self.receipt.body.as_ref()?.get(RECEIPT_VIEW_KEY)?;
+        (!view.is_null()).then_some(view)
+    }
+}
+
 /// A socket that has answered its status line and its headers, handed over before the body has been
 /// read.
 ///
@@ -295,6 +774,18 @@ fn open(
     socket.set_read_timeout(Some(read_timeout)).ok();
     socket.set_write_timeout(Some(CONNECT_TIMEOUT)).ok();
 
+    // 🔴 **The second layer of [`addressable`], and it is here because this is the one function
+    // that writes a request line.** Until `RECORD_ROUTES` every path through here was a
+    // `&'static str` declared in this file, so "the only method this module can write is `GET`" was
+    // a property of the source. A path built from a value the engine sent makes it a property of
+    // whoever built the path — unless the writer itself refuses. A space ends the request target
+    // and a control character ends the line, so either one turns one request into two.
+    if !path.starts_with('/') || path.chars().any(|c| c.is_control() || c == ' ') {
+        return Err(format!(
+            "this face will not put {path:?} in a request line: a request target with a space or a \
+             control character in it is a second request"
+        ));
+    }
     // 🔴 The only method this module can write. There is no branch here and no parameter for it.
     let mut request = String::from("GET ");
     request.push_str(path);
@@ -843,6 +1334,17 @@ impl InverseMark {
 /// does not have the field* and *this row has no escrow* — and nothing on this screen tells them
 /// apart. It is written down rather than hidden, and the road to telling them apart is
 /// `GET /v1/healthz`'s `engine_version`, which this face already draws.
+///
+/// 🔴 **Declared and not distinguished, the second** (`req/924` §TUI-97, SS1136, 2026-09-02;
+/// measured on the Owner's running engine by `[T-r76]`): the `null` of a `Candidate` and the `null`
+/// of an `{"Aborted":"Expired"}` are **not the same nothing** — one is *not yet* and one is
+/// *never* — and this face draws both `--`. See [`INVERSE_NULL_STATES`] for the ruling and for why
+/// no eighth mark is minted here.
+///
+/// 🔴 The road for this one is **better than the first's and it is on the same row**: `state`
+/// separates the two and is drawn beside this cell. That is what makes this a collapse a reader can
+/// undo rather than a fact the screen destroys — and it is why `g97` measures whether `state` is
+/// still on the row at every width, rather than this comment asserting that it is.
 #[must_use]
 pub fn inverse_status(object: &serde_json::Value) -> InverseMark {
     let Some(value) = object.get(INVERSE_STATUS_KEY) else {
@@ -869,6 +1371,329 @@ pub fn inverse_status(object: &serde_json::Value) -> InverseMark {
             .find(|kind| *kind == text)
             .map_or(InverseMark::Other(text), InverseMark::Kind),
     }
+}
+
+/// The wire's key for where the transformation stands now.
+pub const STATE_KEY: &str = "state";
+
+/// The two states whose `inverse_status` is `null` for **different reasons**.
+///
+/// 🔴 `req/924` §TUI-97 (SS1136, 2026-09-02), measured on the Owner's running engine: of thirty-two
+/// rows, thirty carry `inverse_status "Available"` and two carry `null` — and those two are exactly
+/// one `Candidate` and one `{"Aborted":"Expired"}`. The wire flattens both to `null`; the ruling is
+/// that they are **two kinds of nothing**:
+///
+/// * `Candidate` — **not yet**. Nothing has been escrowed because nothing has been planned. Time
+///   will change this.
+/// * `Aborted` — **never**. The transformation did not commit, so there is nothing to invert and
+///   nothing ever will be.
+///
+/// 🔴 **This face draws both as `--` and that is a collapse, declared here rather than hidden.**
+/// [`inverse_status`]'s "Declared and not distinguished" paragraph carries the whole argument; what
+/// this array adds is that the collapse is **recoverable on the same row**: `state` is 32/32
+/// non-null on that engine and separates the two, so a reader looking at the row can tell them
+/// apart even though the cell cannot. `g97` is what holds the road open — a width at which the row
+/// is drawn and `state` is not, without the disclosure counting `state`, is the collapse becoming
+/// silent.
+///
+/// 🔴 Spelling a new mark for *not yet* is deliberately **not** done here: `req/924` §TUI-48 ruled
+/// that the vocabulary of nothing is closed at seven and that any eighth mark's spelling goes
+/// through the Owner (見本 → Owner 裁定 → 量産). A lane inventing one is the failure that ruling was
+/// written about.
+/// 🔴 **Derived, not typed a second time** (`[T-r82]`, 2026-09-02, closing the audit's D4-③).
+/// `[T-r76]` hand-wrote `["Candidate", "Aborted"]` here **and attached no freshness gate to it** —
+/// in the same lane whose own doc comment warned that a hand-made list of lifecycle states goes
+/// stale in silence. The names now come off [`NULL_MEANING_BY_STATE`], which `g98` checks against
+/// the engine's own `LIFECYCLE_STATES` at test time, so there is one list and it is the checked one.
+pub const INVERSE_NULL_STATES: [&str; 2] =
+    [NULL_MEANING_BY_STATE[0].0, NULL_MEANING_BY_STATE[1].0];
+
+/// The lifecycle states from which a `null` on a **judged** field can be read, and what it means.
+///
+/// # 🔴 The ruling this table is (`req/924` §TUI-101, SS1145, 2026-09-02)
+///
+/// Measured on the Owner's running engine and read off the seat's own inspection of the captures,
+/// two rows carry `verdict: null` **and** `inverse_status: null`, and the wire's `state` tells them
+/// apart 32/32. `[T-r76]` repaired the one cell it had measured and left the other three:
+///
+/// | row | field | what the wire means | drawn before |
+/// |---|---|---|---|
+/// | `Aborted Expired` | `inverse_status` | never committed, so nothing was ever escrowed | `--` ✓ |
+/// | `Aborted Expired` | `verdict` | terminal, so no verdict was written and none ever will be | `?` ✗ |
+/// | `Candidate` | `inverse_status` | **not yet**: T-3 has not run | `--` ✗ |
+/// | `Candidate` | `verdict` | **not yet**: T-3 has not run | `?` ✗ |
+///
+/// Three of four were wrong, and two of them in the direction `INHERITED_PRINCIPLES`' *nothing
+/// vertical* puts first: 🔴 **a "not yet" that comes from time was being drawn as a semantic
+/// "never".** The other pair — a `Candidate` and a terminal `Aborted` — were receiving the
+/// **identical symbol pair** `? / --`, which is the collapse §TUI-97 ruled must be visible.
+///
+/// # 🔴 The symbol is read from `(state, field)`, not from `(field, wire value)`
+///
+/// This is what makes the defect closeable **on this side of the membrane**: the wire flattens both
+/// rows to `null`, but `state` is non-null on every row of that bed and separates them, so the face
+/// has the fact and was throwing it away. §TUI-97's own ruling is that the collapse is recoverable
+/// on the same row; this table is that recovery taken rather than described.
+///
+/// # 🔴 No eighth mark is minted, and that is a hard boundary
+///
+/// `req/924` §TUI-48 (SS1079) reserves the spelling of an eighth kind of nothing to the Owner
+/// (見本 → Owner 裁定 → 量産). Both words used here are **already in [`Nothing::ALL`]**:
+///
+/// * [`Nothing::Loading`] (`...`) — *not measured yet; something is still coming*. This is the
+///   existing word for the *not yet* family, and re-seating an existing word is what §TUI-48 asks
+///   for in place of minting.
+/// * [`Nothing::Absent`] (`--`) — *a line where nothing was ever written*, which is what a terminal
+///   abort leaves behind and what [`inverse_status`] already resolves a `null` to.
+///
+/// 🔴 **And the existing ruling that a `null` and an `Unavailable` may not share a spelling is
+/// untouched**: `Unavailable` is a word the wire carried and is drawn as [`InverseMark::Kind`],
+/// never as a mark. This table only ever replaces one mark for nothing with another.
+///
+/// # 🔴 Two states and no more, and the rest is declared rather than assumed
+///
+/// The eleven states are not all rulings waiting to be written. A `null` is read through this table
+/// only where the lifecycle **entails** the reading:
+///
+/// * `Candidate` — 43 T-2 has run and T-3 has not. Whatever T-3 and T-4 will write is *not yet*
+///   written, and time changes it.
+/// * `Aborted` — terminal, carrying its `AbortReason`. Nothing further is written, ever.
+///
+/// Every other state is left to the classifier that was already there, because a `null` there is a
+/// fact about the **engine** and not about the lifecycle — a `Committed` row with no `verdict` is a
+/// gap, and drawing it as *not yet* would be this face inventing a reason. `Draft` is in the
+/// vocabulary and never in the table (`pipeline.rs` says so of itself), so it cannot reach a row.
+/// `Verifying` is arguably *not yet* as well and is **deliberately left out**: no row of the
+/// measured bed was in it, so a ruling here would be one this lane could not fire.
+///
+/// The remainder is not silence — `g98` prints every state it found no ruling for.
+pub const NULL_MEANING_BY_STATE: [(&str, Nothing); 2] =
+    [("Candidate", Nothing::Loading), ("Aborted", Nothing::Absent)];
+
+/// How many states `crates/gx-engine/src/pipeline.rs` declared when [`NULL_MEANING_BY_STATE`] was
+/// ruled on.
+///
+/// 🔴 **A tripwire, not a source of truth.** The list itself is read out of the engine's source by
+/// `g98` at test time and never copied here; this one number is what makes a *twelfth* state red
+/// instead of silently unruled. `[T-r76]`'s array had no such wire at all, which is the whole of
+/// the audit's D4-③.
+pub const LIFECYCLE_STATE_COUNT_AT_RULING: usize = 11;
+
+/// The fields whose `null` [`NULL_MEANING_BY_STATE`] is allowed to speak for.
+///
+/// 🔴 **Two, and the boundary is the point.** On the measured bed `created_at`, `scope`, `actor`,
+/// `rollback` and `superseded_by` are `null` on **all thirty-two rows regardless of state** — that
+/// is an engine gap, not a lifecycle fact, and reading it through this table would have the face
+/// telling a reader that a `Committed` record's `created_at` is *still coming*. These two are the
+/// judged fields: they are the ones 43's transitions write, so they are the ones the state entails.
+pub const NULL_MEANING_FIELDS: [&str; 2] = [VERDICT_KEY, INVERSE_STATUS_KEY];
+
+/// What kind of nothing this row's `state` says a missing judged field is, if it says anything.
+///
+/// `None` means *this face has no ruling for this state* and the general classifier stands.
+///
+/// 🔴 Keyed on [`StateMark`]'s **tag**, so `{"Aborted":"Expired"}` and a bare `"Aborted"` are the
+/// same row to this function. The member is what the state column draws; the reason an abort
+/// happened does not change that nothing further will be written.
+#[must_use]
+pub fn null_meaning(object: &serde_json::Value) -> Option<Nothing> {
+    let tag = match state(object) {
+        StateMark::Kind(text) => text,
+        StateMark::Compound { kind, .. } => kind,
+        StateMark::Nothing(_) | StateMark::Other(_) => return None,
+    };
+    NULL_MEANING_BY_STATE
+        .iter()
+        .find(|(name, _)| *name == tag)
+        .map(|(_, nothing)| *nothing)
+}
+
+/// What the `state` column draws: the engine's word, a tagged state with its member, or one of the
+/// kinds of nothing.
+///
+/// 🔴 **`state` carries two wire types in one column** (`[T-r76]`, 2026-09-02, measured on the
+/// Owner's engine): thirty-one rows spell it as a **string** (`"Committed"`, `"Candidate"`) and one
+/// as a **single-key object** (`{"Aborted":"Expired"}`). [`cell`]'s general rule turns a non-empty
+/// object into `value.to_string()`, so at a column thirteen cells wide the screen read
+/// `{"Aborted":"~` — **the whole column spent on punctuation, and `Expired`, the only fact the
+/// object was carrying, lost.**
+///
+/// That is verbatim the defect [`InverseMark::Consumed`] exists to prevent one column over, and it
+/// is repaired the same way and with the same words: the tag and its member, spelled as **two
+/// words**, so a cut takes the member and never hides that there was one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StateMark {
+    /// No word arrived, in the kind of nothing that was there instead.
+    Nothing(Nothing),
+    /// The engine spelled it as a bare string, and it is drawn as it arrived. The face declares no
+    /// enumeration of the lifecycle: `wire.rs` does not name the engine's enum (see
+    /// [`VERDICT_KINDS`] for the reason), so a hand-made list here would go stale in silence.
+    ///
+    /// # 🔴 RETRACTED, in the place the mistake is inherited from (`[T-r82]`, 2026-09-02)
+    ///
+    /// The sentence above is kept because it is what was written, and the half of it that is true
+    /// is still true: **this crate** may not name the engine's enum, for the membrane reason
+    /// [`VERDICT_KINDS`] gives. What `[T-r76]` said next, and raised as a finding, is **false**:
+    ///
+    /// > *`state`'s vocabulary has no declared enumeration, so a hand-written list goes stale in
+    /// > silence.*
+    ///
+    /// It is declared, in three places, and a seat confirmed all three from the source rather than
+    /// from a report:
+    ///
+    /// * `crates/gx-engine/src/pipeline.rs` — `pub enum Lifecycle`, eleven variants.
+    /// * the same file — **`pub const LIFECYCLE_STATES: [&str; 11]`**, whose own doc says it is
+    ///   declared once in 43 §1's order and that *a twelfth state added without a row is a compile
+    ///   error at `Lifecycle::name` and a failing probe at the table*.
+    /// * `crates/gx-engine/tests/lifecycle_states.rs`, which reads 43 §1's table out of the spec
+    ///   file and compares it against both.
+    ///
+    /// `crates/gx-core/src/error.rs`'s `pub enum AbortReason` does the same for the member an
+    /// `Aborted` carries, and it is closed on purpose (ASM-15).
+    ///
+    /// 🔴 **And the technique for reaching them was already in this lane's own suite.** `g95` reads
+    /// `crates/gx-api/src/handlers.rs` **at test time** to derive its denominator, and prints
+    /// `UNTESTABLE` where the file is not in the checkout. The membrane forbids a *dependency*, not
+    /// a *test-time read*: one column over, the same lane had already shown the way and did not
+    /// take it. What went stale in silence was not a list — it was the claim that no list existed.
+    ///
+    /// The freshness the retracted sentence said was impossible is now held by `g98`, over
+    /// [`NULL_MEANING_BY_STATE`].
+    Kind(String),
+    /// A single-key object — the tag and what it carries.
+    Compound {
+        /// The one key of the object.
+        kind: String,
+        /// What it held, as a string.
+        member: String,
+    },
+    /// A shape this face has no reading for, drawn as it arrived rather than guessed at.
+    Other(String),
+}
+
+impl StateMark {
+    /// What is drawn in the cell.
+    #[must_use]
+    pub fn mark(&self) -> String {
+        match self {
+            StateMark::Nothing(nothing) => nothing.mark().to_string(),
+            StateMark::Kind(text) | StateMark::Other(text) => text.clone(),
+            StateMark::Compound { kind, member } => format!("{kind} {member}"),
+        }
+    }
+
+    /// The paint role it is drawn in — [`super::tokens::Role::Body`] for everything the wire
+    /// carried, for the reason [`InverseMark::role`] gives: the states are told apart by their
+    /// spelling on `mono`, where there is no hue at all.
+    #[must_use]
+    pub fn role(&self) -> super::tokens::Role {
+        match self {
+            StateMark::Nothing(nothing) => nothing.role(),
+            _ => super::tokens::Role::Body,
+        }
+    }
+}
+
+/// Classify one row's `state`.
+///
+/// 🔴 **A single-key object is the only object shape read.** Two keys, or a key holding something
+/// that is not a non-empty string, falls to [`StateMark::Other`] and is drawn as it arrived — a
+/// face that folded an unread shape into `kind member` would be reporting the shape it expected
+/// instead of the shape it was sent, which is the sentence [`inverse_status`] already makes about
+/// a `Consumed` whose member did not come.
+#[must_use]
+pub fn state(object: &serde_json::Value) -> StateMark {
+    let Some(value) = object.get(STATE_KEY) else {
+        return StateMark::Nothing(Nothing::Absent);
+    };
+    if let serde_json::Value::Object(map) = value {
+        if map.len() == 1 {
+            if let Some((kind, held)) = map.iter().next() {
+                if let Some(member) = held.as_str() {
+                    if !member.is_empty() {
+                        return StateMark::Compound {
+                            kind: kind.clone(),
+                            member: member.to_string(),
+                        };
+                    }
+                }
+            }
+        }
+        if !map.is_empty() {
+            return StateMark::Other(value.to_string());
+        }
+    }
+    match cell(object, STATE_KEY) {
+        Cell::Nothing(nothing) => StateMark::Nothing(nothing),
+        Cell::Value(text) => StateMark::Kind(text),
+    }
+}
+
+/// The wire's key for the transformation that replaced this one.
+///
+/// 🔴 **Declared here and spelled in two other places, and that is measured rather than tidied.**
+/// `super::layout::LEDGER_COLUMNS` draws a column under this name and
+/// `super::renderer::AGREEMENT_KEYS` compares it; both are frozen tables this lane does not touch.
+/// Gate `g94` asserts all three are the same string, so a rename becomes a red test instead of a
+/// column that quietly stops agreeing with the row.
+pub const SUPERSEDED_BY_KEY: &str = "superseded_by";
+
+/// What the record draws on `superseded_by` when [`supersede_agrees`] holds.
+///
+/// 🔴 **Words, and not a symbol.** `INHERITED_PRINCIPLES` §3c-③'' lets a TUI face spend a symbol
+/// only when a *word* disappears in exchange; nothing disappears here except a repeated address, so
+/// no symbol is minted. Neither key loses its own word either: `inverse_status` keeps `Consumed`
+/// one row above and `superseded_by` keeps its label on this one.
+pub const SUPERSEDE_AGREEMENT: &str = "same as inverse_status";
+
+/// Whether this row's `superseded_by` names the same transformation `inverse_status` already
+/// named, so that drawing the address a second time would spell one fact twice.
+///
+/// # 🔴 The two are the same value by construction, and this is where that was checked
+///
+/// `[T-r76]`, 2026-09-02. The question asked first was not *are these equal on this bed* but *can
+/// the engine ever make them differ* — a face that folded two coincidentally-equal facts into one
+/// would be lying about the engine rather than economising on a row. Read out of the engine's live
+/// source, not out of a capture:
+///
+/// * `crates/gx-engine/src/pipeline.rs`'s `supersede_after_commit` is 43 T-12, and its own comment
+///   says "Three facts move together (**M5-16 adopted (a)**: one place) ... and this is the only
+///   place any of them is written". The block writes, from **one binding** `*t_u`:
+///   `self.supersedes.record(t_o, *t_u)`, `row.status = InverseStatus::Consumed { by: *t_u }` and
+///   `entry.superseded_by = Some(*t_u)`.
+/// * `crates/gx-engine/src/replay.rs`'s `EngineJournalRecord::Superseded` arm rebuilds both from
+///   **one record field** `*by`: `row.superseded_by = Some(*by)` and
+///   `held.status = InverseStatus::Consumed { by: *by }`.
+/// * Those are the **only** writers. Grepping the engine's `src` for `superseded_by =`,
+///   `.status = InverseStatus::` and `status: InverseStatus::` returns those four assignments plus
+///   two constructions of `Available` / `Unavailable`, and no site writes `Consumed` alone.
+/// * The two arrive on the wire through one spelling: `crates/gx-api/src/list.rs` asks
+///   `engine.superseded_by(&id)` and `engine.inverse_status(&id)` about the **same** `id`, and
+///   `gx_core::Cid`'s `Serialize` is `serialize_str(&self.to_text())` on a human-readable format,
+///   which `gx-canon/tests/cid_text.rs` pins as the one implementation of `gx1:<base32>` in the
+///   workspace.
+///
+/// So `inverse_status == Consumed { by: X }` **entails** `superseded_by == X`.
+///
+/// # 🔴 The converse does not hold, and the fold does not claim it
+///
+/// Both writers guard the escrow half (`if let Some(row) = …get_mut(…)`) and only the pipeline's
+/// loop has already proved the row exists; a replay over a journal whose `Escrowed` record is
+/// missing sets `superseded_by` and leaves `inverse_status` at `null`. That row draws its address
+/// and its own mark, untouched — this function answers `false` there. The fold is one-directional
+/// because the fact is.
+///
+/// # 🔴 Equality is asked of the drawn text, not of the parsed value
+///
+/// The comparison is `by` against [`cell`]'s `Value`, which is what the two rows would put in the
+/// buffer. A row where the wire sent `superseded_by` as something other than a string, or as one of
+/// the seven kinds of nothing, is not folded: this face may only remove a repetition it can see.
+#[must_use]
+pub fn supersede_agrees(object: &serde_json::Value) -> bool {
+    let InverseMark::Consumed { by } = inverse_status(object) else {
+        return false;
+    };
+    matches!(cell(object, SUPERSEDED_BY_KEY), Cell::Value(text) if text == by)
 }
 
 /// The wire's key for why `status` is not `ok`, on `/v1/healthz` and on `server_health`

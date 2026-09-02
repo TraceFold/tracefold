@@ -680,9 +680,17 @@ pub async fn create_candidate(
 /// `404 NOT_FOUND` for an id this engine has never planned.
 pub async fn get_candidate(State(state): State<AppState>, Segment(id): Segment<String>) -> Answer {
     let id = transformation_id(&id)?;
+    let at = state.now();
     let (transformation, lifecycle, verdict) = {
         // 🔴 **DR-43-6 / `req/215` H-05** — read to the end of the log first, without the lock.
-        let engine = state.engine_refreshed()?;
+        let mut engine = state.engine_refreshed()?;
+        // 🔴 **[T-r56] / this lane** — see [`get_transformation`]'s copy of this comment: the
+        // same best-effort, lock-free, idempotent rebuild `with_a_body` already gives the write
+        // handlers, generalised to this read face rather than left a sibling that still answers
+        // `null` for a row `with_a_body` would happily rebuild one call later.
+        if engine.transformation(&id).is_none() {
+            let _ = rebuilt(&state, &mut engine, &id, at);
+        }
         (
             serde_json::to_value(engine.transformation(&id)).unwrap_or(serde_json::Value::Null),
             engine.state(&id),
@@ -746,9 +754,31 @@ pub async fn get_transformation(
     Segment(id): Segment<String>,
 ) -> Answer {
     let id = transformation_id(&id)?;
+    let at = state.now();
     let (transformation, lifecycle, superseded_by, rollback, inverse_status) = {
         // 🔴 **DR-43-6 / `req/215` H-05** — read to the end of the log first, without the lock.
-        let engine = state.engine_refreshed()?;
+        let mut engine = state.engine_refreshed()?;
+        // 🔴 **[T-r56] / this lane** — `with_a_body`'s rebuild (DR-43-6 / `req/215` M-01),
+        // generalised from the five write handlers it already covers to this read face
+        // (`feedback_fix_the_question_not_the_row`: a repair confined to the row it was measured
+        // on leaves the sibling that asks the same question — "does this process hold a body for
+        // this row" — still answering wrong). `GET /v1/transformations/{id}` and
+        // `GET /v1/candidates/{id}` were the two siblings `without_a_body`'s own doc comment names
+        // ("`GET /v1/candidates/{id}` had just answered `200`") without ever being changed
+        // themselves.
+        //
+        // Best-effort and silent by construction: a `GET` must never turn into a write-style
+        // refusal, so a rebuild this cannot attempt (no draft archive, no adapter, a re-plan that
+        // names a different id) is swallowed and this falls through to the pre-existing `null`
+        // body — the same answer this endpoint always gave, not a new failure mode. Safe without
+        // the cross-process `.gx/LOCK` write lock `engine_for_write` takes: `rehydrate_committed`
+        // appends nothing to the journal or the ledger (`store.rs`'s own note on `catch_up_unlocked`
+        // says a `GET` "may not do is repair" of *those two files*; this touches neither), it only
+        // seats an entry in this process's in-memory table, and it is idempotent when a body is
+        // already held (`rehydrate_committed`'s own first line).
+        if engine.transformation(&id).is_none() {
+            let _ = rebuilt(&state, &mut engine, &id, at);
+        }
         (
             serde_json::to_value(engine.transformation(&id)).unwrap_or(serde_json::Value::Null),
             engine.state(&id),

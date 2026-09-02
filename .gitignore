@@ -38,4 +38,32 @@ conformance/divergences/
 tools/_scratch_*
 tools/_wire_*
 C*Usersmhira/
+
+# req/1065 (2026-09-02) gate_watch.mjs's per-run evidence snapshots. Bounded locally (RETAIN_N=60
+# in tools/gate_watch.mjs prunes older ones per mode) but still real per-commit diff noise if
+# tracked -- the same reasoning req/145 gave conformance/*.jsonl above (regenerated on every run,
+# adds no reproducibility by being committed). tools/gate_runs/HISTORY.txt is the durable,
+# git-tracked summary (one line per run, same `.txt`-not-`.log` convention as
+# tools/disk_sentinel_log.txt uses to opt back into tracking despite the blanket *.log rule above)
+# -- only the raw JSON detail behind each line is left untracked.
+tools/gate_runs/*.json
 req/688_SESSION_DISTILL_2026-08-23/raw.anchor.txt
+
+# req/1079 (2026-09-02) tools/version_sync_check.mjs's per-run evidence: one JSON report per
+# invocation of the daily crates.io/npm version-drift check, plus LATEST.json/HISTORY.log/
+# scheduled_run.log and the isolated _test_injection_runs/ negative-control reports (req/1079 §5).
+# Same reasoning as tools/gate_runs/*.json above: regenerated every run, adds diff noise with no
+# reproducibility gained by being committed. The durable trail lives on disk locally
+# (HISTORY.log is append-only, never truncated) but is not repo history.
+tools/version_sync_reports/
+
+# 2026-09-02: req_mint.mjs leaves a per-number lock behind on purpose (see tools/req_mint.mjs).
+# They are reservation artifacts, not content -- untracked they block other seats' merges.
+req/.mint_lock_*
+
+# 2026-09-02: engrave/edit backups are restore points, kept on disk (no-delete) but not tracked.
+req/*.bak-*
+*.md.bak-*
+
+# 2026-09-02: 1.9MB lane scratch report, kept on disk, too large to track.
+tools/gates/_lane_*.json

@@ -168,6 +168,12 @@ fn dump(options: &Options, tier: Tier) -> crate::Result<Answer> {
             // The same default view the shape above is read from: `--dump` draws one frame and
             // nobody has scrolled it.
             glide: super::tui::acts::View::default().glide,
+            // 🔴 Nought, and it is a fact rather than a placeholder: `--dump` draws one frame from
+            // a view nobody has opened, so the shape above is always the grid and these two are
+            // read by nothing (`super::layout::resolve_attended` asks them only for
+            // `Subject::Record`).
+            record_members: 0,
+            record_beyond: 0,
         },
     );
     let buffer =

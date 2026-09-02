@@ -22,11 +22,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-wasm.mjs",
+    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.json",
+    "postbuild": "node scripts/copy-wasm.mjs",
     "build:wasm": "bash ../wasm-verify/build.sh",
     "pretest": "npm run build",
     "test": "node --test",
-    "prepublishOnly": "npm run build && npm test",
+    "prepublishOnly": "npm test",
     "quickstart": "node scripts/quickstart.mjs",
     "gui-probe": "node scripts/gui_probe.mjs"
   },
