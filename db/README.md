@@ -41,6 +41,35 @@ the Measured table. The crate builds and its controls pass without them, which i
 next section is for, but it does mean the derived sections here cannot be regenerated from
 this folder alone.
 
+## Tests
+
+`tests/` is carried whole, not summarised: one file of controls and the fixture corpora they
+build against. Nothing under it was picked out, cut down or paraphrased for this folder.
+
+| what | count |
+|---|---|
+| files under `tests/` in this folder | 9 |
+| files left out when this folder was assembled | 0 |
+| control functions in `tests/controls.rs` | 21 |
+
+Every fixture is invented text — nobody's directory tree, no real corpus, no request that ever
+answered a browser. That was checked, not assumed: two independent scanners (`grep -rInE` and a
+PowerShell `Select-String` in regex mode, because `-SimpleMatch` silently returns zero on these
+patterns) searched `tests/` for a filesystem path outside this repository, a credential-shaped
+string and an email address, each scanner first proven alive against a planted file that must
+match. Both returned zero on all three patterns; `db/tools/publish_floor_gate.mjs` reruns the
+file count and refuses if it stops matching the numbers above.
+
+The engine this crate is developed against carries seven more controls than the 21 above:
+`gate --json`, the `/v1/gate` route and `--include-gaps` are exercised by tests that are not
+in this folder, because the `src/` they test against was never synced here past the commit
+that added `db/`. Carrying the newer `tests/controls.rs` alone was tried while preparing this
+section and produces 23 passed, 5 failed — a broken build, not a stricter one — because the
+five failing controls call a flag and a route this folder's binary does not have. That gap is
+between `src/` here and `src/` in the engine's own tree, not between `tests/` here and
+`tests/` there; closing it means syncing both together, and is out of the range this folder's
+maintenance has authorised so far.
+
 ## Commands
 
 Derived from the command tree; the script that derives it is not in this folder, but
