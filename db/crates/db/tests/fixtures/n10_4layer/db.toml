@@ -1,0 +1,16 @@
+[db]
+schema = 1
+
+[layers]
+L0 = "hot"
+L1 = "lean"
+L2 = "full"
+
+[caps]
+L0 = 100
+L1 = 30
+L2 = 8
+budget_tokens = 8000
+
+[bands]
+order = ["arch", "evidence"]

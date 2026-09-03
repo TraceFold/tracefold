@@ -159,6 +159,20 @@ full, dated detail (checked current as of 2026-09-01).
 
 ---
 
+## db/
+
+[`db/`](db/README.md) is a self-contained crate that compiles a corpus of markdown into addressable
+atoms, records what it admitted in an append-only journal, and answers queries from a SQLite index
+it can delete and rebuild. Apache-2.0, like the rest of this repository. It is its own cargo
+workspace rather than a member of the one at the root, so `cargo build --workspace` here does not
+touch it and none of this repository's checks cover it -- build and test it on its own with
+`cd db && cargo test -p db` (21 controls, all passing when it was added). On the corpus it was
+measured against it returns 14.7x fewer bytes than `grep` for the same question but takes about
+62 ms where `grep` takes 2; that trade, and the two rows the harness refused to time at all, are in
+[db/README.md](db/README.md).
+
+---
+
 ## Writing
 
 - [The undo has to exist before the write does](https://dev.to/mahirhir/the-undo-has-to-exist-before-the-write-does-46on) — 30 Aug 2026

@@ -1,0 +1,6 @@
+[workspace]
+members = ["crates/db"]
+resolver = "2"
+
+[profile.release]
+opt-level = 1

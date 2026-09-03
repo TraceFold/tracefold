@@ -1,0 +1,10 @@
+[band]
+id = "arch"
+title = "Architecture"
+abstract = "Two bands, small enough that every gate control can be built by hand."
+executor = "owner"
+
+[[documents]]
+path = "01_overview.md"
+order = 0
+role = "decisions"

@@ -1,0 +1,10 @@
+[band]
+id = "evidence"
+title = "Evidence"
+abstract = "One measured run, kept under the L2 cap of eight rows."
+executor = "lane"
+
+[[documents]]
+path = "run.md"
+order = 0
+role = "evidence"
