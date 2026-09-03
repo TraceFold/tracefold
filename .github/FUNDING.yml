@@ -2,4 +2,9 @@
 # Switched from Polar to Stripe on 1 Sep 2026 (Polar checkout account's
 # onboarding was not finishing). Stripe has no dedicated FUNDING.yml
 # platform key, so this stays under `custom:` same as the prior Polar link.
+#
+# 3 Sep 2026: this file had been on `main` since 31 Aug, but Settings > Features >
+# Sponsorships was off, so GitHub never parsed it and the header Sponsor button was
+# absent (`hasSponsorshipsEnabled: false`, `fundingLinks: []`, measured over GraphQL).
+# The setting is now on; this touch is what makes GitHub re-read the file.
 custom: ["https://buy.stripe.com/8x214mbkU2pu5yneyk97G00"]
