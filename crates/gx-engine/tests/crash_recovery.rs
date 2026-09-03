@@ -613,13 +613,26 @@ fn a_restart_restores_the_drafts_and_the_recovery_needs_no_table() {
     //
     // 🔴 **Narrowed by DR-43-2** (`req/38` §148), and the two halves are now measured separately
     // rather than as one. M5H3-5's claim was and remains "`open` rebuilds **no bodies**, and the
-    // recovery completes a commit anyway" — that is what `held_ids` and the four `is_none()`
+    // recovery completes a commit anyway" — that is what `held_ids` and the three `is_none()`
     // assertions below say, and none of them moved. What did move is the claim this line used to
     // make by accident: `transformation_ids()` was empty because *nothing* survived, and `req/182`
     // H-02 measured what that cost a restarted `gx serve` (a `404` for a row its own journal held).
     // The Σ-shadow now answers the state, so the id is here and the body is not — which is the
     // distinction M5H3-5 was about in the first place. The old assertion is kept, one accessor
     // narrower, rather than deleted.
+    //
+    // 🔴 **`planned_delta` retracted from this list (T-r90)** — this test's own two lines above
+    // (`sigma_from_journal.state_of(&id).and_then(|r| r.delta_cid)` and
+    // `engine.blobs().contains(&delta_cid)`, both true) already demonstrated that the name and the
+    // body this accessor needs both survive the restart; the `is_none()` this test asserted below
+    // was a fact about the accessor's own blindness to a body its own engine already held on disk,
+    // not a fact about what `open` rebuilds. `Engine::planned_delta` (`pipeline.rs`, doc comment
+    // "T-r90") now reads `self.table` then `self.shadow`+`self.blobs` on a miss, the same shape
+    // this suite's own narrative describes recovery itself doing three lines below ("What it reads
+    // instead is the journal (through Sigma), the blob store … and the ledger"). This test's
+    // negative control is `crates/gx-engine/tests/planned_delta_shadow_restart.rs`, which fails
+    // pre-fix and passes post-fix; see that file for the restart-vs-live comparison this assertion
+    // does not attempt.
     assert!(
         engine.transformation_ids().is_empty(),
         "no state rows: `open` rebuilds no `Transformation` body, and M5H3-5's measurement is that          the recovery does not need one"
@@ -634,7 +647,12 @@ fn a_restart_restores_the_drafts_and_the_recovery_needs_no_table() {
         "the state a restarted engine answers is the journal's own fold and nothing else — no          table, no body, no second reading (req/38 §148 T6 condition ①)"
     );
     assert!(engine.precondition_fingerprint(&id).is_none());
-    assert!(engine.planned_delta(&id).is_none());
+    assert!(
+        engine.planned_delta(&id).is_some(),
+        "T-r90: the accessor now falls through table -> shadow(delta_cid) -> blobs, and this row's \
+         delta_cid and blob both survived the restart (see BLOB_PRESENT above and the delta_cid \
+         binding this test already reads at the top of this function)"
+    );
     assert!(engine.transformation(&id).is_none());
     assert!(engine.precondition_snapshot(&id).is_none());
     // What it does: the draft phase, the blob bodies and the ledger's own file.

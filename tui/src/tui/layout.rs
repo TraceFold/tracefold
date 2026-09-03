@@ -118,17 +118,45 @@ pub const LAYOUT_ROLES: [&str; 4] = [
 ];
 
 /// The declared order of letting go. `One` is the last to be dropped.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub enum Priority {
-    /// Never dropped while anything is drawn at all.
-    One,
-    /// Dropped after everything below it.
-    Two,
-    /// Dropped early.
-    Three,
-    /// Dropped first.
-    Four,
+///
+/// 🔴 **A re-export, and it used to be a declaration** (`[T-r87]`, 2026-09-02). The four variants
+/// are unchanged and every caller's spelling is unchanged; what moved is *where the rank is
+/// decided*. It was decided **here**, at each column and at each region, by typing `Priority::Two`
+/// beside the thing — so the order this face lets go of columns in was a fact about ten lines of
+/// this file and not a declaration anything could swap. It is now `super::tokens::standing`, on the
+/// placement ladder, beside the width and the order, and a second name for it here would be the
+/// defect `super::tokens`'s own header names: two names for one join disagree the day one of them
+/// is edited.
+pub use super::tokens::Rank as Priority;
+
+/// The width class this face resolves placement at, and the table it resolves against.
+///
+/// 🔴 Read once per call rather than threaded from the top, and the reason is stated rather than
+/// left as convenience: the scheme is a property of the **reader's environment** exactly as
+/// `super::tokens::Tier::detect` reads `NO_COLOR`, and every function below that needs it is
+/// already taking a `width` — so threading a second argument through twenty-five call sites would
+/// change every one of them to carry a value none of them decides. **Named ceiling**: this makes
+/// the scheme process-global, so two frames drawn in one process cannot use two schemes. Nothing
+/// asks for that today and the day something does, this is the one line that changes.
+fn table(width: u16) -> (super::tokens::Grade, super::tokens::Scheme) {
+    (
+        super::tokens::Grade::of(width),
+        super::tokens::Scheme::detect(),
+    )
 }
+
+/// The grade and scheme every `const` in this file is resolved at.
+///
+/// 🔴 A `const` cannot read an environment, so the declarations below answer at the widest grade of
+/// the scheme this face ships with. That is not a hidden second table: [`columns_for_less`] — the
+/// one function that decides what is actually **drawn** — resolves at the real grade and the real
+/// scheme, and these constants are the *declaration index* (which keys exist, and what they are
+/// worth when nothing narrows them). Gate `g103` measures that the two agree at `Grade::Full` under
+/// `Scheme::Ledger`, so the index can never quietly stop describing the shipped default.
+const BASE: (super::tokens::Grade, super::tokens::Scheme) = (
+    super::tokens::Grade::Full,
+    super::tokens::SCHEME_DEFAULT,
+);
 
 /// Where a reader goes for what this region carried, once it is not on the screen.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -166,7 +194,7 @@ pub const REGIONS: [Region; 4] = [
     Region {
         intent: Intent::HowThisPageKnows,
         role: RegionRole::Apparatus,
-        priority: Priority::Three,
+        priority: super::tokens::standing(super::tokens::Slot::BandApparatus, BASE.1).0,
         recoverable: Recoverable::Route("GET /v1/healthz"),
         // 🔴 Three, and it was four. The fourth row was reserved against a `status_reason` long
         // enough to wrap twice, and in every state measured against a live engine it was **never
@@ -188,12 +216,17 @@ pub const REGIONS: [Region; 4] = [
         // new finding: `ok` has no reason, so the truth is `--`). The reason is drawn now exactly
         // when the engine is not `ok`, which is the state it was reserved for, and it is disclosed
         // among the fields not drawn when it is not.
-        min_rows: 1,
+        //
+        // 🔴 **The numeral left this line** (`[T-r87]`, 2026-09-02). What stands here is the same
+        // one, resolved through `super::tokens::cells` at `band.apparatus`, and the paragraphs above
+        // are the record of how it came to be one — kept, because a declaration that loses the
+        // argument for its own value is a number nobody may ever change again.
+        min_rows: super::tokens::cells(super::tokens::Slot::BandApparatus, BASE.0, BASE.1).width,
     },
     Region {
         intent: Intent::RecordsTheEngineProduced,
         role: RegionRole::Subject,
-        priority: Priority::One,
+        priority: super::tokens::standing(super::tokens::Slot::BandLedger, BASE.1).0,
         recoverable: Recoverable::Address,
         // A header and three rows. A ledger showing one row is not a smaller ledger, it is a
         // different claim: it reads as "this is what there is".
@@ -209,21 +242,25 @@ pub const REGIONS: [Region; 4] = [
         // it bought is still answered: [`heading`] is drawn on the **top rail**, in the apparatus
         // region's one row, beside the address it is the last segment of. Nothing is lost and one
         // record is gained, which is the trade this whole lane is.
-        min_rows: 4,
+        //
+        // 🔴 The numeral left this line too (`[T-r87]`): `band.ledger` is its own measure precisely
+        // because it is the one region floor that is not one row, and a measure the other three
+        // shared would have hidden that.
+        min_rows: super::tokens::cells(super::tokens::Slot::BandLedger, BASE.0, BASE.1).width,
     },
     Region {
         intent: Intent::WhereTheNumbersCameFrom,
         role: RegionRole::Provenance,
-        priority: Priority::One,
+        priority: super::tokens::standing(super::tokens::Slot::BandProvenance, BASE.1).0,
         recoverable: Recoverable::Nowhere,
-        min_rows: 1,
+        min_rows: super::tokens::cells(super::tokens::Slot::BandProvenance, BASE.0, BASE.1).width,
     },
     Region {
         intent: Intent::WhatIsNotOnTheScreen,
         role: RegionRole::Disclosure,
-        priority: Priority::One,
+        priority: super::tokens::standing(super::tokens::Slot::BandDisclosure, BASE.1).0,
         recoverable: Recoverable::Nowhere,
-        min_rows: 1,
+        min_rows: super::tokens::cells(super::tokens::Slot::BandDisclosure, BASE.0, BASE.1).width,
     },
 ];
 
@@ -297,57 +334,60 @@ pub const LEDGER_COLUMNS: [Column; 10] = [
     // `VALIDATION_ERROR` / `422`, and only the whole fifty-two answers `200`. Whatever this column
     // draws is a discriminator and never an address, at any width, and
     // `super::renderer::help_lines` is where that is now said out loud.
-    Column {
-        key: "transformation",
-        width: 14,
-        priority: Priority::One,
-    },
-    Column {
-        key: "verdict",
-        width: 9,
-        priority: Priority::One,
-    },
-    Column {
-        key: "state",
-        width: 13,
-        priority: Priority::One,
-    },
-    Column {
-        key: "created_at",
-        width: 20,
-        priority: Priority::Two,
-    },
-    Column {
-        key: "scope",
-        width: 18,
-        priority: Priority::Two,
-    },
-    Column {
-        key: "enforced",
-        width: 8,
-        priority: Priority::Two,
-    },
-    Column {
-        key: "inverse_status",
-        width: 14,
-        priority: Priority::Three,
-    },
-    Column {
-        key: "rollback",
-        width: 10,
-        priority: Priority::Three,
-    },
-    Column {
-        key: "superseded_by",
-        width: 16,
-        priority: Priority::Four,
-    },
-    Column {
-        key: "actor",
-        width: 12,
-        priority: Priority::Four,
-    },
+    //
+    // 🔴 **Every one of the thirty numerals and rank names that stood here is gone to the ladder**
+    // (`[T-r87]`, 2026-09-02). Ten keys, ten widths and ten ranks were typed at this array, and the
+    // array's own subscript was a *fourth* declaration nothing had written down: the order columns
+    // are kept in. All four are `super::tokens` now — `Slot::key`, `cells(..).width`,
+    // `cells(..).rank` and `cells(..).order` — so *put that column first*, *make it narrower* and
+    // *let it go sooner* are table edits rather than edits to this file.
+    //
+    // What this array still is: the **declaration index**, resolved at [`BASE`]. It says which keys
+    // exist and what they are worth when nothing narrows them, and it is what the twenty-seven
+    // sites that read `LEDGER_COLUMNS` have always wanted. [`columns_for_less`] is what decides the
+    // columns a screen actually draws, and it resolves at the real grade and the real scheme.
+    column(super::tokens::LEDGER_SLOTS[0]),
+    column(super::tokens::LEDGER_SLOTS[1]),
+    column(super::tokens::LEDGER_SLOTS[2]),
+    column(super::tokens::LEDGER_SLOTS[3]),
+    column(super::tokens::LEDGER_SLOTS[4]),
+    column(super::tokens::LEDGER_SLOTS[5]),
+    column(super::tokens::LEDGER_SLOTS[6]),
+    column(super::tokens::LEDGER_SLOTS[7]),
+    column(super::tokens::LEDGER_SLOTS[8]),
+    column(super::tokens::LEDGER_SLOTS[9]),
 ];
+
+/// One column, resolved off the placement ladder.
+///
+/// 🔴 The join between the two vocabularies, and it is one function so that it is one join. `key`
+/// is the wire's own word (`super::tokens::Slot::key`, gate `P5`), `width` and `priority` are what
+/// the table says at the grade and scheme it is asked at.
+#[must_use]
+const fn column_at(
+    slot: super::tokens::Slot,
+    grade: super::tokens::Grade,
+    scheme: super::tokens::Scheme,
+) -> Column {
+    let cells = super::tokens::cells(slot, grade, scheme);
+    Column {
+        key: match slot.key() {
+            Some(key) => key,
+            // Unreachable from `LEDGER_SLOTS`, and the compiler proves it on every build rather
+            // than a comment claiming it: a slot that is not a column has no key, and a const
+            // evaluation is where that is caught.
+            None => panic!("a ledger column's slot must carry the wire's own key"),
+        },
+        width: cells.width,
+        priority: cells.rank,
+    }
+}
+
+/// The same column at [`BASE`], for the declaration index above.
+#[must_use]
+const fn column(slot: super::tokens::Slot) -> Column {
+    column_at(slot, BASE.0, BASE.1)
+}
 
 /// The keys the page carries around the rows. Never drawn, and therefore always disclosed.
 pub const LEDGER_PAGE_KEYS: [&str; 1] = ["next_cursor"];
@@ -375,7 +415,13 @@ pub const READ_NOT_DRAWN: [&str; 2] = ["GET /v1/candidates", "GET /v1/escalation
 /// 🔴 Declared once because two places need the same number — the disclosure is **composed**
 /// against `width - FRAME_MARGIN` and `super::renderer` **draws** the corners into those cells. A
 /// second spelling is how a line comes to be composed against one width and drawn at another.
-pub const FRAME_MARGIN: u16 = 4;
+///
+/// 🔴 Resolved off the ladder (`[T-r87]`), and it is one of the four measures the ladder holds
+/// **constant** along both axes — see `super::tokens::Measure::welded`. The reason is this
+/// constant's own doc above: two places need the same number, and a measure that varied would put
+/// an axis between them.
+pub const FRAME_MARGIN: u16 =
+    super::tokens::cells(super::tokens::Slot::Enclosure, BASE.0, BASE.1).width;
 
 /// The phrase that must appear when the provenance is folded into the disclosure.
 ///
@@ -1112,10 +1158,17 @@ pub fn scrolled(
 /// `super::renderer::spans` draws it, `header_width` measures it and the margin is charged to the
 /// width the plan is resolved against. A second spelling is how a row comes to be composed at one
 /// width and drawn at another, which [`FRAME_MARGIN`] is declared once to prevent.
-pub const COLUMN_GAP: u16 = 2;
+///
+/// 🔴 Resolved off the ladder (`[T-r87]`), and **welded**: `super::tokens::span` answers this
+/// measure before it consults the scheme, so no table can make the price and the row disagree.
+pub const COLUMN_GAP: u16 =
+    super::tokens::cells(super::tokens::Slot::CellGap, BASE.0, BASE.1).width;
 
 /// The cells before the first column of every row of the ledger.
-pub const LEFT_MARGIN: u16 = 1;
+///
+/// 🔴 Resolved off the ladder (`[T-r87]`), and welded for the reason [`COLUMN_GAP`] is.
+pub const LEFT_MARGIN: u16 =
+    super::tokens::cells(super::tokens::Slot::RowLead, BASE.0, BASE.1).width;
 
 /// How many cells a ledger row carrying exactly these columns occupies on the screen.
 ///
@@ -1163,7 +1216,12 @@ pub fn row_width(columns: &[Column]) -> u16 {
 /// line a terminal can draw without spending a row on it. Ink added: **nought**; rows given up:
 /// **nought**. The chrome budget is reported either way, because the ruling asked for the
 /// measurement rather than for the answer.
-pub const GROUP_ROWS: usize = 5;
+///
+/// 🔴 Resolved off the ladder (`[T-r87]`) at `frame.run`, and **not** welded: how many records share
+/// a group is a legibility judgement rather than an arithmetic one, so a scheme may move it without
+/// putting anything out of agreement with anything.
+pub const GROUP_ROWS: usize =
+    super::tokens::cells(super::tokens::Slot::GroupRun, BASE.0, BASE.1).width as usize;
 
 /// Which rung of the provenance ladder the width bought.
 ///
@@ -1251,8 +1309,32 @@ pub fn columns_for_less(width: u16, vacant: &[&'static str]) -> (Vec<Column>, Ve
     //
     // Ascending and stable: `Priority::One` is kept first, and among equals the column declared
     // first is kept first, which is the "last first" order the array says of itself it is in.
-    let mut ordered = LEDGER_COLUMNS;
-    ordered.sort_by_key(|column| column.priority);
+    //
+    // 🔴 **Resolved at the screen's own grade and the run's own scheme** (`[T-r87]`, 2026-09-02).
+    // This walked [`LEDGER_COLUMNS`] — the declaration index, whose widths are [`BASE`]'s — so a
+    // column was the same number of cells wide at forty cells as at a hundred and twenty, and the
+    // only lever a narrow terminal had was **dropping the column whole**. That is the shape of the
+    // Owner's finding: at `40x10` this face answered *fewer facts*, never *smaller ones*, because
+    // there was no table to ask. There is one now, and this is where it is asked.
+    let (grade, scheme) = table(width);
+    let mut ordered: Vec<Column> = super::tokens::LEDGER_SLOTS
+        .into_iter()
+        .map(|slot| column_at(slot, grade, scheme))
+        .collect();
+    // 🔴 Rank first, then the declared order within a rank — and the second key is the repair of a
+    // thing that was never written down. The sort here was by priority alone and **stable**, so ties
+    // kept the order the array happened to be typed in; the order was therefore a fact about a
+    // literal's line numbers that no declaration carried and no gate could read. It is
+    // `super::tokens::Cells::order` now, so a scheme can say *this column comes first* without an
+    // array being retyped.
+    ordered.sort_by_key(|column| {
+        let cells = super::tokens::cells(
+            super::tokens::Slot::of_key(column.key).expect("a drawn column has a slot"),
+            grade,
+            scheme,
+        );
+        (cells.rank, cells.order)
+    });
     for column in ordered {
         if vacant.contains(&column.key) {
             dropped.push(column.key);
@@ -1339,16 +1421,116 @@ pub fn resolve_shared(
     columns: &[Column],
     rows: &[Vec<String>],
 ) -> (Vec<Column>, Vec<(&'static str, String)>) {
-    let mut kept = Vec::new();
-    let mut shared = Vec::new();
-    for (index, column) in columns.iter().enumerate() {
-        let marks: Vec<String> = rows.iter().map(|row| row[index].clone()).collect();
-        match uniform(&marks) {
-            Some(mark) => shared.push((column.key, mark.to_string())),
-            None => kept.push(*column),
+    // 🔴 **One voice and a quorum of two**, which is exactly what this function has always meant
+    // (`[T-r87]`, 2026-09-02): fold only when *every* record agrees, and answer nothing at all about
+    // fewer than two records. Expressed as the declaration rather than as its own loop, so that the
+    // day a scheme allows a second voice, this function and [`resolve_folded`] cannot disagree about
+    // what the first one meant.
+    let (voices, quorum) = super::tokens::strict_fold();
+    let (kept, folded) = resolve_folded(columns, rows, voices, quorum);
+    let shared = folded
+        .into_iter()
+        .filter_map(|(key, tally)| tally.into_iter().next().map(|(mark, _)| (key, mark)))
+        .collect();
+    (kept, shared)
+}
+
+/// Which values a column carried over these rows, and how many rows said each.
+///
+/// 🔴 Ordered by **count, descending, ties in the order first seen** — and the tie-break is the
+/// point rather than tidiness. A tally is drawn, so its order is a fact on the screen; ordering by
+/// the value's own spelling would put `?` above `Admit` on some beds and below it on others, and a
+/// line whose order is a function of the alphabet of the data is the same defect `req/38` SS1047
+/// killed one layer up (*a screen whose shape is a function of something the reader cannot see*).
+///
+/// Layer-independent for the reason [`uniform`] is: this has no idea what a wire key, a column or a
+/// mark for nothing is, and would answer the same question about exit codes.
+#[must_use]
+pub fn tally(marks: &[String]) -> Vec<(String, usize)> {
+    let mut counted: Vec<(String, usize)> = Vec::new();
+    for mark in marks {
+        match counted.iter_mut().find(|(seen, _)| seen == mark) {
+            Some((_, count)) => *count += 1,
+            None => counted.push((mark.clone(), 1)),
         }
     }
-    (kept, shared)
+    // Stable, so the order things were first seen in survives a tie.
+    counted.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+    counted
+}
+
+/// The same split [`resolve_shared`] makes, with the two numbers that decide it taken from the
+/// placement ladder instead of being implicit.
+///
+/// 🔴 **`[T-r87]`, 2026-09-02, and it is the declaration the Owner's finding needed.** The grid was
+/// measured at thirty-two records of which thirty are byte-identical in every column but the
+/// discriminator, and twenty-six screen rows went to drawing that repetition. [`resolve_shared`]
+/// could not touch it, because its rule is *all or nothing* — two dissenting records out of
+/// thirty-two keep all thirty repetitions on the screen — and that rule was **not written down
+/// anywhere a request could reach**. It is `fold.voices` and `fold.quorum` now.
+///
+/// * `voices` — how many **different** values a column may carry and still be said once at the head.
+///   One is [`resolve_shared`]'s rule exactly.
+/// * `quorum` — how many rows there must be before saying it once is worth the row it costs. Two is
+///   [`uniform`]'s rule exactly, and it is why fewer than two rows proves nothing about repetition.
+///
+/// 🔴 **What a fold with more than one voice gives up, said plainly, because a renderer that cannot
+/// invert owes the disclosure instead** (`req/942` §1-1): the **distribution** survives — every
+/// value the column carried is on the screen with the count of rows that said it — and what goes is
+/// the binding of a value to a *particular* row. That is recoverable and the road is `open`: the
+/// record face draws every member of the attended record, including the ones the grid has no column
+/// for. The caller is what spells the road; this function is what makes the loss.
+///
+/// **Named ceiling**, inherited whole from [`resolve_shared`]: the domain is the rows it is handed,
+/// and the caller is responsible for handing it every record the read carried rather than the slice
+/// on screen (`req/924` §TUI-20, `req/38` SS1047). Nothing here can tell the difference.
+#[must_use]
+pub fn resolve_folded(
+    columns: &[Column],
+    rows: &[Vec<String>],
+    voices: usize,
+    quorum: usize,
+) -> (Vec<Column>, Vec<(&'static str, Vec<(String, usize)>)>) {
+    let mut kept = Vec::new();
+    let mut folded = Vec::new();
+    for (index, column) in columns.iter().enumerate() {
+        let marks: Vec<String> = rows.iter().map(|row| row[index].clone()).collect();
+        if marks.len() < quorum {
+            kept.push(*column);
+            continue;
+        }
+        if voices <= 1 {
+            // The old road, walked by the old function, so the one-voice answer cannot drift from
+            // what [`uniform`] has always said it is.
+            match uniform(&marks) {
+                Some(mark) => folded.push((column.key, vec![(mark.to_string(), marks.len())])),
+                None => kept.push(*column),
+            }
+            continue;
+        }
+        let counted = tally(&marks);
+        if counted.len() <= voices {
+            folded.push((column.key, counted));
+        } else {
+            kept.push(*column);
+        }
+    }
+    (kept, folded)
+}
+
+/// How many different values a column may carry at this width and still be folded, and how many
+/// rows make folding worth a row — read off the ladder.
+///
+/// 🔴 Two slots and one function, so the pair is asked for together. They are a single ruling
+/// (`fold.voices` alone would fold a two-record ledger; `fold.quorum` alone has nothing to fold),
+/// and a caller that could take one without the other is a caller that can take half a decision.
+#[must_use]
+pub fn fold_budget(width: u16) -> (usize, usize) {
+    let (grade, scheme) = table(width);
+    (
+        super::tokens::cells(super::tokens::Slot::FoldVoices, grade, scheme).width as usize,
+        super::tokens::cells(super::tokens::Slot::FoldQuorum, grade, scheme).width as usize,
+    )
 }
 
 /// How many rows a line of text needs at this width, word-wrapped.
@@ -1403,7 +1585,7 @@ fn units(text: &str) -> Vec<String> {
     'word: while at < words.len() {
         for atom in &atoms {
             let span = atom.split(' ').count();
-            if span < 2 || at + span > words.len() {
+            if span < 2 || at + span > words.len() { // g100: a count of words, not of cells -- a one-word atom cannot be broken across a break, so it is not a phrase this loop is about
                 continue;
             }
             let joined = words[at..at + span].join(" ");
@@ -1861,7 +2043,11 @@ fn clip(text: &str, room: usize) -> String {
 ///
 /// Sixteen: enough for `N/M fields` and a mark. Declared rather than typed into [`clip`] because it
 /// is a judgement about legibility and the day it is wrong there is one line to change.
-const CLIP_FLOOR: usize = 16;
+///
+/// 🔴 Resolved off the ladder (`[T-r87]`) at `frame.floor`, and welded: a cut that stopped at a
+/// different length in a different scheme would make the mark `~` mean two things.
+const CLIP_FLOOR: usize =
+    super::tokens::cells(super::tokens::Slot::ClipFloor, BASE.0, BASE.1).width as usize;
 
 const fn disclosure_cap(_folded: bool) -> u16 {
     // 🔴 **One, and it was three or four** (`req/924` §TUI-57, `req/38` SS1088, Owner `#282-T`).
@@ -2007,7 +2193,10 @@ pub fn resolve_attended(
     let folded = !(measured.all_200 && measured.healthy);
     // The rung is still chosen by measuring the line rather than against a width the line used to
     // fit at, and it still decides what [`Plan::provenance`] carries for the hatch.
-    let rung = if width >= 60 && rows_needed(&measured.long(), width) <= 1 {
+    let rung = if super::tokens::Grade::of(width).index()
+        >= super::tokens::Grade::Snug.index()
+        && rows_needed(&measured.long(), width) <= 1
+    {
         Rung::Long
     } else if rows_needed(&measured.short(), width) <= 1 {
         Rung::Short
@@ -2026,7 +2215,7 @@ pub fn resolve_attended(
     let (dot_mark, dot_role) = measured.link.dot();
     // One space either side of the dot: `super::renderer::spans` puts one between cells, and the
     // row then reads as three parts rather than as one run.
-    let dot_cells = dot_mark.chars().count() as u16 + 2;
+    let dot_cells = dot_mark.chars().count() as u16 + 2; // g100: a count of sides -- a mark has two of them, and this is one cell at each
     let room = width.saturating_sub(dot_cells);
     let position = if attention.items == 0 {
         String::new()
@@ -2230,7 +2419,7 @@ pub fn resolve_attended(
     // a cut row has is two fewer than the room an uncut one has. Left out of this arithmetic the
     // marks themselves went off the right edge, which is a cut nothing marked.
     let spent = note.chars().count() + disclosure.chars().count() + dot_cells as usize;
-    let marked_room = width.saturating_sub(2) as usize;
+    let marked_room = width.saturating_sub(2) as usize; // g100: the cut mark and the space after it, each one character, so this is a count of characters rather than a chosen width
     let disclosure = if !wide && spent > width as usize {
         truncated = true;
         clip(
@@ -2254,7 +2443,7 @@ pub fn resolve_attended(
     // is cut back to leave it room. The order of survival on this row is: the reader's position,
     // then the connection's state, then the road, then the caveat's tail.
     let note = {
-        let room = width.saturating_sub(dot_cells + u16::from(truncated) * 2) as usize;
+        let room = width.saturating_sub(dot_cells + u16::from(truncated) * 2) as usize; // g100: the same two characters as `marked_room` above -- the mark and its space
         if note.chars().count() > room {
             truncated = true;
             clip(&note, room)

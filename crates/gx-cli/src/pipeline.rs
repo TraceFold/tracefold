@@ -254,7 +254,7 @@ pub fn plan(session: &mut Session, id: &str, at: Timestamp) -> Result<Outcome> {
     let state = engine.state(&transformation);
     Ok(Outcome::ok(serde_json::json!({
         "transformation": engine.transformation(&transformation),
-        "delta_ref": engine.planned_delta(&transformation).map(|d| d.reference()),
+        "delta_ref": engine.planned_delta(&transformation).map(|d| d.reference().clone()),
         "precondition_fingerprint": engine
             .precondition_fingerprint(&transformation)
             .map(FingerprintRecord::of),

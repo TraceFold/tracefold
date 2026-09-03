@@ -17,6 +17,7 @@ Eight documents and three articles. Read them in the order below if you are new;
 | [`TRACEFOLD_TR.md`](TRACEFOLD_TR.md) | The technical report: the calculus, the encoding rules, and the receipt format in full. |
 | [`DEVELOPMENT_TREE_TESTS.md`](DEVELOPMENT_TREE_TESTS.md) | The taxonomy of the test probes, and what each family is actually measuring. |
 | [`API_SDK_LEDGER.md`](API_SDK_LEDGER.md) | What the public HTTP surface and the TypeScript SDK actually cover — a registry, not a pitch: one row per asset, where its number came from, and whether anything turns red if it drifts. |
+| [`ADAPTER_GUIDE.md`](ADAPTER_GUIDE.md) | Whether an adapter can actually connect to any OSS substrate — the narrower question this page answers instead, and what it costs to answer yes to it. |
 | `README.md` | This page. |
 
 ## Articles

@@ -16,7 +16,7 @@
  */
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { GxCliMembrane } from "./gx-cli-membrane.ts";
-import { register } from "./plugin.ts";
+import { MEDIATED_TOOLS, register } from "./plugin.ts";
 
 // Same shape demo.ts uses (req/1034 §4-1's measured working combination: bed on ext4, target file
 // may be on DrvFs). Overridable via env so this file does not hardcode a path that only exists on
@@ -43,7 +43,7 @@ export default definePluginEntry({
   register(api: any) {
     register(api, {
       membrane,
-      tools: ["write"],
+      tools: MEDIATED_TOOLS,
       actorModel: "openclaw-agent",
       escrowed,
       log: (line: string) => {

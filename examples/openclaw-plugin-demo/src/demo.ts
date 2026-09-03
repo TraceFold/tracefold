@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 /**
- * The demo. One process, three scenarios, a text log, and an exit code that is 0 only if every
+ * The demo. One process, four scenarios, a text log, and an exit code that is 0 only if every
  * assertion held.
+ *
+ * The two defects ANP2 Network reported have their own negative controls in
+ * `unmediated-writes.test.ts`, which needs no engine; this file is the part that needs a real one.
  *
  * What it drives is a real `gx` binary against a real filesystem. What it does NOT drive is
  * OpenClaw: the hook is called by `harness.ts`, which reproduces the firing order read out of their
@@ -17,7 +20,7 @@ import { join } from "node:path";
 
 import { GxCliMembrane, runGx } from "./gx-cli-membrane.ts";
 import type { GxMembrane, EscrowOutcome, ProposedEffect, UndoOutcome } from "./membrane.ts";
-import { makeBeforeToolCallHandler, type PluginConfig } from "./plugin.ts";
+import { MEDIATED_TOOLS, makeBeforeToolCallHandler, type PluginConfig } from "./plugin.ts";
 import { runToolCall, type ToolCallEvent } from "./harness.ts";
 
 // ---------------------------------------------------------------------------------------------
@@ -139,21 +142,31 @@ async function setup(): Promise<{ keyId: string; pubFileLinux: string }> {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * What the target held at the instant the native tool was about to write.
+ * Byte movements made by the native tool rather than by the membrane.
  *
- * Recorded because the obvious assertion -- "the file holds what the agent asked for" -- is true
- * whether gx applied the change or the native tool did, so on its own it discriminates nothing.
- * This is the discriminator: if gx's commit is what put the bytes there, the native tool finds the
- * work already done.
+ * The obvious assertion -- "the file holds what the agent asked for" -- is true whether gx applied
+ * the change or the tool did, so on its own it discriminates nothing. This counter is what
+ * discriminates: if it is still zero and the file holds the new content, the membrane is the only
+ * thing that can have put it there.
+ *
+ * Until the fix for the first defect ANP2 Network reported, this counter went to 1 on every
+ * admitted write, because the hook let the native tool re-apply the bytes gx had already applied.
  */
-let observedByNativeTool: string | null = null;
+let nativeWrites = 0;
 
+/**
+ * Modelled on OpenClaw's own `write` (`src/agents/sessions/tools/write.ts`): it prechecks the
+ * file's current content and returns a terminal no-op when it is already identical, otherwise it
+ * writes unconditionally. Both halves matter -- the first is why the old pass-through looked
+ * harmless, the second is why it was not.
+ */
 function nativeWrite(params: Record<string, unknown>): Promise<void> {
   const target = String(params["path"] ?? params["file_path"]);
   const content = String(params["content"]);
   const win = toWinPath(target);
-  observedByNativeTool = readFileSync(win, "utf8");
+  if (readFileSync(win, "utf8") === content) return Promise.resolve(); // terminal no-op
   writeFileSync(win, content, "utf8");
+  nativeWrites += 1;
   return Promise.resolve();
 }
 
@@ -192,7 +205,7 @@ const ORIGINAL = "notes for the release\n- ship the thing\n";
 const DESIRED = "notes for the release\n- ship the thing\n- AGENT APPENDED THIS LINE\n";
 
 async function scenarioA(cfg: PluginConfig, pubFileLinux: string): Promise<void> {
-  say("SCENARIO A -- an ordinary write: escrowed, allowed, applied, then actually taken back");
+  say("SCENARIO A -- an ordinary write: escrowed, applied by gx alone, then actually taken back");
   say();
 
   const winTarget = join(WIN_WORKSPACE, "notes.txt");
@@ -208,10 +221,8 @@ async function scenarioA(cfg: PluginConfig, pubFileLinux: string): Promise<void>
   };
 
   const handler = makeBeforeToolCallHandler(cfg);
+  const nativeBefore = nativeWrites;
   const result = await runToolCall(handler, event, nativeWrite);
-
-  check("hook allowed the call", !result.blocked, `blocked=${result.blocked}`);
-  check("native tool ran", result.executed, `executed=${result.executed}`);
 
   const escrowedRow = cfg.escrowed.at(-1);
   check(
@@ -228,14 +239,19 @@ async function scenarioA(cfg: PluginConfig, pubFileLinux: string): Promise<void>
     `${sha256(afterWrite).slice(0, 16)}...`,
   );
 
-  // The discriminating one. The previous check would pass either way; this one fails unless the
-  // membrane is what actually applied the change, before the tool was allowed to run.
+  // The discriminating one. The check above would pass whoever wrote the bytes; this one fails
+  // unless the membrane is the only thing that touched the substrate. The native tool is stopped
+  // precisely so that this stays true no matter what else happened in the meantime -- see README,
+  // "What the native tool does after we return".
   check(
-    "gx had already applied it -- the native tool found the change done",
-    observedByNativeTool !== null && sha256(observedByNativeTool) === sha256(DESIRED),
-    observedByNativeTool === null
-      ? "the native tool never ran"
-      : `native tool saw ${sha256(observedByNativeTool).slice(0, 16)}... (desired=${sha256(DESIRED).slice(0, 16)}...)`,
+    "gx is the only thing that moved a byte",
+    nativeWrites === nativeBefore && !result.executed,
+    `native writes=${nativeWrites - nativeBefore}, tool body executed=${result.executed}`,
+  );
+  check(
+    "the agent is told the write landed, and by which transformation",
+    (result.reason ?? "").includes(escrowedRow.transformationId),
+    result.reason ?? "nothing was said to the model",
   );
 
   // A checkpoint taken while the commit is the newest thing in the log, so the receipt can be
@@ -354,7 +370,7 @@ async function scenarioC(): Promise<void> {
 
   const cfg: PluginConfig = {
     membrane: new UnreachableMembrane(),
-    tools: ["write"],
+    tools: MEDIATED_TOOLS,
     actorModel: "openclaw-demo",
     escrowed: [],
   };
@@ -437,7 +453,7 @@ async function main(): Promise<void> {
 
   const cfg: PluginConfig = {
     membrane: recording,
-    tools: ["write"],
+    tools: MEDIATED_TOOLS,
     actorModel: "openclaw-demo",
     escrowed: [],
     log: (l) => say(l),

@@ -2632,7 +2632,7 @@ fn draft_cmd(cli: &Cli, cmd: &DraftCmd) -> Result<Outcome> {
         "path": path.display().to_string(),
         // The sentence the ruling asks for, on the wire as well as in the source: an operator
         // reading stdout is told that nothing was recorded, rather than having to infer it.
-        "ledger": "unchanged: discarding a draft is not a transition (E-M6-14; 43 T-7 acts on a                    transformation and a draft is not one yet)",
+        "ledger": "unchanged: discarding a draft is not a transition (E-M6-14; 43 T-7 acts on a transformation and a draft is not one yet)",
     })))
 }
 

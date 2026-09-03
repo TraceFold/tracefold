@@ -380,8 +380,31 @@ fn the_workspace_has_one_road_from_a_surface_to_a_substrate() {
         // not for publishing", §29 M4H1-6). It calls `apply` eleven times, because it is the harness that (sem: SEM-gx-adapter-mcp-397)
         // runs the contracts -- and a probe that excluded it **by name** would be a declared list, which
         // is the thing ruling #10 forbids. So the predicate is read from the manifest. (sem: SEM-gx-adapter-mcp-398)
+        //
+        // 🔴 **`publish = false` alone stopped meaning "not shipping" once req/636's blanket guard
+        // landed** ("no crate in this workspace is a designated publish target yet") and req/1032's
+        // registry-rename decision left more crates private for reasons that have nothing to do with
+        // whether they ship: `gx-adapter-mysql`/`gx-adapter-postgres`/`gx-confine`/`gx-mcp-wire` are
+        // withheld per `req/1019`; `gx-cli`'s own manifest is the private, full-feature shape and a
+        // separate public-safe variant lives at `public/crates/gx-cli/Cargo.toml`; `gx-gate` is
+        // blocked from publishing only by `req/1032`'s Blocker B (an out-of-tree `include_str!`) and
+        // its own comment says its `publish = false` "is therefore accurate, not a stale leftover" --
+        // none of that makes any of the five **test-only**. Excluding them from this scan would hide
+        // a real `adapter.apply(` call in real shipping code, which is the opposite of what Rule 2
+        // is for. What actually singles `gx-substrate-conformance` out, in its own words, is that it
+        // is a **"test instrument: it holds no product code"** -- a phrase deliberately written into
+        // its manifest as a self-description (the same paragraph names `probes/doubt` as carrying
+        // the identical line, which is why that directory is excluded separately, by the `crates`
+        // walk root above never reaching it at all). Both conditions are read from the manifest
+        // text, so this stays a derivation and not a declared list: a crate has to say **both** "I am
+        // not published" and "I hold no product code" to be excluded, and today only one does.
         let manifest = std::fs::read_to_string(dir.join("Cargo.toml")).expect("a manifest");
-        if manifest.lines().any(|l| l.trim() == "publish = false") {
+        let publish_false = manifest.lines().any(|l| {
+            let code = l.split('#').next().unwrap_or("").trim();
+            code == "publish = false"
+        });
+        let test_instrument = manifest.contains("test instrument");
+        if publish_false && test_instrument {
             skipped.push(
                 dir.file_name()
                     .expect("named")

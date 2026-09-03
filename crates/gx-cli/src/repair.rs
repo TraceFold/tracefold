@@ -130,7 +130,7 @@ pub fn run_accepting(
 ) -> Result<Outcome> {
     if reissue_receipts && !yes {
         return Err(Error::Usage {
-            detail: "--reissue-receipts writes to `.gx/receipts/`. Pass --yes as well, or drop the                      flag to read `receipts_missing` in the diagnosis first (req/234 H-01)"
+            detail: "--reissue-receipts writes to `.gx/receipts/`. Pass --yes as well, or drop the flag to read `receipts_missing` in the diagnosis first (req/234 H-01)"
                 .to_string(),
         });
     }
@@ -1303,7 +1303,7 @@ fn repair_and_report(layout: &Layout, asked: RunAsked<'_>, holding: Held, found:
     // is actually gone.
     if declaration_written {
         remedy_parts.push(format!(
-            "`{}` was not there when this run opened the project, and this run wrote it back              (`meta_repaired` names it, and `declaration_absent` is what was found rather than              what was left). What it holds is this project's own facts — the layout version and              the framing sniffed off the journal — so if you had settings of your own on that              file they are not in the copy gx wrote; the bytes that were there, if any could be              read, are beside it as `VERSION.pre-repair.<n>` (req/240 L-08)",
+            "`{}` was not there when this run opened the project, and this run wrote it back (`meta_repaired` names it, and `declaration_absent` is what was found rather than what was left). What it holds is this project's own facts — the layout version and the framing sniffed off the journal — so if you had settings of your own on that file they are not in the copy gx wrote; the bytes that were there, if any could be read, are beside it as `VERSION.pre-repair.<n>` (req/240 L-08)",
             layout.join("VERSION").display()
         ));
     }
@@ -1320,7 +1320,7 @@ fn repair_and_report(layout: &Layout, asked: RunAsked<'_>, holding: Held, found:
     }
     if config_written {
         remedy_parts.push(format!(
-            "`{}` was not there when this run opened the project, and this run wrote the shipping              default back (`meta_repaired` names it). What the shipping default does **not** carry              is `engine_signing_keyid`: if this project recorded one, that line is yours to put              back, and until it is there every verb that signs needs `--signing-key` (req/240 L-08)",
+            "`{}` was not there when this run opened the project, and this run wrote the shipping default back (`meta_repaired` names it). What the shipping default does **not** carry is `engine_signing_keyid`: if this project recorded one, that line is yours to put back, and until it is there every verb that signs needs `--signing-key` (req/240 L-08)",
             layout.config_path().display()
         ));
     }

@@ -98,5 +98,5 @@ pub mod locator;
 pub mod plan;
 
 pub use adapter::TimeAdapter;
-pub use entry::{Entry, TimeOp, MAX_PAYLOAD_BYTES};
+pub use entry::{Entry, TimeOp, MAX_FORWARD_PAYLOAD_BYTES};
 pub use locator::normalize;

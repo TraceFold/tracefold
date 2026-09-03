@@ -16,7 +16,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use gx_adapter_time::{Entry, TimeAdapter, MAX_PAYLOAD_BYTES};
+use gx_adapter_time::{Entry, TimeAdapter, MAX_FORWARD_PAYLOAD_BYTES};
 use gx_canon::cid::{self, Domain};
 use gx_core::{Actor, ChangeContext, Cid, GoalBytes, Intent, ObjectSnapshot};
 use gx_substrate::{PlannedDelta, Result, SubstrateAdapter};
@@ -265,7 +265,7 @@ impl Fixture for TimeFixture {
         Some(cid::mint(Domain::Leaf, &[&bytes(&goal())]))
     }
 
-    /// A delta whose inverse exceeds [`MAX_PAYLOAD_BYTES`] (**M4-21**, AC-048's `Ok(None)`).
+    /// A delta whose inverse exceeds [`MAX_FORWARD_PAYLOAD_BYTES`] (**M4-21**, AC-048's `Ok(None)`).
     ///
     /// The escrow carries the *standing* entry, so the subject is a position holding an entry over
     /// the ceiling and an ordinary plan to replace it.
@@ -319,7 +319,7 @@ impl Fixture for TimeFixture {
 #[must_use]
 pub fn heavy_entry() -> Entry {
     Entry {
-        action: "H".repeat(MAX_PAYLOAD_BYTES + 1),
+        action: "H".repeat(MAX_FORWARD_PAYLOAD_BYTES + 1),
         fire_at: WHEN,
         fired: Some(false),
     }

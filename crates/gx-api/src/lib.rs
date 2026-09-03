@@ -156,7 +156,7 @@ pub fn journal_and_head_note(
         (Some(departure), None) => journal_note(Some(departure)).to_string(),
         (None, Some(why)) => rolled_back_note(Some(why)),
         (Some(departure), Some(why)) => format!(
-            "{} {why}. That is a second difference and not the same one: this project is also              behind the signed head it already published (`.gx/checkpoints/head.json`). The              sentence before it is about the journal file itself.",
+            "{} {why}. That is a second difference and not the same one: this project is also behind the signed head it already published (`.gx/checkpoints/head.json`). The sentence before it is about the journal file itself.",
             journal_note(Some(departure))
         ),
     }

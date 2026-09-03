@@ -36,7 +36,7 @@ use gx_core::{Intent, ObjectSnapshot};
 use gx_substrate::{Error, PlannedDelta, Result};
 
 use crate::adapter::{absent_digest, content_digest, kind};
-use crate::entry::{Entry, TimeOp, MAX_PAYLOAD_BYTES};
+use crate::entry::{Entry, TimeOp, MAX_FORWARD_PAYLOAD_BYTES};
 use crate::locator;
 
 /// Work out the change an intent asks for, without making it (41 §4).
@@ -44,7 +44,7 @@ use crate::locator;
 /// # Errors
 /// [`Error::NotPlannable`] when the intent is for another substrate, names a position this adapter
 /// cannot accept, carries a goal that is not a schedule entry, claims the entry has already run
-/// (**INV-WM4a-1**), or asks for a payload over [`MAX_PAYLOAD_BYTES`]; [`Error::NotDigestible`]
+/// (**INV-WM4a-1**), or asks for a payload over [`MAX_FORWARD_PAYLOAD_BYTES`]; [`Error::NotDigestible`]
 /// when the operation has no canonical form.
 pub fn plan(intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
     if intent.substrate() != &kind() {
@@ -101,12 +101,12 @@ pub fn plan(intent: &Intent, _pre: &ObjectSnapshot) -> Result<PlannedDelta> {
     };
 
     let payload = op.encode()?;
-    if payload.len() > MAX_PAYLOAD_BYTES {
+    if payload.len() > MAX_FORWARD_PAYLOAD_BYTES {
         return Err(Error::NotPlannable {
             detail: format!(
                 "the payload of this change would be {} bytes and this adapter plans at most \
-                 {MAX_PAYLOAD_BYTES}; a delta is kept once it is planned (42 §5, E-M4-8), so the \
-                 size is a cost the whole pipeline pays",
+                 {MAX_FORWARD_PAYLOAD_BYTES}; a delta is kept once it is planned (42 §5, E-M4-8), so \
+                 the size is a cost the whole pipeline pays",
                 payload.len()
             ),
         });

@@ -448,7 +448,7 @@ impl AppState {
                 crate::gx_code::DECLARATION_ABSENT,
                 crate::gx_code::DECLARATION_ABSENT_TITLE,
                 format!(
-                    "`{}` is not there. This server read it when it started and it has gone since:                      R7 binds that file's digest into the signed head, so a project without it                      cannot be written to until the declaration is back, and a server that went on                      writing would be adding leaves under a head whose declaration digest matches                      nothing. `gx repair` reports the whole project and `gx repair --yes` writes                      the declaration back and says that it did (req/240 M-04, req/238 H-01)",
+                    "`{}` is not there. This server read it when it started and it has gone since: R7 binds that file's digest into the signed head, so a project without it cannot be written to until the declaration is back, and a server that went on writing would be adding leaves under a head whose declaration digest matches nothing. `gx repair` reports the whole project and `gx repair --yes` writes the declaration back and says that it did (req/240 M-04, req/238 H-01)",
                     absent.path
                 ),
             )
@@ -457,7 +457,7 @@ impl AppState {
                 crate::gx_code::CONFIG_ABSENT,
                 crate::gx_code::CONFIG_ABSENT_TITLE,
                 format!(
-                    "`{}` is not there. This server read it when it started and it has gone since:                      43 §7.9 (b) calls it the file that decides which key a recovery signs with, so                      the writer's door stays shut until it is back rather than let this project                      carry on under a key it did not choose. `gx repair --yes` writes the shipping                      default and says so; the `engine_signing_keyid` line is the operator's to put                      back (req/240 M-04, req/238 H-01)",
+                    "`{}` is not there. This server read it when it started and it has gone since: 43 §7.9 (b) calls it the file that decides which key a recovery signs with, so the writer's door stays shut until it is back rather than let this project carry on under a key it did not choose. `gx repair --yes` writes the shipping default and says so; the `engine_signing_keyid` line is the operator's to put back (req/240 M-04, req/238 H-01)",
                     absent.path
                 ),
             )

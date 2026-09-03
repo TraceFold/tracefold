@@ -2934,13 +2934,24 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
 
     /// The `PlannedDelta` T-2 fixed.
     ///
-    /// Held in the row for now. **E-M4-8**'s durable CID-keyed blob store is **M5-05 adopted (a)** (sem: SEM-gx-engine-160) and
-    /// hand 3's; what is here is the in-memory Σ, and a restart loses it. `EngineJournal` already
-    /// holds the delta's *CID* in every `Planned` record, so hand 3's store is what turns that name
-    /// back into a body.
+    /// 🔴 **T-r90 (`req/1094` T-4 census follow-on)**: the table first, then the blob store, keyed
+    /// off the CID the Σ-shadow's `StateRow::delta_cid` names. This is **not** the `T6 condition ①`
+    /// shape [`Engine::state`]/[`Engine::verdict`]/[`Engine::escrowed_inverse`] carry, because
+    /// `replay.rs`'s `StateRow` doc is explicit that Σ holds "**names and digests, never bodies**"
+    /// (ASM-9) — the fall-through cannot end at the shadow, because the shadow was never going to
+    /// have this. `Engine::plan` already writes the body to [`BlobStore`] under its own CID for
+    /// both the fresh-plan and the "rehydrating" road (see the two `self.blobs.put(&delta)` calls),
+    /// so a restart loses the *row* but not the *blob* — the fall-through reads that.
+    ///
+    /// Returns the owned value rather than a reference: a table hit is a clone of the row's copy, a
+    /// table miss reads the store fresh, and neither has a `&self`-tied lifetime to hand back for
+    /// the second case.
     #[must_use]
-    pub fn planned_delta(&self, id: &TransformationId) -> Option<&PlannedDelta> {
-        self.table.get(id).map(|e| &e.delta)
+    pub fn planned_delta(&self, id: &TransformationId) -> Option<PlannedDelta> {
+        self.table.get(id).map(|e| e.delta.clone()).or_else(|| {
+            let cid = self.shadow.row(id)?.delta_cid?;
+            self.blobs.get(&cid).ok()
+        })
     }
 
     /// The transformation itself.
@@ -3355,9 +3366,21 @@ impl<E: EvidenceSource, C: Canonicalizer> Engine<E, C> {
     /// those three and no others, so a `Canonicalized` transformation waiting for a `commit` call
     /// has no deadline. That is 43's design and not an oversight of this hand: the states T-6
     /// covers are the ones where the engine is waiting on somebody else.
+    ///
+    /// 🔴 **T6 condition ① (Σ-shadow)** — the table first, then [`Engine::shadow_deadline`], the
+    /// same fall-through this accessor's own private twin has had since **R3 / `req/222` H-04**.
+    /// Until this line the twin was wired into [`Engine::expire_if_due`] (so `reap` has always
+    /// expired a shadow-only row on time) and not into this one — the read-only accessor and the
+    /// enforcement sweep disagreed about the same fact, which is the shape [`Engine::escrowed_inverse`]'s
+    /// doc names for the escrow pair. `GET /v1/transformations`'s `deadline` key
+    /// (`crates/gx-api/src/list.rs`) reads this accessor directly, so a restarted server was
+    /// answering `null` on the wire for a row `reap` would still expire on schedule.
     #[must_use]
     pub fn deadline(&self, id: &TransformationId) -> Option<Timestamp> {
-        self.table.get(id).and_then(|e| self.deadline_of(e))
+        self.table
+            .get(id)
+            .and_then(|e| self.deadline_of(e))
+            .or_else(|| self.shadow_deadline(id))
     }
 
     /// 43 T-6's deadline for one row, or `None` where T-6 does not reach.

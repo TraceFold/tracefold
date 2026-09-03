@@ -12,13 +12,25 @@ use serde::{Deserialize, Serialize};
 
 /// How large an entry payload this adapter carries, in either direction.
 ///
-/// # Why one constant where `gx-adapter-fs` argued for two
+/// # Why one constant where `gx-adapter-fs` argued for two, and why it is still named
+/// # `MAX_FORWARD_PAYLOAD_BYTES`
 ///
 /// That adapter's two bounds ask different questions of different bytes: the forward one bounds a
 /// whole new file, the escrow one bounds the *old* file's content, and the two can be expected to
 /// move apart. Here both directions carry the same shape -- one entry, or nothing -- so a forward
 /// payload this adapter accepts is one it could equally escrow, which is the relation the fs crate
-/// has to argue for (`MAX_FORWARD <= MAX_INVERSE`) and this one gets by construction.
+/// has to argue for (`MAX_FORWARD <= MAX_INVERSE`) and this one gets by construction: there is no
+/// second constant to declare, because the single bound already equals itself.
+///
+/// `gx-substrate`'s `plan` contract row and `crates/gx-adapter-fs/tests/forward_ceiling.rs`'s
+/// `the_contract_row_and_the_one_declaration_name_each_other` require **every** adapter crate to
+/// declare exactly one `pub const MAX_FORWARD_PAYLOAD_BYTES` -- "every adapter needs [the forward
+/// bound] because every adapter accepts payloads" (that test's own words), independent of whether
+/// the adapter also carries a *separate* escrow bound (`crates/gx-adapter-fs/tests/
+/// invert_ceiling.rs`'s `the_contract_row_and_the_one_declaration_name_each_other` makes the escrow
+/// bound optional -- "at most one per adapter, none anywhere else"). This constant is the forward
+/// bound the shared contract asks for; it is not re-declared under a second name for the escrow
+/// side because, by the paragraph above, the escrow side has no value of its own to declare.
 ///
 /// 64 KiB is chosen against what a schedule entry is: a command line and a moment. The largest
 /// entry this crate's own tests build is under 200 bytes. The number is a declared ceiling and not
@@ -26,7 +38,7 @@ use serde::{Deserialize, Serialize};
 /// forward direction, [`crate::invert`] for the escrow -- and not at [`TimeOp::decode`], so a
 /// payload written by hand still decodes. That split is `gx-adapter-fs`'s and is kept deliberately:
 /// a longer value is legal *as a value* and refused *as a v0.1 payload*.
-pub const MAX_PAYLOAD_BYTES: usize = 64 * 1024;
+pub const MAX_FORWARD_PAYLOAD_BYTES: usize = 64 * 1024;
 
 /// One entry of a schedule: what is to be run, when, and whether the schedule says it has run.
 ///

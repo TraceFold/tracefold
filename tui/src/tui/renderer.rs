@@ -576,6 +576,49 @@ pub fn hoist(
     columns: &[layout::Column],
     capacity: usize,
 ) -> (Vec<layout::Column>, Vec<(&'static str, String)>) {
+    // 🔴 One voice, a quorum of two, and the tally flattened back to the single mark this
+    // signature has always carried (`[T-r87]`, 2026-09-02). Kept as its own name because
+    // twenty-odd call sites and three gates ask for it, and because *every record agrees* is a
+    // question worth having a name for even now that a scheme may ask a looser one.
+    let (kept, folded) = hoist_at(items, columns, capacity, 1, 2);
+    (
+        kept,
+        folded
+            .into_iter()
+            .filter_map(|(key, tally)| tally.into_iter().next().map(|(mark, _)| (key, mark)))
+            .collect(),
+    )
+}
+
+/// The same question, with the two numbers that decide it taken from the placement ladder.
+///
+/// 🔴 **`[T-r87]`, 2026-09-02.** [`hoist`] asks *does every record agree*, and the Owner's finding
+/// is what that rule costs when two records out of thirty-two do not: thirty identical rows stay on
+/// the screen and twenty-six of them are the same three words. `super::layout::fold_budget` is the
+/// declaration — `fold.voices` and `fold.quorum` — and this is where the grid asks it.
+///
+/// The domain is unchanged and is the whole of what `req/924` §TUI-20 ruled: **every record the read
+/// carried**, never the slice on screen.
+#[must_use]
+pub fn hoist_folded(
+    items: &[&serde_json::Value],
+    columns: &[layout::Column],
+    capacity: usize,
+    width: u16,
+) -> (Vec<layout::Column>, Vec<(&'static str, Vec<(String, usize)>)>) {
+    let (voices, quorum) = layout::fold_budget(width);
+    hoist_at(items, columns, capacity, voices, quorum)
+}
+
+/// One implementation, so the two roads above cannot answer differently about the same bed.
+#[must_use]
+pub fn hoist_at(
+    items: &[&serde_json::Value],
+    columns: &[layout::Column],
+    capacity: usize,
+    voices: usize,
+    quorum: usize,
+) -> (Vec<layout::Column>, Vec<(&'static str, Vec<(String, usize)>)>) {
     // Every record the read carried, and not the slice on screen: the answer is a property of the
     // ledger this face was handed, so it does not move when the terminal is resized or when the
     // reader presses `j`.
@@ -588,7 +631,7 @@ pub fn hoist(
                 .collect()
         })
         .collect();
-    let (kept, shared) = layout::resolve_shared(columns, &marks);
+    let (kept, shared) = layout::resolve_folded(columns, &marks, voices, quorum);
     if shared.is_empty() {
         return (columns.to_vec(), Vec::new());
     }
@@ -1546,8 +1589,12 @@ fn subject(
     // 43 percent of the ink at 120x32 was five columns repeating the same five words down every
     // one of twenty-three rows. Asked only where there is a record to ask the question of: an
     // empty grid has no cell to compare, and an opened record is not this branch at all.
+    // 🔴 **`hoist_folded`, and it is the one line that lets a declaration answer the Owner's
+    // finding** (`[T-r87]`, 2026-09-02). `hoist` asks *does every record agree*; this asks the
+    // question `super::layout::fold_budget` declares, and under the shipped default
+    // (`super::tokens::SCHEME_DEFAULT`) the two are the same question with the same answer.
     let (columns, shared) = if grid && !items.is_empty() {
-        hoist(&items, &plan.columns, plan.grid_capacity)
+        hoist_folded(&items, &plan.columns, plan.grid_capacity, area.width)
     } else {
         (plan.columns.clone(), Vec::new())
     };
@@ -1627,7 +1674,31 @@ fn subject(
             // budgeted. The role beside each mark is read from the first drawn row — every record
             // in `items` agrees by construction since `req/924` §TUI-20 moved the domain there, so
             // any one of them names the same appearance.
-            let sample = items[window.first];
+            // 🔴 **The role is read off the record that carries the very mark being drawn**
+            // (`[T-r87]`, 2026-09-02). This read it off one sample row, which was exact while a
+            // fold meant *every record agrees* — any row named the same appearance — and becomes
+            // wrong the moment a fold carries two voices, because the sample's mark is only one of
+            // them. Asking [`cell_mark`] which row actually says this mark is the same classifier
+            // the row would have been drawn by, so a `?` in the tally is painted as a `?` and an
+            // `Admit` as an `Admit`, with no second table to disagree with the first.
+            let voice_role = |key: &str, mark: &str| -> Role {
+                items
+                    .iter()
+                    .find_map(|item| {
+                        let (text, role) = cell_mark(item, key);
+                        (text == mark).then_some(role)
+                    })
+                    // Unreachable while the tally is built from these same records; `Role::Body`
+                    // rather than a panic because a face that dies over an appearance is worse
+                    // than one that draws the wire's own value plainly.
+                    .unwrap_or(Role::Body)
+            };
+            // 🔴 Whether any folded column carries more than one voice, which is the one thing that
+            // decides whether this face owes a road. One voice loses nothing: every record said the
+            // same word and the word is on the screen. Two or more keep the **distribution** and
+            // give up the binding of a value to a particular row — so the clause below spells where
+            // the binding is (`req/942` §1-1: a renderer cannot invert, so it discloses).
+            let multivoice = shared.iter().any(|(_, tally)| tally.len() > 1);
             // 🔴 **The quantifier, and it is the membrane's second obligation rather than a
             // decoration** (`req/924` §TUI-20). A renderer cannot invert, so what it owes instead
             // is to say what it let go of — and what this line lets go of is not a row, it is the
@@ -1640,11 +1711,53 @@ fn subject(
                 (format!("{FETCHED_SCOPE} {}", items.len()), Role::Quiet),
             ]
             .into_iter();
-            let fields = shared.iter().enumerate().map(|(index, (key, mark))| {
-                let (_, role) = cell_mark(sample, key);
-                let sep = if index + 1 < shared.len() { " |" } else { "" };
-                (format!("{key} {mark}{sep}"), role)
-            });
+            let fields = shared
+                .iter()
+                .enumerate()
+                .flat_map(|(index, (key, tally))| {
+                    let last = index + 1 == shared.len() && !multivoice;
+                    let sep = if last { "" } else { " |" };
+                    match tally.as_slice() {
+                        // 🔴 **One voice keeps the spelling it has always had**, down to the byte:
+                        // `verdict Admit |`. The count is not drawn because the quantifier in front
+                        // of the row already said it — `all 32` — and a second `32` on the same row
+                        // would be the face saying one number twice. This arm is what makes
+                        // `super::tokens::Scheme::Ledger` reproduce the old screen exactly.
+                        [(mark, _)] => {
+                            vec![(format!("{key} {mark}{sep}"), voice_role(key, mark))]
+                        }
+                        // 🔴 Two or more: the **key once, then each value with the count of records
+                        // that said it**, each painted in its own role. The counts are new
+                        // information — `all 32` says how many records there are and says nothing
+                        // about how they divide — and they are what keeps this from being the
+                        // dishonest fold: nothing is asserted of a record that did not say it.
+                        voices => {
+                            let mut cells = vec![(key.to_string(), Role::Quiet)];
+                            for (at, (mark, count)) in voices.iter().enumerate() {
+                                let tail = if at + 1 < voices.len() { "" } else { sep };
+                                cells.push((
+                                    format!("{mark} {count}{tail}"),
+                                    voice_role(key, mark),
+                                ));
+                            }
+                            cells
+                        }
+                    }
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                // 🔴 **The road, and it is drawn exactly when there is something to recover**
+                // (`req/924` §TUI-21: a road has to arrive). `super::acts::Act::Open` is already
+                // this face's word for *show me this record whole*, and the record face draws every
+                // member — including the ones the grid has no column for — so the binding this line
+                // gave up is one keystroke away. Spelled through [`spelled`] rather than typed, so
+                // there is no second name for the act or for its key.
+                .chain(multivoice.then(|| {
+                    (
+                        format!("by row {}", spelled(super::acts::Act::Open)),
+                        Role::Quiet,
+                    )
+                }));
             // The same gap the header above it uses, so the two rows of the preamble start on the
             // same cell. Composed with `spans_with` for that reason and not because this row has
             // columns — it has clauses.
@@ -1945,7 +2058,16 @@ fn help_lines(
     tier: Tier,
     plan: &Plan,
 ) {
-    let mut entries: Vec<String> = Vec::new();
+    // 🔴 **The word each line is filed under, carried beside the line** (`[T-r86]`, 2026-09-02,
+    // `req/924` §TUI-103). The note below names the entries a shape had no room for, and reading
+    // those names back out of the drawn text would be this face measuring its own padding instead
+    // of its own declarations — `pad` is not a vocabulary. Every label here is already a declared
+    // `&'static str` (`Act::name`, `RegionRole::short`, `Link::name`, `ENGINE_LABEL`), so the note
+    // introduces no word of its own, which is the property that lets this face be believed.
+    fn entry(label: &'static str, rest: &str) -> (&'static str, String) {
+        (label, format!("{} {rest}", pad(label, 11)))
+    }
+    let mut entries: Vec<(&'static str, String)> = Vec::new();
     // 🔴 **The escape hatch, and this is the half that makes the shorter disclosure honest**
     // (`req/924` §TUI-21: *the numbers may stay on the screen and the names may move behind `?` —
     // but do not say they were moved until a gate has confirmed the hatch lists them*). The
@@ -2002,9 +2124,8 @@ fn help_lines(
     // `GET /v1/transformations/{id}` -- **no prefix of an id resolves at any length**, not three,
     // not thirteen, not fifty-one of fifty-two. So a reader who copies what that column shows gets a
     // refusal on either road, and until this clause no screen said so.
-    entries.push(format!(
-        "{} {} | id column: {} of a `{}`; no prefix resolves, {} opens the whole",
-        pad("address", 11),
+    let address = format!(
+        "{} | id column: {} of a `{}`; no prefix resolves, {} opens the whole",
         layout::LEDGER_ADDRESS,
         layout::LEDGER_COLUMNS[0].width.saturating_sub(1),
         layout::LEDGER_COLUMNS[0].key,
@@ -2012,7 +2133,8 @@ fn help_lines(
         // `req/924` §TUI-21: a road named here has to arrive, and a key spelled twice arrives
         // nowhere the day the binding moves.
         acts::Act::Open.keys().first().copied().unwrap_or_default(),
-    ));
+    );
+    entries.push(entry("address", &address));
     // 🔴 **The six dots, and what each one says** (`req/924` §TUI-57, `req/38` SS1088, Owner
     // `#282-T`). The dot is the only thing on the standing row that stands for the connection, and
     // a mark a reader cannot look up is a mark that says nothing to them. Read out of
@@ -2022,15 +2144,12 @@ fn help_lines(
     //
     // Second, for the reason the address above it is first: it is spelled nowhere else, and gate
     // `g74` is what confirms the six reach this page rather than this comment being believed.
-    entries.push(format!(
-        "{} {}",
-        pad("dots", 11),
-        tokens::DOTS
-            .iter()
-            .filter_map(|mark| tokens::glyph(mark).map(|g| format!("{mark} {}", g.means)))
-            .collect::<Vec<_>>()
-            .join(" | ")
-    ));
+    let dots = tokens::DOTS
+        .iter()
+        .filter_map(|mark| tokens::glyph(mark).map(|g| format!("{mark} {}", g.means)))
+        .collect::<Vec<_>>()
+        .join(" | ");
+    entries.push(entry("dots", &dots));
     // 🔴 **Third, and it was last** (independent audit F-01, 2026-09-02). `live::LIVE_MEANS` is
     // Owner #227's ruling — *a face that prints `LIVE` has to say **whose** events it counts* — and
     // it is the one sentence in this face about a **measured engine limitation** (`req/38` SS987:
@@ -2042,11 +2161,7 @@ fn help_lines(
     // honesty**, which is the defect `INHERITED_PRINCIPLES` §削る前に3分類 names, committed by a lane
     // whose report claimed it had not. It goes beside the dot because the dot is now the thing the
     // sentence qualifies: `●` is a claim about *this process's* events and about nothing else.
-    entries.push(format!(
-        "{} {}",
-        pad(live::Link::Open.name(), 11),
-        live::LIVE_MEANS
-    ));
+    entries.push(entry(live::Link::Open.name(), live::LIVE_MEANS));
     // 🔴 **This entry was almost made to carry `wire::RECEIPT_VIEW_NOT_DRAWN` and must not be**
     // (`[T-r76]`, 2026-09-02). The predicate reads as if it fits — *read and not drawn* is true of
     // the two routes and of those three members alike — but measured on this lane's own
@@ -2054,11 +2169,7 @@ fn help_lines(
     // 100x30, and both are 道標 rather than 説得. The names went onto the record's own `key_id` row
     // instead, where they cost no row at any width. Written down so the next lane does not rediscover
     // the fit and pay the price for it.
-    entries.push(format!(
-        "{} {}",
-        pad("routes", 11),
-        layout::READ_NOT_DRAWN.join(", ")
-    ));
+    entries.push(entry("routes", &layout::READ_NOT_DRAWN.join(", ")));
     // 🔴 **The two roads an opened record carries, and the one thing it cannot draw** (`req/924`
     // §TUI-64, `req/38` SS1095, Owner `#285-T`). Fourth, immediately after the three sentences
     // spelled nowhere else, and for the same reason they are first: the addresses below are the
@@ -2071,9 +2182,8 @@ fn help_lines(
     // **now**, and no route this face reads answers *which states it passed through*. Three arrows
     // for three transitions nobody measured is the face asserting a history the engine never sent.
     // See [`record_rows`] for the full argument; this is where a reader is told.
-    entries.push(format!(
-        "{} {} | {}",
-        pad("record", 11),
+    let record = format!(
+        "{} | {}",
         wire::RECORD_ROUTES
             .iter()
             .map(|route| format!("GET {route}"))
@@ -2085,7 +2195,8 @@ fn help_lines(
         // more entry of this lane's takes the last `Intent::sentence` off the page and gates `g36`
         // and `g65` go red.
         RECEIPT_ROW_WORDS.join(", ")
-    ));
+    );
+    entries.push(entry("record", &record));
     // 🔴 **The vocabulary the two ledger faces stand on, and it is derived** (`[T-r58]`,
     // 2026-09-02, defect 6). `req/924` §TUI-21 is that a road has to arrive: a word on the screen
     // that `?` cannot explain is *deleted* wearing *moved*'s clothes. Measured on this lane's own
@@ -2118,8 +2229,7 @@ fn help_lines(
     // than hidden: at 66x20 and below this entry is not on the page, and the words it explains are
     // unexplained there. The count is in this lane's report.
     let vocabulary = format!(
-        "{} {} | verdict {} | inverse {}",
-        pad("vocabulary", 11),
+        "{} | verdict {} | inverse {}",
         layout::LEDGER_COLUMNS
             .iter()
             .map(|column| column.key)
@@ -2177,14 +2287,14 @@ fn help_lines(
     // the reduction pass that cuts the honesty (`INHERITED_PRINCIPLES` 削る前に3分類), and the three
     // categories that survive a cut are exactly what is kept here: both roads, the disclaimer on
     // each, and the fact that the chain is not carried. What went is only ①説得.
-    entries.push(format!(
-        "{} {RECEIPT_VERIFY_ADDRESS} grades a receipt; this face does not | {UNDO_ADDRESS} runs \
-         the inverse; no key here does",
-        pad("beyond", 11)
-    ));
-    entries.push(format!(
-        "{} the lifecycle chain: no route says which states a row passed through, so it is not drawn",
-        pad("not carried", 11)
+    let beyond = format!(
+        "{RECEIPT_VERIFY_ADDRESS} grades a receipt; this face does not | {UNDO_ADDRESS} runs the \
+         inverse; no key here does"
+    );
+    entries.push(entry("beyond", &beyond));
+    entries.push(entry(
+        "not carried",
+        "the lifecycle chain: no route says which states a row passed through, so it is not drawn",
     ));
     // 🔴 Asked of `columns_for` rather than read off `plan.dropped_fields`, and the difference is
     // a real one: while the help face is the subject, the plan's dropped set is **empty** by
@@ -2197,15 +2307,12 @@ fn help_lines(
     // touched anything. Found in this lane's own base capture; repaired here because the line it is
     // in is one this lane is editing anyway, and reported as **found rather than introduced**.
     let names: Vec<&str> = unseen;
-    entries.push(format!(
-        "{} {}",
-        pad("not drawn", 11),
-        if names.is_empty() {
-            wire::Nothing::Zero.mark().to_string()
-        } else {
-            names.join(", ")
-        }
-    ));
+    let not_drawn = if names.is_empty() {
+        wire::Nothing::Zero.mark().to_string()
+    } else {
+        names.join(", ")
+    };
+    entries.push(entry("not drawn", &not_drawn));
     // 🔴 The engine's own keys **by name**, and the condition the last of them is drawn under.
     // [`RAIL_KEYS`] explains the condition: an engine that is `ok` has no reason, and the face will
     // not assert `--` on the engine's behalf, so it draws nothing and says here that it does.
@@ -2236,10 +2343,9 @@ fn help_lines(
     // `N of 11 fields not drawn` and the rule that raised N is a different rule from width, so a
     // reader who cannot tell the two apart cannot act on either. `g61`'s argument, one rule up: a
     // count whose members can be named nowhere is a deletion with a number left behind.
-    entries.push(format!(
-        "{} {} | every record in this reading answered with that mark and no answer was obtained, \
-         so the column is not drawn at any width",
-        pad("no answer", 11),
+    let no_answer = format!(
+        "{} | every record in this reading answered with that mark and no answer was obtained, so \
+         the column is not drawn at any width",
         if plan.vacant_fields.is_empty() {
             wire::Nothing::Zero.mark().to_string()
         } else {
@@ -2249,7 +2355,8 @@ fn help_lines(
                 .collect::<Vec<_>>()
                 .join(", ")
         }
-    ));
+    );
+    entries.push(entry("no answer", &no_answer));
     // 🔴 The engine's line **as it stands underneath the fold**, values and all. `req/924` §TUI-29
     // folds the rail to `engine ok` while both claims hold, and SS842 is why that is only half a
     // decision: `engine_version` is spelled on no other row of any screen, so folding it without
@@ -2260,16 +2367,16 @@ fn help_lines(
     // `status_reason` is carried under has not changed and neither has the fold's own sentence,
     // which gate `g59` reads — what changed is the place the sentence names, and a sentence that
     // goes on naming a row this face no longer draws is the defect this whole session is about.
-    entries.push(format!(
-        "{} {} | status_reason is carried here only when status is not ok | folded to \
+    let engine = format!(
+        "{} | status_reason is carried here only when status is not ok | folded to \
          `{ENGINE_LABEL} {HEALTHY}` while status is {HEALTHY} and ledger_agrees is {AGREES}",
-        pad(ENGINE_LABEL, 11),
         plan.engine_full
             .iter()
             .map(|(key, value)| format!("{key} {value}"))
             .collect::<Vec<_>>()
             .join(", ")
-    ));
+    );
+    entries.push(entry(ENGINE_LABEL, &engine));
     // 🔴 The marks that stand in for an act's name, with the name they stand in for. Read out of
     // the two declarations rather than spelled again: `ACT_MARKS` pairs them and
     // `super::tokens::GLYPHS` holds the meaning and the deleted word, so a mark added without an
@@ -2282,10 +2389,9 @@ fn help_lines(
     //
     // The ledger's vocabulary, composed above, stands here — after everything spelled nowhere else
     // and before the acts.
-    entries.push(vocabulary);
-    entries.push(format!(
-        "{} {} | receipt {} | record rows {}",
-        pad("marks", 11),
+    entries.push(entry("vocabulary", &vocabulary));
+    let marks = format!(
+        "{} | receipt {} | record rows {}",
         ACT_MARKS
             .iter()
             .map(|(act, mark)| format!("{mark} {}", act.name().trim_start_matches("act.")))
@@ -2297,13 +2403,20 @@ fn help_lines(
             .collect::<Vec<_>>()
             .join(", "),
         RECORD_ROW_WORDS.join(", ")
-    ));
+    );
+    entries.push(entry("marks", &marks));
     entries.extend(acts::ACTS.into_iter().map(|act| {
-        format!(
-            "{} {}  {}",
-            pad(act.name().trim_start_matches("act."), 6),
-            pad(&act.keys().join(" "), 14),
-            act.intent()
+        // 🔴 Not `entry`: an act's line is padded to six and fourteen rather than eleven, and the
+        // note below names it by the same word this line opens with either way.
+        let name = act.name().trim_start_matches("act.");
+        (
+            name,
+            format!(
+                "{} {}  {}",
+                pad(name, 6),
+                pad(&act.keys().join(" "), 14),
+                act.intent()
+            ),
         )
     }));
     // 🔴 **And whether the region is on the standing frame at all** (`req/924` §TUI-57). Two of the
@@ -2316,10 +2429,9 @@ fn help_lines(
         } else {
             ""
         };
-        format!(
-            "{} {}{standing}",
-            pad(region.role.short(), 11),
-            region.intent.sentence()
+        entry(
+            region.role.short(),
+            &format!("{}{standing}", region.intent.sentence()),
         )
     }));
     // 🔴 **The disclosed half of the provenance, and it stands last** (Owner #227: keep the four
@@ -2339,10 +2451,9 @@ fn help_lines(
     // Both labels are declared words. `RegionRole::short` is the region this belongs to and
     // `Link::name` is the state whose badge it explains, so the help face still introduces no
     // vocabulary of its own — the property that lets it be believed.
-    let provenance = format!(
-        "{} {}",
-        pad(layout::RegionRole::Provenance.short(), 11),
-        plan.provenance_full
+    let provenance = entry(
+        layout::RegionRole::Provenance.short(),
+        &plan.provenance_full,
     );
     // 🔴 **It moves to the front exactly when something else on the screen promises it.**
     //
@@ -2371,39 +2482,99 @@ fn help_lines(
     // Composed before the rows it sits under, like every other note in this face: a line that says
     // how much was let go of, written after the letting go, is a line that gets clipped.
     //
+    // 🔴 **RETRACTED (`[T-r86]`, 2026-09-02, `req/924` §TUI-103, `req/38` SS1155). The paragraph
+    // below is kept because the argument in it is still the right argument — it is the conclusion
+    // that was wrong.** `acts in full: gx tui --help` was measured against eight other terminal
+    // products photographed at the same shapes on the same instrument: **this face was the only
+    // one of nine whose standing help sends the reader out of the process**, at 5/5 shapes, while
+    // the other thirty captures point at 0 addresses outside their own window. It is also this
+    // face's own §TUI-9 A3 — *do not put a way out of the process on the standing face* — broken by
+    // the face whose whole job is to be the way in. The clause is gone; what replaces it is below.
+    //
     // 🔴 `acts in full:` and not a bare address. `gx tui --help` spells every declared act — gate
     // g12c in the consumer's suite is what makes that worth saying — and it spells **neither** of
     // the two lines above, which are measurements of this run. An address offered against a count
     // of sixteen would be claiming to answer for all sixteen; naming what it carries is four words
     // and the difference between a road and a wave.
-    let note = |shown: usize| {
+    //
+    // 🔴 **What replaces it: the names, not a road.** The count was never the missing half —
+    // `24 of 27` is on the screen and always was. What a reader could not get was **which three**,
+    // and that answer is *inside* this process, in the words the entries are already filed under.
+    // Photographed across nine products at three narrow shapes, the ways of speaking about what was
+    // cut were: a count (1/9, this face), a percentage (1/9), **names (0/9)**, and nothing at all
+    // (7/9). The 0/9 is a fact about the other eight and **not** an argument for this — this is the
+    // membrane's second obligation (a renderer cannot `invert`, so what it owes instead is to say
+    // what it let go of), and it would be owed on an empty shelf.
+    //
+    // 🔴 **The names are bounded by the note's own rows, and the bound is spoken.** The rows are
+    // measured on the count alone, so a name can never take a row away from the entry it is naming;
+    // whatever will not fit is left as `+N`, a number the reader can act on rather than a silence.
+    // At forty cells nothing fits and the note is the count alone — the same disclosure it made
+    // before, minus the road out of the process, and one row cheaper, because the address it used
+    // to carry wrapped to a second row there.
+    let head = |shown: usize| {
         format!(
-            "{shown} of {} | close: {} | acts in full: {HELP_ADDRESS}",
+            "{shown} of {} | close: {}",
             entries.len(),
             spelled(Act::Help)
         )
     };
-    let note_rows = layout::rows_needed(&note(entries.len()), width) as usize;
+    let note_rows = layout::rows_needed(&head(entries.len()), width) as usize;
     let room = body_rows.saturating_sub(note_rows);
     let mut spent = 0usize;
     let mut shown = 0usize;
-    for entry in &entries {
-        let need = layout::rows_needed(entry, width) as usize;
+    for (_, text) in &entries {
+        let need = layout::rows_needed(text, width) as usize;
         if spent + need > room {
             break;
         }
-        for line in layout::wrap(entry, width) {
+        for line in layout::wrap(text, width) {
             lines.push(Line::raw(line));
         }
         spent += need;
         shown += 1;
     }
     // The obligation a renderer carries in place of `invert`: say what was let go of. The count is
-    // of declarations, and `HELP_ADDRESS` is where the ones that did not fit are spelled in full.
-    for line in layout::wrap(&note(shown), width) {
+    // of declarations, and the words after it are the declarations the count is short by, named in
+    // the order they would have been drawn in — so a reader who widens the terminal sees the first
+    // of them arrive where the note said it would.
+    let mut note = head(shown);
+    let dropped = entries.len() - shown;
+    let mut named = 0usize;
+    while named < dropped {
+        let lead = if named == 0 { LET_GO_LEAD } else { ", " };
+        let label = entries[shown + named].0;
+        // What would still be unnamed after taking this one. It is added to the candidate before
+        // the fit is asked, so a row can never be spent on a name and then have no cells left to
+        // admit the count of the ones it displaced — the silent bound this clause exists to refuse.
+        let unnamed = dropped - named - 1;
+        let mut candidate = format!("{note}{lead}{label}");
+        if unnamed > 0 {
+            candidate.push_str(&format!(" +{unnamed}"));
+        }
+        if layout::rows_needed(&candidate, width) as usize > note_rows {
+            break;
+        }
+        note = format!("{note}{lead}{label}");
+        named += 1;
+    }
+    if named > 0 && named < dropped {
+        note.push_str(&format!(" +{}", dropped - named));
+    }
+    for line in layout::wrap(&note, width) {
         lines.push(Line::styled(line, paint(Role::Quiet, tier)));
     }
 }
+
+/// The words the note opens the names of the cut entries with.
+///
+/// 🔴 Declared rather than spelled inline for the reason every other word on this face is: it is
+/// read by `g65` to tell the note apart from an entry, and by the gate that refuses a road out of
+/// the process on this page (`tools/gates/help_process_exit_gate.mjs`); a phrase spelled twice
+/// diverges the day one of the two is edited. The phrase is this face's own — `help_lines`'s
+/// obligation is written in the same words — rather than a third synonym beside the `not drawn` and
+/// `not carried` entries, which name **wire fields** rather than entries of this hatch.
+pub const LET_GO_LEAD: &str = " | let go: ";
 
 /// The address that carries every key.
 ///

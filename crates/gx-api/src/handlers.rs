@@ -425,7 +425,7 @@ pub(crate) fn degraded_reason(state: &AppState) -> Option<String> {
     state
         .meta_missing()
         .map(|path| format!(
-            "`{path}` is not there, so this server refuses every write until it is back              (`DECLARATION_ABSENT`/`CONFIG_ABSENT`, the same refusal the CLI gives). Reads are              unaffected and the ledger and the journal still describe one tree. `gx repair`              reports the project; `gx repair --yes` writes the file back and says that it did              (req/240 M-04)"
+            "`{path}` is not there, so this server refuses every write until it is back (`DECLARATION_ABSENT`/`CONFIG_ABSENT`, the same refusal the CLI gives). Reads are unaffected and the ledger and the journal still describe one tree. `gx repair` reports the project; `gx repair --yes` writes the file back and says that it did (req/240 M-04)"
         ))
 }
 

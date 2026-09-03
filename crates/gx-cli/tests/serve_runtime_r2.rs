@@ -292,10 +292,30 @@ fn a_restarted_server_undoes_a_row_it_never_planned() {
     let second = Serving::start(&fixture.project, &fixture.home, &fixture.key_id);
     let before_undo = second.json("GET", &format!("/v1/transformations/{id}"));
     println!("AFTER_RESTART_GET={before_undo}");
+    // 🔴 **Stale since `c9a4056e` (2026-09-02, "fix(gx-api): rebuild transformation body on GET,
+    // not just on write")** — this assertion used to hold because `GET /v1/transformations/{id}`
+    // was `null`-only after a restart (the write handlers' `with_a_body`/`rebuilt` rebuild had
+    // never been wired to the read face). That commit wired it, deliberately and by name
+    // (`gx-api/src/handlers.rs`'s `[T-r56]`-tagged comment on `get_transformation`, citing
+    // `feedback_fix_the_question_not_the_row`: "a repair confined to the row it was measured on
+    // leaves the sibling that asks the same question ... still answering wrong" — the sibling
+    // being this exact GET), and its own commit message names all 116 `gx-api` tests passing, but
+    // did not check this crate's own `serve_runtime_r2.rs`, which is why this went unnoticed until
+    // now. The row is no longer a null-bodied Σ-shadow at this point; it is already rebuilt, same
+    // as a write handler would rebuild it one call later. The state name is still the fact worth
+    // asserting here: the row reads as `Committed` before undo touches it, which is what makes the
+    // undo below a real state transition and not a no-op.
     assert_eq!(
+        before_undo["state"],
+        serde_json::json!("Committed"),
+        "the restarted process rebuilt the row (GET now shares the write handlers' rebuild since \
+         c9a4056e) and reads it as Committed before undo: {before_undo}"
+    );
+    assert_ne!(
         before_undo["transformation"],
         serde_json::Value::Null,
-        "R1's Σ-shadow answers the state and holds no body — that is the row being rebuilt"
+        "GET rebuilds the body eagerly since c9a4056e; a null body here would mean the rebuild \
+         regressed, not that R1's old Σ-shadow-only answer came back: {before_undo}"
     );
 
     let (undo_status, undo_body) = second.request(

@@ -247,7 +247,7 @@ pub enum Error {
     /// 2". `req/222` H-06's rule — a state you can see must have a way out — is answered here in
     /// the only place it can be, because the door itself must stay shut (47 §4): in the **words**.
     #[error(
-        "{path} declares layout version {found}; this binary writes {expected}. This directory          says it was written by a gx newer than this one, and a binary that opened it anyway could          misread a journal shape it does not know (47 §4), so every verb refuses — including the          ones that only read. What to fix: if a newer gx wrote this project, use that gx; if you          edited the file, put `{expected}` back on the first line of `{path}` (the lines after it          are `key=value` settings and are not the version). gx does not rewrite this number: a          binary that lowered another binary's declaration would be claiming to understand a          directory it has never read (req/240 M-07)"
+        "{path} declares layout version {found}; this binary writes {expected}. This directory says it was written by a gx newer than this one, and a binary that opened it anyway could misread a journal shape it does not know (47 §4), so every verb refuses — including the ones that only read. What to fix: if a newer gx wrote this project, use that gx; if you edited the file, put `{expected}` back on the first line of `{path}` (the lines after it are `key=value` settings and are not the version). gx does not rewrite this number: a binary that lowered another binary's declaration would be claiming to understand a directory it has never read (req/240 M-07)"
     )]
     Layout {
         /// Where the version file is.

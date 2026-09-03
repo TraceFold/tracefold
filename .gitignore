@@ -67,3 +67,7 @@ req/*.bak-*
 
 # 2026-09-02: 1.9MB lane scratch report, kept on disk, too large to track.
 tools/gates/_lane_*.json
+# 2026-09-02: mint_ss_id.mjs leaves a per-number lock behind on purpose (see tools/mint_ss_id.mjs),
+# the same way req_mint.mjs does. Reservation artifacts, not content.
+req/.ss_lock_*
+req/.tui_lock_*

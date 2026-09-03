@@ -483,7 +483,7 @@ pub async fn ledger_consistency(
         // tree" are different sentences, and saying the second when the first happened would be
         // the skip/pass conflation `req/29` §4 forbids, on the field a GUI raises an alarm from.
         return Err(ApiError::internal(format!(
-            "the log proved consistency between {} and {} and then had no root for one of those              sizes; the proof is not being graded against a root this server cannot state",
+            "the log proved consistency between {} and {} and then had no root for one of those sizes; the proof is not being graded against a root this server cannot state",
             proof.old_size, proof.new_size
         )));
     };

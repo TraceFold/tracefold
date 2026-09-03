@@ -315,7 +315,7 @@ fn contract_invert_none(fixture: &dyn Fixture) -> Outcome {
         ),
         Err(e) => unmeasured_or_failed(
             &e,
-            "invert answered with an error rather than `Ok(None)` (41 §4 separates \"the question              cannot be answered\" from \"the answer is no inverse\" (sem: SEM-gx-substrate-conformance-016), and E-M3-4 escalates on the              second)",
+            "invert answered with an error rather than `Ok(None)` (41 §4 separates \"the question cannot be answered\" from \"the answer is no inverse\" (sem: SEM-gx-substrate-conformance-016), and E-M3-4 escalates on the second)",
         ),
     }
 }
@@ -377,7 +377,7 @@ fn contract_apply_idempotence(fixture: &dyn Fixture) -> Outcome {
     if let Err(e) = adapter.apply(&delta) {
         return unmeasured_or_failed(
             &e,
-            "the retry (43 T-10c is a crash between the write and the journal record, and recovery              means running the same delta again)",
+            "the retry (43 T-10c is a crash between the write and the journal record, and recovery means running the same delta again)",
         );
     }
     let twice = match adapter.snapshot(&locator) {

@@ -44,7 +44,7 @@ use gx_core::{ObjectSnapshot, ReadEntry};
 use gx_substrate::{Error, InvertOutcome, PlannedDelta, Result};
 
 use crate::adapter::{absent_digest, content_digest, kind};
-use crate::entry::{Entry, TimeOp, MAX_PAYLOAD_BYTES};
+use crate::entry::{Entry, TimeOp, MAX_FORWARD_PAYLOAD_BYTES};
 use crate::locator;
 
 /// Build the delta that undoes `delta` from the state `pre` (41 §4, DR-1(a)).
@@ -107,7 +107,7 @@ pub fn invert(delta: &PlannedDelta, pre: &ObjectSnapshot) -> Result<InvertOutcom
     }
 
     let payload = TimeOp::write(position, standing).encode()?;
-    if payload.len() > MAX_PAYLOAD_BYTES {
+    if payload.len() > MAX_FORWARD_PAYLOAD_BYTES {
         // **M4-21**: over the ceiling there is no escrow, and the change is escalated instead of
         // being quietly made unundoable. The read still happened and is still attested.
         return Ok(InvertOutcome::none(vec![read]));

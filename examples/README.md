@@ -39,3 +39,15 @@ was first written, held four once `openclaw-plugin-demo/` landed without this pa
 to match (caught 2026-09-01, GitDoc inventory pass), and holds five now that
 `receipt-memory-export/` is listed above. Read the table above for the current count, not this
 paragraph's history.
+
+## Nested file names (this folder's own TOC check, req/968 AC-6)
+
+The table above names each top-level starting point and points at its own README for how to run
+it. This gate also expects every tracked file's basename to appear somewhere on this page, not
+only the top-level ones, so here is the rest by basename rather than by re-describing each
+sub-project (their own README does that):
+
+- `openclaw-plugin-demo/`: `.gitignore`, `package.json`, `package-lock.json`, `tsconfig.json`,
+  `openclaw-entry.ts`, `plugin.ts`, `membrane.ts`, `harness.ts`, `gx-cli-membrane.ts`, and under
+  `openclaw-install/`: `openclaw.plugin.json`, `package.json`, and `src/index.ts`.
+- `receipt-memory-export/`: `export_memory.py`.

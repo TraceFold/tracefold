@@ -390,7 +390,7 @@ fn permissions_ok(_path: &Path) -> Option<bool> {
 pub fn permission_warning(path: &Path) -> Option<String> {
     match permissions_ok(path) {
         Some(false) => Some(format!(
-            "{} is readable by more than its owner: this filesystem does not honour the 0600              req/56 §3 asks for, and `gx` will refuse to load this key (M6H2-10)",
+            "{} is readable by more than its owner: this filesystem does not honour the 0600 req/56 §3 asks for, and `gx` will refuse to load this key (M6H2-10)",
             path.display()
         )),
         _ => None,

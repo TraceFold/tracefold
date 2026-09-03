@@ -436,7 +436,7 @@ pub const HAND3_EXITS: [ExitRow; 17] = [
         group: "verify",
         code: ESCALATED,
         meaning: "4=Escalate",
-        common_table_note: "agrees with §1.4 (\"Verdict Escalate, awaiting human ruling\" (sem: SEM-gx-cli-559) — spelled without                             the path separator on purpose: Rule 1 (ii)'s scanner reads string                             literals, and a quotation is not a construction only if it does not                             look like one)",
+        common_table_note: "agrees with §1.4 (\"Verdict Escalate, awaiting human ruling\" (sem: SEM-gx-cli-559) — spelled without the path separator on purpose: Rule 1 (ii)'s scanner reads string literals, and a quotation is not a construction only if it does not look like one)",
     },
     ExitRow {
         group: "verify",

@@ -115,6 +115,47 @@ fn toml_code_only(src: &str) -> String {
         .join("\n")
 }
 
+/// The body of a top-level TOML section, found by a *whole line* equal to `header`
+/// (e.g. `"[dependencies]"`) -- never a substring match anywhere in the file.
+///
+/// 🔴 This crate's own manifest is why the distinction matters: line 21 of `Cargo.toml` is a prose
+/// comment naming `[dependencies]` directly ("Cargo derives the extern-crate identifier from the
+/// *key* on the consuming manifest's `[dependencies]` line, not from this crate's own package
+/// name."), and a plain `str::split("[dependencies]")` matched *that* occurrence, before the real
+/// header. The leftover text after the comment's `[dependencies]` (`" line, not from this crate's
+/// own package name."`) was then scanned as if it were manifest body, and its first
+/// whitespace-delimited token, `"line,"`, was reported as an unexpected runtime dependency -- a
+/// misread of the extractor, not a new dependency. Anchoring to a *line* whose trimmed text is
+/// exactly the header closes this: a header can only ever open a real TOML section at the start of
+/// its own line, never appear mid-sentence inside one.
+///
+/// The body runs from the line after the header to the next line that opens a new `[section]` (or
+/// `[[array-of-tables]]`), or to the end of the file if there is none -- so this same function finds
+/// `[dependencies]`'s body up to `[dev-dependencies]` without either name being hard-coded as the
+/// other's boundary.
+fn toml_section(text: &str, header: &str) -> Option<String> {
+    let mut lines = text.lines();
+    let mut found = false;
+    for line in lines.by_ref() {
+        if line.trim() == header {
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        return None;
+    }
+    let mut body = String::new();
+    for line in lines {
+        if line.trim_start().starts_with('[') {
+            break;
+        }
+        body.push_str(line);
+        body.push('\n');
+    }
+    Some(body)
+}
+
 #[test]
 fn ac_008_forbid_unsafe_code_is_declared() {
     assert!(
@@ -146,20 +187,15 @@ fn ac_008_manifest_dependencies_stay_inside_the_allowlist() {
     // The dev-dependencies section is a
     // separate matter: `cargo tree -p gx-core -e normal` is the graph a consumer gets, and
     // proptest/serde_json are absent from it. tools/verify_hand2.sh records both trees.
-    let deps = MANIFEST
-        .split("[dependencies]")
-        .nth(1)
-        .expect("manifest has a [dependencies] section")
-        .split("[dev-dependencies]")
-        .next()
-        .expect("split always yields one");
+    let deps = toml_section(MANIFEST, "[dependencies]")
+        .expect("manifest has a [dependencies] section");
     for bad in DENY {
         assert!(
-            !toml_code_only(deps).contains(bad),
+            !toml_code_only(&deps).contains(bad),
             "[dependencies] names `{bad}`"
         );
     }
-    for line in toml_code_only(deps).lines() {
+    for line in toml_code_only(&deps).lines() {
         let line = line.trim();
         if line.is_empty() {
             continue;

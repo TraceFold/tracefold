@@ -571,3 +571,775 @@ pub fn ink(role: Role, tier: Tier) -> Ink {
         Tier::Mono => emphasis,
     }
 }
+
+// =================================================================================================
+// The placement ladder
+// =================================================================================================
+//
+// 🔴 **`[T-r87]`, 2026-09-02, and it is the answer to a question the Owner asked of this face:**
+// *いかなる見た目上の要求に Token 変更のみで対応しうるんだろうな — は?どういうこと配置とか全部含め
+// Token じゃないの?* (`req/OWNER_VERBATIM`). The honest answer, measured before this section was
+// written, was **no**: the paint axis resolved through the ladder above and refused a raw value at
+// the seam (gate `g13`), while every placement magnitude this face draws with — ten column widths,
+// ten column ranks, ten column orders, five frame magnitudes and four region floors — was a
+// numeral typed into `super::layout`. So a request of the form *put that column first*, *make it
+// narrower*, *fold it away* was a **code** change, and the four-layer claim in `super::layout`'s
+// own header was true of colour and false of placement.
+//
+// What follows is the same ladder, for the axis that had none:
+//
+// ```text
+// intent  ->  slot  ->  measure  ->  cells
+// ```
+//
+// [`Slot`] is what a placed thing **is** — the rung a caller names, exactly as [`Role`] is on the
+// paint axis. [`Measure`] is the named quantity it resolves to. [`cells`] is the value, and it is
+// the only place in this face where a placement magnitude is written down.
+//
+// # `Grade` is the placement axis's `Tier`, and it is not an analogy
+//
+// [`Tier`] exists because one declared colour has to be spelled differently on terminals of
+// different capability, and the value layer is where the spelling is chosen. Placement has exactly
+// the same shape with a different axis: **a width is a capability of the reader's terminal**, and a
+// column that is honest at a hundred and twenty cells is a lie at forty. [`Grade`] is that axis, its
+// five classes are the five widths this face is measured at (`[T-r87]`'s brief:
+// `40 / 46 / 60 / 80 / 120`), and [`cells`] takes it for the reason [`ink`] takes a tier.
+//
+// # `Scheme` is what makes the answer to the Owner's question demonstrable rather than asserted
+//
+// One declaration table is a table. **Three** are a proof that the table is the thing the screen
+// obeys: [`Scheme::Ledger`] is what this face drew before this section existed, and the other two
+// are different screens produced **without one line of drawing code changing**. If a scheme swap
+// did not move the screen, the ladder would be decoration and this section would be a lie a gate
+// could not see.
+//
+// # What deliberately does **not** vary, and the mechanism that says why
+//
+// [`Measure::Lead`], [`Measure::Gap`], [`Measure::Frame`] and [`Measure::Floor`] answer the same
+// number at every grade and in every scheme. That is a **ruling, not an oversight**, and the reason
+// is `[T-r66]`: the row's price (`super::layout::row_width`) and the row's drawing
+// (`super::renderer::spans_with`) are two readers of those magnitudes, and the defect `[T-r66]`
+// repaired was the two disagreeing by exactly one gap — a budget two cells looser than the screen,
+// a column kept that did not fit, and a value clipped in silence. Making them vary would put a
+// second axis between the price and the row. They go through the ladder (so nothing types them
+// twice) and they are constant along it (so the price and the row cannot diverge again).
+
+/// How wide the reader's terminal is, in classes. The placement axis's [`Tier`].
+///
+/// 🔴 Five, and they are not chosen for tidiness: they are the five widths `[T-r87]` is required to
+/// capture at, so every class this face declares is a class a capture exists for. A sixth class
+/// nothing is ever photographed at is a declaration no one can check.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Grade {
+    /// Narrower than the first ceiling. The shape the brief calls the real one: `40x10`.
+    Crammed,
+    /// The second class, which `46` cells falls in.
+    Narrow,
+    /// The third class, which `60` cells falls in.
+    Snug,
+    /// The fourth class, which `80` cells falls in.
+    Roomy,
+    /// `120` and wider.
+    Full,
+}
+
+/// How many grades there are. Declared so the span table's length is the declaration's length.
+pub const GRADE_COUNT: usize = 5;
+
+/// The width at which each grade gives way to the next, ascending. One shorter than [`GRADE_COUNT`],
+/// because the last class has no ceiling.
+///
+/// 🔴 The numerals live **here**, which is the whole of what this section is for. An `if width < 80`
+/// in a screen is the shape `super::layout`'s header has always refused for regions; these four
+/// numbers are that refusal made true of columns as well.
+pub const GRADE_CEILINGS: [u16; GRADE_COUNT - 1] = [46, 60, 80, 120];
+
+impl Grade {
+    /// All five, for the sweep in `tui/tests/r942_tui.rs`.
+    pub const ALL: [Grade; GRADE_COUNT] = [
+        Grade::Crammed,
+        Grade::Narrow,
+        Grade::Snug,
+        Grade::Roomy,
+        Grade::Full,
+    ];
+
+    /// Where this grade stands in [`Self::ALL`], which is the index the span table is read at.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Grade::Crammed => 0,
+            Grade::Narrow => 1,
+            Grade::Snug => 2,
+            Grade::Roomy => 3,
+            Grade::Full => 4,
+        }
+    }
+
+    /// Which class a terminal of this width is in.
+    ///
+    /// Read from [`GRADE_CEILINGS`] rather than written as a chain of comparisons: a chain is four
+    /// numbers a gate has to parse back out of control flow, and a table is four numbers a gate
+    /// reads.
+    #[must_use]
+    pub const fn of(width: u16) -> Grade {
+        let mut at = 0;
+        while at < GRADE_CEILINGS.len() {
+            if width < GRADE_CEILINGS[at] {
+                return Grade::ALL[at];
+            }
+            at += 1;
+        }
+        Grade::Full
+    }
+
+    /// The name used in a report.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Grade::Crammed => "crammed",
+            Grade::Narrow => "narrow",
+            Grade::Snug => "snug",
+            Grade::Roomy => "roomy",
+            Grade::Full => "full",
+        }
+    }
+
+    /// Parse a grade's name.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        Grade::ALL.into_iter().find(|grade| grade.name() == text)
+    }
+}
+
+/// The declared order of letting go. `One` is the last to be dropped.
+///
+/// 🔴 **One type, and it used to be two.** `super::layout::Priority` was declared there and this
+/// axis had no rank at all, so a column's rank was a name typed at the column and a region's rank
+/// was a name typed at the region. `super::layout::Priority` is now a re-export of this, for the
+/// reason `super::wire` rather than a second `Intent` holds the paint axis's top rung: **two names
+/// for one join disagree the day one of them is edited.**
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Rank {
+    /// Never dropped while anything is drawn at all.
+    One,
+    /// Dropped after everything below it.
+    Two,
+    /// Dropped early.
+    Three,
+    /// Dropped first.
+    Four,
+}
+
+/// What a placed thing **is**. The top of the placement ladder, and the only rung a caller names.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Slot {
+    /// The column that tells one record from the next.
+    Discriminator,
+    /// The column carrying the engine's answer.
+    Judgement,
+    /// The column carrying where the record is in its life.
+    Lifecycle,
+    /// The column carrying when it happened.
+    Instant,
+    /// The column carrying what it reached.
+    Reach,
+    /// The column carrying whether it was held to.
+    Binding,
+    /// The column carrying whether the inverse is there.
+    Reversal,
+    /// The column carrying whether it was taken back.
+    Undoing,
+    /// The column carrying which record replaced it.
+    Successor,
+    /// The column carrying who asked.
+    Hand,
+    /// The cells before the first column of a row.
+    RowLead,
+    /// The cells between one cell and the next.
+    CellGap,
+    /// The cells the ledger's enclosure takes out of a rail's row.
+    Enclosure,
+    /// How many records share one group before the rule.
+    GroupRun,
+    /// The fewest cells a cut clause may be left with.
+    ClipFloor,
+    /// The fewest rows the engine's own account of itself says anything in.
+    BandApparatus,
+    /// The fewest rows the ledger says anything in.
+    BandLedger,
+    /// The fewest rows the measured facts say anything in.
+    BandProvenance,
+    /// The fewest rows the line naming what went says anything in.
+    BandDisclosure,
+    /// How many different values a column may carry over the records the read carried and still be
+    /// said once at the head instead of on every row.
+    FoldVoices,
+    /// How many records there must be before saying a column once at the head is worth the row it
+    /// costs.
+    FoldQuorum,
+}
+
+/// Every placement slot this face declares.
+pub const SLOTS: [Slot; 21] = [
+    Slot::Discriminator,
+    Slot::Judgement,
+    Slot::Lifecycle,
+    Slot::Instant,
+    Slot::Reach,
+    Slot::Binding,
+    Slot::Reversal,
+    Slot::Undoing,
+    Slot::Successor,
+    Slot::Hand,
+    Slot::RowLead,
+    Slot::CellGap,
+    Slot::Enclosure,
+    Slot::GroupRun,
+    Slot::ClipFloor,
+    Slot::BandApparatus,
+    Slot::BandLedger,
+    Slot::BandProvenance,
+    Slot::BandDisclosure,
+    Slot::FoldVoices,
+    Slot::FoldQuorum,
+];
+
+/// The ten slots that are columns of the ledger, in the order they are **declared**, which is not
+/// necessarily the order they are drawn in — that is [`Cells::order`], and it is a scheme's to say.
+pub const LEDGER_SLOTS: [Slot; 10] = [
+    Slot::Discriminator,
+    Slot::Judgement,
+    Slot::Lifecycle,
+    Slot::Instant,
+    Slot::Reach,
+    Slot::Binding,
+    Slot::Reversal,
+    Slot::Undoing,
+    Slot::Successor,
+    Slot::Hand,
+];
+
+/// A byte-for-byte comparison usable in a `const fn`, since `str::eq` is not one on this toolchain.
+const fn same(left: &str, right: &str) -> bool {
+    let (left, right) = (left.as_bytes(), right.as_bytes());
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut at = 0;
+    while at < left.len() {
+        if left[at] != right[at] {
+            return false;
+        }
+        at += 1;
+    }
+    true
+}
+
+impl Slot {
+    /// The spelled name, for a gate and for a reader of a report.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Slot::Discriminator => "cell.discriminator",
+            Slot::Judgement => "cell.judgement",
+            Slot::Lifecycle => "cell.lifecycle",
+            Slot::Instant => "cell.instant",
+            Slot::Reach => "cell.reach",
+            Slot::Binding => "cell.binding",
+            Slot::Reversal => "cell.reversal",
+            Slot::Undoing => "cell.undoing",
+            Slot::Successor => "cell.successor",
+            Slot::Hand => "cell.hand",
+            Slot::RowLead => "frame.lead",
+            Slot::CellGap => "frame.gap",
+            Slot::Enclosure => "frame.enclosure",
+            Slot::GroupRun => "frame.run",
+            Slot::ClipFloor => "frame.floor",
+            Slot::BandApparatus => "band.apparatus",
+            Slot::BandLedger => "band.ledger",
+            Slot::BandProvenance => "band.provenance",
+            Slot::BandDisclosure => "band.disclosure",
+            Slot::FoldVoices => "fold.voices",
+            Slot::FoldQuorum => "fold.quorum",
+        }
+    }
+
+    /// The wire's own key for a slot that is a column, and [`None`] for one that is not.
+    ///
+    /// 🔴 The key is the **wire's**, never a synonym, which is the rule
+    /// `super::layout::Column::key` has always carried and gate `P5` measures. This is where the two
+    /// vocabularies are joined, and it is the only place: `super::layout::LEDGER_COLUMNS` is built
+    /// out of this rather than typing the keys a second time.
+    #[must_use]
+    pub const fn key(self) -> Option<&'static str> {
+        Some(match self {
+            Slot::Discriminator => "transformation",
+            Slot::Judgement => "verdict",
+            Slot::Lifecycle => "state",
+            Slot::Instant => "created_at",
+            Slot::Reach => "scope",
+            Slot::Binding => "enforced",
+            Slot::Reversal => "inverse_status",
+            Slot::Undoing => "rollback",
+            Slot::Successor => "superseded_by",
+            Slot::Hand => "actor",
+            _ => return None,
+        })
+    }
+
+    /// Which slot draws this wire key, if any.
+    #[must_use]
+    pub const fn of_key(key: &str) -> Option<Slot> {
+        let mut at = 0;
+        while at < LEDGER_SLOTS.len() {
+            let slot = LEDGER_SLOTS[at];
+            if let Some(own) = slot.key() {
+                if same(own, key) {
+                    return Some(slot);
+                }
+            }
+            at += 1;
+        }
+        None
+    }
+
+    /// Whether this slot's value is a count of **things** rather than of cells.
+    ///
+    /// 🔴 Declared rather than left to be inferred from the name. [`Cells::width`] carries both, and
+    /// a reader who assumes every number in that member is a cell count would read `fold.voices = 3`
+    /// as three cells. The two are told apart here, which is the same discipline the seven words for
+    /// nothing are told apart by: a value and what kind of value it is are two facts.
+    #[must_use]
+    pub const fn counts(self) -> bool {
+        matches!(
+            self,
+            Slot::GroupRun
+                | Slot::BandApparatus
+                | Slot::BandLedger
+                | Slot::BandProvenance
+                | Slot::BandDisclosure
+                | Slot::FoldVoices
+                | Slot::FoldQuorum
+        )
+    }
+
+    /// The measure this slot resolves to.
+    ///
+    /// A `match` rather than a table, for the reason [`Role::token`] is one: the compiler makes the
+    /// map **total**.
+    #[must_use]
+    pub const fn measure(self) -> Measure {
+        match self {
+            Slot::Discriminator => Measure::Ident,
+            Slot::Judgement => Measure::Word,
+            Slot::Lifecycle => Measure::Stage,
+            Slot::Instant => Measure::Stamp,
+            Slot::Reach => Measure::Path,
+            Slot::Binding => Measure::Flag,
+            Slot::Reversal => Measure::Status,
+            Slot::Undoing => Measure::Undo,
+            Slot::Successor => Measure::Successor,
+            Slot::Hand => Measure::Hand,
+            Slot::RowLead => Measure::Lead,
+            Slot::CellGap => Measure::Gap,
+            Slot::Enclosure => Measure::Frame,
+            Slot::GroupRun => Measure::Run,
+            Slot::ClipFloor => Measure::Floor,
+            // 🔴 Three regions share one measure and the ledger does not, and that is the one place
+            // on this axis where the map is genuinely many-to-one today. It is worth saying plainly
+            // rather than dressing up: the ten column slots map to ten measures, so on the current
+            // table `Slot -> Measure` is **injective for columns**. That is not the ladder failing —
+            // it is the ladder **measuring** something true, which is that these widths were never
+            // shared quantities. A scheme is where they are made to share (`Scheme::Compact` gives
+            // `Stamp` and `Ident` one number at the two narrow grades), and that is a decision a
+            // table can carry and a numeral typed at a column cannot.
+            Slot::BandApparatus | Slot::BandProvenance | Slot::BandDisclosure => Measure::Band,
+            Slot::BandLedger => Measure::Deck,
+            Slot::FoldVoices => Measure::Voices,
+            Slot::FoldQuorum => Measure::Quorum,
+        }
+    }
+}
+
+/// The named quantities. One entry per thing this face has an opinion about the size of.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Measure {
+    /// An opaque identifier, and the label over it.
+    Ident,
+    /// One word the engine spells.
+    Word,
+    /// A lifecycle, which may be two words.
+    Stage,
+    /// An RFC 3339 instant.
+    Stamp,
+    /// A scope path.
+    Path,
+    /// Yes or no.
+    Flag,
+    /// An inverse's status word.
+    Status,
+    /// Whether it was taken back.
+    Undo,
+    /// Another record's identifier.
+    Successor,
+    /// Who asked.
+    Hand,
+    /// The cells before a row.
+    Lead,
+    /// The cells between two cells.
+    Gap,
+    /// The cells an enclosure takes out of a row.
+    Frame,
+    /// How many rows share a group.
+    Run,
+    /// The fewest cells a cut may leave.
+    Floor,
+    /// The fewest rows a region says anything in.
+    Band,
+    /// The fewest rows the ledger says anything in.
+    Deck,
+    /// How many different values a column may carry and still be said once.
+    Voices,
+    /// How many records make saying it once worth a row.
+    Quorum,
+}
+
+/// Every measure this face declares. Gate `g101` requires each one to be named by at least one slot
+/// and to answer at every grade of every scheme: a quantity nothing resolves to is a quantity nobody
+/// maintains, which is the sentence [`TOKENS`] carries one axis over.
+pub const MEASURES: [Measure; 19] = [
+    Measure::Ident,
+    Measure::Word,
+    Measure::Stage,
+    Measure::Stamp,
+    Measure::Path,
+    Measure::Flag,
+    Measure::Status,
+    Measure::Undo,
+    Measure::Successor,
+    Measure::Hand,
+    Measure::Lead,
+    Measure::Gap,
+    Measure::Frame,
+    Measure::Run,
+    Measure::Floor,
+    Measure::Band,
+    Measure::Deck,
+    Measure::Voices,
+    Measure::Quorum,
+];
+
+impl Measure {
+    /// The spelled name.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Measure::Ident => "ident",
+            Measure::Word => "word",
+            Measure::Stage => "stage",
+            Measure::Stamp => "stamp",
+            Measure::Path => "path",
+            Measure::Flag => "flag",
+            Measure::Status => "status",
+            Measure::Undo => "undo",
+            Measure::Successor => "successor",
+            Measure::Hand => "hand",
+            Measure::Lead => "lead",
+            Measure::Gap => "gap",
+            Measure::Frame => "frame",
+            Measure::Run => "run",
+            Measure::Floor => "floor",
+            Measure::Band => "band",
+            Measure::Deck => "deck",
+            Measure::Voices => "voices",
+            Measure::Quorum => "quorum",
+        }
+    }
+
+    /// Whether this measure is one of the four the ladder holds constant along both axes, and the
+    /// reason it is.
+    ///
+    /// 🔴 See this section's header: the row's **price** and the row's **drawing** are two readers
+    /// of these four, and `[T-r66]` is the record of what happens when two readers of one magnitude
+    /// disagree. Constant is what keeps them from being able to.
+    #[must_use]
+    pub const fn welded(self) -> bool {
+        matches!(
+            self,
+            Measure::Lead | Measure::Gap | Measure::Frame | Measure::Floor
+        )
+    }
+}
+
+/// Which declaration table is in force.
+///
+/// 🔴 **Three, and the first is the face as it stood.** [`Scheme::Ledger`] answers, at every grade,
+/// exactly the numerals `super::layout` used to carry — so the screen this face drew before the
+/// placement ladder existed is reproducible **as a scheme** rather than as a git revision, and the
+/// other two are the demonstration that the table is what the screen obeys.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Scheme {
+    /// What `super::layout` carried as numerals before `[T-r87]`: one width per column, the same at
+    /// every grade, and a column that does not fit is dropped whole.
+    Ledger,
+    /// The same columns and the same order, sized to the grade. A narrow terminal gets narrower
+    /// columns instead of fewer of them.
+    Compact,
+    /// Sized to the grade, ordered so that what tells one record from the next comes first, and —
+    /// the part no width can buy — a column whose values repeat is **said once at the head with its
+    /// counts** instead of on every row.
+    Digest,
+}
+
+/// Every scheme this face declares.
+pub const SCHEMES: [Scheme; 3] = [Scheme::Ledger, Scheme::Compact, Scheme::Digest];
+
+/// The scheme a run uses when nothing says otherwise.
+///
+/// 🔴 [`Scheme::Ledger`], deliberately: a lane that lands a new default is a lane that has already
+/// made the Owner's ruling for them. `req/924` §TUI-48's order is 見本 → Owner 裁定 → 量産, and
+/// shipping the sample as the default would be the third step taken before the second.
+pub const SCHEME_DEFAULT: Scheme = Scheme::Ledger;
+
+/// The environment variable that names the placement scheme.
+///
+/// 🔴 An environment name and not an act. `super::acts::ACTS` is the declaration of what a **reader
+/// can do**, and adding a key to it would be a change to the product's behaviour surface for the
+/// sake of a photograph. This is the same road [`Tier::detect`] takes for the paint axis: the
+/// reader's environment carries a preference and one function reads it.
+pub const SCHEME_ENV: &str = "GX_TUI_PLACEMENT";
+
+impl Scheme {
+    /// The name used in a report and in [`SCHEME_ENV`].
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Scheme::Ledger => "ledger",
+            Scheme::Compact => "compact",
+            Scheme::Digest => "digest",
+        }
+    }
+
+    /// Parse a scheme's name.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        SCHEMES.into_iter().find(|scheme| scheme.name() == text)
+    }
+
+    /// Read the environment. An unrecognised name is [`SCHEME_DEFAULT`] rather than an error: a
+    /// misspelling must not take a reader's ledger away from them.
+    #[must_use]
+    pub fn detect() -> Self {
+        std::env::var(SCHEME_ENV)
+            .ok()
+            .as_deref()
+            .and_then(Scheme::parse)
+            .unwrap_or(SCHEME_DEFAULT)
+    }
+}
+
+/// One resolved placement: how many cells (or, for [`Slot::counts`], how many things), when the
+/// slot is let go of, and where it stands among its siblings.
+///
+/// 🔴 The shape [`Ink`] has on the other axis: the members that vary along the axis and the members
+/// that do not, in one value, so that a caller asks one question.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Cells {
+    /// Cells, or — for the slots [`Slot::counts`] names — a count of things.
+    pub width: u16,
+    /// When this slot is let go of.
+    pub rank: Rank,
+    /// Where it stands among its siblings, ascending. Ties keep declaration order.
+    pub order: u16,
+}
+
+/// The value a measure takes at each grade, in [`Grade::ALL`]'s order.
+///
+/// 🔴 This is the placement axis's `match token { ... }` inside [`ink`], and it is the **only** place
+/// in this face a placement magnitude is written down. Gate `g100` is what says so: a numeral in
+/// `super::layout` that is not an arithmetic identity turns it red.
+#[must_use]
+pub const fn span(measure: Measure, scheme: Scheme) -> [u16; GRADE_COUNT] {
+    // The four welded measures answer before the scheme is consulted, so a scheme cannot make the
+    // row's price and the row's drawing disagree even by accident.
+    match measure {
+        Measure::Lead => return [1; GRADE_COUNT],
+        Measure::Gap => return [2; GRADE_COUNT],
+        Measure::Frame => return [4; GRADE_COUNT],
+        Measure::Floor => return [16; GRADE_COUNT],
+        _ => {}
+    }
+    match scheme {
+        // 🔴 Every number below was read out of `super::layout` as it stood at
+        // `pre-pivot_2026-09-02_tui_face_rebuild`. Constant along the grade axis, which is exactly
+        // the fact that made the Owner's question answerable with *no*: the face had no notion that
+        // a width is a capability.
+        Scheme::Ledger => match measure {
+            Measure::Ident => [14; GRADE_COUNT],
+            Measure::Word => [9; GRADE_COUNT],
+            Measure::Stage => [13; GRADE_COUNT],
+            Measure::Stamp => [20; GRADE_COUNT],
+            Measure::Path => [18; GRADE_COUNT],
+            Measure::Flag => [8; GRADE_COUNT],
+            Measure::Status => [14; GRADE_COUNT],
+            Measure::Undo => [10; GRADE_COUNT],
+            Measure::Successor => [16; GRADE_COUNT],
+            Measure::Hand => [12; GRADE_COUNT],
+            Measure::Run => [5; GRADE_COUNT],
+            Measure::Band => [1; GRADE_COUNT],
+            Measure::Deck => [4; GRADE_COUNT],
+            // One voice is what `uniform` has always required: a column folds only when **every**
+            // record agrees. Two records is what it has always required before it will answer at
+            // all. So the fold's declaration reproduces the old behaviour exactly, and the two
+            // schemes below are the only place it changes.
+            Measure::Voices => [1; GRADE_COUNT],
+            Measure::Quorum => [2; GRADE_COUNT],
+            Measure::Lead | Measure::Gap | Measure::Frame | Measure::Floor => [0; GRADE_COUNT],
+        },
+        // 🔴 The labels are wire keys drawn unchanged (`req/942` §9, gate `P5`), so a column can
+        // never be narrower than the key over it without the header being the thing that is cut.
+        // Gate `g102` is what holds that rather than this sentence, and it is the gate that made
+        // this table's first draft red: `ident` was cut to ten at the two narrow grades and
+        // `transformation` is fourteen characters, so the header would have been clipped to say a
+        // key the wire does not spell.
+        Scheme::Compact => match measure {
+            Measure::Ident => [14; GRADE_COUNT],
+            Measure::Word => [7, 7, 8, 9, 9],
+            Measure::Stage => [8, 9, 11, 13, 13],
+            Measure::Stamp => [10, 10, 16, 20, 20],
+            Measure::Path => [8, 9, 12, 18, 18],
+            Measure::Flag => [8; GRADE_COUNT],
+            Measure::Status => [14; GRADE_COUNT],
+            Measure::Undo => [10; GRADE_COUNT],
+            Measure::Successor => [13, 13, 14, 16, 16],
+            Measure::Hand => [7, 7, 9, 12, 12],
+            Measure::Run => [5; GRADE_COUNT],
+            Measure::Band => [1; GRADE_COUNT],
+            Measure::Deck => [3, 3, 4, 4, 4],
+            Measure::Voices => [1; GRADE_COUNT],
+            Measure::Quorum => [2; GRADE_COUNT],
+            Measure::Lead | Measure::Gap | Measure::Frame | Measure::Floor => [0; GRADE_COUNT],
+        },
+        // 🔴 The scheme the Owner's finding is actually about. `[T-r87]`'s brief measured the grid
+        // at thirty-two records of which **thirty are byte-identical** in every column but the
+        // discriminator, and twenty-six screen rows went to drawing that repetition. Three voices
+        // over a quorum of eight is the declaration that answers it: a column whose values, over the
+        // records the read carried, come to three or fewer is said **once, with its counts**, and
+        // the rows get the cells back.
+        Scheme::Digest => match measure {
+            Measure::Ident => [14; GRADE_COUNT],
+            Measure::Word => [7, 7, 8, 9, 9],
+            Measure::Stage => [8, 9, 11, 13, 13],
+            Measure::Stamp => [10, 10, 16, 20, 20],
+            Measure::Path => [8, 9, 12, 18, 18],
+            Measure::Flag => [8; GRADE_COUNT],
+            Measure::Status => [14; GRADE_COUNT],
+            Measure::Undo => [10; GRADE_COUNT],
+            Measure::Successor => [13, 13, 14, 16, 16],
+            Measure::Hand => [7, 7, 9, 12, 12],
+            Measure::Run => [5; GRADE_COUNT],
+            Measure::Band => [1; GRADE_COUNT],
+            Measure::Deck => [3, 3, 4, 4, 4],
+            Measure::Voices => [3; GRADE_COUNT],
+            Measure::Quorum => [8; GRADE_COUNT],
+            Measure::Lead | Measure::Gap | Measure::Frame | Measure::Floor => [0; GRADE_COUNT],
+        },
+    }
+}
+
+/// When a slot is let go of and where it stands, in this scheme.
+///
+/// 🔴 Rank and order do not vary with the grade, and that is the same shape [`Ink`]'s `bold` / `dim`
+/// / `reversed` have: they are properties of the **decision**, and the grade chooses the spelling of
+/// the quantity alone. A rank that changed with the width would mean the order the screen lets go of
+/// things in was itself a function of the screen, which is what `super::layout`'s header refuses.
+#[must_use]
+pub const fn standing(slot: Slot, scheme: Scheme) -> (Rank, u16) {
+    match scheme {
+        // Read out of `super::layout::LEDGER_COLUMNS` and `REGIONS` as they stood at
+        // `pre-pivot_2026-09-02_tui_face_rebuild`: the array's own subscript was the order, which is
+        // the third of the four things `[T-r87]` found typed rather than declared.
+        Scheme::Ledger | Scheme::Compact => match slot {
+            Slot::Discriminator => (Rank::One, 0),
+            Slot::Judgement => (Rank::One, 1),
+            Slot::Lifecycle => (Rank::One, 2),
+            Slot::Instant => (Rank::Two, 3),
+            Slot::Reach => (Rank::Two, 4),
+            Slot::Binding => (Rank::Two, 5),
+            Slot::Reversal => (Rank::Three, 6),
+            Slot::Undoing => (Rank::Three, 7),
+            Slot::Successor => (Rank::Four, 8),
+            Slot::Hand => (Rank::Four, 9),
+            Slot::BandApparatus => (Rank::Three, 0),
+            Slot::BandLedger => (Rank::One, 1),
+            Slot::BandProvenance => (Rank::One, 2),
+            Slot::BandDisclosure => (Rank::One, 3),
+            Slot::RowLead
+            | Slot::CellGap
+            | Slot::Enclosure
+            | Slot::GroupRun
+            | Slot::ClipFloor
+            | Slot::FoldVoices
+            | Slot::FoldQuorum => (Rank::One, 0),
+        },
+        // 🔴 What changes here is a **sentence about what the screen is for**: the columns that tell
+        // one record from the next go first, and the ones the fold is about go last. Nothing is
+        // deleted — a column that ranks last is still drawn at a width that has room for it, and one
+        // that folds is said at the head with its counts. The reordering is the declaration doing
+        // the job `[T-r87]` was opened because it could not do.
+        Scheme::Digest => match slot {
+            Slot::Discriminator => (Rank::One, 0),
+            Slot::Instant => (Rank::One, 1),
+            Slot::Reach => (Rank::Two, 2),
+            Slot::Hand => (Rank::Two, 3),
+            Slot::Judgement => (Rank::Three, 4),
+            Slot::Lifecycle => (Rank::Three, 5),
+            Slot::Reversal => (Rank::Three, 6),
+            Slot::Binding => (Rank::Four, 7),
+            Slot::Undoing => (Rank::Four, 8),
+            Slot::Successor => (Rank::Four, 9),
+            Slot::BandApparatus => (Rank::Three, 0),
+            Slot::BandLedger => (Rank::One, 1),
+            Slot::BandProvenance => (Rank::One, 2),
+            Slot::BandDisclosure => (Rank::One, 3),
+            Slot::RowLead
+            | Slot::CellGap
+            | Slot::Enclosure
+            | Slot::GroupRun
+            | Slot::ClipFloor
+            | Slot::FoldVoices
+            | Slot::FoldQuorum => (Rank::One, 0),
+        },
+    }
+}
+
+/// The value a slot takes at this grade, in this scheme — the bottom of the placement ladder.
+///
+/// 🔴 The placement axis's [`ink`], and it takes its arguments in the same order for the same
+/// reason: what a thing is, then the capability of the medium it is being drawn on.
+#[must_use]
+pub const fn cells(slot: Slot, grade: Grade, scheme: Scheme) -> Cells {
+    let (rank, order) = standing(slot, scheme);
+    Cells {
+        width: span(slot.measure(), scheme)[grade.index()],
+        rank,
+        order,
+    }
+}
+
+/// The fold budget the strict rule means: one voice, and a quorum of two.
+///
+/// 🔴 Declared rather than typed at `super::layout::resolve_shared` (`[T-r87]`, and gate `g100`
+/// found it in this lane's own first cut — the gate refusing its author's line on its first run is
+/// the only kind of evidence that it can refuse anything). *Every record agrees* and *fewer than two
+/// records prove nothing about repetition* are the two numbers `uniform` has always meant, and they
+/// are read out of the shipped default's own table so that the strict rule and the default screen
+/// cannot come apart.
+#[must_use]
+pub fn strict_fold() -> (usize, usize) {
+    (
+        cells(Slot::FoldVoices, Grade::Full, SCHEME_DEFAULT).width as usize,
+        cells(Slot::FoldQuorum, Grade::Full, SCHEME_DEFAULT).width as usize,
+    )
+}

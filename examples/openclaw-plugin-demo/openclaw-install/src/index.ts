@@ -12,7 +12,7 @@
  */
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { GxCliMembrane } from "../../src/gx-cli-membrane.ts";
-import { register } from "../../src/plugin.ts";
+import { MEDIATED_TOOLS, register } from "../../src/plugin.ts";
 
 const projectDir = process.env["GX_ESCROW_PROJECT_DIR"] ?? "/tmp/gx-openclaw-demo-bed";
 const homeDir = process.env["GX_ESCROW_HOME_DIR"] ?? "/tmp/gx-openclaw-demo-bed/home";
@@ -36,7 +36,7 @@ export default definePluginEntry({
   register(api: any) {
     register(api, {
       membrane,
-      tools: ["write"],
+      tools: MEDIATED_TOOLS,
       actorModel: "openclaw-agent",
       escrowed,
       log: (line: string) => {

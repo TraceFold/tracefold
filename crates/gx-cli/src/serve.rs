@@ -829,7 +829,7 @@ pub fn build(
                 what: "project",
                 path: engine.journal().path().display().to_string(),
                 detail: format!(
-                    "this project's journal witnesses {} commit(s) and its ledger holds {}                      leaf/leaves, and `ledger_agrees` is false after recovery: the two files                      describe different trees (req/182 M-12/H-01).{} A server that started here would                      sign checkpoints over a tree its own journal contradicts, so it refuses.                      `gx repair` reports what is wrong and `gx repair --yes` runs 43 §7's recovery under the project lock (DR-43-8); `gx replay <ID>` names the rows that differ",
+                    "this project's journal witnesses {} commit(s) and its ledger holds {} leaf/leaves, and `ledger_agrees` is false after recovery: the two files describe different trees (req/182 M-12/H-01).{} A server that started here would sign checkpoints over a tree its own journal contradicts, so it refuses. `gx repair` reports what is wrong and `gx repair --yes` runs 43 §7's recovery under the project lock (DR-43-8); `gx replay <ID>` names the rows that differ",
                     engine.sigma().ledger().len(),
                     engine.ledger().log().len(),
                     note,

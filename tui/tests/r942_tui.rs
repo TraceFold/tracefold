@@ -8987,7 +8987,26 @@ fn g65_what_the_rule_dropped_is_counted_on_the_screen_and_named_in_the_hatch() {
         // line told the reader that width-dropped columns "obtained no answer", folding *cut for
         // room* into *nothing to say*. So the entry's own line is isolated and asked for **exactly**
         // the vacant set, with its marks.
-        let line = hatch
+        // 🔴 **The note is not an entry, and since `[T-r86]` (2026-09-02, `req/924` §TUI-103) it
+        // spells entry labels.** The note now names the entries a shape had no room for, in the
+        // very words they are filed under, so a bare search for `no answer` finds the **note** on
+        // a shape where the entry was cut — and this gate then reads *absent* as *present with the
+        // wrong contents*, which is [[feedback_untestable_is_not_failed]] committed by the
+        // instrument. Measured: at 80x24 on this bed the entry is cut, the `None` branch below is
+        // the correct answer, and before this line the gate produced a fragment of the note
+        // (`", engine, vocabulary, marks,"`) and failed on it.
+        //
+        // This is the **same repair the paragraph above already records once** — a predicate wide
+        // enough to match the chrome reports coverage it does not have — applied again now that the
+        // chrome has grown the labels. The assertion is untouched; only the region it reads is.
+        // `LET_GO_LEAD` is read from the renderer rather than typed here, so the day the phrase
+        // moves this bound moves with it.
+        let entries = hatch
+            .split(renderer::LET_GO_LEAD)
+            .next()
+            .unwrap_or(&hatch)
+            .to_string();
+        let line = entries
             .split("no answer")
             .nth(1)
             .map(|tail| tail.split(" prev ").next().unwrap_or(tail).to_string());
@@ -9015,7 +9034,7 @@ fn g65_what_the_rule_dropped_is_counted_on_the_screen_and_named_in_the_hatch() {
             None => {
                 let unseen = vacant
                     .iter()
-                    .filter(|(key, _)| !hatch.contains(key))
+                    .filter(|(key, _)| !entries.contains(key))
                     .count();
                 println!(
                     "G65 {width}x{height} UNTESTABLE: the hatch was cut before its `no answer` \
@@ -13138,4 +13157,456 @@ fn g98_the_kind_of_nothing_a_judged_field_takes_is_read_from_the_state() {
         "g98: the four cells `req/924` TUI-101 ruled on are the four this face reads through \
          `state`, and it read {read_through_state}: {census:?}"
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// g100..g104 — the placement ladder, and the plant that proves g100 can refuse.
+//
+// 🔴 `[T-r87]`, 2026-09-02. `g1` refuses a raw colour outside the seam and `g13` refuses one in the
+// token table's own doc; the placement axis had **no equivalent**, which is exactly why every
+// column width, rank and order in this face was a numeral typed into `layout.rs`. These are that
+// gate, plus the three that hold the new declaration honest.
+//
+// 🔴 `g5` is untouched by all of this and must stay so. It refuses the **medium's** types
+// (`Rect`, `Constraint`, `Layout`, `ratatui`) outside the renderer, and the placement ladder
+// declares values and role names only — no medium type crosses into `tokens.rs`. A run of these
+// gates that turns `g5` red is a signal that a medium type was carried up, and the design is what
+// is wrong then, not `g5`.
+// ---------------------------------------------------------------------------------------------
+
+/// Everything that is not a magnitude: string literals and the tail of a line comment.
+///
+/// 🔴 Stripped before counting, because the alternative is a gate that measures the wrong thing.
+/// `layout.rs` spells wire addresses (`GET /v1/transformations`) and identifiers (`u16`), and a
+/// scanner that counted the `1` in `/v1/` would report a placement magnitude where there is a road.
+fn without_prose(line: &str) -> String {
+    let mut kept = String::new();
+    let mut chars = line.chars().peekable();
+    let mut in_string = false;
+    while let Some(current) = chars.next() {
+        if in_string {
+            if current == '\\' {
+                let _ = chars.next();
+            } else if current == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        if current == '"' {
+            in_string = true;
+            continue;
+        }
+        if current == '/' && chars.peek() == Some(&'/') {
+            break;
+        }
+        kept.push(current);
+    }
+    kept
+}
+
+/// Every placement magnitude spelled as a literal on a live line of this source.
+///
+/// A magnitude is a bare integer literal of **two or more**. The three exclusions are stated here
+/// rather than left in the code, because a gate whose exclusions are undocumented is a gate nobody
+/// can argue with:
+///
+/// * **Nought and one are arithmetic identities.** `saturating_sub(1)`, `items - 1`, `max(1)` are
+///   statements about how counting works and not about how wide anything is. Excluding them is the
+///   one place this gate is deliberately loose, and it is loose in the direction that lets a real
+///   magnitude of one through — `min_rows: 1` would not have been caught by this gate and was
+///   found by reading. **Said out loud rather than left for an audit**: this gate's floor is two.
+/// * **A subscript is an address.** `LEDGER_SLOTS[3]` names a thing, and the `3` is where it is
+///   kept rather than how big it is.
+/// * **An array's arity is a count of declarations.** The `10` in `[Column; 10]` is how many
+///   columns there are, which is a fact about the declaration and not a placement decision.
+/// * **A tuple index is a name.** `record_split(..).3` names the fourth member of a returned
+///   tuple. 🔴 This exclusion is a **repair of this gate's own first run**, which reported that
+///   line as a magnitude: *a pattern matching and a thing being a defect are two facts*
+///   (`INHERITED_PRINCIPLES`), and the gate that cannot tell them apart is measured by its false
+///   positives as much as by its finds.
+///
+/// 🔴 **And a line may declare itself exempt, in the open.** A trailing `// g100: <reason>` takes
+/// a line out of the finding set and into [`placement_exemptions`], which the gate **prints with a
+/// count**. That is the shape this project holds itself to: do not bound a set quietly — say how
+/// many were let through and why, so that an exemption is an argument someone can lose rather than
+/// a silence.
+fn placement_numerals(text: &str) -> Vec<(usize, u64, String)> {
+    let mut found = Vec::new();
+    for (index, raw) in text.lines().enumerate() {
+        if is_comment(raw) || raw.contains(PLACEMENT_EXEMPT) {
+            continue;
+        }
+        let line: Vec<char> = without_prose(raw).chars().collect();
+        let mut at = 0;
+        while at < line.len() {
+            if !line[at].is_ascii_digit() {
+                at += 1;
+                continue;
+            }
+            // A digit that continues an identifier (`u16`, `v1`, `Grade0`) is part of a name.
+            let joined = at > 0 && (line[at - 1].is_alphanumeric() || line[at - 1] == '_');
+            let start = at;
+            while at < line.len() && line[at].is_ascii_digit() {
+                at += 1;
+            }
+            if joined {
+                continue;
+            }
+            let value: u64 = line[start..at]
+                .iter()
+                .collect::<String>()
+                .parse()
+                .unwrap_or_default();
+            if value < 2 {
+                continue;
+            }
+            // Past a type suffix (`4u16`), so that the character after the literal is the one the
+            // reader sees after it.
+            let mut tail = at;
+            while tail < line.len() && (line[tail].is_alphanumeric() || line[tail] == '_') {
+                tail += 1;
+            }
+            let before = line[..start].iter().rev().find(|c| !c.is_whitespace()).copied();
+            let after = line[tail..].iter().find(|c| !c.is_whitespace()).copied();
+            if before == Some('[') && after == Some(']') {
+                continue;
+            }
+            if before == Some(';') {
+                continue;
+            }
+            // A tuple index is a name, not a magnitude.
+            if before == Some('.') {
+                continue;
+            }
+            found.push((index + 1, value, raw.trim().to_string()));
+        }
+    }
+    found
+}
+
+/// The marker a line uses to declare itself outside this gate, and the reason it gives.
+const PLACEMENT_EXEMPT: &str = "// g100:";
+
+/// Every line that declared itself exempt, with the reason it gave.
+fn placement_exemptions(text: &str) -> Vec<(usize, String)> {
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| !is_comment(line) && line.contains(PLACEMENT_EXEMPT))
+        .map(|(index, line)| {
+            let reason = line
+                .split_once(PLACEMENT_EXEMPT)
+                .map(|(_, tail)| tail.trim().to_string())
+                .unwrap_or_default();
+            (index + 1, reason)
+        })
+        .collect()
+}
+
+#[test]
+fn g100_no_placement_magnitude_is_typed_into_the_layout_module() {
+    let path = tui_dir().join("layout.rs");
+    let text = std::fs::read_to_string(&path).expect("source is readable");
+    let findings = placement_numerals(&text);
+    let exempt = placement_exemptions(&text);
+    println!("G100_FINDINGS={findings:?}");
+    println!("G100_EXEMPT_COUNT={}", exempt.len());
+    for (line, reason) in &exempt {
+        println!("G100_EXEMPT line={line} reason={reason}");
+    }
+    // 🔴 An exemption with no reason is a silence with punctuation on it.
+    let mute: Vec<&(usize, String)> = exempt.iter().filter(|(_, why)| why.is_empty()).collect();
+    assert!(
+        mute.is_empty(),
+        "🔴 g100: {mute:?} declare themselves exempt and give no reason"
+    );
+    println!("G100_SCANNED_LINES={}", text.lines().count());
+    assert!(
+        findings.is_empty(),
+        "🔴 g100 (`[T-r87]`): a width, a rank, an order, a gap or a threshold is a **value**, and \
+         the only place in this face a placement value may be written down is \
+         `super::tokens::span`. This is `g1` for the axis that had no gate: a face that types its \
+         magnitudes cannot answer a request to change one without a code change, which is the \
+         defect the Owner named. {findings:?}"
+    );
+}
+
+#[test]
+fn g100_control_the_scanner_refuses_a_planted_magnitude_and_passes_a_clean_source() {
+    // 🔴 **The negative control, and it is printed before it is believed** (`LANE_BRIEF_CONSTRAINTS`
+    // §4). A gate that has never been shown refusing anything is indistinguishable from a gate that
+    // cannot refuse: this face has shipped a checker that returned `PASS` unconditionally, so the
+    // control is the measurement and the green run is the claim.
+    let planted = "    width: 14,\n";
+    let plant = placement_numerals(planted);
+    println!("G100_PLANT_SOURCE={planted:?}");
+    println!("G100_PLANT_FINDINGS={plant:?}");
+    assert_eq!(
+        plant.len(),
+        1,
+        "🔴 g100's scanner did not refuse a planted width. Everything the gate says about \
+         `layout.rs` is worthless while this is true. {plant:?}"
+    );
+    assert_eq!(plant[0].1, 14);
+
+    // The positive control: the four shapes the gate excludes on purpose, each of which appears in
+    // the real source, and none of which is a placement decision.
+    let clean = "    let selected = selected.min(items - 1);\n\
+                 pub const LEDGER_COLUMNS: [Column; 10] = [\n\
+                 column(super::tokens::LEDGER_SLOTS[3]),\n\
+                 let head: String = text.chars().take(room.saturating_sub(1)).collect();\n\
+                 // the fourth row was reserved against a status_reason 14 cells long\n";
+    let quiet = placement_numerals(clean);
+    println!("G100_CLEAN_FINDINGS={quiet:?}");
+    assert!(
+        quiet.is_empty(),
+        "🔴 g100's scanner reported a magnitude where there is an identity, an arity, a subscript \
+         or a comment. A gate that cries wolf is read the way a gate that never fires is. {quiet:?}"
+    );
+}
+
+#[test]
+fn g101_every_measure_is_named_by_a_slot_and_answers_at_every_grade_of_every_scheme() {
+    // The sentence `TOKENS` carries on the paint axis, one axis over: a quantity nothing resolves
+    // to is a quantity nobody maintains.
+    let mut unnamed: Vec<&'static str> = Vec::new();
+    for measure in tokens::MEASURES {
+        if !tokens::SLOTS
+            .into_iter()
+            .any(|slot| slot.measure() == measure)
+        {
+            unnamed.push(measure.name());
+        }
+    }
+    println!("G101_UNNAMED={unnamed:?}");
+    assert!(
+        unnamed.is_empty(),
+        "🔴 g101: {unnamed:?} are measures no slot resolves to"
+    );
+
+    // Totality, which on this axis is the property a lookup table can only be checked for after the
+    // fact — so it is checked.
+    let mut answered = 0usize;
+    for slot in tokens::SLOTS {
+        for scheme in tokens::SCHEMES {
+            for grade in tokens::Grade::ALL {
+                let cells = tokens::cells(slot, grade, scheme);
+                assert!(
+                    cells.width > 0 || slot.measure() == tokens::Measure::Lead,
+                    "🔴 g101: {} answers nought at {} in {}, which is a slot with no value",
+                    slot.name(),
+                    grade.name(),
+                    scheme.name()
+                );
+                answered += 1;
+            }
+        }
+    }
+    println!(
+        "G101_ANSWERED={answered}/{}",
+        tokens::SLOTS.len() * tokens::SCHEMES.len() * tokens::Grade::ALL.len()
+    );
+
+    // 🔴 The four welded measures answer the same number everywhere, which is the property the
+    // price of a row and the drawing of a row both stand on (`[T-r66]`).
+    for measure in tokens::MEASURES.into_iter().filter(|m| m.welded()) {
+        let first = tokens::span(measure, tokens::SCHEMES[0]);
+        for scheme in tokens::SCHEMES {
+            let span = tokens::span(measure, scheme);
+            assert!(
+                span.iter().all(|cell| *cell == first[0]),
+                "🔴 g101: `{}` is welded and answers {span:?} in `{}`. A welded measure that moves \
+                 puts the row's price and the row's drawing back where `[T-r66]` found them",
+                measure.name(),
+                scheme.name()
+            );
+        }
+    }
+}
+
+#[test]
+fn g102_no_column_is_narrower_than_the_wire_key_drawn_over_it() {
+    // 🔴 The labels on the grid's header row are wire keys drawn unchanged (`req/942` §9, gate
+    // `P5`). A column narrower than its own key means the header is the thing that gets cut, and a
+    // clipped key is a word the wire does not spell.
+    let mut short: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    for slot in tokens::LEDGER_SLOTS {
+        let key = slot.key().expect("a ledger slot carries the wire's key");
+        for scheme in tokens::SCHEMES {
+            for grade in tokens::Grade::ALL {
+                checked += 1;
+                let width = tokens::cells(slot, grade, scheme).width as usize;
+                if width < key.chars().count() {
+                    short.push(format!(
+                        "{} is {width} at {} in {} and `{key}` is {}",
+                        slot.name(),
+                        grade.name(),
+                        scheme.name(),
+                        key.chars().count()
+                    ));
+                }
+            }
+        }
+    }
+    println!("G102_CHECKED={checked} G102_SHORT={short:?}");
+    assert!(short.is_empty(), "🔴 g102: {short:?}");
+}
+
+#[test]
+fn g103_the_declaration_index_agrees_with_the_resolver_at_the_shipped_default() {
+    // 🔴 **Three values, not two** (`req/38` SS870, and it is this project's own first principle
+    // applied to its own gate). `Scheme::detect` reads the environment, so a run with
+    // `GX_TUI_PLACEMENT` set to a sample is measuring a different table than the one this gate is
+    // about — and reporting that as a failure would fold *not measured* into *measured false*.
+    if tokens::Scheme::detect() != tokens::SCHEME_DEFAULT {
+        println!(
+            "G103=UNTESTABLE reason=the environment names `{}` and this gate is about `{}`",
+            tokens::Scheme::detect().name(),
+            tokens::SCHEME_DEFAULT.name()
+        );
+        return;
+    }
+    // Every column, at a width nothing can be dropped for.
+    let (drawn, dropped) = layout::columns_for(u16::MAX);
+    println!(
+        "G103_DRAWN={:?} G103_DROPPED={dropped:?}",
+        drawn.iter().map(|column| column.key).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        drawn.len(),
+        LEDGER_COLUMNS.len(),
+        "🔴 g103: the resolver kept {} columns where the index declares {}",
+        drawn.len(),
+        LEDGER_COLUMNS.len()
+    );
+    for (index, column) in drawn.iter().enumerate() {
+        let declared = LEDGER_COLUMNS[index];
+        assert_eq!(
+            (column.key, column.width, column.priority),
+            (declared.key, declared.width, declared.priority),
+            "🔴 g103: at position {index} the resolver says {column:?} and the declaration index \
+             says {declared:?}. The index is what twenty-seven call sites read, so the day the two \
+             disagree the index is describing a screen nobody draws"
+        );
+    }
+}
+
+#[test]
+fn g104_a_scheme_moves_the_columns_a_narrow_screen_keeps() {
+    // 🔴 **The measurement the Owner's question actually asks for**: not *is there a table* but
+    // *does the table decide the screen*. If swapping the declaration did not move what a forty-cell
+    // terminal keeps, the ladder would be a decoration with a gate on it.
+    //
+    // Asked of `columns_for_less`'s own arithmetic at each scheme rather than of a drawn frame,
+    // because a drawn frame needs an engine and this gate must answer in a suite. **Named ceiling,
+    // stated rather than left**: this measures the *plan*, and a capture of a real terminal is what
+    // measures the *screen*. The two are different claims and this gate makes only the first.
+    let width: u16 = 40;
+    let grade = tokens::Grade::of(width);
+    assert_eq!(grade, tokens::Grade::Crammed, "40 cells is the crammed grade");
+
+    let mut kept_by_scheme: Vec<(&'static str, Vec<&'static str>)> = Vec::new();
+    for scheme in tokens::SCHEMES {
+        // The same walk `columns_for_less` makes, asked of the table directly: the scheme it
+        // resolves at comes from the environment, and a test that set the environment would be a
+        // test that changes the process for every other test in the binary.
+        let mut ordered: Vec<tokens::Slot> = tokens::LEDGER_SLOTS.to_vec();
+        ordered.sort_by_key(|slot| {
+            let cells = tokens::cells(*slot, grade, scheme);
+            (cells.rank, cells.order)
+        });
+        let mut kept: Vec<&'static str> = Vec::new();
+        let mut spent = layout::LEFT_MARGIN;
+        for slot in ordered {
+            let cells = tokens::cells(slot, grade, scheme);
+            let next = spent + layout::COLUMN_GAP + cells.width;
+            if !kept.is_empty() && next > width {
+                break;
+            }
+            spent = next;
+            kept.push(slot.key().expect("a ledger slot carries a key"));
+        }
+        kept_by_scheme.push((scheme.name(), kept));
+    }
+    println!("G104_AT_40={kept_by_scheme:?}");
+    let distinct: BTreeSet<&Vec<&'static str>> =
+        kept_by_scheme.iter().map(|(_, kept)| kept).collect();
+    assert!(
+        distinct.len() > 1,
+        "🔴 g104: every declared scheme keeps the same columns at forty cells, so the table is not \
+         what the screen obeys. {kept_by_scheme:?}"
+    );
+
+    // And the fold, which is the half no width can buy.
+    let mut folds: Vec<(&'static str, u16, u16)> = Vec::new();
+    for scheme in tokens::SCHEMES {
+        folds.push((
+            scheme.name(),
+            tokens::cells(tokens::Slot::FoldVoices, grade, scheme).width,
+            tokens::cells(tokens::Slot::FoldQuorum, grade, scheme).width,
+        ));
+    }
+    println!("G104_FOLD={folds:?}");
+    assert!(
+        folds.iter().any(|(_, voices, _)| *voices > 1),
+        "🔴 g104: no scheme allows a second voice, so the thirty repeated rows the Owner named \
+         cannot be answered by a declaration. {folds:?}"
+    );
+}
+
+#[test]
+fn g105_a_fold_with_two_voices_keeps_every_value_and_its_count() {
+    // 🔴 The honesty condition on `resolve_folded`. A fold that dropped a value would be the face
+    // asserting over records that did not say it, which is the error this product exists to refuse.
+    let column = layout::Column {
+        key: "verdict",
+        width: 9,
+        priority: Priority::One,
+    };
+    // Thirty say one thing, one says another, one says a third: the shape `[T-r87]`'s brief
+    // measured on the live bed.
+    let mut rows: Vec<Vec<String>> = (0..30).map(|_| vec!["Admit".to_string()]).collect();
+    rows.push(vec!["Candidate".to_string()]);
+    rows.push(vec!["?".to_string()]);
+
+    let (kept_strict, folded_strict) = layout::resolve_folded(&[column], &rows, 1, 2);
+    println!("G105_STRICT kept={} folded={folded_strict:?}", kept_strict.len());
+    assert_eq!(
+        kept_strict.len(),
+        1,
+        "🔴 g105: one voice must refuse this bed — that refusal is the defect the Owner named, and \
+         a gate that does not reproduce it is not measuring the change"
+    );
+    assert!(folded_strict.is_empty());
+
+    let (kept_loose, folded_loose) = layout::resolve_folded(&[column], &rows, 3, 8);
+    println!("G105_LOOSE kept={} folded={folded_loose:?}", kept_loose.len());
+    assert!(kept_loose.is_empty());
+    assert_eq!(folded_loose.len(), 1);
+    let (key, tally) = &folded_loose[0];
+    assert_eq!(*key, "verdict");
+    assert_eq!(
+        tally,
+        &vec![
+            ("Admit".to_string(), 30),
+            ("Candidate".to_string(), 1),
+            ("?".to_string(), 1),
+        ],
+        "🔴 g105: the tally must carry every value and its count, most first, ties in the order \
+         first seen. A fold that reported only the majority would be a lie with a number on it"
+    );
+    let counted: usize = tally.iter().map(|(_, count)| count).sum();
+    println!("G105_SUM={counted}/{}", rows.len());
+    assert_eq!(
+        counted,
+        rows.len(),
+        "🔴 g105: the counts must sum to the records the fold was measured over"
+    );
+
+    // Below the quorum nothing folds, however few voices there are: two records prove nothing about
+    // repetition, which is `uniform`'s rule made a declaration.
+    let (kept_thin, folded_thin) = layout::resolve_folded(&[column], &rows[..2], 3, 8);
+    println!("G105_THIN kept={} folded={folded_thin:?}", kept_thin.len());
+    assert_eq!(kept_thin.len(), 1);
+    assert!(folded_thin.is_empty());
 }

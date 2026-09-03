@@ -2401,7 +2401,7 @@ impl EngineJournal {
         if torn > 0 && under_lock && !broken {
             return Err(Error::Malformed {
                 detail: format!(
-                    "{} bytes appended to {} by another process do not replay as whole records                      ({} did): a writer holding `.gx/LOCK` sees a complete log or refuses, because                      truncating here would delete a record this process did not write (req/190                      F-5, DR-43-2)",
+                    "{} bytes appended to {} by another process do not replay as whole records ({} did): a writer holding `.gx/LOCK` sees a complete log or refuses, because truncating here would delete a record this process did not write (req/190 F-5, DR-43-2)",
                     torn,
                     self.path.display(),
                     replayed.good_bytes(),

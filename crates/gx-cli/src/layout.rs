@@ -1315,7 +1315,7 @@ fn declaration_not_text(path: &Path) -> Error {
     Error::Declaration {
         path: path.display().to_string(),
         form: "the bytes are neither UTF-8 nor UTF-16 with a byte-order mark".to_string(),
-        remedy: "this file is two lines of plain text. Write it again as UTF-8: the layout version                  on the first line (`1`) and `journal_format=chained` on the second, with a                  trailing newline — or let `gx repair --yes` do it, which keeps your bytes beside                  it as `VERSION.pre-repair.<n>` and says so. Nothing else in `.gx/` is touched by                  rewriting it, and `gx repair` will tell you whether the digest then matches the                  head this project signed"
+        remedy: "this file is two lines of plain text. Write it again as UTF-8: the layout version on the first line (`1`) and `journal_format=chained` on the second, with a trailing newline — or let `gx repair --yes` do it, which keeps your bytes beside it as `VERSION.pre-repair.<n>` and says so. Nothing else in `.gx/` is touched by rewriting it, and `gx repair` will tell you whether the digest then matches the head this project signed"
             .to_string(),
     }
 }
@@ -1325,7 +1325,7 @@ fn declaration_no_version_line(path: &Path) -> Error {
     Error::Declaration {
         path: path.display().to_string(),
         form: "no line carries a layout version — every line is a `key=value`".to_string(),
-        remedy: "add the layout version as its own line: `1`. Order does not matter (R9 reads the                  declaration rather than the byte order), but the number has to be there, because                  it is what tells a future binary whether it can read this directory at all"
+        remedy: "add the layout version as its own line: `1`. Order does not matter (R9 reads the declaration rather than the byte order), but the number has to be there, because it is what tells a future binary whether it can read this directory at all"
             .to_string(),
     }
 }
@@ -1335,7 +1335,7 @@ fn declaration_bad_version_line(path: &Path, found: &str) -> Error {
     Error::Declaration {
         path: path.display().to_string(),
         form: format!("the layout version line reads {found:?}, which is not a number"),
-        remedy: "replace that line with the layout version alone — `1` for a directory this binary                  writes. Settings belong on their own `key=value` lines below it"
+        remedy: "replace that line with the layout version alone — `1` for a directory this binary writes. Settings belong on their own `key=value` lines below it"
             .to_string(),
     }
 }
@@ -1347,7 +1347,7 @@ fn declaration_bad_version_line(path: &Path, found: &str) -> Error {
 fn declaration_absent(path: &Path) -> Error {
     Error::DeclarationAbsent {
         path: path.display().to_string(),
-        remedy: "this project has a journal, a ledger and a head, so it is a project that has lost                  its declaration rather than a directory that never had one — a restore from a                  backup that skipped it, a synchronising client, or an editor. gx will not write                  one back on its own: R7 binds this file's digest into the signed head so that a                  *rewritten* declaration is caught, and a writer that silently re-created a *lost*                  one would take that detector off (`req/238` H-01). Run `gx repair` to see                  everything else about the project, and `gx repair --yes` to write the declaration                  back and be told that it did"
+        remedy: "this project has a journal, a ledger and a head, so it is a project that has lost its declaration rather than a directory that never had one — a restore from a backup that skipped it, a synchronising client, or an editor. gx will not write one back on its own: R7 binds this file's digest into the signed head so that a *rewritten* declaration is caught, and a writer that silently re-created a *lost* one would take that detector off (`req/238` H-01). Run `gx repair` to see everything else about the project, and `gx repair --yes` to write the declaration back and be told that it did"
             .to_string(),
     }
 }
@@ -1360,7 +1360,7 @@ fn declaration_absent(path: &Path) -> Error {
 fn config_absent(path: &Path) -> Error {
     Error::ConfigAbsent {
         path: path.display().to_string(),
-        remedy: "43 §7.9 (b) calls this the file that decides which key a recovery signs with                  (`engine_signing_keyid`), so re-creating it from the shipping defaults would put                  this project back on a key it did not choose, silently. gx will not: run                  `gx repair` to see the rest of the project, `gx repair --yes` to write the default                  file back and be told that it did, and then put your `engine_signing_keyid` line                  back — or pass `--signing-key` for one run"
+        remedy: "43 §7.9 (b) calls this the file that decides which key a recovery signs with (`engine_signing_keyid`), so re-creating it from the shipping defaults would put this project back on a key it did not choose, silently. gx will not: run `gx repair` to see the rest of the project, `gx repair --yes` to write the default file back and be told that it did, and then put your `engine_signing_keyid` line back — or pass `--signing-key` for one run"
             .to_string(),
     }
 }

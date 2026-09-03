@@ -985,7 +985,7 @@ fn settle(engine: &mut Engine<InjectedEvidence>) -> Result<()> {
             what: "project",
             path: engine.journal().path().display().to_string(),
             detail: format!(
-                "the journal witnesses {} commit(s) and the ledger holds {} leaf/leaves, and                  `ledger_agrees` is false: the two files are describing different trees.{} Writing to                  a disagreement makes it worse, so this verb refuses instead (req/182 M-12/H-01,                  req/38 §148). `gx repair` reports what is wrong and `gx repair --yes` runs 43 §7's                  recovery under the project lock (DR-43-8). {} record(s) had been appended by another                  process since this journal was opened",
+                "the journal witnesses {} commit(s) and the ledger holds {} leaf/leaves, and `ledger_agrees` is false: the two files are describing different trees.{} Writing to a disagreement makes it worse, so this verb refuses instead (req/182 M-12/H-01, req/38 §148). `gx repair` reports what is wrong and `gx repair --yes` runs 43 §7's recovery under the project lock (DR-43-8). {} record(s) had been appended by another process since this journal was opened",
                 engine.sigma().ledger().len(),
                 engine.ledger().log().len(),
                 note,
