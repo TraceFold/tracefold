@@ -135,12 +135,16 @@ TraceFold implements the **Deterministic Approval Gate (Layer 3: Mechanical Laws
 | **Unmeasured Platforms** | 3 environments | Windows native, OneDrive, SMB |
 
 **Deliberately absent:** no CI/build badge on this page, and the honest reason is worse than not
-having one. GitHub Actions has run zero jobs on any push since the account went billing-blocked at
-2026-08-15T17:25:29Z (`req/908`) — not because of a code defect, but a green tick here would not
-mean what a green tick usually means while that stays true. The last time CI ran (commit
-`f65aac2f`), it covered 16 of this project's 17 workspace crates automatically; the TypeScript
-SDK's tests have never run under CI at all. See [docs/LIMITS.md](docs/LIMITS.md) item 8 for the
-full, dated detail (checked current as of 2026-09-01).
+having one. This repository has never carried a workflow file. No commit has ever touched
+`.github/workflows/`, and every Actions run visible here is GitHub's own default setup, CodeQL and
+Pages, which has been completing on pushes since 1 Sep 2026. The CI the next sentence describes is
+the one in the private tree this repository is synced from, which is also why `f65aac2f` does not
+resolve here: it ran zero jobs on any push from 2026-08-15T17:25:29Z while the account was
+billing-blocked (`req/908`), and the last time it ran, at that commit, it covered 16 of this
+project's 17 workspace crates automatically. The TypeScript SDK's tests have never run under CI at
+all. Nothing on this page was produced by a build on this repository, so run `tools/e2e.sh` in your
+own clone for a number that came from your machine. Repository state checked against the GitHub API
+on 4 Sep 2026; see [docs/LIMITS.md](docs/LIMITS.md) item 8 for the full, dated detail.
 
 ### Scope Exclusions (Limits by Design)
 | Out of Scope | Why it cannot be closed from inside |
