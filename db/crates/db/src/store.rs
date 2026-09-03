@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 
-use crate::atom::{canonical_json, sha256_hex, Atom};
+use crate::atom::{canonical_json, sha256_hex, StoredAtom};
 use crate::extract::DocumentIr;
 use crate::manifest::{self, BandManifest, DbManifest};
 use serde::{Deserialize, Serialize};
@@ -24,7 +24,7 @@ pub const DIGEST_TABLES: [&str; 7] = [
 ];
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct JournalRecord {
+pub struct JournalEntry {
     pub seq: u64,
     pub ts: String,
     pub atom_id: String,
@@ -34,6 +34,41 @@ pub struct JournalRecord {
     pub gate_verdict: String,
     pub executor: String,
     pub supersedes: Vec<String>,
+}
+
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+pub struct LegacyRecord {
+    pub seq: u64,
+    pub id: String,
+    pub executor: String,
+    pub prev_hash: String,
+    pub supersedes: Vec<String>,
+    #[serde(default)]
+    pub version: Option<u64>,
+}
+
+pub struct AdmissionRow {
+    pub seq: u64,
+    pub atom_id: String,
+    pub version: Option<u64>,
+    pub ts: Option<String>,
+    pub supersedes: Vec<String>,
+}
+
+pub enum Admitted {
+    Current(JournalEntry),
+    Legacy(LegacyRecord),
+    Unreadable,
+}
+
+pub fn classify(line: &str) -> Admitted {
+    match serde_json::from_str::<JournalEntry>(line) {
+        Ok(record) => Admitted::Current(record),
+        Err(_) => match serde_json::from_str::<LegacyRecord>(line) {
+            Ok(record) => Admitted::Legacy(record),
+            Err(_) => Admitted::Unreadable,
+        },
+    }
 }
 
 pub fn journal_dir(db: &Path) -> PathBuf {
@@ -152,7 +187,8 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 pub struct JournalRead {
-    pub records: Vec<JournalRecord>,
+    pub records: Vec<JournalEntry>,
+    pub legacy: Vec<LegacyRecord>,
     pub lines: Vec<String>,
     pub unparsable: Vec<usize>,
 }
@@ -160,8 +196,9 @@ pub struct JournalRead {
 impl JournalRead {
     pub fn denominator(&self) -> String {
         format!(
-            "{} record(s) over {} journal line(s); {} UNKNOWN (line is not a json record, counted, never dropped from the denominator)",
+            "{} record(s) and {} record(s) in the format this engine replaced, over {} journal line(s); {} UNKNOWN (line is not a json record of either shape, counted, never dropped from the denominator)",
             self.records.len(),
+            self.legacy.len(),
             self.lines.len(),
             self.unparsable.len()
         )
@@ -173,10 +210,40 @@ impl JournalRead {
                 top = record.seq;
             }
         }
+        for record in &self.legacy {
+            if record.seq > top {
+                top = record.seq;
+            }
+        }
         top
     }
-    pub fn newest_for_lineage(&self, lineage: &str) -> Option<&JournalRecord> {
-        let mut best: Option<&JournalRecord> = None;
+    pub fn admissions(&self) -> Vec<AdmissionRow> {
+        let mut out: Vec<AdmissionRow> = Vec::new();
+        for record in &self.records {
+            out.push(AdmissionRow {
+                seq: record.seq,
+                atom_id: record.atom_id.clone(),
+                version: Some(record.version),
+                ts: Some(record.ts.clone()),
+                supersedes: record.supersedes.clone(),
+            });
+        }
+        for record in &self.legacy {
+            out.push(AdmissionRow {
+                seq: record.seq,
+                atom_id: record.id.clone(),
+                version: record.version,
+                ts: None,
+                supersedes: record.supersedes.clone(),
+            });
+        }
+        out
+    }
+    pub fn newest_for_lineage(&self, lineage: &str) -> Option<&JournalEntry> {
+        if !crate::atom::declared(lineage) {
+            return None;
+        }
+        let mut best: Option<&JournalEntry> = None;
         for record in &self.records {
             if record.lineage == lineage {
                 match best {
@@ -202,16 +269,19 @@ pub fn read_journal(db: &Path) -> JournalRead {
         }
         lines.push(line.trim_end_matches('\r').to_string());
     }
-    let mut records: Vec<JournalRecord> = Vec::new();
+    let mut records: Vec<JournalEntry> = Vec::new();
+    let mut legacy: Vec<LegacyRecord> = Vec::new();
     let mut unparsable: Vec<usize> = Vec::new();
     for (index, line) in lines.iter().enumerate() {
-        match serde_json::from_str::<JournalRecord>(line) {
-            Ok(record) => records.push(record),
-            Err(_) => unparsable.push(index + 1),
+        match classify(line) {
+            Admitted::Current(record) => records.push(record),
+            Admitted::Legacy(record) => legacy.push(record),
+            Admitted::Unreadable => unparsable.push(index + 1),
         }
     }
     JournalRead {
         records,
+        legacy,
         lines,
         unparsable,
     }
@@ -228,6 +298,8 @@ pub fn chain_fold(previous: &str, line: &str) -> String {
 pub struct ChainVerdict {
     pub lines: usize,
     pub breaks: Vec<String>,
+    pub unverifiable: usize,
+    pub verified: usize,
     pub computed_head: String,
     pub stored_head: Option<String>,
 }
@@ -243,9 +315,11 @@ pub fn verify_chain(db: &Path) -> ChainVerdict {
     let journal = read_journal(db);
     let mut running = String::new();
     let mut breaks: Vec<String> = Vec::new();
+    let mut unverifiable = 0usize;
+    let mut verified = 0usize;
     for (index, line) in journal.lines.iter().enumerate() {
-        match serde_json::from_str::<JournalRecord>(line) {
-            Ok(record) => {
+        match classify(line) {
+            Admitted::Current(record) => {
                 if record.prev_hash != running {
                     breaks.push(format!(
                         "line {} seq={} carries prev_hash {} but the chain up to it folds to {}",
@@ -254,10 +328,13 @@ pub fn verify_chain(db: &Path) -> ChainVerdict {
                         crate::atom::short_id(&record.prev_hash),
                         crate::atom::short_id(&running)
                     ));
+                } else {
+                    verified += 1;
                 }
             }
-            Err(_) => breaks.push(format!(
-                "line {} is not a json record, so its link in the chain cannot be checked",
+            Admitted::Legacy(_) => unverifiable += 1,
+            Admitted::Unreadable => breaks.push(format!(
+                "line {} is not a json record of either shape, so its link in the chain cannot be checked",
                 index + 1
             )),
         }
@@ -266,12 +343,14 @@ pub fn verify_chain(db: &Path) -> ChainVerdict {
     ChainVerdict {
         lines: journal.lines.len(),
         breaks,
+        unverifiable,
+        verified,
         computed_head: running,
         stored_head: read_head(db),
     }
 }
 
-pub fn append_journal(db: &Path, records: &mut [JournalRecord]) -> Result<usize, String> {
+pub fn append_journal(db: &Path, records: &mut [JournalEntry]) -> Result<usize, String> {
     if records.is_empty() {
         return Ok(0);
     }
@@ -353,6 +432,116 @@ pub fn source_digest(
     Ok(sha256_hex(&material))
 }
 
+pub const META_SOURCE_DIGEST: &str = "source_digest";
+pub const META_SOURCE_STAMP: &str = "source_stamp";
+
+fn stamp_one(material: &mut Vec<u8>, label: &str, path: &Path, required: bool) -> Result<(), String> {
+    material.extend_from_slice(label.as_bytes());
+    material.push(0);
+    let data = match fs::metadata(path) {
+        Ok(data) => data,
+        Err(error) => {
+            if required {
+                return Err(format!("{} could not be stat'd: {}", path.display(), error));
+            }
+            material.extend_from_slice(b"absent\0");
+            return Ok(());
+        }
+    };
+    let modified = match data.modified() {
+        Ok(found) => found,
+        Err(error) => {
+            return Err(format!(
+                "{} carries no modification time on this filesystem ({}), so a stamp over it would compare nothing",
+                path.display(),
+                error
+            ))
+        }
+    };
+    let nanos = match modified.duration_since(std::time::UNIX_EPOCH) {
+        Ok(span) => span.as_nanos(),
+        Err(error) => {
+            return Err(format!(
+                "{} is stamped before the epoch ({}); the clock is not usable as a freshness key",
+                path.display(),
+                error
+            ))
+        }
+    };
+    material.extend_from_slice(format!("{}\0{}\0", data.len(), nanos).as_bytes());
+    Ok(())
+}
+
+pub fn source_stamp(
+    db: &Path,
+    manifest_doc: &DbManifest,
+    bands: &[BandManifest],
+) -> Result<String, String> {
+    let mut material: Vec<u8> = Vec::new();
+    stamp_one(&mut material, "db.toml", &manifest::db_manifest_path(db), true)?;
+    for band_id in &manifest_doc.band_order {
+        let band = match bands.iter().find(|item| item.id == *band_id) {
+            Some(found) => found,
+            None => return Err(format!("band \"{}\" did not load; stamp refused", band_id)),
+        };
+        stamp_one(&mut material, &format!("band\0{}", band.id), &band.dir.join(manifest::BAND_MANIFEST), true)?;
+        for document in &band.documents {
+            stamp_one(
+                &mut material,
+                &format!("doc\0{}/{}", band.id, document.path),
+                &band.dir.join(&document.path),
+                true,
+            )?;
+        }
+    }
+    stamp_one(&mut material, "journal", &journal_path(db), false)?;
+    Ok(sha256_hex(&material))
+}
+
+pub enum Freshness {
+    Fresh,
+    Stale(String),
+    Unknown(String),
+}
+
+pub fn freshness(
+    db: &Path,
+    manifest_doc: &DbManifest,
+    bands: &[BandManifest],
+    connection: &rusqlite::Connection,
+    strict: bool,
+) -> Freshness {
+    if !strict {
+        match source_stamp(db, manifest_doc, bands) {
+            Ok(now) => {
+                if let Some(stored) = meta_value(connection, META_SOURCE_STAMP) {
+                    if stored == now {
+                        return Freshness::Fresh;
+                    }
+                }
+            }
+            Err(error) => return Freshness::Unknown(error),
+        }
+    }
+    let recomputed = match source_digest(db, manifest_doc, bands) {
+        Ok(found) => found,
+        Err(error) => return Freshness::Unknown(error),
+    };
+    match meta_value(connection, META_SOURCE_DIGEST) {
+        Some(stored) if stored == recomputed => Freshness::Fresh,
+        Some(stored) => Freshness::Stale(format!(
+            "the index was built over source that digests to {}, and the source on disk now digests to {}",
+            crate::atom::short_id(&stored),
+            crate::atom::short_id(&recomputed)
+        )),
+        None => Freshness::Unknown(format!(
+            "{} carries no {} row, so there is nothing to compare this source against",
+            index_path(db).display(),
+            META_SOURCE_DIGEST
+        )),
+    }
+}
+
 pub struct IndexStats {
     pub bands: usize,
     pub documents: usize,
@@ -381,8 +570,8 @@ pub fn rebuild_index(
     manifest_doc: &DbManifest,
     bands: &[BandManifest],
     documents: &[DocumentIr],
-    atoms: &[Atom],
-    journal: &[JournalRecord],
+    atoms: &[StoredAtom],
+    journal: &[AdmissionRow],
     digest: &str,
 ) -> Result<IndexStats, String> {
     if let Err(error) = fs::create_dir_all(index_dir(db)) {
@@ -404,7 +593,7 @@ CREATE TABLE documents (id TEXT PRIMARY KEY, band_id TEXT NOT NULL, path TEXT NO
 CREATE TABLE atoms (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, parent_id TEXT, layer TEXT NOT NULL, kind TEXT NOT NULL, anchor TEXT NOT NULL, ordinal INTEGER NOT NULL, line_start INTEGER NOT NULL, line_end INTEGER NOT NULL, byte_start INTEGER NOT NULL, byte_end INTEGER NOT NULL, executor TEXT NOT NULL, evidence TEXT NOT NULL);
 CREATE TABLE atom_text (atom_id TEXT PRIMARY KEY, content TEXT NOT NULL);
 CREATE TABLE relations (src TEXT NOT NULL, dst TEXT NOT NULL, type TEXT NOT NULL);
-CREATE TABLE journal_index (seq INTEGER PRIMARY KEY, atom_id TEXT NOT NULL, version INTEGER NOT NULL, ts TEXT NOT NULL);
+CREATE TABLE journal_index (seq INTEGER PRIMARY KEY, atom_id TEXT NOT NULL, version INTEGER, ts TEXT);
 CREATE VIRTUAL TABLE atoms_fts USING fts5(atom_id UNINDEXED, content, layer UNINDEXED, band UNINDEXED);
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ";
@@ -450,17 +639,17 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         if let Err(error) = transaction.execute(
             "INSERT INTO atoms (id, document_id, parent_id, layer, kind, anchor, ordinal, line_start, line_end, byte_start, byte_end, executor, evidence) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             rusqlite::params![
-                atom.id,
-                atom.provenance.document,
-                atom.parent,
-                atom.layer,
-                atom.kind,
-                atom.provenance.anchor,
-                atom.order as i64,
-                atom.provenance.range.start_line as i64,
-                atom.provenance.range.end_line as i64,
-                atom.provenance.range.byte_start as i64,
-                atom.provenance.range.byte_end as i64,
+                atom.semantic.id,
+                atom.semantic.source.document,
+                atom.semantic.parent,
+                atom.semantic.layer,
+                atom.semantic.kind,
+                atom.semantic.source.anchor,
+                atom.semantic.order as i64,
+                atom.semantic.source.range.start_line as i64,
+                atom.semantic.source.range.end_line as i64,
+                atom.semantic.source.range.byte_start as i64,
+                atom.semantic.source.range.byte_end as i64,
                 atom.executor,
                 atom.evidence
             ],
@@ -469,20 +658,20 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         }
         if let Err(error) = transaction.execute(
             "INSERT INTO atom_text (atom_id, content) VALUES (?1, ?2)",
-            rusqlite::params![atom.id, atom.content],
+            rusqlite::params![atom.semantic.id, atom.semantic.content],
         ) {
             return Err(error.to_string());
         }
         if let Err(error) = transaction.execute(
             "INSERT INTO atoms_fts (atom_id, content, layer, band) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![atom.id, atom.content, atom.layer, atom.band],
+            rusqlite::params![atom.semantic.id, atom.semantic.content, atom.semantic.layer, atom.band],
         ) {
             return Err(error.to_string());
         }
-        if let Some(parent) = &atom.parent {
+        if let Some(parent) = &atom.semantic.parent {
             if let Err(error) = transaction.execute(
                 "INSERT INTO relations (src, dst, type) VALUES (?1, ?2, 'parent')",
-                rusqlite::params![atom.id, parent],
+                rusqlite::params![atom.semantic.id, parent],
             ) {
                 return Err(error.to_string());
             }
@@ -492,7 +681,12 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     for record in journal {
         if let Err(error) = transaction.execute(
             "INSERT OR REPLACE INTO journal_index (seq, atom_id, version, ts) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![record.seq as i64, record.atom_id, record.version as i64, record.ts],
+            rusqlite::params![
+                record.seq as i64,
+                record.atom_id,
+                record.version.map(|value| value as i64),
+                record.ts
+            ],
         ) {
             return Err(error.to_string());
         }
@@ -511,9 +705,11 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         .iter()
         .map(|(key, name)| format!("{}={}", key, name))
         .collect();
+    let stamp = source_stamp(db, manifest_doc, bands)?;
     let meta_rows: Vec<(&str, String)> = vec![
         ("schema", manifest_doc.schema.to_string()),
-        ("source_digest", digest.to_string()),
+        (META_SOURCE_DIGEST, digest.to_string()),
+        (META_SOURCE_STAMP, stamp),
         ("build_ts", now_stamp()),
         ("atom_count", atoms.len().to_string()),
         ("document_count", documents.len().to_string()),

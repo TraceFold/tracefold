@@ -29,6 +29,7 @@ struct DbFile {
     layers: LayerSection,
     caps: CapSection,
     bands: BandsSection,
+    granularity: Option<GranularitySection>,
 }
 
 #[derive(Deserialize)]
@@ -64,6 +65,19 @@ struct CapSection {
 #[serde(deny_unknown_fields)]
 struct BandsSection {
     order: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GranularitySection {
+    min_mean_bytes: i64,
+    max_gap_ratio: f64,
+}
+
+#[derive(Clone, Debug)]
+pub struct Granularity {
+    pub min_mean_bytes: usize,
+    pub max_gap_ratio: f64,
 }
 
 #[derive(Deserialize)]
@@ -118,6 +132,7 @@ pub struct DbManifest {
     pub layer_names: Vec<(String, String)>,
     pub caps: Caps,
     pub band_order: Vec<String>,
+    pub granularity: Option<Granularity>,
 }
 
 #[derive(Clone, Debug)]
@@ -148,36 +163,105 @@ pub fn band_dir(db: &Path, band: &str) -> PathBuf {
     bands_dir(db).join(band)
 }
 
-pub fn find_db(explicit: Option<&str>) -> Option<PathBuf> {
+pub struct DbSearch {
+    pub found: Option<PathBuf>,
+    pub searched: Vec<PathBuf>,
+}
+
+pub fn search_db(explicit: Option<&str>) -> DbSearch {
+    let mut searched: Vec<PathBuf> = Vec::new();
     if let Some(given) = explicit {
-        let path = PathBuf::from(given);
-        if db_manifest_path(&path).is_file() {
-            return Some(path);
-        }
-        return None;
+        let dir = PathBuf::from(given);
+        let candidate = db_manifest_path(&dir);
+        searched.push(candidate.clone());
+        let found = if candidate.is_file() { Some(dir) } else { None };
+        return DbSearch { found, searched };
     }
     if let Ok(from_env) = std::env::var("DB_DIR") {
-        let path = PathBuf::from(from_env);
-        if db_manifest_path(&path).is_file() {
-            return Some(path);
+        let dir = PathBuf::from(from_env);
+        let candidate = db_manifest_path(&dir);
+        searched.push(candidate.clone());
+        if candidate.is_file() {
+            return DbSearch { found: Some(dir), searched };
         }
     }
     let mut here = match std::env::current_dir() {
         Ok(dir) => dir,
-        Err(_) => return None,
+        Err(_) => return DbSearch { found: None, searched },
     };
     loop {
-        if db_manifest_path(&here).is_file() {
-            return Some(here);
+        let direct = db_manifest_path(&here);
+        searched.push(direct.clone());
+        if direct.is_file() {
+            return DbSearch { found: Some(here), searched };
         }
         let sibling = here.join("DB");
-        if db_manifest_path(&sibling).is_file() {
-            return Some(sibling);
+        let sibling_manifest = db_manifest_path(&sibling);
+        searched.push(sibling_manifest.clone());
+        if sibling_manifest.is_file() {
+            return DbSearch { found: Some(sibling), searched };
         }
         if !here.pop() {
-            return None;
+            return DbSearch { found: None, searched };
         }
     }
+}
+
+pub const DECISIONS_BAND: &str = "decisions";
+pub const DECISIONS_DOCUMENT: &str = "01_DECISIONS.md";
+
+const INIT_DB_TOML: &str = "[db]\nschema = 1\n\n[layers]\nL0 = \"hot\"\nL1 = \"lean\"\nL2 = \"full\"\n\n[caps]\nL0 = 100\nL1 = 30\nL2 = 8\nbudget_tokens = 8000\n\n[granularity]\nmin_mean_bytes = 40\nmax_gap_ratio = 0.55\n\n[bands]\norder = [\"decisions\"]\n";
+const INIT_BAND_TOML: &str = "[band]\nid = \"decisions\"\ntitle = \"Decisions\"\nabstract = \"Decisions admitted into this DB, one entry per change.\"\nexecutor = \"cc\"\n\n[[documents]]\npath = \"01_DECISIONS.md\"\norder = 0\nrole = \"decisions\"\n";
+const INIT_DECISIONS_MD: &str = "# Decisions\n";
+const INIT_GITIGNORE: &str = "build/\n";
+const INIT_HEAD: &str = "\n";
+
+pub enum InitError {
+    Exists(Vec<PathBuf>),
+    Failed(String),
+}
+
+pub fn init_targets(dir: &Path) -> Vec<PathBuf> {
+    let decisions_dir = band_dir(dir, DECISIONS_BAND);
+    vec![
+        db_manifest_path(dir),
+        decisions_dir.join(BAND_MANIFEST),
+        decisions_dir.join(DECISIONS_DOCUMENT),
+        crate::store::journal_path(dir),
+        crate::store::head_path(dir),
+        crate::store::build_dir(dir),
+        dir.join(".gitignore"),
+    ]
+}
+
+pub fn init(dir: &Path) -> Result<Vec<PathBuf>, InitError> {
+    let targets = init_targets(dir);
+    let existing: Vec<PathBuf> = targets.iter().filter(|path| path.exists()).cloned().collect();
+    if !existing.is_empty() {
+        return Err(InitError::Exists(existing));
+    }
+    let decisions_dir = band_dir(dir, DECISIONS_BAND);
+    let files: [(PathBuf, &[u8]); 6] = [
+        (db_manifest_path(dir), INIT_DB_TOML.as_bytes()),
+        (decisions_dir.join(BAND_MANIFEST), INIT_BAND_TOML.as_bytes()),
+        (decisions_dir.join(DECISIONS_DOCUMENT), INIT_DECISIONS_MD.as_bytes()),
+        (crate::store::journal_path(dir), b""),
+        (crate::store::head_path(dir), INIT_HEAD.as_bytes()),
+        (dir.join(".gitignore"), INIT_GITIGNORE.as_bytes()),
+    ];
+    let mut written: Vec<PathBuf> = Vec::new();
+    for (path, bytes) in files {
+        if let Err(error) = crate::store::write_atomic(&path, bytes) {
+            return Err(InitError::Failed(error));
+        }
+        written.push(path);
+    }
+    let build = crate::store::build_dir(dir);
+    if let Err(error) = fs::create_dir_all(&build) {
+        return Err(InitError::Failed(format!("create dir {} failed: {}", build.display(), error)));
+    }
+    written.push(build);
+    Ok(written)
 }
 
 pub fn load_db(db: &Path) -> Result<DbManifest, String> {
@@ -242,6 +326,27 @@ pub fn parse_db(text: &str, label: &str) -> Result<DbManifest, String> {
             label
         ));
     }
+    let granularity = match &parsed.granularity {
+        None => None,
+        Some(section) => {
+            if section.min_mean_bytes < 1 {
+                return Err(format!(
+                    "{} sets granularity.min_mean_bytes to {}; a floor below one byte can never be crossed, so it is refused rather than silently raised.",
+                    label, section.min_mean_bytes
+                ));
+            }
+            if !(section.max_gap_ratio > 0.0 && section.max_gap_ratio <= 1.0) {
+                return Err(format!(
+                    "{} sets granularity.max_gap_ratio to {}; a ratio outside the range above 0 and up to 1 measures nothing about a corpus.",
+                    label, section.max_gap_ratio
+                ));
+            }
+            Some(Granularity {
+                min_mean_bytes: section.min_mean_bytes as usize,
+                max_gap_ratio: section.max_gap_ratio,
+            })
+        }
+    };
     Ok(DbManifest {
         schema: parsed.db.schema,
         layer_names: vec![
@@ -256,6 +361,7 @@ pub fn parse_db(text: &str, label: &str) -> Result<DbManifest, String> {
             budget_tokens: parsed.caps.budget_tokens as usize,
         },
         band_order: parsed.bands.order,
+        granularity,
     })
 }
 

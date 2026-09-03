@@ -12,5 +12,9 @@ L1 = 30
 L2 = 8
 budget_tokens = 8000
 
+[granularity]
+min_mean_bytes = 40
+max_gap_ratio = 0.55
+
 [bands]
 order = ["arch", "evidence"]

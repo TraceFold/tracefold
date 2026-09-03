@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Glovrex
 
 use crate::atom::{
-    atom_id, Atom, Provenance, Range, EVIDENCE_DERIVED, EVIDENCE_MEASURED, EVIDENCE_OWNER_SAID,
-    KIND_CODE, KIND_DECISION, KIND_GAP, KIND_HEADING, KIND_LIST, KIND_PARA, KIND_TABLE_ROW, UNKNOWN,
+    atom_id, Range, SemanticAtom, SourceRef, StoredAtom, EVIDENCE_DERIVED, EVIDENCE_MEASURED,
+    EVIDENCE_OWNER_SAID, KIND_CODE, KIND_DECISION, KIND_GAP, KIND_HEADING, KIND_LIST, KIND_PARA,
+    KIND_TABLE_ROW, LAYER_L0, UNKNOWN,
 };
 use crate::manifest::{self, BandManifest, DocumentDecl};
 use std::fs;
@@ -23,7 +24,7 @@ pub struct DocumentIr {
     pub path: String,
     pub role: String,
     pub executor: String,
-    pub atoms: Vec<Atom>,
+    pub atoms: Vec<StoredAtom>,
     pub source_bytes: usize,
 }
 
@@ -230,6 +231,16 @@ pub fn slug(text: &str) -> String {
     out
 }
 
+pub fn evidence_marks(content: &str) -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = Vec::new();
+    for (needle, verdict) in EVIDENCE_MARKERS {
+        if content.contains(needle) && !out.contains(&verdict) {
+            out.push(verdict);
+        }
+    }
+    out
+}
+
 fn evidence_marker(content: &str) -> Option<&'static str> {
     let mut best: Option<(usize, &'static str)> = None;
     for (needle, verdict) in EVIDENCE_MARKERS {
@@ -350,7 +361,7 @@ pub fn extract_document(
     let lines = split_lines(text);
     let blocks = build_blocks(&lines);
 
-    let mut atoms: Vec<Atom> = Vec::new();
+    let mut atoms: Vec<StoredAtom> = Vec::new();
     let mut heading_stack: Vec<(usize, usize)> = Vec::new();
     let mut layer_stack: Vec<(usize, &'static str)> = Vec::new();
     let mut anchors: Vec<String> = Vec::new();
@@ -390,7 +401,7 @@ pub fn extract_document(
             None => None,
         };
         let parent = match parent_index {
-            Some(index) => Some(atoms[index].id.clone()),
+            Some(index) => Some(atoms[index].semantic.id.clone()),
             None => None,
         };
         let order = match parent_index {
@@ -421,10 +432,16 @@ pub fn extract_document(
             Some(tag) => tag.to_string(),
             None => match layer_stack.last() {
                 Some((_, tag)) => tag.to_string(),
-                None => match role_layer {
-                    Some(found) => found.to_string(),
-                    None => UNKNOWN.to_string(),
-                },
+                None => {
+                    if block.kind == KIND_HEADING {
+                        LAYER_L0.to_string()
+                    } else {
+                        match role_layer {
+                            Some(found) => found.to_string(),
+                            None => UNKNOWN.to_string(),
+                        }
+                    }
+                }
             },
         };
 
@@ -444,7 +461,7 @@ pub fn extract_document(
             slug(&title_clean)
         } else {
             match parent_index {
-                Some(index) => format!("{}.{}", atoms[index].provenance.anchor, order),
+                Some(index) => format!("{}.{}", atoms[index].semantic.source.anchor, order),
                 None => format!("~.{}", order),
             }
         };
@@ -459,31 +476,30 @@ pub fn extract_document(
         let tags = if is_heading { bracket_tags(&title_clean) } else { Vec::new() };
         let id = atom_id(block.kind, &document.path, &anchor, &content);
 
-        atoms.push(Atom {
-            id,
-            layer,
-            kind: block.kind.to_string(),
-            content,
-            provenance: Provenance {
-                document: document_id.clone(),
-                path: document.path.clone(),
-                anchor,
-                range: Range {
-                    start_line: block.first + 1,
-                    end_line: block.last + 1,
-                    byte_start: start,
-                    byte_end: end,
+        atoms.push(StoredAtom {
+            semantic: SemanticAtom {
+                id,
+                kind: block.kind.to_string(),
+                content,
+                layer,
+                parent,
+                order,
+                tags,
+                source: SourceRef {
+                    document: document_id.clone(),
+                    path: document.path.clone(),
+                    anchor,
+                    range: Range {
+                        start_line: block.first + 1,
+                        end_line: block.last + 1,
+                        byte_start: start,
+                        byte_end: end,
+                    },
                 },
             },
-            parent,
-            order,
             executor: executor.clone(),
             evidence,
-            tags,
             band: band.id.clone(),
-            version: 1,
-            prev_hash: String::new(),
-            supersedes: Vec::new(),
         });
         child_count.push(0);
         if is_heading {

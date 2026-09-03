@@ -46,7 +46,7 @@ pub struct Range {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Provenance {
+pub struct SourceRef {
     pub document: String,
     pub path: String,
     pub anchor: String,
@@ -54,21 +54,23 @@ pub struct Provenance {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Atom {
+pub struct SemanticAtom {
     pub id: String,
-    pub layer: String,
     pub kind: String,
     pub content: String,
-    pub provenance: Provenance,
+    pub layer: String,
     pub parent: Option<String>,
     pub order: u32,
+    pub tags: Vec<String>,
+    pub source: SourceRef,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct StoredAtom {
+    pub semantic: SemanticAtom,
     pub executor: String,
     pub evidence: String,
-    pub tags: Vec<String>,
     pub band: String,
-    pub version: u64,
-    pub prev_hash: String,
-    pub supersedes: Vec<String>,
 }
 
 pub fn atom_id(kind: &str, path: &str, anchor: &str, text: &str) -> String {
@@ -89,17 +91,21 @@ pub fn lineage_key(path: &str, anchor: &str, kind: &str) -> String {
     sha256_hex(material.as_bytes())
 }
 
-pub fn lineage_of(atom: &Atom) -> String {
-    lineage_key(&atom.provenance.path, &atom.provenance.anchor, &atom.kind)
+pub fn lineage_of(atom: &StoredAtom) -> String {
+    lineage_key(
+        &atom.semantic.source.path,
+        &atom.semantic.source.anchor,
+        &atom.semantic.kind,
+    )
 }
 
 pub fn declared(value: &str) -> bool {
     value != UNKNOWN
 }
 
-pub fn undeclared_fields(atom: &Atom) -> Vec<&'static str> {
+pub fn undeclared_fields(atom: &StoredAtom) -> Vec<&'static str> {
     let mut out: Vec<&'static str> = Vec::new();
-    if !declared(&atom.layer) {
+    if !declared(&atom.semantic.layer) {
         out.push("layer");
     }
     if !declared(&atom.executor) {

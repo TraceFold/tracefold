@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Glovrex
 
-use crate::atom::{Atom, KIND_GAP, VERDICT_FAIL, VERDICT_PASS, VERDICT_UNKNOWN};
+use crate::atom::{StoredAtom, KIND_GAP, VERDICT_FAIL, VERDICT_PASS, VERDICT_UNKNOWN};
 use crate::extract::{self, DocumentIr};
 use crate::manifest::{self, BandManifest, DbManifest};
 use crate::store;
@@ -20,9 +20,13 @@ pub const REASON_PARENT_BROKEN: &str = "PARENT_BROKEN";
 pub const REASON_RANGE_OUTSIDE: &str = "RANGE_OUTSIDE_FILE";
 pub const REASON_BYTE_MISMATCH: &str = "CONTENT_BYTE_MISMATCH";
 pub const REASON_COVERAGE_GAP: &str = "COVERAGE_GAP";
+pub const REASON_GRANULARITY_UNDECLARED: &str = "GRANULARITY_UNDECLARED";
+pub const REASON_GRANULARITY_COARSE: &str = "GRANULARITY_COARSE";
+pub const REASON_GRANULARITY_FINE: &str = "GRANULARITY_FINE";
 pub const REASON_RANGE_OVERLAP: &str = "RANGE_OVERLAP";
 pub const REASON_ORDER_NOT_TOTAL: &str = "ORDER_NOT_TOTAL";
 pub const REASON_CHAIN_BREAK: &str = "CHAIN_BREAK";
+pub const REASON_LEGACY_UNVERIFIABLE: &str = "LEGACY_UNVERIFIABLE";
 pub const REASON_HEAD_MISMATCH: &str = "HEAD_MISMATCH";
 pub const REASON_HEAD_ABSENT: &str = "HEAD_ABSENT";
 pub const REASON_JOURNAL_ABSENT: &str = "JOURNAL_ABSENT";
@@ -41,6 +45,7 @@ pub struct GateLine {
     pub count: usize,
     pub denominator: usize,
     pub detail: String,
+    pub breakdown: Vec<(String, String, usize)>,
 }
 
 impl GateLine {
@@ -52,6 +57,7 @@ impl GateLine {
             count: 0,
             denominator,
             detail,
+            breakdown: Vec::new(),
         }
     }
     pub fn fail(
@@ -68,6 +74,7 @@ impl GateLine {
             count,
             denominator,
             detail,
+            breakdown: Vec::new(),
         }
     }
     pub fn unknown(
@@ -84,15 +91,48 @@ impl GateLine {
             count,
             denominator,
             detail,
+            breakdown: Vec::new(),
         }
     }
+    pub fn counting(mut self, breakdown: Vec<(String, String, usize)>) -> Self {
+        self.breakdown = breakdown;
+        self
+    }
+}
+
+pub fn render_breakdown(lines: &[GateLine]) -> String {
+    let mut out = String::new();
+    for line in lines {
+        if line.breakdown.is_empty() {
+            continue;
+        }
+        let total: usize = line.breakdown.iter().map(|(_, _, count)| count).sum();
+        out.push_str(&format!(
+            "\n{} counts {} over {} attribute and document pair(s); one atom missing two attributes is counted once under each, so this sum is at or above the {} atom(s) the gate names\n",
+            line.name,
+            total,
+            line.breakdown.len(),
+            line.count
+        ));
+        out.push_str(&format!(
+            "{:<10} {:<52} {:>7}\n",
+            "attribute", "document", "count"
+        ));
+        for (attribute, document, count) in &line.breakdown {
+            out.push_str(&format!("{:<10} {:<52} {:>7}\n", attribute, document, count));
+        }
+    }
+    if out.is_empty() {
+        out.push_str("\nno gate on this run carries a breakdown; --detail had nothing to add\n");
+    }
+    out
 }
 
 pub struct Corpus {
     pub manifest: DbManifest,
     pub bands: Vec<BandManifest>,
     pub documents: Vec<DocumentIr>,
-    pub atoms: Vec<Atom>,
+    pub atoms: Vec<StoredAtom>,
     pub band_failures: Vec<String>,
     pub orphans: Vec<String>,
     pub absent: Vec<String>,
@@ -112,7 +152,7 @@ pub fn load_corpus(db: &Path) -> Result<Corpus, String> {
         }
     }
     let mut documents: Vec<DocumentIr> = Vec::new();
-    let mut atoms: Vec<Atom> = Vec::new();
+    let mut atoms: Vec<StoredAtom> = Vec::new();
     let mut orphans: Vec<String> = Vec::new();
     let mut absent: Vec<String> = Vec::new();
     let mut unreadable: Vec<String> = Vec::new();
@@ -215,7 +255,11 @@ pub fn source_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
         ));
     }
 
-    let claiming: Vec<&Atom> = corpus.atoms.iter().filter(|atom| atom.kind != KIND_GAP).collect();
+    let claiming: Vec<&StoredAtom> = corpus
+        .atoms
+        .iter()
+        .filter(|atom| atom.semantic.kind != KIND_GAP)
+        .collect();
     let gaps = corpus.atoms.len() - claiming.len();
     if claiming.is_empty() {
         lines.push(GateLine::unknown(
@@ -230,17 +274,27 @@ pub fn source_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
         ));
     } else {
         let mut undeclared: Vec<String> = Vec::new();
+        let mut tally: BTreeMap<(String, String), usize> = BTreeMap::new();
         for atom in &claiming {
             let fields = crate::atom::undeclared_fields(atom);
-            if !fields.is_empty() {
-                undeclared.push(format!(
-                    "{}#{} {}",
-                    atom.provenance.path,
-                    atom.provenance.anchor,
-                    fields.join(",")
-                ));
+            if fields.is_empty() {
+                continue;
+            }
+            undeclared.push(format!(
+                "{}#{} {}",
+                atom.semantic.source.path,
+                atom.semantic.source.anchor,
+                fields.join(",")
+            ));
+            for field in fields {
+                let document = format!("{}/{}", atom.band, atom.semantic.source.path);
+                *tally.entry((field.to_string(), document)).or_insert(0) += 1;
             }
         }
+        let breakdown: Vec<(String, String, usize)> = tally
+            .into_iter()
+            .map(|((attribute, document), count)| (attribute, document, count))
+            .collect();
         if undeclared.is_empty() {
             lines.push(GateLine::pass(
                 "G-S3",
@@ -252,35 +306,38 @@ pub fn source_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
             ));
         } else {
             let shown: Vec<String> = undeclared.iter().take(5).cloned().collect();
-            lines.push(GateLine::fail(
-                "G-S3",
-                REASON_UNDECLARED,
-                undeclared.len(),
-                claiming.len(),
-                format!(
-                    "{} of {} claiming atom(s) leave an attribute UNKNOWN (gap atoms excluded: {}): {:?}",
+            lines.push(
+                GateLine::fail(
+                    "G-S3",
+                    REASON_UNDECLARED,
                     undeclared.len(),
                     claiming.len(),
-                    gaps,
-                    shown
-                ),
-            ));
+                    format!(
+                        "{} of {} claiming atom(s) leave an attribute UNKNOWN (gap atoms excluded: {}); db gate --detail counts them by attribute and document: {:?}",
+                        undeclared.len(),
+                        claiming.len(),
+                        gaps,
+                        shown
+                    ),
+                )
+                .counting(breakdown),
+            );
         }
     }
 
     let mut ids: BTreeMap<&str, usize> = BTreeMap::new();
     for atom in &corpus.atoms {
-        *ids.entry(atom.id.as_str()).or_insert(0) += 1;
+        *ids.entry(atom.semantic.id.as_str()).or_insert(0) += 1;
     }
     let duplicated: Vec<&str> = ids
         .iter()
         .filter(|(_, count)| **count > 1)
         .map(|(id, _)| *id)
         .collect();
-    let known: Vec<&str> = corpus.atoms.iter().map(|atom| atom.id.as_str()).collect();
+    let known: Vec<&str> = corpus.atoms.iter().map(|atom| atom.semantic.id.as_str()).collect();
     let mut broken_parents = 0usize;
     for atom in &corpus.atoms {
-        if let Some(parent) = &atom.parent {
+        if let Some(parent) = &atom.semantic.parent {
             if !known.contains(&parent.as_str()) {
                 broken_parents += 1;
             }
@@ -298,13 +355,13 @@ pub fn source_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
             Err(_) => continue,
         };
         for atom in &document.atoms {
-            let range = &atom.provenance.range;
+            let range = &atom.semantic.source.range;
             if range.byte_end > bytes.len() || range.byte_start > range.byte_end {
                 outside += 1;
                 continue;
             }
-            if &bytes[range.byte_start..range.byte_end] != atom.content.as_bytes() {
-                mismatched.push(format!("{}#{}", document.path, atom.provenance.anchor));
+            if &bytes[range.byte_start..range.byte_end] != atom.semantic.content.as_bytes() {
+                mismatched.push(format!("{}#{}", document.path, atom.semantic.source.anchor));
             }
         }
     }
@@ -345,8 +402,171 @@ pub fn source_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
     }
 
     lines.push(coverage_gate(corpus));
+    lines.push(granularity_gate(corpus));
     lines.push(journal_gate(db));
     lines
+}
+
+struct Spread {
+    label: String,
+    claiming: usize,
+    gaps: usize,
+    bytes: usize,
+}
+
+impl Spread {
+    fn add(&mut self, atom: &StoredAtom) {
+        if atom.semantic.kind == KIND_GAP {
+            self.gaps += 1;
+            return;
+        }
+        self.claiming += 1;
+        self.bytes += atom.semantic.content.len();
+    }
+    fn breaks(&self, rule: &manifest::Granularity) -> Option<String> {
+        if self.claiming == 0 {
+            return None;
+        }
+        let mean = self.bytes as f64 / self.claiming as f64;
+        let ratio = self.gaps as f64 / (self.claiming + self.gaps) as f64;
+        if mean < rule.min_mean_bytes as f64 && ratio > rule.max_gap_ratio {
+            return Some(format!(
+                "{}: mean claiming atom {:.1} byte under the floor of {} and {:.1}% gap atoms over the ceiling of {:.1}%",
+                self.label,
+                mean,
+                rule.min_mean_bytes,
+                ratio * 100.0,
+                rule.max_gap_ratio * 100.0
+            ));
+        }
+        None
+    }
+}
+
+pub fn granularity_gate(corpus: &Corpus) -> GateLine {
+    let rule = match &corpus.manifest.granularity {
+        Some(rule) => rule,
+        None => {
+            return GateLine::unknown(
+                "G-S6",
+                REASON_GRANULARITY_UNDECLARED,
+                0,
+                corpus.atoms.len(),
+                "db.toml declares no [granularity], so there is no floor or ceiling to measure this corpus against; a rule nobody wrote down is UNKNOWN, never a pass".to_string(),
+            )
+        }
+    };
+    let claiming: Vec<&StoredAtom> = corpus
+        .atoms
+        .iter()
+        .filter(|atom| atom.semantic.kind != KIND_GAP)
+        .collect();
+    if claiming.is_empty() {
+        return GateLine::unknown(
+            "G-S6",
+            REASON_EMPTY_CORPUS,
+            0,
+            0,
+            "0 claiming atom(s) to size; an empty scan is UNTESTABLE, never a pass".to_string(),
+        );
+    }
+    let mut coarse: Vec<String> = Vec::new();
+    for atom in &claiming {
+        let marks = extract::evidence_marks(&atom.semantic.content);
+        if marks.len() >= 2 {
+            coarse.push(format!(
+                "{}/{}#{} carries {:?}",
+                atom.band, atom.semantic.source.path, atom.semantic.source.anchor, marks
+            ));
+        }
+    }
+    let mut per_document: Vec<Spread> = Vec::new();
+    let mut per_band: BTreeMap<String, Spread> = BTreeMap::new();
+    for document in &corpus.documents {
+        let mut spread = Spread {
+            label: format!("{}/{}", document.band, document.path),
+            claiming: 0,
+            gaps: 0,
+            bytes: 0,
+        };
+        for atom in &document.atoms {
+            spread.add(atom);
+            let band = per_band.entry(document.band.clone()).or_insert(Spread {
+                label: format!("band {}", document.band),
+                claiming: 0,
+                gaps: 0,
+                bytes: 0,
+            });
+            band.add(atom);
+        }
+        per_document.push(spread);
+    }
+    let mut fine: Vec<String> = Vec::new();
+    for spread in &per_document {
+        if let Some(broken) = spread.breaks(rule) {
+            fine.push(broken);
+        }
+    }
+    for spread in per_band.values() {
+        if let Some(broken) = spread.breaks(rule) {
+            fine.push(broken);
+        }
+    }
+    let sized = per_document.iter().filter(|spread| spread.claiming > 0).count();
+    if coarse.is_empty() && fine.is_empty() {
+        return GateLine::pass(
+            "G-S6",
+            claiming.len(),
+            format!(
+                "{} claiming atom(s) over {} of {} document(s) and {} band(s): none carries two kinds of evidence marker at once, and none of those groups is both under the {} byte floor and over the {:.0}% gap ceiling",
+                claiming.len(),
+                sized,
+                per_document.len(),
+                per_band.len(),
+                rule.min_mean_bytes,
+                rule.max_gap_ratio * 100.0
+            ),
+        );
+    }
+    let reason = if coarse.is_empty() {
+        REASON_GRANULARITY_FINE
+    } else {
+        REASON_GRANULARITY_COARSE
+    };
+    let mut tally: BTreeMap<(String, String), usize> = BTreeMap::new();
+    for atom in &claiming {
+        if extract::evidence_marks(&atom.semantic.content).len() >= 2 {
+            let document = format!("{}/{}", atom.band, atom.semantic.source.path);
+            *tally.entry(("coarse".to_string(), document)).or_insert(0) += 1;
+        }
+    }
+    for broken in &fine {
+        let label = match broken.split(':').next() {
+            Some(label) => label.to_string(),
+            None => broken.clone(),
+        };
+        *tally.entry(("fine".to_string(), label)).or_insert(0) += 1;
+    }
+    let breakdown: Vec<(String, String, usize)> = tally
+        .into_iter()
+        .map(|((attribute, document), count)| (attribute, document, count))
+        .collect();
+    GateLine::fail(
+        "G-S6",
+        reason,
+        coarse.len() + fine.len(),
+        claiming.len(),
+        format!(
+            "{} atom(s) carry two or more kinds of evidence marker {:?}; {} group(s) are both under the {} byte floor and over the {:.0}% gap ceiling {:?}",
+            coarse.len(),
+            coarse.iter().take(3).collect::<Vec<&String>>(),
+            fine.len(),
+            rule.min_mean_bytes,
+            rule.max_gap_ratio * 100.0,
+            fine.iter().take(3).collect::<Vec<&String>>()
+        ),
+    )
+    .counting(breakdown)
 }
 
 pub fn coverage_gate(corpus: &Corpus) -> GateLine {
@@ -366,7 +586,12 @@ pub fn coverage_gate(corpus: &Corpus) -> GateLine {
         let mut ranges: Vec<(usize, usize)> = document
             .atoms
             .iter()
-            .map(|atom| (atom.provenance.range.byte_start, atom.provenance.range.byte_end))
+            .map(|atom| {
+                (
+                    atom.semantic.source.range.byte_start,
+                    atom.semantic.source.range.byte_end,
+                )
+            })
             .collect();
         ranges.sort();
         let mut cursor = 0usize;
@@ -387,11 +612,11 @@ pub fn coverage_gate(corpus: &Corpus) -> GateLine {
         }
         let mut siblings: BTreeMap<String, Vec<u32>> = BTreeMap::new();
         for atom in &document.atoms {
-            let key = match &atom.parent {
+            let key = match &atom.semantic.parent {
                 Some(parent) => parent.clone(),
                 None => String::new(),
             };
-            siblings.entry(key).or_default().push(atom.order);
+            siblings.entry(key).or_default().push(atom.semantic.order);
         }
         for (parent, orders) in siblings {
             let mut sorted = orders.clone();
@@ -465,39 +690,62 @@ pub fn journal_gate(db: &Path) -> GateLine {
         );
     }
     match &verdict.stored_head {
-        None => GateLine::unknown(
-            "G-S5",
-            REASON_HEAD_ABSENT,
-            1,
-            verdict.lines,
-            format!(
-                "the chain over {} line(s) folds to {} but nothing is stored at {}; the last record has no successor, so without HEAD it is unprotected",
+        None => {
+            return GateLine::unknown(
+                "G-S5",
+                REASON_HEAD_ABSENT,
+                1,
                 verdict.lines,
-                crate::atom::short_id(&verdict.computed_head),
-                store::head_path(db).display()
-            ),
-        ),
-        Some(stored) if *stored == verdict.computed_head => GateLine::pass(
-            "G-S5",
-            verdict.lines,
-            format!(
-                "chain of {} admission event(s) folds to HEAD {}; the last record is covered because HEAD is the fold of every line including it",
+                format!(
+                    "the chain over {} line(s) folds to {} but nothing is stored at {}; the last record has no successor, so without HEAD it is unprotected",
+                    verdict.lines,
+                    crate::atom::short_id(&verdict.computed_head),
+                    store::head_path(db).display()
+                ),
+            )
+        }
+        Some(stored) if *stored != verdict.computed_head => {
+            return GateLine::fail(
+                "G-S5",
+                REASON_HEAD_MISMATCH,
+                1,
                 verdict.lines,
-                crate::atom::short_id(stored)
-            ),
-        ),
-        Some(stored) => GateLine::fail(
-            "G-S5",
-            REASON_HEAD_MISMATCH,
-            1,
-            verdict.lines,
-            format!(
-                "HEAD records {} but the journal folds to {}; a record was edited after it was written",
-                crate::atom::short_id(stored),
-                crate::atom::short_id(&verdict.computed_head)
-            ),
-        ),
+                format!(
+                    "HEAD records {} but the {} line(s) on disk fold to {}; a record was edited, removed or added after it was written. The fold is over every line as it is written, so a line in the format this engine replaced is covered by it too",
+                    crate::atom::short_id(stored),
+                    verdict.lines,
+                    crate::atom::short_id(&verdict.computed_head)
+                ),
+            )
+        }
+        Some(_) => {}
     }
+    if verdict.unverifiable > 0 {
+        return GateLine::unknown(
+            "G-S5",
+            REASON_LEGACY_UNVERIFIABLE,
+            verdict.unverifiable,
+            verdict.lines,
+            format!(
+                "{} of {} line(s) were written by the engine this one replaced, and that engine folded its chain a different way: the prev_hash those {} line(s) carry cannot be recomputed here, so their own links are UNKNOWN, never links this engine found broken. What is checked is checked: {} line(s) in the current format carry a prev_hash this engine recomputed and hold, and HEAD equals the fold of all {} line(s), so no line was edited, removed or added",
+                verdict.unverifiable,
+                verdict.lines,
+                verdict.unverifiable,
+                verdict.verified,
+                verdict.lines
+            ),
+        );
+    }
+    GateLine::pass(
+        "G-S5",
+        verdict.lines,
+        format!(
+            "chain of {} admission event(s) folds to HEAD {}; {} of them carry a prev_hash this engine recomputed, and the last record is covered because HEAD is the fold of every line including it",
+            verdict.lines,
+            crate::atom::short_id(&verdict.computed_head),
+            verdict.verified
+        ),
+    )
 }
 
 pub fn index_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
@@ -583,6 +831,37 @@ pub fn index_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
         )),
     }
     lines
+}
+
+pub fn all_gates(db: &Path, corpus: &Corpus) -> Vec<GateLine> {
+    let mut lines = source_gates(db, corpus);
+    lines.extend(index_gates(db, corpus));
+    match store::open_index(db) {
+        Ok(connection) => {
+            lines.extend(query_gates(&connection, &corpus.manifest));
+            lines.push(settings_gate(db));
+            lines.extend(crate::route::commute_gate(&connection));
+        }
+        Err(error) => {
+            lines.push(GateLine::unknown("G-Q1", REASON_INDEX_ABSENT, 0, 0, error.clone()));
+            lines.push(settings_gate(db));
+            lines.push(GateLine::unknown("G-Q3", REASON_INDEX_ABSENT, 0, 0, error));
+        }
+    }
+    lines
+}
+
+pub fn summary_text(db: &Path, corpus: &Corpus, lines: &[GateLine]) -> String {
+    let mut out = render(lines);
+    let journal = store::read_journal(db);
+    out.push_str(&format!("journal denominator: {}\n", journal.denominator()));
+    out.push_str(&format!(
+        "corpus denominator: {} band(s), {} document(s), {} atom(s)\n",
+        corpus.bands.len(),
+        corpus.documents.len(),
+        corpus.atoms.len()
+    ));
+    out
 }
 
 pub fn summarise(lines: &[GateLine]) -> (usize, usize, usize) {
@@ -706,6 +985,7 @@ pub fn query_gates(connection: &rusqlite::Connection, manifest_doc: &DbManifest)
                 layer: Some(layer.to_string()),
                 role: None,
                 executor: None,
+                include_gaps: false,
             };
             let count = all.iter().filter(|atom| route::matches(atom, &filters)).count();
             if count == 0 && empty_pair.is_none() {
@@ -730,6 +1010,7 @@ pub fn query_gates(connection: &rusqlite::Connection, manifest_doc: &DbManifest)
             layer: Some("L9".to_string()),
             role: None,
             executor: None,
+            include_gaps: false,
         },
         0,
         None,
@@ -750,6 +1031,7 @@ pub fn query_gates(connection: &rusqlite::Connection, manifest_doc: &DbManifest)
                     layer: Some(layer.clone()),
                     role: None,
                     executor: None,
+                    include_gaps: false,
                 },
                 0,
                 None,
@@ -782,6 +1064,7 @@ pub fn query_gates(connection: &rusqlite::Connection, manifest_doc: &DbManifest)
                     layer: Some(layer.clone()),
                     role: None,
                     executor: None,
+                    include_gaps: false,
                 },
                 0,
                 None,

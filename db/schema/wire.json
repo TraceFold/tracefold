@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tracefold/db/schema/wire.json",
+  "title": "db wire",
+  "description": "The one shape every db answer takes, on stdout under --json and over loopback http, and the only place that shape is declared. crates/db/tests/wire_schema.rs asserts the engine emits exactly this; tools/wire_schema.mjs generates face/src/wire.generated.ts from it. Neither side is allowed to be the source: a field that exists in one and not the other turns one of those two red. Four profiles, told apart by query: a page (ls, show, find), a band listing, a gate run, and a refusal the transport itself made before a command was ever chosen. They are mutually exclusive on purpose, so oneOf is exact rather than a guess.",
+  "oneOf": [
+    { "$ref": "#/$defs/page_wire" },
+    { "$ref": "#/$defs/bands_wire" },
+    { "$ref": "#/$defs/gate_wire" },
+    { "$ref": "#/$defs/transport_refusal" }
+  ],
+  "$defs": {
+    "verdict": {
+      "description": "Three values, never two. TRUE the question was asked and answered, FALSE it was asked and the answer is nothing, UNKNOWN it could not be asked.",
+      "type": "string",
+      "enum": ["TRUE", "FALSE", "UNKNOWN"]
+    },
+    "exit": {
+      "description": "The same three codes every command uses. 0 answered, 1 a gate counted a failure, 2 refused or UNTESTABLE.",
+      "type": "integer",
+      "enum": [0, 1, 2]
+    },
+    "source_ref": {
+      "description": "Where the atom's bytes are. Carried on the wire under the key provenance, which the face and its controls already bind; SourceRef is the name the design constitution C2 gives the same thing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "anchor", "start_line", "end_line", "byte_start", "byte_end"],
+      "properties": {
+        "path": { "type": "string" },
+        "anchor": { "type": "string" },
+        "start_line": { "type": "integer" },
+        "end_line": { "type": "integer" },
+        "byte_start": { "type": "integer" },
+        "byte_end": { "type": "integer" }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "dst"],
+      "properties": {
+        "type": { "type": "string" },
+        "dst": { "type": "string" }
+      }
+    },
+    "atom_row": {
+      "description": "One atom. The last four keys arrive as the level of detail deepens and never leave again: score only from find, content from lod 1, provenance and relations from lod 2.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "band", "document", "layer", "kind", "role", "executor", "evidence", "line"],
+      "properties": {
+        "id": { "type": "string" },
+        "band": { "type": "string" },
+        "document": { "type": "string" },
+        "layer": { "type": "string" },
+        "kind": { "type": "string" },
+        "role": { "type": "string" },
+        "executor": { "type": "string" },
+        "evidence": { "type": "string" },
+        "line": { "type": "string" },
+        "score": { "type": "number" },
+        "content": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/source_ref" },
+        "relations": { "type": "array", "items": { "$ref": "#/$defs/relation" } }
+      }
+    },
+    "band_row": {
+      "description": "One band. atoms counts the atoms that carry a claim and gaps counts the bytes between them, so neither number hides inside the other.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "abstract", "documents", "atoms", "gaps"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "abstract": { "type": "string" },
+        "documents": { "type": "integer" },
+        "atoms": { "type": "integer" },
+        "gaps": { "type": "integer" }
+      }
+    },
+    "breakdown_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "document", "count"],
+      "properties": {
+        "attribute": { "type": "string" },
+        "document": { "type": "string" },
+        "count": { "type": "integer" }
+      }
+    },
+    "gate_row": {
+      "description": "One gate. verdict here is the gate's own three values and is a different question from the envelope verdict beside it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "verdict", "reason", "count", "denominator", "detail", "breakdown"],
+      "properties": {
+        "name": { "type": "string" },
+        "verdict": { "type": "string", "enum": ["pass", "fail", "unknown"] },
+        "reason": { "type": "string" },
+        "count": { "type": "integer" },
+        "denominator": { "type": "integer" },
+        "detail": { "type": "string" },
+        "breakdown": { "type": "array", "items": { "$ref": "#/$defs/breakdown_row" } }
+      }
+    },
+    "page_denominator": {
+      "description": "total is the corpus the projection was drawn from and is null, never 0, when the request was refused before anything was counted. withheld is matched minus returned. gaps_excluded is how many gap atoms this projection left out; leaving them out is not the same as hiding them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "matched", "returned", "withheld", "unscanned", "gaps_excluded"],
+      "properties": {
+        "total": { "type": ["integer", "null"] },
+        "matched": { "type": "integer" },
+        "returned": { "type": "integer" },
+        "withheld": { "type": "integer" },
+        "unscanned": { "type": "integer" },
+        "gaps_excluded": { "type": "integer" }
+      }
+    },
+    "plain_denominator": {
+      "description": "The four fields a gate run and a transport refusal carry. They do not project over atoms, so there are no gap atoms to exclude and no corpus total to report. Two shapes for one name is drift that has not been ruled on rather than a design; it is declared here so that a change to either emitter turns the conformance test red instead of passing unseen.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matched", "returned", "withheld", "unscanned"],
+      "properties": {
+        "matched": { "type": "integer" },
+        "returned": { "type": "integer" },
+        "withheld": { "type": "integer" },
+        "unscanned": { "type": "integer" }
+      }
+    },
+    "cap": {
+      "description": "The ceilings that were in force. bytes_returned is the length of the note a person reads, not of this envelope.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rows", "budget_tokens", "bytes_returned"],
+      "properties": {
+        "rows": { "type": "integer" },
+        "budget_tokens": { "type": "integer" },
+        "bytes_returned": { "type": "integer" }
+      }
+    },
+    "page_query": {
+      "description": "The question as the engine understood it. cmd is unknown when the refusal happened before a command could be named, which is how a face tells an unmeasured zero from a measured one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cmd", "band", "layer", "lod", "cursor"],
+      "properties": {
+        "cmd": { "type": "string", "enum": ["ls", "show", "find", "unknown"] },
+        "band": { "type": ["string", "null"] },
+        "layer": { "type": ["string", "null"] },
+        "lod": { "type": "integer" },
+        "cursor": { "type": ["string", "null"] }
+      }
+    },
+    "bands_query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cmd", "band", "layer", "lod", "cursor"],
+      "properties": {
+        "cmd": { "const": "bands" },
+        "band": { "type": "null" },
+        "layer": { "type": "null" },
+        "lod": { "type": "null" },
+        "cursor": { "type": "null" }
+      }
+    },
+    "gate_query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cmd", "band", "layer", "lod", "cursor"],
+      "properties": {
+        "cmd": { "const": "gate" },
+        "band": { "type": "null" },
+        "layer": { "type": "null" },
+        "lod": { "type": "null" },
+        "cursor": { "type": "null" }
+      }
+    },
+    "page_wire": {
+      "description": "ls, show and find, answered or refused. Every refusal that got as far as counting carries the same denominator the answer would have.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "verdict", "reason", "exit", "query", "cap", "denominator", "rows", "note"],
+      "properties": {
+        "schema": { "const": 1 },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "reason": { "type": "string" },
+        "exit": { "$ref": "#/$defs/exit" },
+        "query": { "$ref": "#/$defs/page_query" },
+        "cap": { "$ref": "#/$defs/cap" },
+        "denominator": { "$ref": "#/$defs/page_denominator" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/atom_row" } },
+        "note": { "type": "string" }
+      }
+    },
+    "bands_wire": {
+      "description": "The bands this DB declares. cap is null because a band listing has no row cap and a 0 there would read like one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "verdict", "reason", "exit", "query", "cap", "denominator", "rows", "note"],
+      "properties": {
+        "schema": { "const": 1 },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "reason": { "type": "string" },
+        "exit": { "$ref": "#/$defs/exit" },
+        "query": { "$ref": "#/$defs/bands_query" },
+        "cap": { "type": "null" },
+        "denominator": { "$ref": "#/$defs/page_denominator" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/band_row" } },
+        "note": { "type": "string" }
+      }
+    },
+    "gate_wire": {
+      "description": "A gate run. A gate line sits where a row would.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "verdict", "reason", "exit", "query", "cap", "denominator", "rows", "note"],
+      "properties": {
+        "schema": { "const": 1 },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "reason": { "type": "string" },
+        "exit": { "$ref": "#/$defs/exit" },
+        "query": { "$ref": "#/$defs/gate_query" },
+        "cap": { "type": "null" },
+        "denominator": { "$ref": "#/$defs/plain_denominator" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/gate_row" } },
+        "note": { "type": "string" }
+      }
+    },
+    "transport_refusal": {
+      "description": "A refusal http itself made: a method that implies a write, a route that does not exist, a query value that is not a number. query is null because no command was ever chosen, which is also why the face reads this body as unreadable rather than as an answer. That is the state on 2026-09-04, declared rather than corrected: whether these refusals should carry a named command instead is a ruling, not a lane's call.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "verdict", "reason", "exit", "query", "cap", "denominator", "rows", "note"],
+      "properties": {
+        "schema": { "const": 1 },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "reason": { "type": "string" },
+        "exit": { "$ref": "#/$defs/exit" },
+        "query": { "type": "null" },
+        "cap": { "type": "null" },
+        "denominator": { "$ref": "#/$defs/plain_denominator" },
+        "rows": { "type": "array", "items": { "$ref": "#/$defs/atom_row" } },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

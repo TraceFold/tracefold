@@ -9,7 +9,7 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
 pub const DEFAULT_PORT: u16 = 7423;
-pub const ROUTES: [&str; 3] = ["/v1/ls", "/v1/show", "/v1/find"];
+pub const ROUTES: [&str; 5] = ["/v1/ls", "/v1/show", "/v1/find", "/v1/gate", "/v1/bands"];
 
 struct Request {
     method: String,
@@ -115,7 +115,7 @@ fn refusal(reason: &str, detail: &str) -> String {
         "exit": 2,
         "query": serde_json::Value::Null,
         "cap": serde_json::Value::Null,
-        "denominator": { "matched": 0, "returned": 0, "unscanned": 0 },
+        "denominator": { "matched": 0, "returned": 0, "withheld": 0, "unscanned": 0 },
         "rows": [],
         "note": detail,
     });
@@ -144,10 +144,59 @@ fn answer(db: &Path, manifest_doc: &DbManifest, request: &Request) -> (u16, Stri
             ),
         );
     }
+    if request.path == "/v1/gate" {
+        let corpus = match crate::gate::load_corpus(db) {
+            Ok(corpus) => corpus,
+            Err(error) => return (503, refusal("UNTESTABLE", &error)),
+        };
+        let lines = crate::gate::all_gates(db, &corpus);
+        let code = crate::gate::exit_for(&lines);
+        let mut note = crate::gate::summary_text(db, &corpus, &lines);
+        if param(request, "detail").is_some() {
+            note.push_str(&crate::gate::render_breakdown(&lines));
+        }
+        let status = if code == 0 { 200 } else { 422 };
+        return (status, route::gate_wire(&lines, code, note));
+    }
     let connection = match store::open_index(db) {
         Ok(connection) => connection,
         Err(error) => return (503, refusal("INDEX_ABSENT", &error)),
     };
+    let command: &'static str = match request.path.as_str() {
+        "/v1/ls" => "ls",
+        "/v1/show" => "show",
+        "/v1/bands" => "bands",
+        _ => "find",
+    };
+    let mut bands: Vec<crate::manifest::BandManifest> = Vec::new();
+    for load in crate::manifest::load_bands(db, manifest_doc) {
+        match load.outcome {
+            Ok(band) => bands.push(band),
+            Err(reason) => {
+                return (
+                    422,
+                    route::wire(&route::freshness_unknown(
+                        command,
+                        format!("band \"{}\" does not carry a readable contract: {}", load.id, reason),
+                    )),
+                )
+            }
+        }
+    }
+    match store::freshness(db, manifest_doc, &bands, &connection, false) {
+        store::Freshness::Fresh => {}
+        store::Freshness::Stale(detail) => {
+            return (422, route::wire(&route::stale_index(command, detail)))
+        }
+        store::Freshness::Unknown(detail) => {
+            return (422, route::wire(&route::freshness_unknown(command, detail)))
+        }
+    }
+    if request.path == "/v1/bands" {
+        let answer = route::bands(&connection, manifest_doc);
+        let status = if answer.exit == 0 { 200 } else { 422 };
+        return (status, route::bands_wire(&answer));
+    }
     let lod = match number(request, "lod", if request.path == "/v1/show" { 1 } else { 0 }) {
         Ok(value) => value,
         Err(error) => return (400, refusal("UNKNOWN_FILTER_VALUE", &error)),
@@ -161,6 +210,7 @@ fn answer(db: &Path, manifest_doc: &DbManifest, request: &Request) -> (u16, Stri
                 layer: param(request, "layer"),
                 role: param(request, "role"),
                 executor: param(request, "executor"),
+                include_gaps: param(request, "include_gaps").is_some(),
             },
             lod,
             param(request, "cursor").as_deref(),
@@ -189,6 +239,7 @@ fn answer(db: &Path, manifest_doc: &DbManifest, request: &Request) -> (u16, Stri
                         layer: param(request, "layer"),
                         role: None,
                         executor: None,
+                        include_gaps: param(request, "include_gaps").is_some(),
                     },
                     limit,
                 ),

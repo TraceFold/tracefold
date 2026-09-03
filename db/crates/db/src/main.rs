@@ -27,7 +27,7 @@ const EXIT_CODES: [(&str, &str, &str); 3] = [
     (
         "2",
         "refused, or UNTESTABLE",
-        "the question was malformed or could not be asked: an unknown filter value, a projection over its cap or budget, a cursor that is not a row id, an empty answer, an empty corpus, an unreadable manifest",
+        "the question was malformed or could not be asked: an unknown filter value, a projection whose first row alone is over the budget, a cursor that is not a row id, an empty answer, an empty corpus, an unreadable manifest, an index the source has moved past",
     ),
 ];
 
@@ -45,6 +45,12 @@ struct Cli {
     )]
     db: Option<String>,
     #[arg(
+        long,
+        global = true,
+        help = "before ls, show and find, compare the index against a digest of every source byte instead of the length and modification time of every source file"
+    )]
+    strict: bool,
+    #[arg(
         long = "dump-commands",
         help = "print this command tree and the exit codes as json, for the README sync gate"
     )]
@@ -55,12 +61,27 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    #[command(about = "create a DB at a directory: db.toml, one band, an empty journal and an empty build/, refusing rather than overwriting anything already there")]
+    Init {
+        #[arg(help = "the directory to create the DB in; created if it does not exist")]
+        dir: String,
+    },
     #[command(about = "read the source, build the semantic index, print the counts and the digests")]
     Compile,
     #[command(about = "record the atoms that changed as admission events in the journal, then compile")]
     Push,
     #[command(about = "run every source, index and query gate over this DB and print pass, fail and UNKNOWN")]
-    Gate,
+    Gate {
+        #[arg(long, help = "also print, for each gate that counts one, the tally by attribute and document")]
+        detail: bool,
+        #[arg(long, help = "print the wire json a face consumes instead of the table a person reads")]
+        json: bool,
+    },
+    #[command(about = "list the bands this DB declares, with the document and atom count of each")]
+    Bands {
+        #[arg(long, help = "print the wire json a face consumes instead of the table a person reads")]
+        json: bool,
+    },
     #[command(about = "list the atoms of a projection")]
     Ls {
         #[arg(long, help = "keep only the atoms of one band")]
@@ -75,6 +96,8 @@ enum Command {
         lod: usize,
         #[arg(long, help = "the exact id printed at the end of the previous page, or begin")]
         cursor: Option<String>,
+        #[arg(long = "include-gaps", help = "also list the gap atoms, the bytes between the atoms that carry claims; they are excluded by default and always counted")]
+        include_gaps: bool,
         #[arg(long, help = "print the wire json a face consumes instead of the text a person reads")]
         json: bool,
     },
@@ -97,6 +120,8 @@ enum Command {
         layer: Option<String>,
         #[arg(long, default_value_t = 10, help = "how many hits to print, never above the cap of the layer")]
         limit: usize,
+        #[arg(long = "include-gaps", help = "also search the gap atoms, the bytes between the atoms that carry claims; they are excluded by default and always counted")]
+        include_gaps: bool,
         #[arg(long, help = "print the wire json a face consumes instead of the text a person reads")]
         json: bool,
     },
@@ -113,13 +138,29 @@ enum Command {
 }
 
 fn resolve_db(explicit: Option<&str>) -> PathBuf {
-    match manifest::find_db(explicit) {
+    let search = manifest::search_db(explicit);
+    match search.found {
         Some(path) => path,
         None => {
             eprintln!(
-                "UNTESTABLE: no DB directory was found. A DB is a directory holding {}; pass --db, set DB_DIR, or run inside one",
-                manifest::DB_MANIFEST
+                "UNTESTABLE: no DB directory was found in {} candidate location(s):",
+                search.searched.len()
             );
+            for candidate in &search.searched {
+                eprintln!("  {}", candidate.display());
+            }
+            eprintln!("pass --db, set DB_DIR, or run db init <dir> to create one");
+            eprintln!("reason: NO_DB_ROOT");
+            exit(2);
+        }
+    }
+}
+
+fn manifest_or_refuse(db: &Path) -> manifest::DbManifest {
+    match manifest::load_db(db) {
+        Ok(manifest_doc) => manifest_doc,
+        Err(error) => {
+            eprintln!("UNTESTABLE: {}", error);
             exit(2);
         }
     }
@@ -175,8 +216,9 @@ fn compile_now(db: &Path, corpus: &gate::Corpus) -> store::IndexStats {
     let journal = store::read_journal(db);
     if !journal.unparsable.is_empty() {
         eprintln!(
-            "UNTESTABLE: {}; the journal is Source, so a line nobody can read is not a line that can be skipped",
-            journal.denominator()
+            "UNTESTABLE: {}; the journal is Source, so a line nobody can read is not a line that can be skipped. The unreadable line(s) are at {:?}",
+            journal.denominator(),
+            journal.unparsable
         );
         exit(2);
     }
@@ -193,7 +235,7 @@ fn compile_now(db: &Path, corpus: &gate::Corpus) -> store::IndexStats {
         &corpus.bands,
         &corpus.documents,
         &corpus.atoms,
-        &journal.records,
+        &journal.admissions(),
         &digest,
     ) {
         Ok(stats) => stats,
@@ -254,6 +296,31 @@ fn open_or_refuse(db: &Path) -> rusqlite::Connection {
     }
 }
 
+fn fresh_or_refuse(
+    db: &Path,
+    manifest_doc: &manifest::DbManifest,
+    connection: &rusqlite::Connection,
+    strict: bool,
+    command: &'static str,
+    json: bool,
+) {
+    let mut bands: Vec<manifest::BandManifest> = Vec::new();
+    for load in manifest::load_bands(db, manifest_doc) {
+        match load.outcome {
+            Ok(band) => bands.push(band),
+            Err(reason) => emit(
+                route::freshness_unknown(command, format!("band \"{}\" does not carry a readable contract, so the source this index was built from could not be identified: {}", load.id, reason)),
+                json,
+            ),
+        }
+    }
+    match store::freshness(db, manifest_doc, &bands, connection, strict) {
+        store::Freshness::Fresh => {}
+        store::Freshness::Stale(detail) => emit(route::stale_index(command, detail), json),
+        store::Freshness::Unknown(detail) => emit(route::freshness_unknown(command, detail), json),
+    }
+}
+
 fn emit(outcome: route::Outcome, json: bool) -> ! {
     if json {
         println!("{}", route::wire(&outcome));
@@ -273,12 +340,14 @@ fn filters(
     layer: Option<String>,
     role: Option<String>,
     executor: Option<String>,
+    include_gaps: bool,
 ) -> route::Filters {
     route::Filters {
         band,
         layer,
         role,
         executor,
+        include_gaps,
     }
 }
 
@@ -385,9 +454,39 @@ fn main() {
         println!("scanned {}", dir.display());
         exit(gate::exit_for(&lines));
     }
+    if let Command::Init { dir } = &command {
+        let target = PathBuf::from(dir);
+        match manifest::init(&target) {
+            Ok(created) => {
+                println!("initialized a DB at {}", target.display());
+                for path in &created {
+                    println!("  {}", path.display());
+                }
+                exit(0);
+            }
+            Err(manifest::InitError::Exists(existing)) => {
+                eprintln!(
+                    "{} of the {} target(s) already exist under {}; nothing was written:",
+                    existing.len(),
+                    manifest::init_targets(&target).len(),
+                    target.display()
+                );
+                for path in &existing {
+                    eprintln!("  {}", path.display());
+                }
+                eprintln!("reason: INIT_REFUSED_EXISTS");
+                exit(2);
+            }
+            Err(manifest::InitError::Failed(error)) => {
+                eprintln!("nothing was written: {}", error);
+                exit(2);
+            }
+        }
+    }
     let db = resolve_db(cli.db.as_deref());
 
     match command {
+        Command::Init { .. } => exit(2),
         Command::Selftest { .. } => exit(2),
         Command::Compile => {
             let corpus = load_or_refuse(&db);
@@ -407,7 +506,7 @@ fn main() {
             }
             let stamp = store::now_stamp();
             let mut seq = journal.max_seq();
-            let mut records: Vec<store::JournalRecord> = Vec::new();
+            let mut records: Vec<store::JournalEntry> = Vec::new();
             let mut unchanged = 0usize;
             let mut fresh = 0usize;
             let mut versioned = 0usize;
@@ -415,7 +514,7 @@ fn main() {
             for item in &corpus.atoms {
                 let lineage = atom::lineage_of(item);
                 let (version, supersedes) = match journal.newest_for_lineage(&lineage) {
-                    Some(record) if record.atom_id == item.id => {
+                    Some(record) if record.atom_id == item.semantic.id => {
                         unchanged += 1;
                         continue;
                     }
@@ -435,10 +534,10 @@ fn main() {
                     atom::VERDICT_UNKNOWN
                 };
                 seq += 1;
-                records.push(store::JournalRecord {
+                records.push(store::JournalEntry {
                     seq,
                     ts: stamp.clone(),
-                    atom_id: item.id.clone(),
+                    atom_id: item.semantic.id.clone(),
                     lineage,
                     version,
                     prev_hash: String::new(),
@@ -471,44 +570,35 @@ fn main() {
             compile_now(&db, &corpus);
             exit(0);
         }
-        Command::Gate => {
+        Command::Gate { detail, json } => {
             let corpus = load_or_refuse(&db);
-            let mut lines = gate::source_gates(&db, &corpus);
-            lines.extend(gate::index_gates(&db, &corpus));
-            match store::open_index(&db) {
-                Ok(connection) => {
-                    lines.extend(gate::query_gates(&connection, &corpus.manifest));
-                    lines.push(gate::settings_gate(&db));
-                    lines.extend(route::commute_gate(&connection));
-                }
-                Err(error) => {
-                    lines.push(gate::GateLine::unknown(
-                        "G-Q1",
-                        gate::REASON_INDEX_ABSENT,
-                        0,
-                        0,
-                        error.clone(),
-                    ));
-                    lines.push(gate::settings_gate(&db));
-                    lines.push(gate::GateLine::unknown(
-                        "G-Q3",
-                        gate::REASON_INDEX_ABSENT,
-                        0,
-                        0,
-                        error,
-                    ));
-                }
+            let lines = gate::all_gates(&db, &corpus);
+            let code = gate::exit_for(&lines);
+            let mut note = gate::summary_text(&db, &corpus, &lines);
+            if detail {
+                note.push_str(&gate::render_breakdown(&lines));
             }
-            print!("{}", gate::render(&lines));
-            let journal = store::read_journal(&db);
-            println!("journal denominator: {}", journal.denominator());
-            println!(
-                "corpus denominator: {} band(s), {} document(s), {} atom(s)",
-                corpus.bands.len(),
-                corpus.documents.len(),
-                corpus.atoms.len()
-            );
-            exit(gate::exit_for(&lines));
+            if json {
+                println!("{}", route::gate_wire(&lines, code, note));
+            } else {
+                print!("{}", note);
+            }
+            exit(code);
+        }
+        Command::Bands { json } => {
+            let manifest_doc = manifest_or_refuse(&db);
+            let connection = open_or_refuse(&db);
+            fresh_or_refuse(&db, &manifest_doc, &connection, cli.strict, "bands", json);
+            let answer = route::bands(&connection, &manifest_doc);
+            if json {
+                println!("{}", route::bands_wire(&answer));
+            } else if answer.exit == 0 {
+                print!("{}", answer.text);
+            } else {
+                eprint!("{}", answer.text);
+                eprintln!("reason: {}", answer.reason);
+            }
+            exit(answer.exit);
         }
         Command::Ls {
             band,
@@ -517,21 +607,25 @@ fn main() {
             executor,
             lod,
             cursor,
+            include_gaps,
             json,
         } => {
-            let corpus = load_or_refuse(&db);
+            let manifest_doc = manifest_or_refuse(&db);
             let connection = open_or_refuse(&db);
+            fresh_or_refuse(&db, &manifest_doc, &connection, cli.strict, "ls", json);
             let outcome = route::ls(
                 &connection,
-                &corpus.manifest,
-                &filters(band, layer, role, executor),
+                &manifest_doc,
+                &filters(band, layer, role, executor, include_gaps),
                 lod,
                 cursor.as_deref(),
             );
             emit(outcome, json);
         }
         Command::Show { address, lod, json } => {
+            let manifest_doc = manifest_or_refuse(&db);
             let connection = open_or_refuse(&db);
+            fresh_or_refuse(&db, &manifest_doc, &connection, cli.strict, "show", json);
             emit(route::show(&connection, &address, lod), json);
         }
         Command::Find {
@@ -539,15 +633,17 @@ fn main() {
             band,
             layer,
             limit,
+            include_gaps,
             json,
         } => {
-            let corpus = load_or_refuse(&db);
+            let manifest_doc = manifest_or_refuse(&db);
             let connection = open_or_refuse(&db);
+            fresh_or_refuse(&db, &manifest_doc, &connection, cli.strict, "find", json);
             let outcome = route::find(
                 &connection,
-                &corpus.manifest,
+                &manifest_doc,
                 &needle,
-                &filters(band, layer, None, None),
+                &filters(band, layer, None, None, include_gaps),
                 limit,
             );
             emit(outcome, json);

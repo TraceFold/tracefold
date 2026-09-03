@@ -54,17 +54,21 @@ const SRC = option('src', inside(path.join(ROOT, 'crates', 'db', 'src')));
 
 const BAND = option('band', null);
 const narrow = BAND ? ['--band', BAND] : [];
+const SCOPE = option('scope', 'bands/decisions');
 
 const CASES = [
   { name: 'compile', kind: 'db', argv: ['compile'] },
   { name: 'gate', kind: 'db', argv: ['gate'] },
+  { name: 'bands', kind: 'db', argv: ['bands'] },
   { name: 'ls --layer L0 --cursor begin', kind: 'db', argv: ['ls', ...narrow, '--layer', 'L0', '--cursor', 'begin'] },
   { name: 'ls --layer L1 --lod 1 --cursor begin', kind: 'db', argv: ['ls', ...narrow, '--layer', 'L1', '--lod', '1', '--cursor', 'begin'] },
   { name: 'show <anchor> --lod 2', kind: 'db', argv: ['show', option('anchor', 'Overview'), '--lod', '2'] },
   { name: 'find <needle>', kind: 'db', argv: ['find', option('needle', 'regenerable')] },
+  { name: 'find <needle> --strict', kind: 'db', argv: ['--strict', 'find', option('needle', 'regenerable')] },
   { name: 'find <needle> --layer L1', kind: 'db', argv: ['find', option('needle-l1', 'lean'), '--layer', 'L1'] },
   { name: 'selftest', kind: 'db', argv: ['selftest', '--path', SRC] },
-  { name: 'grep -rIn <needle> bands/', kind: 'raw', argv: [] }
+  { name: 'grep -rIn <needle> bands/', kind: 'raw', argv: [] },
+  { name: `grep -rIn <needle> ${SCOPE}/`, kind: 'scoped', argv: [] }
 ];
 
 function quote(value) {
@@ -98,6 +102,8 @@ function script() {
     if (item.kind === 'db') {
       const argv = item.argv.map(quote).join(' ');
       lines.push(`measure ${quote(item.name)} "$BIN" --db "$DB" ${argv}`);
+    } else if (item.kind === 'scoped') {
+      lines.push(`measure ${quote(item.name)} grep -rIn ${quote(option('needle', 'regenerable'))} "$DB/${SCOPE}"`);
     } else {
       lines.push(`measure ${quote(item.name)} grep -rIn ${quote(option('needle', 'regenerable'))} "$DB/bands"`);
     }
@@ -172,10 +178,17 @@ for (const item of CASES) {
   });
 }
 
-const rawRow = rows.find((one) => one.command.startsWith('grep'));
+const rawRow = rows.find((one) => one.command === 'grep -rIn <needle> bands/');
+const scopedRow = rows.find((one) => one.command.startsWith('grep') && one !== rawRow);
 for (const row of rows) {
-  if (!row.measured || !rawRow || !rawRow.measured || rawRow.bytes === 0) continue;
-  row.bytes_vs_grep = Number((rawRow.bytes / Math.max(row.bytes, 1)).toFixed(1));
+  if (!row.measured) continue;
+  if (rawRow && rawRow.measured && rawRow.bytes > 0) {
+    row.bytes_vs_grep = Number((rawRow.bytes / Math.max(row.bytes, 1)).toFixed(1));
+  }
+  if (scopedRow && scopedRow.measured && scopedRow.bytes > 0) {
+    row.bytes_vs_scoped_grep = Number((scopedRow.bytes / Math.max(row.bytes, 1)).toFixed(1));
+    row.ms_vs_scoped_grep = Number((row.ms_by_date / Math.max(scopedRow.ms_by_date, 0.001)).toFixed(2));
+  }
 }
 
 const target = OUT || path.join(ROOT, 'build', 'bench.jsonl');
@@ -185,11 +198,14 @@ writeFileSync(
   rows.map((row) => JSON.stringify({ ...row, repeat: REPEAT, db: DB, bin: BIN })).join('\n') + '\n'
 );
 
-const header = ['| command | runs | exit | ms (date) | ms (time) | clock spread | bytes | rows | bytes vs grep |', '|---|---|---|---|---|---|---|---|---|'];
+const header = [
+  '| command | runs | exit | ms (date) | ms (time) | clock spread | bytes | rows | bytes vs grep | bytes vs scoped grep | ms vs scoped grep |',
+  '|---|---|---|---|---|---|---|---|---|---|---|'
+];
 const table = rows.map((row) =>
   row.measured
-    ? `| \`${row.command}\` | ${row.runs} | ${row.exit} | ${row.ms_by_date} | ${row.ms_by_time} | ${row.clock_spread} | ${row.bytes} | ${row.rows} | ${row.bytes_vs_grep ?? 'n/a'} |`
-    : `| \`${row.command}\` | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | ${row.note} |`
+    ? `| \`${row.command}\` | ${row.runs} | ${row.exit} | ${row.ms_by_date} | ${row.ms_by_time} | ${row.clock_spread} | ${row.bytes} | ${row.rows} | ${row.bytes_vs_grep ?? 'n/a'} | ${row.bytes_vs_scoped_grep ?? 'n/a'} | ${row.ms_vs_scoped_grep ?? 'n/a'} |`
+    : `| \`${row.command}\` | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | ${row.note} |`
 );
 process.stdout.write([...header, ...table].join('\n') + '\n');
 
