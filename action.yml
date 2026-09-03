@@ -1,48 +1,114 @@
 name: 'Tracefold Agent Mutation & Receipt Verifier'
-description: 'Verifies pre-commit tool inverses, validates DSSE audit receipts, and checks Merkle tile log integrity in CI'
+description: 'Verifies DSSE audit receipts offline against a trusted checkpoint, and lints the Cedar policy pack, in CI'
 author: 'Tracefold Core Team'
 branding:
   icon: 'shield'
   color: 'purple'
 
+# What changed on 3 Sep 2026 (issue #5): the previous version of this file called
+# `gx verify-receipts --dir <d> --policy <p>`, which is not a subcommand the CLI has
+# ever shipped, so the action could not pass even with `gx` installed. The shipped
+# surface is `gx receipt verify <FILE> [--offline --checkpoint --checkpoint-key --key]`
+# and `gx policy lint <PATH>` -- both read off `gx --help` on the built binary. The
+# steps below call those, one receipt at a time.
+#
+# Two inputs were removed rather than kept as decoration: `enforce-inverses` and
+# `fail-on-tamper`. Neither mapped to any flag. `gx receipt verify` always checks the
+# DSSE signature, the canonical CID, and inclusion against the head it is given; there
+# is no dial that turns half of that off, so an input claiming to be one was a lie.
+#
+# Honest limit: this action has not been observed running green in CI. Actions on this
+# repository are blocked at the billing gate (no workflow job has started since 20 Aug),
+# so the evidence behind it is the CLI's own `--help` and the same call shape
+# `crates/gx-cli/src/demo.rs::verify_offline` uses -- not a green run.
+#
+# What a green run would mean, and would not: it says each receipt is genuine, is the
+# bytes it names, and is included in the log at that checkpoint's tree size. It says
+# nothing about whether the change a receipt describes was correct. See docs/LIMITS.md.
+
 inputs:
   receipt-dir:
-    description: 'Directory containing .dsse signed audit receipts'
+    description: 'Directory holding the receipts to verify (*.json and *.dsse are read)'
     required: false
     default: '.agent-receipts'
+  checkpoint:
+    description: 'The trusted ledger head to check each inclusion proof against'
+    required: false
+    default: 'checkpoint.json'
+  checkpoint-key:
+    description: 'The public key that checkpoint was signed with. Without it the answer says anchor_authenticated: false'
+    required: false
+    default: 'trusted_key.json'
+  key:
+    description: 'The public key the receipts were signed with'
+    required: false
+    default: 'trusted_key.json'
   policy-path:
-    description: 'Path to Cedar policy file for tool authorization gating'
+    description: 'Cedar policy pack to lint. Skipped when the path does not exist'
     required: false
     default: 'policy.cedar'
-  enforce-inverses:
-    description: 'Require every mutation to have an offline checked inverse'
-    required: false
-    default: 'true'
-  fail-on-tamper:
-    description: 'Fail the build if any DSSE signature or Merkle tile proof fails'
+  fail-on-empty:
+    description: 'Fail when receipt-dir holds no receipts. A gate with nothing to check should not report green'
     required: false
     default: 'true'
 
 runs:
   using: 'composite'
   steps:
-    - name: Run Tracefold Verification Gate
+    - name: Run Tracefold verification gate
       shell: bash
+      env:
+        RECEIPT_DIR: ${{ inputs.receipt-dir }}
+        CHECKPOINT: ${{ inputs.checkpoint }}
+        CHECKPOINT_KEY: ${{ inputs.checkpoint-key }}
+        TRUSTED_KEY: ${{ inputs.key }}
+        POLICY_PATH: ${{ inputs.policy-path }}
+        FAIL_ON_EMPTY: ${{ inputs.fail-on-empty }}
       run: |
-        echo "Running Tracefold Agent Mutation Gate..."
-        echo "Receipt Directory: ${{ inputs.receipt-dir }}"
-        echo "Policy Path: ${{ inputs.policy-path }}"
-        echo "Enforce Inverses: ${{ inputs.enforce-inverses }}"
-        if command -v gx &> /dev/null; then
-          # Honest limit: `gx verify-receipts` is not a shipped subcommand yet
-          # (the CLI ships `gx receipt verify`, see examples/ci/receipt-check.yml),
-          # so even with gx installed this step currently fails -- which is the
-          # intended fail-closed direction until the input mapping lands (issue #5).
-          gx verify-receipts --dir "${{ inputs.receipt-dir }}" --policy "${{ inputs.policy-path }}"
-        else
-          # Fail-closed repair (issue #5): a gate that cannot run must not pass.
-          # Retired fail-open stub, kept for the record and never executed:
-          #   echo "Tracefold gate validation passed (stub check)."
-          echo "::error::gx binary not found -- this check cannot pass without it. Install the gx CLI in a prior step (see examples/ci/receipt-check.yml) before running this action." >&2
+        set -euo pipefail
+
+        # Fail-closed: a gate that cannot run must not pass.
+        if ! command -v gx >/dev/null 2>&1; then
+          echo "::error::gx not found on PATH. Install the CLI in a prior step (see examples/ci/receipt-check.yml) before this action." >&2
           exit 1
         fi
+        gx --version
+
+        if [ -f "$POLICY_PATH" ]; then
+          echo "Linting policy pack: $POLICY_PATH"
+          gx policy lint "$POLICY_PATH"
+        else
+          echo "::notice::no policy pack at $POLICY_PATH -- skipping gx policy lint"
+        fi
+
+        shopt -s nullglob
+        receipts=("$RECEIPT_DIR"/*.json "$RECEIPT_DIR"/*.dsse)
+        if [ "${#receipts[@]}" -eq 0 ]; then
+          if [ "$FAIL_ON_EMPTY" = "true" ]; then
+            echo "::error::no receipts under $RECEIPT_DIR -- a gate with nothing to check must not report green." >&2
+            exit 1
+          fi
+          echo "::notice::no receipts under $RECEIPT_DIR, and fail-on-empty is false -- nothing was checked."
+          exit 0
+        fi
+
+        # --offline keeps this self-contained: no ledger is consulted, so the checkpoint
+        # the caller already trusts is the only anchor. Missing anchor files are an error
+        # rather than a silent downgrade to anchor_authenticated:false.
+        for f in "$CHECKPOINT" "$CHECKPOINT_KEY" "$TRUSTED_KEY"; do
+          if [ ! -f "$f" ]; then
+            echo "::error::anchor file not found: $f -- offline verification needs the checkpoint, the key it was signed with, and the receipts' key." >&2
+            exit 1
+          fi
+        done
+
+        for receipt in "${receipts[@]}"; do
+          echo "Verifying $receipt"
+          gx receipt verify "$receipt" \
+            --offline \
+            --checkpoint "$CHECKPOINT" \
+            --checkpoint-key "$CHECKPOINT_KEY" \
+            --key "$TRUSTED_KEY"
+        done
+
+        echo "Verified ${#receipts[@]} receipt(s) offline against $CHECKPOINT."
