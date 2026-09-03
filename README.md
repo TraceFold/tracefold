@@ -61,6 +61,13 @@ A real OpenClaw agent (`deepseek/deepseek-chat`, a live API call, not a fixture)
 <pre><code>npm i @mahirhir/tracefold</code></pre>
 </td>
 </tr>
+<tr>
+<td colspan="2" valign="top">
+<h4>⌨️ Route C: The <code>gx</code> Command Line (Rust)</h4>
+<pre><code>cargo install tracefold</code></pre>
+<p>Installs one binary, <code>gx</code>, the CLI the demo above runs (<code>gx undo</code>, <code>gx receipt verify</code>). Published on crates.io at 0.1.2 under Apache-2.0, and it builds from source. No prebuilt binaries yet, tracked in <a href="https://github.com/TraceFold/tracefold/issues/7">#7</a>.</p>
+</td>
+</tr>
 </table>
 
 ```js
