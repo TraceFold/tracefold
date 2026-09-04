@@ -1585,7 +1585,13 @@ fn units(text: &str) -> Vec<String> {
     'word: while at < words.len() {
         for atom in &atoms {
             let span = atom.split(' ').count();
-            if span < 2 || at + span > words.len() { // g100: a count of words, not of cells -- a one-word atom cannot be broken across a break, so it is not a phrase this loop is about
+            // A one-word atom cannot be broken across a break, so it is not a phrase this loop is
+            // about. The exemption sits inside the condition rather than after the brace because
+            // rustfmt moves a comment that follows `{` onto its own line, and g100 reads its
+            // exemption from the line the magnitude is on.
+            if span < 2 // g100: a count of words, not of cells
+                || at + span > words.len()
+            {
                 continue;
             }
             let joined = words[at..at + span].join(" ");
