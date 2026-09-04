@@ -39,6 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
+      # rust-toolchain.toml pins the channel, so cargo runs under the pinned toolchain and not
+      # under the one the action installed, and a component asked of the action lands on the wrong
+      # one. This adds rustfmt to whichever toolchain the pin resolves to.
+      - run: rustup component add rustfmt
       - run: cargo fmt --all --check
