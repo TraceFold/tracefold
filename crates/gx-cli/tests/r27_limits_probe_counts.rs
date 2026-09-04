@@ -88,7 +88,31 @@ const PRIVATE_TREE_ONLY: &[&str] = &[
     // the private tree their absence still fails.
     "probes/doubt/tests/inference_closed_doubt.rs",
     "probes/doubt/tests/read_surface_census_doubt.rs",
+    // 🔴 **H-9 / `req/954` §3-1 / `req/983`** — the C-25 canon suite, held for the reason the rows
+    // above are held: no commit reachable in the published tree carries the path, `docs/LIMITS.md`
+    // never names it, and the requirements its registry row cites do not ship, so the whole H-9
+    // material was withheld rather than this one file being dropped. That is inferred from the
+    // published tree because the private tree is not on the machine this row was written on; if the
+    // inference is wrong, the private tree fails on the absence, which is where it should surface.
+    "crates/gx-witness/tests/r964_c25_canon.rs",
 ];
+
+/// Whether a registry row is held against the **private** tree rather than against this one.
+///
+/// True only for a `PRIVATE_TREE_ONLY` path that this tree does not carry, in a tree whose
+/// workspace does not declare `probes/doubt`. A suite this tree does carry is never set aside, so
+/// `boundary_attest.rs` stays held here even though its row is on the list, and in the private tree
+/// nothing is set aside at all.
+/// What both probes say when they set a row aside, so that a skip reads the same in either log.
+const SET_ASIDE: &str = "a private-tree registry row (req/789 §3 / SS772-773 canon exclusion), \
+                         absent from this tree, whose workspace does not declare probes/doubt \
+                         (published tree, req/817). Held against the private tree (req/833).";
+
+fn held_against_the_private_tree(path: &str) -> bool {
+    PRIVATE_TREE_ONLY.contains(&path)
+        && !workspace_declares("probes/doubt")
+        && !repo_root().join(path).exists()
+}
 
 /// Whether this tree's workspace declares `member` — read from the root `Cargo.toml`'s
 /// `members` array, inside which nothing but member paths may be written (the public root's own
@@ -331,16 +355,12 @@ fn a_bed_control_every_registered_count_is_this_trees_count() {
     let mut wrong: Vec<String> = Vec::new();
     let mut divergent: Vec<String> = Vec::new();
     for (path, word) in REGISTERED {
+        if held_against_the_private_tree(path) {
+            eprintln!("SKIP {path}: {SET_ASIDE}");
+            continue;
+        }
         let full = repo_root().join(path);
         let Ok(text) = std::fs::read_to_string(&full) else {
-            if PRIVATE_TREE_ONLY.contains(&path) && !workspace_declares("probes/doubt") {
-                eprintln!(
-                    "SKIP {path}: a private-tree registry row (req/789 §3 / SS772-773 canon \
-                     exclusion) and this tree's workspace does not declare probes/doubt \
-                     (published tree, req/817). Held against the private tree (req/833)."
-                );
-                continue;
-            }
             wrong.push(format!("{path} is not in this tree"));
             continue;
         };
@@ -387,11 +407,21 @@ fn a_bed_control_every_registered_count_is_this_trees_count() {
 ///
 /// The needle is a fixed shape rather than a guess at prose, so this gate cannot be satisfied by
 /// accident and cannot fire on a sentence that merely mentions a number near a path.
+///
+/// A row this tree does not carry is set aside exactly as the bed control sets it aside. The two
+/// probes read the same registry, and one of them being unable to say "this tree does not carry
+/// that suite" was the asymmetry: it held the page to statements about files a reader of this tree
+/// cannot open. A suite this tree does carry is still held, which is why `boundary_attest.rs` is
+/// still checked here.
 #[test]
 fn b_the_page_carries_a_current_statement_for_every_registered_suite() {
     let page = limits();
     let mut missing: Vec<String> = Vec::new();
     for (path, word) in REGISTERED {
+        if held_against_the_private_tree(path) {
+            eprintln!("SKIP {path}: {SET_ASIDE}");
+            continue;
+        }
         let needle = format!("`{path}` has **{word}**");
         if !page.contains(&needle) {
             missing.push(needle);

@@ -3812,3 +3812,32 @@ crates.io for any crate. The npm package `@mahirhir/tracefold` (a WASM receipt v
 describes and its publication status is not what this note is about (see
 `docs/ADAPTER_GUIDE.md` §5). This paragraph should be updated, not replaced, the day a crate
 first publishes successfully.
+
+## Three probe counts this page stated are not this tree's, and the tree was asked (2026-09-04, `req/329` L-01)
+
+This page is additive: an old block records what was true when it was written, and rewriting it
+would destroy the record. What has to be true is the page's **most recent** answer about a file.
+Three of those answers were not. `crates/gx-cli/tests/r27_limits_probe_counts.rs` held the right
+numbers in its registry while no block on this page carried them, which is `req/329` L-01 happening
+again, one window later, to the file written to stop it happening.
+
+Each number below was re-derived from this tree rather than carried across from a lane note. Two
+instruments were run separately and agree on all three: the registry's own counter, which requires
+the `#[test]` attributes and the items those attributes introduce to produce the same figure, and a
+plain `grep -cE '^#\[(tokio::)?test\]'` over the same file. A number nobody re-derived is the
+failure this page is about, so a correction that only swaps a numeral would be the same defect in a
+newer paragraph.
+
+`crates/gx-witness/tests/boundary_attest.rs` has **ten** probes. The read-set section above says
+eleven, and eleven was true the day it was written. The suite lost
+`the_boundary_does_not_reach_the_gate` in a merge resolution and no non-merge commit removes it
+(`req/999` F-3); the sentence above is kept as the record of what was measured then, and this is the
+current answer.
+
+`crates/gx-cli/tests/r26_not_attempted_causes.rs` has **ten** probes. The `v0.5-n` block quotes nine,
+which was the count on the day it was quoted. R-1001-1 (`req/1001` §4) grew the suite by one and
+this is the block that says so.
+
+`crates/gx-adapter-fs/tests/apply_durability.rs` has **nine** probes. The `req/868` R-868-5 section
+above names this suite and its ordering probe and states no size for it at all, so the page made a
+claim about a suite whose number nothing here held. Nine is that number.
