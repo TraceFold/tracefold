@@ -693,6 +693,41 @@ fn commit_cut_at(fixture: &Pipeline, tid: &str, after_ms: u64) -> Option<i32> {
     child.wait().expect("the child dies").code()
 }
 
+/// Commit one row in `fixture` uncut, and answer how long the commit took, spawn to exit, in
+/// milliseconds.
+///
+/// A cut aimed at a phase boundary has to be a fraction of a commit rather than a fixed count of
+/// milliseconds, because a fixed count only aims at a boundary on the machine and the load it was
+/// tuned on: the sweeps below were written where a commit took about 110 ms, and on a runner where
+/// it took 65 ms every offset past the second landed on a process that had already exited. The
+/// measurement is taken in the same project moments before the cut rather than once for the whole
+/// sweep, because these suites run beside forty others and a span measured while the machine was
+/// busy aims every later cut past the end of a commit made while it was not.
+fn timed_commit_ms(fixture: &Pipeline, goal: &str) -> u64 {
+    let tid = fixture.planned_one(goal);
+    assert_eq!(
+        run_verify(fixture, &tid),
+        0,
+        "the measured row is Admitted before it is committed"
+    );
+    let started = Instant::now();
+    let committed = support::run(fixture.gx().args(["commit", &tid]));
+    let elapsed = started.elapsed();
+    assert_eq!(
+        committed.code, 0,
+        "the measured commit succeeds or the cut below is aimed at nothing: {}",
+        committed.stderr
+    );
+    elapsed.as_millis() as u64
+}
+
+/// Where in one commit the cuts land, as a percentage of that commit.
+///
+/// The proportions the fixed sweep stood for on the machine it was written on: the first is before
+/// the journal's first write and the last is after the head, so a sweep that keeps them keeps the
+/// phase boundaries these probes name.
+const CUT_PERCENTS: [u64; 7] = [36, 55, 68, 77, 86, 95, 109];
+
 /// Every commit receipt filed under `.gx/receipts/`.
 fn commit_receipts(fixture: &Pipeline) -> Vec<String> {
     let dir = fixture.project.join(".gx").join("receipts");
@@ -736,15 +771,18 @@ fn run_verify(fixture: &Pipeline, tid: &str) -> i32 {
 /// R8 and it does not care *how* the repair was made.
 #[test]
 fn a_power_cut_inside_a_commit_never_leaves_a_leaf_without_its_receipt() {
-    // The offsets walk one commit. On this machine a commit is ~110 ms; the sweep is deliberately
-    // wider than that at both ends so that "before anything" and "after everything" are included
-    // rather than assumed.
-    const OFFSETS: [u64; 7] = [40, 60, 75, 85, 95, 105, 120];
+    // The offsets walk one commit, each one a percentage of a commit this fixture just made. The
+    // sweep is deliberately wider than that commit at both ends so that "before anything" and
+    // "after everything" are included rather than assumed.
     let mut cut_landed = 0usize;
-    for offset in OFFSETS {
+    let mut spans: Vec<u64> = Vec::new();
+    for (step, percent) in CUT_PERCENTS.into_iter().enumerate() {
         for run in 0..3 {
-            let fixture = pipeline(&format!("model_a_midcut_{offset}_{run}"), "before\n");
+            let fixture = pipeline(&format!("model_a_midcut_{step}_{run}"), "before\n");
             fixture.commit_one("warm\n");
+            let span_ms = timed_commit_ms(&fixture, &format!("span-{step}-{run}\n"));
+            spans.push(span_ms);
+            let offset = span_ms * percent / 100;
             let tid = fixture.planned_one(&format!("cut-{offset}-{run}\n"));
             assert_eq!(
                 run_verify(&fixture, &tid),
@@ -784,11 +822,13 @@ fn a_power_cut_inside_a_commit_never_leaves_a_leaf_without_its_receipt() {
     // 🔴 The denominator, asserted rather than hoped for: if no `SIGKILL` ever landed on a running
     // commit, the whole sweep above measured nothing and would pass on any binary. `code.is_none()`
     // is "the child died of a signal", which is what a power cut looks like from here.
+    println!("MODEL_A_MIDCUT cuts={cut_landed} spans_ms={spans:?}");
     assert!(
-        cut_landed >= OFFSETS.len(),
+        cut_landed >= CUT_PERCENTS.len(),
         "the sweep has to actually cut running commits; only {cut_landed} of {} runs were killed \
-         mid-flight, so this probe was measuring completed commits",
-        OFFSETS.len() * 3
+         mid-flight, so this probe was measuring completed commits. The commits measured beside \
+         them ran {spans:?} ms",
+        CUT_PERCENTS.len() * 3
     );
 }
 
@@ -1413,12 +1453,17 @@ fn a_recovery_under_the_wrong_key_does_not_take_the_way_out_with_it() {
 /// nothing; what they break is the belief that this verb reports everything it can see.
 #[test]
 fn a_crash_leaves_no_staging_file_a_repair_will_not_sweep() {
-    const OFFSETS: [u64; 6] = [60, 75, 85, 95, 105, 120];
+    // The walk of the probe above, from its second offset on: this arm is about what a cut leaves
+    // behind rather than about which phase it landed in.
     let mut cut_landed = 0usize;
     let mut seen_before_repair = 0usize;
-    for offset in OFFSETS {
-        let fixture = pipeline(&format!("model_a_r9_staging_{offset}"), "before\n");
+    let mut spans: Vec<u64> = Vec::new();
+    for (step, percent) in CUT_PERCENTS.into_iter().enumerate().skip(1) {
+        let fixture = pipeline(&format!("model_a_r9_staging_{step}"), "before\n");
         fixture.commit_one("warm\n");
+        let span_ms = timed_commit_ms(&fixture, &format!("span-{step}\n"));
+        spans.push(span_ms);
+        let offset = span_ms * percent / 100;
         let tid = fixture.planned_one(&format!("cut-{offset}\n"));
         assert_eq!(run_verify(&fixture, &tid), 0);
         if commit_cut_at(&fixture, &tid, offset).is_none() {
@@ -1441,10 +1486,13 @@ fn a_crash_leaves_no_staging_file_a_repair_will_not_sweep() {
             staging_residue(&fixture)
         );
     }
-    println!("R9_STAGING cuts={cut_landed} runs_with_residue={seen_before_repair}");
+    println!(
+        "R9_STAGING cuts={cut_landed} runs_with_residue={seen_before_repair} spans_ms={spans:?}"
+    );
     assert!(
         cut_landed >= 3,
-        "the sweep has to actually cut running commits; only {cut_landed} landed"
+        "the sweep has to actually cut running commits; only {cut_landed} landed. The commits \
+         measured beside them ran {spans:?} ms"
     );
 }
 
