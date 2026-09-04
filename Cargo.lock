@@ -1884,207 +1884,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "gx-adapter-fs"
-version = "0.1.0"
+name = "gx-adapter-time"
+version = "0.1.2"
 dependencies = [
- "gx-canon",
- "gx-core",
- "gx-gate",
- "gx-substrate",
- "gx-substrate-conformance",
- "proptest",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "gx-adapter-git"
-version = "0.1.0"
-dependencies = [
- "gix",
- "gx-canon",
- "gx-core",
- "gx-gate",
- "gx-substrate",
  "gx-substrate-conformance",
  "serde",
-]
-
-[[package]]
-name = "gx-adapter-mcp"
-version = "0.1.0"
-dependencies = [
- "gx-canon",
- "gx-core",
- "gx-engine",
- "gx-gate",
- "gx-substrate",
- "gx-substrate-conformance",
- "gx-witness",
- "serde",
- "serde_json",
- "sha1",
-]
-
-[[package]]
-name = "gx-api"
-version = "0.1.0"
-dependencies = [
- "axum",
- "chrono",
- "criterion",
- "futures-core",
- "gx-adapter-fs",
- "gx-core",
- "gx-engine",
- "gx-gate",
- "gx-log",
- "gx-witness",
- "http-body-util",
- "serde",
- "serde_json",
- "tokio",
- "tower",
-]
-
-[[package]]
-name = "gx-canon"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "gx-canon",
- "gx-core",
- "ipld-core",
- "proptest",
- "serde",
- "serde_ipld_dagcbor",
- "serde_json",
- "serde_json_canonicalizer",
- "thiserror",
-]
-
-[[package]]
-name = "gx-cli"
-version = "0.1.0"
-dependencies = [
- "axum",
- "clap",
- "gix",
- "gx-adapter-fs",
- "gx-adapter-git",
- "gx-adapter-mcp",
- "gx-api",
- "gx-core",
- "gx-engine",
- "gx-gate",
- "gx-log",
- "gx-substrate",
- "gx-tui",
- "gx-witness",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tower",
-]
-
-[[package]]
-name = "gx-core"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "gx-engine"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "gx-adapter-fs",
- "gx-canon",
- "gx-core",
- "gx-engine",
- "gx-gate",
- "gx-log",
- "gx-substrate",
- "gx-witness",
- "proptest",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "gx-gate"
-version = "0.1.0"
-dependencies = [
- "cedar-policy",
- "criterion",
- "gx-canon",
- "gx-core",
- "gx-witness",
- "proptest",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "gx-log"
-version = "0.1.0"
-dependencies = [
- "gx-canon",
- "gx-core",
- "proptest",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "gx-substrate"
-version = "0.1.0"
-dependencies = [
- "gx-canon",
- "gx-core",
- "serde",
- "thiserror",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-substrate",
 ]
 
 [[package]]
 name = "gx-substrate-conformance"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
- "gx-canon",
- "gx-core",
- "gx-substrate",
-]
-
-[[package]]
-name = "gx-tui"
-version = "0.1.0"
-dependencies = [
- "ratatui",
- "serde_json",
-]
-
-[[package]]
-name = "gx-witness"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "chacha20poly1305",
- "ed25519-dalek",
- "getrandom 0.3.4",
- "gx-canon",
- "gx-core",
- "gx-log",
- "proptest",
- "serde",
- "serde_json",
- "thiserror",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-substrate",
 ]
 
 [[package]]
@@ -3794,6 +3610,201 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
+name = "tracefold"
+version = "0.1.2"
+dependencies = [
+ "axum",
+ "clap",
+ "gix",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tower",
+ "tracefold-adapter-fs",
+ "tracefold-adapter-git",
+ "tracefold-adapter-mcp",
+ "tracefold-api",
+ "tracefold-core",
+ "tracefold-engine",
+ "tracefold-gate",
+ "tracefold-log",
+ "tracefold-substrate",
+ "tracefold-tui",
+ "tracefold-witness",
+]
+
+[[package]]
+name = "tracefold-adapter-fs"
+version = "0.1.2"
+dependencies = [
+ "gx-substrate-conformance",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-gate",
+ "tracefold-substrate",
+]
+
+[[package]]
+name = "tracefold-adapter-git"
+version = "0.1.2"
+dependencies = [
+ "gix",
+ "gx-substrate-conformance",
+ "serde",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-gate",
+ "tracefold-substrate",
+]
+
+[[package]]
+name = "tracefold-adapter-mcp"
+version = "0.1.2"
+dependencies = [
+ "gx-substrate-conformance",
+ "serde",
+ "serde_json",
+ "sha1",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-engine",
+ "tracefold-gate",
+ "tracefold-substrate",
+ "tracefold-witness",
+]
+
+[[package]]
+name = "tracefold-api"
+version = "0.1.2"
+dependencies = [
+ "axum",
+ "chrono",
+ "criterion",
+ "futures-core",
+ "http-body-util",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracefold-adapter-fs",
+ "tracefold-core",
+ "tracefold-engine",
+ "tracefold-gate",
+ "tracefold-log",
+ "tracefold-witness",
+]
+
+[[package]]
+name = "tracefold-canon"
+version = "0.1.2"
+dependencies = [
+ "blake3",
+ "ipld-core",
+ "proptest",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_json_canonicalizer",
+ "thiserror",
+ "tracefold-canon",
+ "tracefold-core",
+]
+
+[[package]]
+name = "tracefold-core"
+version = "0.1.2"
+dependencies = [
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "tracefold-engine"
+version = "0.1.2"
+dependencies = [
+ "criterion",
+ "proptest",
+ "serde",
+ "thiserror",
+ "tracefold-adapter-fs",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-engine",
+ "tracefold-gate",
+ "tracefold-log",
+ "tracefold-substrate",
+ "tracefold-witness",
+]
+
+[[package]]
+name = "tracefold-gate"
+version = "0.1.2"
+dependencies = [
+ "cedar-policy",
+ "criterion",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-witness",
+]
+
+[[package]]
+name = "tracefold-log"
+version = "0.1.2"
+dependencies = [
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracefold-canon",
+ "tracefold-core",
+]
+
+[[package]]
+name = "tracefold-substrate"
+version = "0.1.2"
+dependencies = [
+ "serde",
+ "thiserror",
+ "tracefold-canon",
+ "tracefold-core",
+]
+
+[[package]]
+name = "tracefold-tui"
+version = "0.1.2"
+dependencies = [
+ "ratatui",
+ "serde_json",
+]
+
+[[package]]
+name = "tracefold-witness"
+version = "0.1.2"
+dependencies = [
+ "argon2",
+ "chacha20poly1305",
+ "ed25519-dalek",
+ "getrandom 0.3.4",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracefold-canon",
+ "tracefold-core",
+ "tracefold-log",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4012,13 +4023,13 @@ dependencies = [
 
 [[package]]
 name = "wasm-verify"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "ed25519-dalek",
- "gx-core",
- "gx-log",
- "gx-witness",
  "serde_json",
+ "tracefold-core",
+ "tracefold-log",
+ "tracefold-witness",
  "wasm-bindgen",
 ]
 

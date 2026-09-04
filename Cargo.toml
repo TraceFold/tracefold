@@ -41,6 +41,7 @@ members = [
     "crates/gx-adapter-fs",
     "crates/gx-adapter-git",
     "crates/gx-adapter-mcp",
+    "crates/gx-adapter-time",
     "crates/gx-engine",
     "crates/gx-cli",
     "crates/gx-api",
