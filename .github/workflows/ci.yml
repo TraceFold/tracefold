@@ -1,0 +1,44 @@
+# The suite in this repository ran only when somebody typed cargo test. This file is
+# the difference between a test that exists and a test that is enforced.
+name: ci
+
+on:
+  push:
+    branches: [main, "ci/**"]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    # Some probes set a directory to mode 0500 and require the write to be refused.
+    # A filesystem that ignores the mode makes those fixtures void, so this job must
+    # run on a filesystem that enforces one.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # --locked is the point rather than a detail: the published lock did not match
+      # the published manifest until 2026-09-04, so every reproducible build failed
+      # before it compiled anything. This step fails if that ever returns.
+      - name: cargo metadata --locked
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
+      - name: cargo test --workspace --locked
+        run: cargo test --workspace --locked --no-fail-fast
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
