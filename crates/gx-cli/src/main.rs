@@ -1847,8 +1847,7 @@ impl StdinTempFile {
             })?;
         static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("gx-stdin-{}-{n}.tmp", std::process::id()));
+        let path = std::env::temp_dir().join(format!("gx-stdin-{}-{n}.tmp", std::process::id()));
         std::fs::write(&path, &buf).map_err(|e| Error::Io {
             action: "write",
             path: path.display().to_string(),

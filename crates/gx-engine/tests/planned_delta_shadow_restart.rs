@@ -94,10 +94,7 @@ fn planned_delta_survives_a_restart() {
     );
     // The name survives (Σ-shadow carries `delta_cid`) -- confirms this is a body problem, not a
     // name problem, before reading the accessor under test.
-    let shadow_cid = restarted
-        .shadow()
-        .row(&id)
-        .and_then(|r| r.delta_cid);
+    let shadow_cid = restarted.shadow().row(&id).and_then(|r| r.delta_cid);
     // The body survives too, one layer down (this is the fix's ingredient, read directly rather than
     // through the accessor under test, so a failure below cannot be blamed on the blob store).
     let blob_present = shadow_cid.is_some_and(|c| restarted.blobs().contains(&c));

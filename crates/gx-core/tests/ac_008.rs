@@ -187,8 +187,8 @@ fn ac_008_manifest_dependencies_stay_inside_the_allowlist() {
     // The dev-dependencies section is a
     // separate matter: `cargo tree -p gx-core -e normal` is the graph a consumer gets, and
     // proptest/serde_json are absent from it. tools/verify_hand2.sh records both trees.
-    let deps = toml_section(MANIFEST, "[dependencies]")
-        .expect("manifest has a [dependencies] section");
+    let deps =
+        toml_section(MANIFEST, "[dependencies]").expect("manifest has a [dependencies] section");
     for bad in DENY {
         assert!(
             !toml_code_only(&deps).contains(bad),

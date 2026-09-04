@@ -158,10 +158,7 @@ fn without_engine_version(now: &str) -> String {
     let contribution = format!(
         "6e{}{}",
         hex(b"engine_version"),
-        hex(
-            &cbor::encode(&Some(support::FIXTURE_ENGINE_VERSION.to_string()))
-                .expect("canonical")
-        )
+        hex(&cbor::encode(&Some(support::FIXTURE_ENGINE_VERSION.to_string())).expect("canonical"))
     );
     assert!(
         now.contains(&contribution),

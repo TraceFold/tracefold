@@ -130,9 +130,9 @@ pub const MAX_ID_BYTES: usize = 128;
 pub fn addressable(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= MAX_ID_BYTES
-        && id.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '_' | '~' | '-')
-        })
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '_' | '~' | '-'))
 }
 
 /// The address of one record on one of [`RECORD_ROUTES`], or `None` for an id this face will not
@@ -411,8 +411,7 @@ pub const RECEIPT_VIEW_KEYS: [&str; 4] = ["key_id", "leaf_index", "tree_size", "
 /// 🔴 Together with [`RECEIPT_VIEW_KEYS`] this is the **whole** of the engine's object. Gate `g95`
 /// asserts the two arrays are disjoint and cover all seven members named in `handlers.rs`'s table,
 /// so a member the engine adds tomorrow makes the gate red rather than vanishing unnamed.
-pub const RECEIPT_VIEW_NOT_DRAWN: [&str; 3] =
-    ["subject", "postcondition_fingerprint", "issued_at"];
+pub const RECEIPT_VIEW_NOT_DRAWN: [&str; 3] = ["subject", "postcondition_fingerprint", "issued_at"];
 
 /// How the receipt block introduces [`RECEIPT_VIEW_NOT_DRAWN`].
 ///
@@ -1405,8 +1404,7 @@ pub const STATE_KEY: &str = "state";
 /// in the same lane whose own doc comment warned that a hand-made list of lifecycle states goes
 /// stale in silence. The names now come off [`NULL_MEANING_BY_STATE`], which `g98` checks against
 /// the engine's own `LIFECYCLE_STATES` at test time, so there is one list and it is the checked one.
-pub const INVERSE_NULL_STATES: [&str; 2] =
-    [NULL_MEANING_BY_STATE[0].0, NULL_MEANING_BY_STATE[1].0];
+pub const INVERSE_NULL_STATES: [&str; 2] = [NULL_MEANING_BY_STATE[0].0, NULL_MEANING_BY_STATE[1].0];
 
 /// The lifecycle states from which a `null` on a **judged** field can be read, and what it means.
 ///
@@ -1467,8 +1465,10 @@ pub const INVERSE_NULL_STATES: [&str; 2] =
 /// measured bed was in it, so a ruling here would be one this lane could not fire.
 ///
 /// The remainder is not silence — `g98` prints every state it found no ruling for.
-pub const NULL_MEANING_BY_STATE: [(&str, Nothing); 2] =
-    [("Candidate", Nothing::Loading), ("Aborted", Nothing::Absent)];
+pub const NULL_MEANING_BY_STATE: [(&str, Nothing); 2] = [
+    ("Candidate", Nothing::Loading),
+    ("Aborted", Nothing::Absent),
+];
 
 /// How many states `crates/gx-engine/src/pipeline.rs` declared when [`NULL_MEANING_BY_STATE`] was
 /// ruled on.

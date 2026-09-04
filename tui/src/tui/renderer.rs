@@ -605,7 +605,10 @@ pub fn hoist_folded(
     columns: &[layout::Column],
     capacity: usize,
     width: u16,
-) -> (Vec<layout::Column>, Vec<(&'static str, Vec<(String, usize)>)>) {
+) -> (
+    Vec<layout::Column>,
+    Vec<(&'static str, Vec<(String, usize)>)>,
+) {
     let (voices, quorum) = layout::fold_budget(width);
     hoist_at(items, columns, capacity, voices, quorum)
 }
@@ -618,7 +621,10 @@ pub fn hoist_at(
     capacity: usize,
     voices: usize,
     quorum: usize,
-) -> (Vec<layout::Column>, Vec<(&'static str, Vec<(String, usize)>)>) {
+) -> (
+    Vec<layout::Column>,
+    Vec<(&'static str, Vec<(String, usize)>)>,
+) {
     // Every record the read carried, and not the slice on screen: the answer is a property of the
     // ledger this face was handed, so it does not move when the terminal is resized or when the
     // reader presses `j`.
@@ -1006,7 +1012,6 @@ pub const UNDO_ADDRESS: &str = "gx undo";
 /// reads `leaf N of M`, so the word a reader sees is `leaf` and the wire key is not.
 pub const RECEIPT_ROW_WORDS: [&str; 3] = [wire::RECEIPT_KEY_ID, "leaf", "root"];
 
-
 /// The two words the record's own rows are judged with, as opposed to read off the wire.
 ///
 /// 🔴 Declared for the reason [`RECEIPT_ROW_WORDS`] is: `help_lines` names them and
@@ -1152,7 +1157,10 @@ fn fit(cells: &[(String, Role)], width: u16, gap: u16) -> Vec<(String, Role)> {
         // exactly the failure this function exists to refuse, inside the branch written to refuse
         // it. A row that is one cell wide can still say `~`.
         if let Some((text, _)) = out.last_mut() {
-            let keep: String = text.chars().take(text.chars().count().saturating_sub(1)).collect();
+            let keep: String = text
+                .chars()
+                .take(text.chars().count().saturating_sub(1))
+                .collect();
             *text = format!("{keep}~");
         } else if width > 0 {
             out.push(("~".to_string(), Role::Quiet));
@@ -1288,9 +1296,8 @@ fn record_own(item: &serde_json::Value, width: u16) -> Vec<(Vec<(String, Role)>,
         // unreachable, not merely in agreement. That is *why* the disagreement had never shown —
         // and it is also why the guard is worth one line, because the thing standing between the
         // two classifiers is a **priority in a table another lane may change**, not an argument.
-        let own_vocabulary = key == wire::VERDICT_KEY
-            || key == wire::INVERSE_STATUS_KEY
-            || key == wire::STATE_KEY;
+        let own_vocabulary =
+            key == wire::VERDICT_KEY || key == wire::INVERSE_STATUS_KEY || key == wire::STATE_KEY;
         if !own_vocabulary {
             if let wire::Cell::Nothing(nothing) = wire::cell(item, &key) {
                 match gathered.iter_mut().find(|(mark, _)| *mark == nothing) {
@@ -1531,10 +1538,7 @@ fn agreement(item: &serde_json::Value, held: &wire::Held) -> (String, Role) {
         .filter(|key| item.get(*key) != body.get(*key))
         .collect();
     if moved.is_empty() {
-        (
-            format!("read again {}", RECORD_ROW_WORDS[0]),
-            Role::Body,
-        )
+        (format!("read again {}", RECORD_ROW_WORDS[0]), Role::Body)
     } else {
         (
             format!("read again moved on {}", moved.join(", ")),
@@ -1735,10 +1739,8 @@ fn subject(
                             let mut cells = vec![(key.to_string(), Role::Quiet)];
                             for (at, (mark, count)) in voices.iter().enumerate() {
                                 let tail = if at + 1 < voices.len() { "" } else { sep };
-                                cells.push((
-                                    format!("{mark} {count}{tail}"),
-                                    voice_role(key, mark),
-                                ));
+                                cells
+                                    .push((format!("{mark} {count}{tail}"), voice_role(key, mark)));
                             }
                             cells
                         }
@@ -1889,10 +1891,17 @@ fn subject(
             let keys_total: usize = members.iter().map(|(_, keys)| keys).sum();
             let keys_shown: usize = members.iter().take(shown).map(|(_, keys)| keys).sum();
             if keys_shown < keys_total {
-                clauses.push(format!("{} of {keys_total} members", keys_total - keys_shown));
+                clauses.push(format!(
+                    "{} of {keys_total} members",
+                    keys_total - keys_shown
+                ));
             }
             if past < beyond.len() {
-                clauses.push(format!("{} of {} more rows", beyond.len() - past, beyond.len()));
+                clauses.push(format!(
+                    "{} of {} more rows",
+                    beyond.len() - past,
+                    beyond.len()
+                ));
             }
             // `not drawn` leads, for the reason `Measured::bare` leads with the connection's mark:
             // a terminal cuts from the right, so what cannot be recovered from what is left goes at

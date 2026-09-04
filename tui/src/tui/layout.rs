@@ -153,10 +153,8 @@ fn table(width: u16) -> (super::tokens::Grade, super::tokens::Scheme) {
 /// scheme, and these constants are the *declaration index* (which keys exist, and what they are
 /// worth when nothing narrows them). Gate `g103` measures that the two agree at `Grade::Full` under
 /// `Scheme::Ledger`, so the index can never quietly stop describing the shipped default.
-const BASE: (super::tokens::Grade, super::tokens::Scheme) = (
-    super::tokens::Grade::Full,
-    super::tokens::SCHEME_DEFAULT,
-);
+const BASE: (super::tokens::Grade, super::tokens::Scheme) =
+    (super::tokens::Grade::Full, super::tokens::SCHEME_DEFAULT);
 
 /// Where a reader goes for what this region carried, once it is not on the screen.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1000,7 +998,11 @@ pub fn subject_shape(reading: &super::wire::Reading, view: &super::acts::View) -
 /// them it took, whether either is short of what was asked for, and how many rows are left for the
 /// ledger underneath.
 #[must_use]
-fn record_split(subject_height: usize, members: usize, beyond: usize) -> (usize, usize, bool, usize) {
+fn record_split(
+    subject_height: usize,
+    members: usize,
+    beyond: usize,
+) -> (usize, usize, bool, usize) {
     let cut = members + beyond > subject_height;
     let room = subject_height.saturating_sub(usize::from(cut));
     let members_shown = members.min(room);
@@ -2199,8 +2201,7 @@ pub fn resolve_attended(
     let folded = !(measured.all_200 && measured.healthy);
     // The rung is still chosen by measuring the line rather than against a width the line used to
     // fit at, and it still decides what [`Plan::provenance`] carries for the hatch.
-    let rung = if super::tokens::Grade::of(width).index()
-        >= super::tokens::Grade::Snug.index()
+    let rung = if super::tokens::Grade::of(width).index() >= super::tokens::Grade::Snug.index()
         && rows_needed(&measured.long(), width) <= 1
     {
         Rung::Long
@@ -2379,7 +2380,10 @@ pub fn resolve_attended(
         // record above it. What `window` guarantees is the one property this needs, which is that
         // the attended record is inside the slice (gate `g28`), so the row whose detail is drawn
         // above is the row marked below.
-        Subject::Record => (0usize, window(attention.selected, attention.items, grid_capacity)),
+        Subject::Record => (
+            0usize,
+            window(attention.selected, attention.items, grid_capacity),
+        ),
     };
     // 🔴 **Nought, and it is not a loss** (`req/924` §TUI-57). The note used to be the last line of
     // the subject region, paid for out of the rows the records left over — and

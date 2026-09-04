@@ -292,7 +292,10 @@ fn a2_a_forged_engine_version_in_sigma_is_not_signed_over_in_silence() {
     let outcome = repairing
         .reissue_receipt(&id, AT, &signing_key())
         .expect("the re-issue road runs");
-    println!("A2_FORGED_SIGMA outcome={outcome:?} issued={:?}", issued.engine_version);
+    println!(
+        "A2_FORGED_SIGMA outcome={outcome:?} issued={:?}",
+        issued.engine_version
+    );
 
     match outcome {
         Reissued::Filed(receipt) => {

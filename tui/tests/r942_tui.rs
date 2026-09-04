@@ -2448,7 +2448,9 @@ fn p14_no_grid_header_stands_over_an_opened_record() {
     let header_rows = |text: &str| {
         text.lines()
             .filter(|line| {
-                line.contains("transformation") && line.contains("verdict") && !line.contains("gx1:")
+                line.contains("transformation")
+                    && line.contains("verdict")
+                    && !line.contains("gx1:")
             })
             .count()
     };
@@ -4924,9 +4926,9 @@ fn g30_the_order_of_letting_go_is_the_order_that_was_declared() {
                     selected: 0,
                     items: 28,
                     glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                    // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                    // these plans is resolved for a grid, so the default is the measurement.
+                    ..layout::Attention::default()
                 },
             );
             let mut given_up: Vec<RegionRole> = plan.dropped.clone();
@@ -5660,9 +5662,9 @@ fn ac12_the_draw_road_is_measured_cold_and_warm_at_five_shapes() {
                     selected: 0,
                     items: 28,
                     glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                    // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                    // these plans is resolved for a grid, so the default is the measurement.
+                    ..layout::Attention::default()
                 },
             );
             plans.push(started.elapsed().as_micros());
@@ -8109,9 +8111,9 @@ fn g58_the_column_set_does_not_move_when_the_attention_does() {
                 selected,
                 items: items.len(),
                 glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                // these plans is resolved for a grid, so the default is the measurement.
+                ..layout::Attention::default()
             },
         )
     };
@@ -8627,9 +8629,9 @@ fn g64_a_column_whose_every_value_is_nothing_is_not_drawn() {
                 selected: 0,
                 items: items.len(),
                 glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                // these plans is resolved for a grid, so the default is the measurement.
+                ..layout::Attention::default()
             },
         );
         let drawn: Vec<&str> = plan.columns.iter().map(|column| column.key).collect();
@@ -8927,9 +8929,9 @@ fn g65_what_the_rule_dropped_is_counted_on_the_screen_and_named_in_the_hatch() {
                 selected: 0,
                 items: items.len(),
                 glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                // these plans is resolved for a grid, so the default is the measurement.
+                ..layout::Attention::default()
             },
         );
         let (_, width_only) = layout::columns_for(width);
@@ -9407,9 +9409,9 @@ fn g73_the_standing_chrome_is_one_row_and_the_preamble_scrolls() {
                 selected: 0,
                 items: records,
                 glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                // these plans is resolved for a grid, so the default is the measurement.
+                ..layout::Attention::default()
             },
         );
         // Every row this face draws is either the standing chrome or the body. A third role with
@@ -9855,9 +9857,9 @@ fn g76_the_hatch_carries_what_the_standing_row_moved_there() {
                 selected: 0,
                 items: records,
                 glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                // these plans is resolved for a grid, so the default is the measurement.
+                ..layout::Attention::default()
             },
         );
         let wanted: Vec<(&str, String)> = vec![
@@ -10171,7 +10173,10 @@ fn g83_the_record_draws_its_members_in_a_declared_order() {
         "scope": "src/lib.rs",
     });
     let screen = Screen {
-        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        healthz: answered(
+            wire::ROUTES[0],
+            serde_json::from_str(HEALTHZ).expect("fixture parses"),
+        ),
         transformations: answered(
             wire::ROUTES[1],
             serde_json::json!({"items": [row], "next_cursor": null}),
@@ -10356,9 +10361,9 @@ fn ac13_the_record_road_is_measured_at_every_ruled_shape() {
                     selected: 0,
                     items: screen.transformations.items().len(),
                     glide: 0,
-            // [T-r58] the two record counts are read only for `Subject::Record`; every one of
-            // these plans is resolved for a grid, so the default is the measurement.
-            ..layout::Attention::default()
+                    // [T-r58] the two record counts are read only for `Subject::Record`; every one of
+                    // these plans is resolved for a grid, so the default is the measurement.
+                    ..layout::Attention::default()
                 },
             );
             plans.push(started.elapsed().as_micros());
@@ -10574,7 +10579,10 @@ fn g84_a_reading_is_not_believed_about_a_row_it_may_not_be_about() {
     );
 
     // S5. A `404` that is not this surface's refusal is not `NotHere`.
-    let engine_404 = held_answering(404, serde_json::json!({"title": "not found", "gx_code": "NOT_FOUND"}));
+    let engine_404 = held_answering(
+        404,
+        serde_json::json!({"title": "not found", "gx_code": "NOT_FOUND"}),
+    );
     let stranger_404 = held_answering(404, serde_json::json!({"error": "Not Found"}));
     assert_eq!(
         engine_404.receipt_mark(),
@@ -11137,7 +11145,10 @@ fn g86_the_marks_gather_without_collapsing_two_kinds_of_nothing() {
         "superseded_by": serde_json::Value::Null,
     });
     let screen = Screen {
-        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        healthz: answered(
+            wire::ROUTES[0],
+            serde_json::from_str(HEALTHZ).expect("fixture parses"),
+        ),
         transformations: answered(
             wire::ROUTES[1],
             serde_json::json!({"items": [row], "next_cursor": null}),
@@ -11332,7 +11343,10 @@ fn g87_the_record_face_stands_on_exactly_one_status_row() {
     // statement about the search rather than about the screen.
     let doubled = "1 of 40 | x\nsomething\n1 of 40 | x";
     assert_eq!(
-        doubled.lines().filter(|line| line.contains("1 of 40 | x")).count(),
+        doubled
+            .lines()
+            .filter(|line| line.contains("1 of 40 | x"))
+            .count(),
         2,
         "🔴 g87: the counting predicate cannot see two standing rows, so it cannot refuse them"
     );
@@ -11437,7 +11451,8 @@ fn g88_no_row_of_the_record_is_cut_without_the_cut_being_marked() {
     // `undo …` clipped to forty-six with nothing marking it.
     let clipped = "undo not from this face -- gx undo gx1:2hc4zanmdgh00";
     assert!(
-        clipped.ends_with(|c: char| c.is_ascii_alphanumeric()) && clipped.split_whitespace().count() > 1,
+        clipped.ends_with(|c: char| c.is_ascii_alphanumeric())
+            && clipped.split_whitespace().count() > 1,
         "🔴 g88: the predicate admits the row this gate was written from, so a green means nothing"
     );
 }
@@ -11642,7 +11657,10 @@ fn g90_the_price_of_a_ledger_row_is_the_row_that_is_drawn() {
             // the row. Every *other* set has to fit, and a second column appearing at a width that
             // cannot hold it is the defect this gate exists to refuse.
             if cells > width && drawn.len() > 1 {
-                over.push(format!("{width} vacant={label} drawn={cells} columns={}", drawn.len()));
+                over.push(format!(
+                    "{width} vacant={label} drawn={cells} columns={}",
+                    drawn.len()
+                ));
             }
             if cells > width && drawn.len() == 1 {
                 floored += 1;
@@ -11982,7 +12000,10 @@ fn r76_screen(inverse: serde_json::Value, superseded: serde_json::Value) -> Scre
         "superseded_by": superseded,
     });
     Screen {
-        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        healthz: answered(
+            wire::ROUTES[0],
+            serde_json::from_str(HEALTHZ).expect("fixture parses"),
+        ),
         transformations: answered(
             wire::ROUTES[1],
             serde_json::json!({"items": [row], "next_cursor": null}),
@@ -12101,7 +12122,12 @@ fn g94_one_address_is_drawn_once_and_two_addresses_are_both_drawn() {
 
     // ---- the predicate is three-valued, and the third value is not the second ------------------
     let item_of = |screen: &Screen| -> serde_json::Value {
-        screen.transformations.items().first().map(|item| (*item).clone()).expect("one row")
+        screen
+            .transformations
+            .items()
+            .first()
+            .map(|item| (*item).clone())
+            .expect("one row")
     };
     assert!(
         wire::supersede_agrees(&item_of(&same)),
@@ -12143,7 +12169,10 @@ fn g94_one_address_is_drawn_once_and_two_addresses_are_both_drawn() {
     // discipline was carried entirely by a doc comment. Planted below `R76_DECIDABLE` on purpose,
     // and the plant is printed before its count is believed.
     let planted_untestable = vec![
-        format!("inverse_status  Consumed {}~", &R76_UNDOER[..R76_DECIDABLE - 1]),
+        format!(
+            "inverse_status  Consumed {}~",
+            &R76_UNDOER[..R76_DECIDABLE - 1]
+        ),
         format!("superseded_by  {}~", &R76_UNDOER[..26]),
     ];
     println!("G94_PLANTED_UNTESTABLE={planted_untestable:?}");
@@ -12414,7 +12443,11 @@ fn g95_the_receipt_view_members_this_face_drops_are_named_in_full() {
     // meant to remove.
     let doorways = face
         .lines()
-        .filter(|line| wire::RECEIPT_VIEW_NOT_DRAWN.iter().any(|name| line.contains(name)))
+        .filter(|line| {
+            wire::RECEIPT_VIEW_NOT_DRAWN
+                .iter()
+                .any(|name| line.contains(name))
+        })
         .count();
     println!("G95_ROWS_CARRYING_THE_NAMES={doorways}");
     assert_eq!(
@@ -12526,11 +12559,13 @@ fn g95_the_receipt_view_members_this_face_drops_are_named_in_full() {
     let (_, beyond_after) = renderer::record_extent(&screen, &held, &opened(), 120);
     println!("G95_BEYOND_ROWS={beyond_after}");
     assert!(
-        face.lines().any(|line| line.starts_with(&format!("{} ", wire::RECEIPT_KEY_ID))),
+        face.lines()
+            .any(|line| line.starts_with(&format!("{} ", wire::RECEIPT_KEY_ID))),
         "🔴 g95: the names are not on the `key_id` row, so they are on a row this lane added and \
          the ledger paid for it\n{face}"
     );
-}/// **g96 -- what the columns only one record answered in cost, measured and left standing.**
+}
+/// **g96 -- what the columns only one record answered in cost, measured and left standing.**
 ///
 /// # 🔴 This gate exists because a brief asked for a change the canon refuses
 ///
@@ -12575,7 +12610,10 @@ fn g96_the_one_answer_column_keeps_its_place_and_its_price_is_printed() {
             (key, count)
         })
         .collect();
-    println!("G96_ANSWERED={answered:?} of {}", bed.transformations.items().len());
+    println!(
+        "G96_ANSWERED={answered:?} of {}",
+        bed.transformations.items().len()
+    );
     for (key, count) in &answered {
         assert_eq!(
             *count, 1,
@@ -12684,7 +12722,10 @@ fn g97_the_state_column_reads_an_object_and_the_two_null_inverse_rows_keep_a_roa
         ),
     ];
     let screen = Screen {
-        healthz: answered(wire::ROUTES[0], serde_json::from_str(HEALTHZ).expect("fixture parses")),
+        healthz: answered(
+            wire::ROUTES[0],
+            serde_json::from_str(HEALTHZ).expect("fixture parses"),
+        ),
         transformations: answered(
             wire::ROUTES[1],
             serde_json::json!({"items": rows, "next_cursor": null}),
@@ -12699,7 +12740,11 @@ fn g97_the_state_column_reads_an_object_and_the_two_null_inverse_rows_keep_a_roa
         ),
     };
     let items = screen.transformations.items();
-    assert_eq!(items.len(), 3, "🔴 g97: the bed is not the bed this gate was written for");
+    assert_eq!(
+        items.len(),
+        3,
+        "🔴 g97: the bed is not the bed this gate was written for"
+    );
 
     // ---- (a) the object is read, and no punctuation reaches the cell ---------------------------
     let aborted = renderer::cell_mark(items[0], wire::STATE_KEY).0;
@@ -12777,7 +12822,9 @@ fn g97_the_state_column_reads_an_object_and_the_two_null_inverse_rows_keep_a_roa
     assert!(
         wire::INVERSE_NULL_STATES
             .iter()
-            .any(|state| renderer::cell_mark(items[0], wire::STATE_KEY).0.starts_with(state)),
+            .any(|state| renderer::cell_mark(items[0], wire::STATE_KEY)
+                .0
+                .starts_with(state)),
         "🔴 g97: the aborted row's state is not one the declaration names, so the array and the \
          bed have drifted apart"
     );
@@ -12828,7 +12875,9 @@ fn g97_the_state_column_reads_an_object_and_the_two_null_inverse_rows_keep_a_roa
     let mut with_road = 0usize;
     for (width, height) in R76_SHAPES {
         let (road, counted, _, text) = probe(width, height);
-        census.push(format!("{width}x{height} state_drawn={road} counted={counted}"));
+        census.push(format!(
+            "{width}x{height} state_drawn={road} counted={counted}"
+        ));
         if road {
             with_road += 1;
         }
@@ -12841,7 +12890,10 @@ fn g97_the_state_column_reads_an_object_and_the_two_null_inverse_rows_keep_a_roa
              `--`, and no road back\n{text}"
         );
     }
-    println!("G97_ROAD={census:?} with_road={with_road}/{}", R76_SHAPES.len());
+    println!(
+        "G97_ROAD={census:?} with_road={with_road}/{}",
+        R76_SHAPES.len()
+    );
 
     // ---- (f) both arms of the disjunction have to be walked, and now both are ------------------
     // 🔴 On `[T-r76]`'s bed this read `with_road=7/7`: every green above was carried by `road`
@@ -12926,7 +12978,10 @@ fn g97_the_state_column_reads_an_object_and_the_two_null_inverse_rows_keep_a_roa
 #[test]
 fn g98_the_kind_of_nothing_a_judged_field_takes_is_read_from_the_state() {
     // ---- (1) the declaration, against the engine's own list -------------------------------------
-    let ruled: BTreeSet<&str> = wire::NULL_MEANING_BY_STATE.iter().map(|(name, _)| *name).collect();
+    let ruled: BTreeSet<&str> = wire::NULL_MEANING_BY_STATE
+        .iter()
+        .map(|(name, _)| *name)
+        .collect();
     assert_eq!(
         ruled.len(),
         wire::NULL_MEANING_BY_STATE.len(),
@@ -12947,7 +13002,10 @@ fn g98_the_kind_of_nothing_a_judged_field_takes_is_read_from_the_state() {
             // The third value. A checkout without the engine's source (a published crate, a partial
             // tree) cannot answer this, and a gate that quietly fell back to comparing the face
             // against itself would report the weaker answer as though it were the stronger one.
-            println!("G98_LIFECYCLE=UNTESTABLE reason={error} path={}", source.display());
+            println!(
+                "G98_LIFECYCLE=UNTESTABLE reason={error} path={}",
+                source.display()
+            );
         }
         Ok(text) => {
             let mut states: Vec<String> = Vec::new();
@@ -12997,7 +13055,11 @@ fn g98_the_kind_of_nothing_a_judged_field_takes_is_read_from_the_state() {
             // The remainder is printed rather than left silent: these are the states no reading has
             // been ruled for, and they keep the general classifier on purpose.
             let unruled: Vec<&&str> = declared.difference(&ruled).collect();
-            println!("G98_UNRULED_STATES={unruled:?} ruled={}/{}", ruled.len(), declared.len());
+            println!(
+                "G98_UNRULED_STATES={unruled:?} ruled={}/{}",
+                ruled.len(),
+                declared.len()
+            );
         }
     }
 
@@ -13266,7 +13328,11 @@ fn placement_numerals(text: &str) -> Vec<(usize, u64, String)> {
             while tail < line.len() && (line[tail].is_alphanumeric() || line[tail] == '_') {
                 tail += 1;
             }
-            let before = line[..start].iter().rev().find(|c| !c.is_whitespace()).copied();
+            let before = line[..start]
+                .iter()
+                .rev()
+                .find(|c| !c.is_whitespace())
+                .copied();
             let after = line[tail..].iter().find(|c| !c.is_whitespace()).copied();
             if before == Some('[') && after == Some(']') {
                 continue;
@@ -13503,7 +13569,11 @@ fn g104_a_scheme_moves_the_columns_a_narrow_screen_keeps() {
     // measures the *screen*. The two are different claims and this gate makes only the first.
     let width: u16 = 40;
     let grade = tokens::Grade::of(width);
-    assert_eq!(grade, tokens::Grade::Crammed, "40 cells is the crammed grade");
+    assert_eq!(
+        grade,
+        tokens::Grade::Crammed,
+        "40 cells is the crammed grade"
+    );
 
     let mut kept_by_scheme: Vec<(&'static str, Vec<&'static str>)> = Vec::new();
     for scheme in tokens::SCHEMES {
@@ -13570,7 +13640,10 @@ fn g105_a_fold_with_two_voices_keeps_every_value_and_its_count() {
     rows.push(vec!["?".to_string()]);
 
     let (kept_strict, folded_strict) = layout::resolve_folded(&[column], &rows, 1, 2);
-    println!("G105_STRICT kept={} folded={folded_strict:?}", kept_strict.len());
+    println!(
+        "G105_STRICT kept={} folded={folded_strict:?}",
+        kept_strict.len()
+    );
     assert_eq!(
         kept_strict.len(),
         1,
@@ -13580,7 +13653,10 @@ fn g105_a_fold_with_two_voices_keeps_every_value_and_its_count() {
     assert!(folded_strict.is_empty());
 
     let (kept_loose, folded_loose) = layout::resolve_folded(&[column], &rows, 3, 8);
-    println!("G105_LOOSE kept={} folded={folded_loose:?}", kept_loose.len());
+    println!(
+        "G105_LOOSE kept={} folded={folded_loose:?}",
+        kept_loose.len()
+    );
     assert!(kept_loose.is_empty());
     assert_eq!(folded_loose.len(), 1);
     let (key, tally) = &folded_loose[0];

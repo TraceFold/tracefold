@@ -42,7 +42,12 @@ async fn commit(server: &Server, goal: &str) -> String {
             Some(server.intent_body(goal, &actor)),
         )
         .await;
-    assert_eq!(created.status.as_u16(), 201, "create({goal}): {}", created.json);
+    assert_eq!(
+        created.status.as_u16(),
+        201,
+        "create({goal}): {}",
+        created.json
+    );
     let id = created.json["id"]
         .as_str()
         .expect("POST /v1/candidates returns the id")
@@ -51,12 +56,22 @@ async fn commit(server: &Server, goal: &str) -> String {
     let verified = client
         .send("POST", &format!("/v1/candidates/{id}/verify"), None)
         .await;
-    assert_eq!(verified.status.as_u16(), 200, "verify({goal}): {}", verified.json);
+    assert_eq!(
+        verified.status.as_u16(),
+        200,
+        "verify({goal}): {}",
+        verified.json
+    );
 
     let committed = client
         .send("POST", &format!("/v1/candidates/{id}/commit"), None)
         .await;
-    assert_eq!(committed.status.as_u16(), 200, "commit({goal}): {}", committed.json);
+    assert_eq!(
+        committed.status.as_u16(),
+        200,
+        "commit({goal}): {}",
+        committed.json
+    );
     id
 }
 
@@ -70,7 +85,10 @@ async fn undo(server: &Server, id: &str) -> (u16, String, serde_json::Value) {
             Some(serde_json::json!({})),
         )
         .await;
-    let minted = out.json["transformation"].as_str().unwrap_or_default().to_string();
+    let minted = out.json["transformation"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
     (out.status.as_u16(), minted, out.json)
 }
 
@@ -86,12 +104,23 @@ async fn dr891_1_parity_http_same_context_redo() {
     let server = Server::new("dr891_http_same_context", "V0\n");
 
     let t_o = commit(&server, "V1\n").await;
-    assert_eq!(server.target_contents(), "V1\n", "the first commit moved the world");
+    assert_eq!(
+        server.target_contents(),
+        "V1\n",
+        "the first commit moved the world"
+    );
 
     let (undo_o_status, t_u, undo_o_body) = undo(&server, &t_o).await;
     assert_eq!(undo_o_status, 200, "undo(T_o): {undo_o_body}");
-    assert!(!t_u.is_empty(), "the undo minted a transformation: {undo_o_body}");
-    assert_eq!(server.target_contents(), "V0\n", "the undo put the world back");
+    assert!(
+        !t_u.is_empty(),
+        "the undo minted a transformation: {undo_o_body}"
+    );
+    assert_eq!(
+        server.target_contents(),
+        "V0\n",
+        "the undo put the world back"
+    );
 
     let t_x = commit(&server, "V2\n").await;
     assert_eq!(server.target_contents(), "V2\n");
@@ -102,7 +131,11 @@ async fn dr891_1_parity_http_same_context_redo() {
         "the two undos differ in `parents`, so they are two transformations -- if these are equal \
          the rest of this probe is measuring nothing"
     );
-    assert_eq!(server.target_contents(), "V0\n", "the world is back at the fork");
+    assert_eq!(
+        server.target_contents(),
+        "V0\n",
+        "the world is back at the fork"
+    );
 
     // The redo: undo the first undo. On the pre-repair engine this is where CLI's DEFECT-891-1
     // showed as exit 6 NOT_FOUND, because the shared intent's `resolved` entry had been
@@ -161,7 +194,12 @@ async fn dr891_1_parity_http_different_context_control() {
             })),
         )
         .await;
-    assert_eq!(created.status.as_u16(), 201, "create(diff ctx): {}", created.json);
+    assert_eq!(
+        created.status.as_u16(),
+        201,
+        "create(diff ctx): {}",
+        created.json
+    );
     let cand_id = created.json["id"].as_str().expect("id").to_string();
     let verified = client
         .send("POST", &format!("/v1/candidates/{cand_id}/verify"), None)
@@ -256,8 +294,7 @@ async fn dr891_1_parity_http_after_restart_is_untestable_no_draft_archive() {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .expect("the body reads");
-    let body: serde_json::Value =
-        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
     let gx_code = body.get("gx_code").and_then(|v| v.as_str()).unwrap_or("");
     println!(
         "DR891_HTTP_RESTART status={status} gx_code={gx_code} untestable_reason=NoDrafts \

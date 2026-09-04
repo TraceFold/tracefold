@@ -9,7 +9,9 @@ mod support;
 
 use gx_core::VerdictKind;
 
-use support::{commit_receipt, issue, keypair, project, run, scratch, seed_ledger, verdict_payload, write_json};
+use support::{
+    commit_receipt, issue, keypair, project, run, scratch, seed_ledger, verdict_payload, write_json,
+};
 
 /// (g): `gx log checkpoint` was the one `LogCmd` leaf with no `--json`, though its siblings
 /// (`proof`/`consistency`) both have it and 44 §1.2's flag is vestigial on every other verb (accepted,
@@ -260,5 +262,9 @@ fn checkpoint_audit_reads_one_file_from_stdin() {
         stdout.trim(),
         stderr.trim()
     );
-    assert_eq!(out.status.code(), Some(0), "one file, no contradiction possible: {stderr}");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "one file, no contradiction possible: {stderr}"
+    );
 }

@@ -758,8 +758,12 @@ mod theorem_lemma_predicate {
 
     #[test]
     fn fixed_predicate_counts_stacked_and_comma_separated_attributes() {
-        assert!(is_decl("@[simp] @[reducible] theorem stacked_attrs : True := trivial"));
-        assert!(is_decl("@[simp, reducible] theorem comma_attrs : True := trivial"));
+        assert!(is_decl(
+            "@[simp] @[reducible] theorem stacked_attrs : True := trivial"
+        ));
+        assert!(is_decl(
+            "@[simp, reducible] theorem comma_attrs : True := trivial"
+        ));
     }
 
     #[test]
@@ -777,8 +781,12 @@ mod theorem_lemma_predicate {
         assert!(!is_decl(
             "   theorem is a word this sentence uses, not a declaration."
         ));
-        assert!(!is_decl("  @[simp] theorem indented_should_not_count : True := trivial"));
-        assert!(!is_decl("  lemma indented_should_not_count : True := trivial"));
+        assert!(!is_decl(
+            "  @[simp] theorem indented_should_not_count : True := trivial"
+        ));
+        assert!(!is_decl(
+            "  lemma indented_should_not_count : True := trivial"
+        ));
     }
 
     /// 🔴 negative control — an attribute whose body is not followed by `theorem`/`lemma` (e.g. a

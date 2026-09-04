@@ -112,7 +112,10 @@ fn w7_relearning_the_same_transformation_does_not_grow_the_chain() {
     index.learn(intent_id, t);
     index.learn(intent_id, t);
     index.learn(intent_id, t);
-    println!("W7_IDEMPOTENT chain_len={}", index.get_all(&intent_id).len());
+    println!(
+        "W7_IDEMPOTENT chain_len={}",
+        index.get_all(&intent_id).len()
+    );
     assert_eq!(index.get_all(&intent_id), &[t]);
 }
 

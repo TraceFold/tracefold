@@ -34,7 +34,9 @@ fn an_escrow_that_read_the_branch_tip_attests_it() {
     let adapter = fixture.git();
     let locator = gx_adapter_git::normalize(&fixture.sandbox().locator_on(BRANCH));
 
-    let pre = adapter.snapshot(&locator).expect("the sandbox holds this entry");
+    let pre = adapter
+        .snapshot(&locator)
+        .expect("the sandbox holds this entry");
     let delta = planned(adapter, &locator, GOAL);
     let outcome = adapter.invert(&delta, &pre).expect("invert answers");
 
@@ -54,7 +56,8 @@ fn an_escrow_that_read_the_branch_tip_attests_it() {
          denial of a read that happened (DEFECT-892-1, one substrate over from the fs adapter)"
     );
     let entry = &outcome.reads()[0];
-    let position = gx_adapter_git::locator::parse(&locator).expect("a planned delta's locator parses");
+    let position =
+        gx_adapter_git::locator::parse(&locator).expect("a planned delta's locator parses");
     assert_eq!(
         entry.locator,
         position.scope(),
@@ -75,7 +78,9 @@ fn the_attested_digest_is_the_prior_tip_and_not_the_goal() {
     let adapter = fixture.git();
     let locator = gx_adapter_git::normalize(&fixture.sandbox().locator_on(BRANCH));
 
-    let pre = adapter.snapshot(&locator).expect("the sandbox holds this entry");
+    let pre = adapter
+        .snapshot(&locator)
+        .expect("the sandbox holds this entry");
     let delta = planned(adapter, &locator, GOAL);
     let outcome = adapter.invert(&delta, &pre).expect("invert answers");
     let entry = outcome
@@ -135,7 +140,9 @@ fn the_entry_and_the_precondition_are_about_one_branch() {
     let adapter = fixture.git();
     let locator = gx_adapter_git::normalize(&fixture.sandbox().locator_on(BRANCH));
 
-    let pre = adapter.snapshot(&locator).expect("the sandbox holds this entry");
+    let pre = adapter
+        .snapshot(&locator)
+        .expect("the sandbox holds this entry");
     let fingerprint = adapter.precondition(&pre).expect("precondition answers");
     let delta = planned(adapter, &locator, GOAL);
     let outcome = adapter.invert(&delta, &pre).expect("invert answers");

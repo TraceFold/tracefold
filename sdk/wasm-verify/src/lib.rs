@@ -201,9 +201,8 @@ fn authenticate(
                 .map_err(|e| format!("checkpoint_key: checkpoint_public_key_base64: {e}"))?;
             let key = PublicKey::from_bytes(id.to_string(), &bytes)
                 .map_err(|e| format!("checkpoint_key: checkpoint_public_key_base64: {e}"))?;
-            gx_witness::dsse::verify_checkpoint(head, &key.verifying()).map_err(|e| {
-                format!("{}: {e}", gx_witness::dsse::CHECKPOINT_REFUSAL_PREFIX)
-            })?;
+            gx_witness::dsse::verify_checkpoint(head, &key.verifying())
+                .map_err(|e| format!("{}: {e}", gx_witness::dsse::CHECKPOINT_REFUSAL_PREFIX))?;
             Ok(true)
         }
         (Some(_), Some(_), None) => Err("checkpoint_key: a checkpoint key names the key a \

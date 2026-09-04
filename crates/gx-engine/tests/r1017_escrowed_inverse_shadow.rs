@@ -58,7 +58,9 @@ fn a_committed_row(name: &str) -> (std::path::PathBuf, TransformationId, Cid) {
     let i = intent("/tmp/target.txt", "after");
     engine.submit(&i, 42, AT).expect("submit");
     let id = engine.plan(&i, AT).expect("plan");
-    engine.verify(&id, AT, &signing_key(), None).expect("verify");
+    engine
+        .verify(&id, AT, &signing_key(), None)
+        .expect("verify");
     engine.canonicalize(&id, AT, None).expect("canonicalize");
     let state = engine.commit(&id, AT, &signing_key()).expect("commit runs");
 
@@ -124,7 +126,10 @@ fn a_reopened_engine_names_the_inverse_it_says_is_available() {
         .blobs()
         .get(&cid)
         .expect("42 §5: the escrowed body outlives the process that escrowed it");
-    println!("REOPENED_BODY={:?}", String::from_utf8_lossy(body.payload()));
+    println!(
+        "REOPENED_BODY={:?}",
+        String::from_utf8_lossy(body.payload())
+    );
     assert_eq!(
         body.reference().cid,
         cid,

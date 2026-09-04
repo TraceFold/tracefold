@@ -442,8 +442,7 @@ fn ac_070_the_ledger_digest_excludes_exactly_two_things() {
         .collect();
     let excluded: std::collections::BTreeSet<String> =
         std::iter::once("inclusion_proof".to_string()).collect();
-    let accounted: std::collections::BTreeSet<String> =
-        covered.union(&excluded).cloned().collect();
+    let accounted: std::collections::BTreeSet<String> = covered.union(&excluded).cloned().collect();
     println!(
         "AC070_LEDGER_DIGEST_COVERS={}_OF_{} EXCLUDED={:?}",
         covered.len(),

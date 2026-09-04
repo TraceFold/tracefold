@@ -105,7 +105,9 @@ fn store_and_decode_failures_are_reported_under_different_words() {
         decode_failure.stderr
     );
     assert!(
-        !decode_failure.stderr.contains("receipt store would not answer"),
+        !decode_failure
+            .stderr
+            .contains("receipt store would not answer"),
         "🔴 the regression this file exists to catch: `Error::Malformed` (the store answered, the \
          document did not decode) folded into `StoreUnreadable`'s wording would be the same \
          access/decode confusion DR-46-50 was filed to close, moved rather than fixed: {}",
@@ -132,7 +134,9 @@ fn store_and_decode_failures_are_reported_under_different_words() {
         store_failure.stderr
     );
     assert!(
-        store_failure.stderr.contains("receipt store would not answer"),
+        store_failure
+            .stderr
+            .contains("receipt store would not answer"),
         "`Error::Io` (nothing was read) is `WitnessMissing::StoreUnreadable`'s claim: {}",
         store_failure.stderr
     );

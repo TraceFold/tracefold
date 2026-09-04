@@ -65,7 +65,9 @@ fn undo_intent_disagrees_with_inverse_status_after_a_restart() {
         let i = intent("/tmp/undo_intent_shadow_gap.txt", "after");
         engine.submit(&i, 42, AT).expect("submit");
         let id = engine.plan(&i, AT).expect("plan");
-        engine.verify(&id, AT, &signing_key(), None).expect("verify");
+        engine
+            .verify(&id, AT, &signing_key(), None)
+            .expect("verify");
         engine.canonicalize(&id, AT, None).expect("canonicalize");
         let state = engine.commit(&id, AT, &signing_key()).expect("commit runs");
 
@@ -73,7 +75,10 @@ fn undo_intent_disagrees_with_inverse_status_after_a_restart() {
         assert_eq!(state, Lifecycle::Committed);
         assert_eq!(engine.inverse_status(&id), Some(InverseStatus::Available));
         assert!(
-            engine.undo_intent(&id).expect("live table, no error").is_some(),
+            engine
+                .undo_intent(&id)
+                .expect("live table, no error")
+                .is_some(),
             "the live process can build the undo's intent"
         );
         id
@@ -88,7 +93,10 @@ fn undo_intent_disagrees_with_inverse_status_after_a_restart() {
 
     let status = reopened.inverse_status(&id);
     let intent = reopened.undo_intent(&id).expect("no blob-store error");
-    println!("REOPENED status={status:?} undo_intent_is_some={}", intent.is_some());
+    println!(
+        "REOPENED status={status:?} undo_intent_is_some={}",
+        intent.is_some()
+    );
 
     assert_eq!(
         status,

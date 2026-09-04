@@ -26,8 +26,8 @@
 mod support;
 
 use gx_canon::cbor;
-use gx_witness::receipt::ReceiptPayload;
 use gx_core::VerdictKind;
+use gx_witness::receipt::ReceiptPayload;
 use support::{commit_payload, keypair, verdict_payload, FIXTURE_ENGINE_VERSION};
 
 fn inclusion() -> gx_core::InclusionProof {
